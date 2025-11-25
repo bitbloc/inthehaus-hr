@@ -8,7 +8,7 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 export default function AdminDashboard() {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedMonth, setSelectedMonth] = useState(format(new Date(), "yyyy-MM")); // ค่าเริ่มต้น: เดือนปัจจุบัน
+  const [selectedMonth, setSelectedMonth] = useState(format(new Date(), "yyyy-MM"));
   const [stats, setStats] = useState({ total: 0, late: 0, onTime: 0 });
 
   // ดึงข้อมูลเมื่อเลือกเดือนเปลี่ยน
@@ -16,9 +16,7 @@ export default function AdminDashboard() {
     fetchData();
   }, [selectedMonth]);
 
-  const fetchData = async () => {
-    setLoading(true);
-// เพิ่มฟังก์ชันนี้
+  // --- ฟังก์ชันส่งรายงาน (ตัวที่ Error เมื่อกี้) ---
   const handleSendReport = async () => {
     const confirm = window.confirm("ต้องการส่งรายงานสรุปเข้า LINE เดี๋ยวนี้เลยไหม?");
     if (!confirm) return;
@@ -34,14 +32,14 @@ export default function AdminDashboard() {
         alert("Error: " + e.message);
     }
   };
+  // ------------------------------------------
 
-  // ... useEffect & functions
-
-    // คำนวณวันเริ่มต้นและสิ้นสุดของเดือนที่เลือก
+  const fetchData = async () => {
+    setLoading(true);
+    
     const startDate = startOfMonth(parseISO(selectedMonth + "-01")).toISOString();
     const endDate = endOfMonth(parseISO(selectedMonth + "-01")).toISOString();
 
-    // ดึงข้อมูลจาก Supabase (Join ตาราง employees)
     const { data, error } = await supabase
       .from("attendance_logs")
       .select("*, employees(name, position)")
@@ -58,11 +56,9 @@ export default function AdminDashboard() {
     setLoading(false);
   };
 
-  // คำนวณสถิติเพื่อทำกราฟ
   const calculateStats = (data) => {
     let lateCount = 0;
     data.forEach(log => {
-        // สมมติว่าเข้างาน 08:00 (ถ้าจะแก้เวลาเข้างาน แก้เลข 8 ตรงนี้ครับ)
         const logTime = new Date(log.timestamp).getHours() * 60 + new Date(log.timestamp).getMinutes();
         const checkTime = 8 * 60; // 08:00 น.
         if (logTime > checkTime) lateCount++;
@@ -75,10 +71,9 @@ export default function AdminDashboard() {
     });
   };
 
-  // ข้อมูลสำหรับกราฟวงกลม
   const chartData = [
-    { name: "เข้างานปกติ", value: stats.onTime, color: "#10B981" }, // สีเขียว
-    { name: "มาสาย", value: stats.late, color: "#EF4444" },     // สีแดง
+    { name: "เข้างานปกติ", value: stats.onTime, color: "#10B981" }, 
+    { name: "มาสาย", value: stats.late, color: "#EF4444" },     
   ];
 
   return (
@@ -91,23 +86,24 @@ export default function AdminDashboard() {
             <h1 className="text-2xl font-bold text-gray-800">In the haus Dashboard ☕️</h1>
             <p className="text-gray-500 text-sm">ภาพรวมการลงเวลาพนักงาน</p>
           </div>
-          <div className="mt-4 md:mt-0 flex gap-2"> {/* เพิ่ม flex gap-2 ตรงนี้ */}
-            
-            {/* ปุ่มใหม่ ใส่ตรงนี้! */}
+          
+          <div className="mt-4 md:mt-0 flex flex-col md:flex-row gap-3 items-center">
+            {/* ปุ่มส่งรายงาน */}
             <button 
                 onClick={handleSendReport}
-                className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow transition"
+                className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow transition flex items-center"
             >
                 📢 ส่งสรุปเข้า LINE
             </button>
 
-            <div className="flex items-center"> {/* ห่อ input เดิมไว้ */}
+            {/* ช่องเลือกเดือน */}
+            <div className="flex items-center bg-gray-50 px-3 py-2 rounded-lg border border-gray-200">
                 <label className="mr-2 text-gray-600 text-sm font-medium">เลือกเดือน:</label>
                 <input 
                     type="month" 
                     value={selectedMonth}
                     onChange={(e) => setSelectedMonth(e.target.value)}
-                    className="border border-gray-300 rounded-lg px-4 py-2 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="bg-transparent text-gray-700 focus:outline-none text-sm"
                 />
             </div>
           </div>
@@ -115,7 +111,6 @@ export default function AdminDashboard() {
 
         {/* Stats Cards & Chart */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            {/* Card 1: สรุปตัวเลข */}
             <div className="bg-white p-6 rounded-2xl shadow-sm border-l-4 border-blue-500 flex flex-col justify-center">
                 <p className="text-gray-500">ลงเวลาทั้งหมด (ครั้ง)</p>
                 <h2 className="text-4xl font-bold text-gray-800 mt-2">{stats.total}</h2>
@@ -125,7 +120,6 @@ export default function AdminDashboard() {
                 </div>
             </div>
 
-            {/* Card 2: กราฟวงกลม */}
             <div className="bg-white p-4 rounded-2xl shadow-sm md:col-span-2 flex items-center justify-center">
                 <ResponsiveContainer width="100%" height={200}>
                     <PieChart>
@@ -177,7 +171,7 @@ export default function AdminDashboard() {
                         ) : (
                             logs.map((log) => {
                                 const logDate = parseISO(log.timestamp);
-                                const isLate = logDate.getHours() * 60 + logDate.getMinutes() > 8 * 60; // เช็คสายอีกรอบตอน render
+                                const isLate = logDate.getHours() * 60 + logDate.getMinutes() > 8 * 60; 
 
                                 return (
                                 <tr key={log.id} className="hover:bg-gray-50 transition">
