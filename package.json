@@ -12,9 +12,11 @@
     "@line/bot-sdk": "^10.5.0",
     "@line/liff": "^2.27.3",
     "@supabase/supabase-js": "^2.84.0",
+    "date-fns": "^4.1.0",
     "next": "16.0.4",
     "react": "19.2.0",
-    "react-dom": "19.2.0"
+    "react-dom": "19.2.0",
+    "recharts": "^3.5.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
