@@ -12,7 +12,7 @@ export default function CheckIn() {
   // 🔴 1. แก้พิกัดร้านตรงนี้ (ไปดูวิธีหาพิกัดด้านล่าง)
   const SHOP_LAT = 17.390110564180162; 
   const SHOP_LONG = 104.79292673153263;
-  const ALLOWED_RADIUS_KM = 0.05; // 0.05 กม. = 50 เมตร
+  const ALLOWED_RADIUS_KM = 500; // 0.05 กม. = 50 เมตร
   // -------------------------------------------------------
 
   useEffect(() => {
@@ -125,7 +125,9 @@ export default function CheckIn() {
         <p className="mb-2 text-lg font-medium text-gray-700">
             {profile ? profile.displayName : "Loading..."}
         </p>
-
+        <p className="mb-4 text-xs text-gray-400 bg-gray-100 p-2 rounded select-all">
+    {profile ? profile.userId : ""}
+</p>
         {/* สถานะ GPS */}
         <div className={`p-3 rounded-lg mb-6 text-sm font-semibold ${status.includes('✅') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
             {status}
