@@ -9,8 +9,8 @@ export default function CheckIn() {
   const [debugMsg, setDebugMsg] = useState("");
 
   // --- ตั้งค่าพิกัดร้าน ---
-  const SHOP_LAT = 17.400000; // แก้เป็นเลขจริงของคุณ
-  const SHOP_LONG = 104.700000; // แก้เป็นเลขจริงของคุณ
+  const SHOP_LAT = 17.390223187001645; // แก้เป็นเลขจริงของคุณ
+  const SHOP_LONG = 104.79300183338273; // แก้เป็นเลขจริงของคุณ
   const ALLOWED_RADIUS_KM = 0.05; // 0.05 = 50 เมตร
   // --------------------
 
