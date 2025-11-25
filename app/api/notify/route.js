@@ -10,42 +10,67 @@ const client = new Client({
 
 export async function POST(request) {
   try {
-    // 1. ดึงข้อมูลการลงเวลาของ "วันนี้"
+    // 1. กำหนดช่วงเวลา "วันนี้" (00:00 - 23:59)
     const today = new Date();
-    today.setHours(0, 0, 0, 0); // เริ่มต้นวัน 00:00
+    today.setHours(0, 0, 0, 0); 
     const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1); // วันพรุ่งนี้
+    tomorrow.setDate(tomorrow.getDate() + 1);
 
+    // 2. ดึงข้อมูล Log + ชื่อพนักงาน + เวลาเข้างานของกะ (shifts)
     const { data: logs, error } = await supabase
       .from('attendance_logs')
-      .select('*, employees(name)')
+      .select('*, employees(name, shifts(name, start_time))')
       .gte('timestamp', today.toISOString())
       .lt('timestamp', tomorrow.toISOString());
 
-    if (error) throw error;
+    if (error) {
+      console.error("Supabase Error:", error);
+      throw error;
+    }
 
-    // 2. สรุปข้อมูล
+    // 3. ประมวลผลข้อมูล (นับจำนวน / เช็คสายตามกะ)
     const total = logs.length;
     let lateCount = 0;
-    let onTimeCount = 0;
     let names = [];
 
     logs.forEach(log => {
       const logDate = new Date(log.timestamp);
-      // เช็คสาย (08:00)
-      if (logDate.getHours() * 60 + logDate.getMinutes() > 8 * 60) {
+      
+      // ดึงเวลาเริ่มงานจากกะ (ถ้าไม่มีกะ ให้ Default เป็น 08:00)
+      const shiftStart = log.employees?.shifts?.start_time || "08:00";
+      const shiftName = log.employees?.shifts?.name || "";
+
+      // แปลงเวลาเข้างานของกะ เป็นนาที (เช่น 10:30 -> 630 นาที)
+      const [sHour, sMin] = shiftStart.split(':').map(Number);
+      const shiftLimitMinutes = sHour * 60 + sMin;
+
+      // แปลงเวลาที่พนักงานมาจริง เป็นนาที
+      const actualMinutes = logDate.getHours() * 60 + logDate.getMinutes();
+
+      // จัดรูปแบบเวลาให้สวยงาม (เช่น 9:5 -> 09:05)
+      const timeString = `${String(logDate.getHours()).padStart(2, '0')}:${String(logDate.getMinutes()).padStart(2, '0')}`;
+
+      // เปรียบเทียบเวลา
+      if (actualMinutes > shiftLimitMinutes) {
         lateCount++;
-        names.push(`🔴 ${log.employees?.name} (สาย ${logDate.getHours()}:${logDate.getMinutes()})`);
+        names.push({
+            text: `🔴 ${log.employees?.name} (สาย ${timeString})`,
+            sub: `กะ: ${shiftName} (${shiftStart})`,
+            color: '#ff5555'
+        });
       } else {
-        onTimeCount++;
-        names.push(`🟢 ${log.employees?.name} (ปกติ)`);
+        names.push({
+            text: `🟢 ${log.employees?.name} (ปกติ ${timeString})`,
+            sub: `กะ: ${shiftName}`,
+            color: '#555555'
+        });
       }
     });
 
-    // 3. เตรียมข้อความที่จะส่ง
+    // 4. สร้างข้อความ Flex Message สวยๆ
     const message = {
       type: 'flex',
-      altText: 'สรุปการลงเวลาวันนี้',
+      altText: `สรุปการลงเวลาประจำวันที่ ${new Date().toLocaleDateString('th-TH')}`,
       contents: {
         type: 'bubble',
         header: {
@@ -60,6 +85,7 @@ export async function POST(request) {
           type: 'box',
           layout: 'vertical',
           contents: [
+            // ส่วนสรุปยอดรวม
             {
               type: 'box',
               layout: 'horizontal',
@@ -79,21 +105,32 @@ export async function POST(request) {
             },
             { type: 'separator', margin: 'lg' },
             { type: 'text', text: 'รายชื่อ:', margin: 'lg', weight: 'bold', size: 'sm' },
-            // เอา list รายชื่อมาใส่ตรงนี้
-            ...names.map(n => ({ type: 'text', text: n, size: 'xs', margin: 'sm', color: '#555555' }))
+            
+            // Loop รายชื่อใส่เข้าไป
+            ...names.map(item => ({
+                type: 'box',
+                layout: 'vertical',
+                margin: 'sm',
+                contents: [
+                    { type: 'text', text: item.text, size: 'xs', color: item.color, weight: item.color === '#ff5555' ? 'bold' : 'regular' },
+                    { type: 'text', text: item.sub, size: 'xxs', color: '#aaaaaa', margin: 'xs', offsetStart: '18px' }
+                ]
+            }))
           ]
         }
       }
     };
 
-    // 4. ส่งข้อความ (Broadcast หาทุกคนที่เป็นเพื่อนกับบอท)
-    // *หมายเหตุ: ถ้าอยากส่งหาแค่ผู้บริหาร ต้องเปลี่ยน method เป็น pushMessage แล้วใส่ UserID ผู้บริหาร
-    await client.broadcast([message]);
-
-    return NextResponse.json({ success: true });
+    // 5. ส่งข้อความ (Broadcast)
+    if (total > 0) {
+        await client.broadcast([message]);
+        return NextResponse.json({ success: true, message: "Report sent" });
+    } else {
+        return NextResponse.json({ success: true, message: "No attendance data today" });
+    }
 
   } catch (error) {
-    console.error(error);
+    console.error("API Error:", error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
