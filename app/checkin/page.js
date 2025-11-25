@@ -6,27 +6,24 @@ import { supabase } from "../../lib/supabaseClient";
 export default function CheckIn() {
   const [status, setStatus] = useState("กำลังระบุตำแหน่ง...");
   const [profile, setProfile] = useState(null);
-  const [debugMsg, setDebugMsg] = useState(""); // เอาไว้ดู Error
+  const [debugMsg, setDebugMsg] = useState("");
 
-  // -------------------------------------------------------
-  // 🔴 1. แก้พิกัดร้านตรงนี้ (ไปดูวิธีหาพิกัดด้านล่าง)
-  const SHOP_LAT = 17.390110564180162; 
-  const SHOP_LONG = 104.79292673153263;
-  const ALLOWED_RADIUS_KM = 0.05; // 0.05 กม. = 50 เมตร
-  // -------------------------------------------------------
+  // --- ตั้งค่าพิกัดร้าน ---
+  const SHOP_LAT = 17.400000; // แก้เป็นเลขจริงของคุณ
+  const SHOP_LONG = 104.700000; // แก้เป็นเลขจริงของคุณ
+  const ALLOWED_RADIUS_KM = 0.05; // 0.05 = 50 เมตร
+  // --------------------
 
   useEffect(() => {
     const initLiff = async () => {
       try {
-        // เริ่มต้น LIFF
         await liff.init({ liffId: process.env.NEXT_PUBLIC_LIFF_ID });
-        
         if (!liff.isLoggedIn()) {
           liff.login();
         } else {
           const userProfile = await liff.getProfile();
           setProfile(userProfile);
-          getLocation(); // ดึง User Profile เสร็จแล้วค่อยขอ GPS
+          getLocation();
         }
       } catch (error) {
         setStatus("LIFF Error");
@@ -38,7 +35,6 @@ export default function CheckIn() {
 
   const getLocation = () => {
     if (navigator.geolocation) {
-      // ขอพิกัด GPS
       navigator.geolocation.getCurrentPosition(success, error);
     } else {
       setStatus("Browser ไม่รองรับ GPS");
@@ -48,11 +44,8 @@ export default function CheckIn() {
   const success = (position) => {
     const lat = position.coords.latitude;
     const long = position.coords.longitude;
-    
-    // คำนวณระยะทาง
     const dist = getDistanceFromLatLonInKm(lat, long, SHOP_LAT, SHOP_LONG);
     
-    // เช็คว่าอยู่ในระยะไหม?
     if (dist <= ALLOWED_RADIUS_KM) {
       setStatus(`✅ อยู่ในพื้นที่ร้าน (ห่าง ${dist.toFixed(3)} กม.)`);
     } else {
@@ -65,12 +58,16 @@ export default function CheckIn() {
     setDebugMsg(err.message);
   };
 
-  // ฟังก์ชันกดปุ่มบันทึก
-  const handleCheckIn = async () => {
+  // --- ฟังก์ชันบันทึก + แจ้งเตือน ---
+  const handleCheckIn = async (actionType) => { 
     if (!profile) return;
+    
+    const confirmMsg = actionType === 'check_in' ? "ยืนยันการ เข้างาน?" : "ยืนยันการ ออกงาน?";
+    if (!confirm(confirmMsg)) return;
+
     setStatus("กำลังบันทึก...");
     
-    // 1. หา ID พนักงานจาก Line User ID ในฐานข้อมูล
+    // 1. หา ID พนักงาน
     const { data: emp, error: searchError } = await supabase
       .from('employees')
       .select('id, name')
@@ -83,22 +80,37 @@ export default function CheckIn() {
         return;
     }
 
-    // 2. บันทึกลงตาราง Log
+    // 2. บันทึกลง Log
     const { error: insertError } = await supabase.from('attendance_logs').insert({
         employee_id: emp.id,
-        action_type: 'check_in',
-        // สามารถเพิ่ม field location ตรงนี้ถ้าต้องการเก็บพิกัดจริง
+        action_type: actionType,
     });
 
     if (!insertError) {
-        alert(`✅ บันทึกเวลาสำเร็จ! สวัสดีคุณ ${emp.name}`);
-        liff.closeWindow(); // ปิดหน้าต่างให้อัตโนมัติ
+        // 3. ยิงแจ้งเตือน Realtime
+        const now = new Date();
+        const timeString = `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
+        
+        try {
+            await fetch('/api/notify-realtime', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: emp.name,
+                    action: actionType,
+                    time: timeString,
+                    locationStatus: status
+                })
+            });
+        } catch (e) { console.error("Notify Error", e); }
+
+        alert(`✅ บันทึก ${actionType === 'check_in' ? 'เข้างาน' : 'ออกงาน'} สำเร็จ!`);
+        liff.closeWindow();
     } else {
         alert("บันทึกผิดพลาด: " + insertError.message);
     }
   };
 
-  // --- สูตรคำนวณระยะทาง (Haversine Formula) ---
   function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
     var R = 6371; 
     var dLat = deg2rad(lat2-lat1);
@@ -110,14 +122,12 @@ export default function CheckIn() {
   }
   function deg2rad(deg) { return deg * (Math.PI/180); }
 
-  // --- ส่วนแสดงผลหน้าจอ (UI) ---
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4 font-sans text-center">
       <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-sm">
         <h1 className="text-2xl font-bold mb-2 text-gray-800">In the haus</h1>
         <p className="text-gray-500 mb-6 text-sm">ระบบลงเวลาเข้างาน</p>
         
-        {/* รูปโปรไฟล์ LINE */}
         {profile && (
             <img src={profile.pictureUrl} alt="Profile" className="w-20 h-20 rounded-full mx-auto mb-4 border-4 border-blue-100" />
         )}
@@ -125,25 +135,29 @@ export default function CheckIn() {
         <p className="mb-2 text-lg font-medium text-gray-700">
             {profile ? profile.displayName : "Loading..."}
         </p>
-        <p className="mb-4 text-xs text-gray-400 bg-gray-100 p-2 rounded select-all">
-    {profile ? profile.userId : ""}
-</p>
-        {/* สถานะ GPS */}
+
         <div className={`p-3 rounded-lg mb-6 text-sm font-semibold ${status.includes('✅') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
             {status}
         </div>
         
-        {/* ปุ่มกด (จะโชว์เฉพาะตอนอยู่ในพื้นที่) */}
+        {/* แสดงปุ่มเมื่ออยู่ในพื้นที่ */}
         {status.includes('✅') && (
-            <button 
-                onClick={handleCheckIn}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl shadow-lg transition transform active:scale-95"
-            >
-                📍 กดลงเวลาเข้างาน
-            </button>
+            <div className="flex flex-col gap-3 w-full">
+                <button 
+                    onClick={() => handleCheckIn('check_in')}
+                    className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-xl shadow-lg transition transform active:scale-95 flex items-center justify-center"
+                >
+                    🟢 เข้างาน (Check In)
+                </button>
+                <button 
+                    onClick={() => handleCheckIn('check_out')}
+                    className="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-4 rounded-xl shadow-lg transition transform active:scale-95 flex items-center justify-center"
+                >
+                    🔴 ออกงาน (Check Out)
+                </button>
+            </div>
         )}
 
-        {/* Debug Area (เอาไว้ดู Error ถ้ามี) */}
         {debugMsg && <p className="text-xs text-red-400 mt-4 break-words">{debugMsg}</p>}
       </div>
     </div>
