@@ -1,3 +1,30 @@
+{/* Header Section */}
+        <div className="flex flex-col md:flex-row justify-between items-center mb-8 bg-white p-6 rounded-2xl shadow-sm">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">In the haus Dashboard ☕️</h1>
+            <p className="text-gray-500 text-sm">ภาพรวมการลงเวลาพนักงาน</p>
+          </div>
+          <div className="mt-4 md:mt-0 flex gap-2"> {/* เพิ่ม flex gap-2 ตรงนี้ */}
+            
+            {/* ปุ่มใหม่ ใส่ตรงนี้! */}
+            <button 
+                onClick={handleSendReport}
+                className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow transition"
+            >
+                📢 ส่งสรุปเข้า LINE
+            </button>
+
+            <div className="flex items-center"> {/* ห่อ input เดิมไว้ */}
+                <label className="mr-2 text-gray-600 text-sm font-medium">เลือกเดือน:</label>
+                <input 
+                    type="month" 
+                    value={selectedMonth}
+                    onChange={(e) => setSelectedMonth(e.target.value)}
+                    className="border border-gray-300 rounded-lg px-4 py-2 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+            </div>
+          </div>
+        </div>
 "use client";
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
@@ -18,7 +45,25 @@ export default function AdminDashboard() {
 
   const fetchData = async () => {
     setLoading(true);
-    
+// เพิ่มฟังก์ชันนี้
+  const handleSendReport = async () => {
+    const confirm = window.confirm("ต้องการส่งรายงานสรุปเข้า LINE เดี๋ยวนี้เลยไหม?");
+    if (!confirm) return;
+
+    try {
+        const res = await fetch('/api/notify', { method: 'POST' });
+        if (res.ok) {
+            alert("✅ ส่งรายงานเรียบร้อยแล้ว!");
+        } else {
+            alert("❌ ส่งไม่ผ่าน มีบางอย่างผิดพลาด");
+        }
+    } catch (e) {
+        alert("Error: " + e.message);
+    }
+  };
+
+  // ... useEffect & functions
+
     // คำนวณวันเริ่มต้นและสิ้นสุดของเดือนที่เลือก
     const startDate = startOfMonth(parseISO(selectedMonth + "-01")).toISOString();
     const endDate = endOfMonth(parseISO(selectedMonth + "-01")).toISOString();
