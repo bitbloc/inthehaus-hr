@@ -9,9 +9,9 @@ export default function CheckIn() {
   const [debugMsg, setDebugMsg] = useState("");
 
   // --- ตั้งค่าพิกัดร้าน ---
-  const SHOP_LAT = 17.390223187001645; // แก้เป็นเลขจริงของคุณ
-  const SHOP_LONG = 104.79300183338273; // แก้เป็นเลขจริงของคุณ
-  const ALLOWED_RADIUS_KM = 0.05; // 0.05 = 50 เมตร
+  const SHOP_LAT = 17.400000; // 🔴 อย่าลืมแก้พิกัดตรงนี้ให้เป็นร้านคุณนะครับ
+  const SHOP_LONG = 104.700000; 
+  const ALLOWED_RADIUS_KM = 0.05; // 50 เมตร
   // --------------------
 
   useEffect(() => {
@@ -58,7 +58,6 @@ export default function CheckIn() {
     setDebugMsg(err.message);
   };
 
-  // --- ฟังก์ชันบันทึก + แจ้งเตือน ---
   const handleCheckIn = async (actionType) => { 
     if (!profile) return;
     
@@ -67,7 +66,6 @@ export default function CheckIn() {
 
     setStatus("กำลังบันทึก...");
     
-    // 1. หา ID พนักงาน
     const { data: emp, error: searchError } = await supabase
       .from('employees')
       .select('id, name')
@@ -80,17 +78,15 @@ export default function CheckIn() {
         return;
     }
 
-    // 2. บันทึกลง Log
     const { error: insertError } = await supabase.from('attendance_logs').insert({
         employee_id: emp.id,
         action_type: actionType,
     });
 
     if (!insertError) {
-        // 3. ยิงแจ้งเตือน Realtime
+        // ยิงแจ้งเตือน Realtime
         const now = new Date();
         const timeString = `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
-        
         try {
             await fetch('/api/notify-realtime', {
                 method: 'POST',
@@ -136,11 +132,17 @@ export default function CheckIn() {
             {profile ? profile.displayName : "Loading..."}
         </p>
 
+        {/* ✅✅✅ ส่วนแสดง User ID สำหรับลงทะเบียน ✅✅✅ */}
+        <div className="mb-4 bg-gray-100 p-2 rounded-lg text-xs text-gray-500 break-all font-mono select-all border border-gray-200">
+            <span className="font-bold text-gray-400 block mb-1">YOUR ID:</span>
+            {profile ? profile.userId : "กำลังดึงข้อมูล..."}
+        </div>
+        {/* ------------------------------------------------ */}
+
         <div className={`p-3 rounded-lg mb-6 text-sm font-semibold ${status.includes('✅') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
             {status}
         </div>
         
-        {/* แสดงปุ่มเมื่ออยู่ในพื้นที่ */}
         {status.includes('✅') && (
             <div className="flex flex-col gap-3 w-full">
                 <button 
