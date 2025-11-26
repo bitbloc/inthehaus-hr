@@ -6,33 +6,45 @@ const client = new Client({
   channelSecret: process.env.CHANNEL_SECRET,
 });
 
+// รองรับ GET: เอาไว้เปิดใน Browser เพื่อเช็คว่า Link ไม่เสีย
+export async function GET(request) {
+  return NextResponse.json({ status: "Webhook is active!" });
+}
+
+// รองรับ POST: อันนี้ที่ LINE ใช้ยิงเข้ามา
 export async function POST(request) {
   try {
     const body = await request.json();
+    
+    // ✅ ดักจับกรณี LINE กดปุ่ม Verify (มันจะไม่มี events ส่งมา)
+    if (!body.events || body.events.length === 0) {
+      console.log("LINE Webhook verified!");
+      return NextResponse.json({ success: true, message: "Webhook verified" });
+    }
+
     const events = body.events;
 
-    // วนลูปเช็คทุกข้อความที่ส่งมา
+    // วนลูปเช็คทุกข้อความ
     for (const event of events) {
-      // ถ้าเป็นข้อความตัวอักษร
       if (event.type === 'message' && event.message.type === 'text') {
         const text = event.message.text.toLowerCase().trim();
 
-        // ถ้าพิมพ์คำว่า "id" หรือ "checkid"
+        // เช็คคำสั่ง "id"
         if (text === 'id' || text === 'checkid') {
           const userId = event.source.userId;
-          
-          // ตอบกลับ User ID
           await client.replyMessage(event.replyToken, {
             type: 'text',
-            text: `รหัสพนักงานของคุณคือ:\n\n${userId}\n\n(Copy รหัสนี้ส่งให้ Admin เพื่อลงทะเบียน)`
+            text: `รหัสพนักงานของคุณคือ:\n${userId}`
           });
         }
       }
     }
 
     return NextResponse.json({ success: true });
+
   } catch (error) {
-    console.error(error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    console.error("Webhook Error:", error);
+    // ส่ง 200 OK กลับไปหลอก LINE เสมอ เพื่อไม่ให้มันฟ้อง Error (แม้หลังบ้านจะพัง)
+    return NextResponse.json({ success: false }, { status: 200 }); 
   }
 }
