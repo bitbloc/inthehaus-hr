@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { supabase } from '../../../lib/supabaseClient';
 import { Client } from '@line/bot-sdk';
 
+// ✅ ใส่ Group ID ของร้าน
+const GROUP_ID = 'Cc2c65da5408563ef57ae61dee6ce3c1d';
+
 const client = new Client({
   channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN,
   channelSecret: process.env.CHANNEL_SECRET,
@@ -9,26 +12,18 @@ const client = new Client({
 
 export async function POST(request) {
   try {
-    // 1. ดึงข้อมูลตารางงาน (เฉพาะคนที่มีกะ ไม่เอาวันหยุด)
-    // Join 3 ตาราง: Schedule -> Employees -> Shifts
     const { data: schedules } = await supabase
       .from('employee_schedules')
       .select('day_of_week, employees(name), shifts(name, start_time, end_time)')
-      .eq('is_off', false) // เอาเฉพาะวันที่มาทำงาน
-      .order('day_of_week', { ascending: true }); // เรียง จันทร์-อาทิตย์
+      .eq('is_off', false)
+      .order('day_of_week', { ascending: true });
 
-    if (!schedules || schedules.length === 0) {
-        return NextResponse.json({ message: "ไม่พบตารางงาน" });
-    }
+    if (!schedules || schedules.length === 0) return NextResponse.json({ message: "ไม่พบตาราง" });
 
-    // 2. จัดกลุ่มตามวัน (0=อาทิตย์, 1=จันทร์ ...)
     const daysTitle = ["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์"];
     const rosterByDay = {};
-    
-    // เตรียมกล่องใส่ข้อมูลแต่ละวัน
     daysTitle.forEach((_, index) => rosterByDay[index] = []);
 
-    // เอาข้อมูลหยอดลงกล่อง
     schedules.forEach(item => {
         rosterByDay[item.day_of_week].push({
             name: item.employees?.name,
@@ -37,16 +32,10 @@ export async function POST(request) {
         });
     });
 
-    // 3. สร้างชิ้นส่วนข้อความ (Flex Message Components)
     const contents = [];
-    
-    // หัวข้อ
-    contents.push({
-        type: 'text', text: '📅 ตารางงานสัปดาห์นี้', weight: 'bold', size: 'xl', color: '#1DB446', align: 'center'
-    });
+    contents.push({ type: 'text', text: '📅 ตารางงานสัปดาห์นี้', weight: 'bold', size: 'xl', color: '#1DB446', align: 'center' });
     contents.push({ type: 'separator', margin: 'md' });
 
-    // วนลูปสร้างตารางทีละวัน (เรียง จันทร์ -> อาทิตย์ ตามมาตรฐานทำงาน)
     const dayOrder = [1, 2, 3, 4, 5, 6, 0]; 
 
     dayOrder.forEach(dayIndex => {
@@ -54,55 +43,37 @@ export async function POST(request) {
         const staffList = rosterByDay[dayIndex];
 
         if (staffList.length > 0) {
-            // หัวข้อวัน (เช่น "จันทร์")
             contents.push({
-                type: 'box',
-                layout: 'horizontal',
-                margin: 'lg',
+                type: 'box', layout: 'horizontal', margin: 'lg',
                 contents: [
-                    { type: 'text', text: dayName, weight: 'bold', size: 'sm', color: '#333333', flex: 2 }, // ชื่อวันสีเข้ม
+                    { type: 'text', text: dayName, weight: 'bold', size: 'sm', color: '#333333', flex: 2 },
                     { type: 'text', text: `${staffList.length} คน`, size: 'xs', color: '#aaaaaa', align: 'end', flex: 1 }
                 ]
             });
-
-            // รายชื่อพนักงานในวันนั้น
             staffList.forEach(staff => {
                 contents.push({
-                    type: 'box',
-                    layout: 'horizontal',
-                    margin: 'xs',
+                    type: 'box', layout: 'horizontal', margin: 'xs',
                     contents: [
                         { type: 'text', text: `• ${staff.name}`, size: 'xs', color: '#555555', flex: 3 },
-                        { type: 'text', text: `${staff.shift}`, size: 'xs', color: '#007bff', align: 'end', flex: 2 } // สีฟ้าคือกะ
+                        { type: 'text', text: `${staff.shift}`, size: 'xs', color: '#007bff', align: 'end', flex: 2 }
                     ]
                 });
             });
-            
-            // เส้นขีดคั่นวัน
             contents.push({ type: 'separator', margin: 'sm' });
         }
     });
 
-    // 4. ประกอบร่างเป็น Message
     const message = {
       type: 'flex',
       altText: '📅 ตารางงานสัปดาห์นี้ออกแล้ว!',
-      contents: {
-        type: 'bubble',
-        body: {
-          type: 'box',
-          layout: 'vertical',
-          contents: contents
-        }
-      }
+      contents: { type: 'bubble', body: { type: 'box', layout: 'vertical', contents: contents } }
     };
 
-    // 5. ส่งเข้ากลุ่ม
-    await client.broadcast([message]);
+    // ✅ เปลี่ยนจาก broadcast เป็น pushMessage ระบุกลุ่ม
+    await client.pushMessage(GROUP_ID, [message]);
     return NextResponse.json({ success: true });
 
   } catch (error) {
-    console.error(error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

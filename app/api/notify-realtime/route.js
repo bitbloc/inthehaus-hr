@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { Client } from '@line/bot-sdk';
 
+// ✅ ใส่ Group ID ของร้าน
+const GROUP_ID = 'Cc2c65da5408563ef57ae61dee6ce3c1d';
+
 const client = new Client({
   channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN,
   channelSecret: process.env.CHANNEL_SECRET,
@@ -10,9 +13,8 @@ export async function POST(request) {
   try {
     const { name, action, time, locationStatus } = await request.json();
 
-    // เลือกสีและคำพูดตามการกระทำ
     const isCheckIn = action === 'check_in';
-    const color = isCheckIn ? '#06c755' : '#ff334b'; // เขียว / แดง
+    const color = isCheckIn ? '#06c755' : '#ff334b'; 
     const title = isCheckIn ? '🟢 ลงเวลาเข้างาน' : '🔴 ลงเวลาออกงาน';
 
     const message = {
@@ -41,7 +43,9 @@ export async function POST(request) {
       }
     };
 
-    await client.broadcast([message]); 
+    // ✅ เปลี่ยนจาก broadcast เป็น pushMessage ระบุกลุ่ม
+    await client.pushMessage(GROUP_ID, [message]); 
+    
     return NextResponse.json({ success: true });
 
   } catch (error) {

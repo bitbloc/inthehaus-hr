@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { Client } from '@line/bot-sdk';
 
+// ✅ ใส่ Group ID ของร้าน
+const GROUP_ID = 'Cc2c65da5408563ef57ae61dee6ce3c1d';
+
 const client = new Client({
   channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN,
   channelSecret: process.env.CHANNEL_SECRET,
@@ -9,9 +12,7 @@ const client = new Client({
 export async function POST(request) {
   try {
     const { shiftName } = await request.json(); 
-    
-    // ลิงก์ LIFF ของคุณ (ตามที่คุณให้มา)
-    const liffUrl = "https://liff.line.me/2008567449-W868y8RY";
+    const liffUrl = "https://liff.line.me/2008567449-W868y8RY"; // ลิงก์ LIFF เดิมของคุณ
 
     const message = {
       type: 'flex',
@@ -19,8 +20,7 @@ export async function POST(request) {
       contents: {
         type: 'bubble',
         body: {
-          type: 'box',
-          layout: 'vertical',
+          type: 'box', layout: 'vertical',
           contents: [
             { type: 'text', text: '⏰ ได้เวลาลงเวลาเข้างาน!', weight: 'bold', size: 'lg', color: '#1DB446' },
             { type: 'text', text: `สำหรับพนักงาน "${shiftName}"`, weight: 'bold', size: 'md', margin: 'md' },
@@ -28,25 +28,14 @@ export async function POST(request) {
           ]
         },
         footer: {
-          type: 'box',
-          layout: 'vertical',
-          contents: [
-            {
-              type: 'button',
-              style: 'primary',
-              color: '#06c755',
-              action: {
-                type: 'uri',
-                label: '📍 กดลงเวลาที่นี่',
-                uri: liffUrl
-              }
-            }
-          ]
+          type: 'box', layout: 'vertical',
+          contents: [{ type: 'button', style: 'primary', color: '#06c755', action: { type: 'uri', label: '📍 กดลงเวลาที่นี่', uri: liffUrl } }]
         }
       }
     };
 
-    await client.broadcast([message]);
+    // ✅ เปลี่ยนจาก broadcast เป็น pushMessage ระบุกลุ่ม
+    await client.pushMessage(GROUP_ID, [message]);
     return NextResponse.json({ success: true });
 
   } catch (error) {
