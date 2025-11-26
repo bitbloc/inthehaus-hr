@@ -7,10 +7,13 @@ export default function CheckIn() {
   const [status, setStatus] = useState("กำลังระบุตำแหน่ง...");
   const [profile, setProfile] = useState(null);
   const [debugMsg, setDebugMsg] = useState("");
+  
+  // State สำหรับเปิด/ปิด การแสดง User ID
+  const [showId, setShowId] = useState(false);
 
   // --- ตั้งค่าพิกัดร้าน ---
-  const SHOP_LAT = 17.400000; // 🔴 อย่าลืมแก้พิกัดตรงนี้ให้เป็นร้านคุณนะครับ
-  const SHOP_LONG = 104.700000; 
+  const SHOP_LAT = 17.390110564180162; // 🔴 อย่าลืมแก้พิกัดตรงนี้ให้เป็นร้านคุณนะครับ
+  const SHOP_LONG = 104.79292673153263; 
   const ALLOWED_RADIUS_KM = 0.05; // 50 เมตร
   // --------------------
 
@@ -128,16 +131,29 @@ export default function CheckIn() {
             <img src={profile.pictureUrl} alt="Profile" className="w-20 h-20 rounded-full mx-auto mb-4 border-4 border-blue-100" />
         )}
         
-        <p className="mb-2 text-lg font-medium text-gray-700">
+        <p className="mb-1 text-lg font-medium text-gray-700">
             {profile ? profile.displayName : "Loading..."}
         </p>
 
-        {/* ✅✅✅ ส่วนแสดง User ID สำหรับลงทะเบียน ✅✅✅ */}
-        <div className="mb-4 bg-gray-100 p-2 rounded-lg text-xs text-gray-500 break-all font-mono select-all border border-gray-200">
-            <span className="font-bold text-gray-400 block mb-1">YOUR ID:</span>
-            {profile ? profile.userId : "กำลังดึงข้อมูล..."}
+        {/* ✅✅✅ ส่วนปุ่ม Toggle ซ่อน/แสดง ID ✅✅✅ */}
+        <div className="mb-6">
+            <button 
+                onClick={() => setShowId(!showId)}
+                className="text-xs text-blue-500 hover:text-blue-700 underline mb-2 cursor-pointer"
+            >
+                {showId ? "ซ่อน ID" : "แสดง ID สำหรับลงทะเบียน"}
+            </button>
+
+            {showId && (
+                <div className="bg-slate-100 p-3 rounded-lg border border-slate-200 text-left animate-fade-in-down">
+                    <p className="text-[10px] text-gray-400 font-bold uppercase mb-1">Your Line User ID:</p>
+                    <p className="text-xs font-mono text-slate-700 break-all select-all">
+                        {profile ? profile.userId : "กำลังโหลด..."}
+                    </p>
+                </div>
+            )}
         </div>
-        {/* ------------------------------------------------ */}
+        {/* ------------------------------------------- */}
 
         <div className={`p-3 rounded-lg mb-6 text-sm font-semibold ${status.includes('✅') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
             {status}
