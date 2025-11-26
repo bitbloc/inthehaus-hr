@@ -7,21 +7,18 @@ import { th } from "date-fns/locale";
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("dashboard");
   
-  // Data States
   const [logs, setLogs] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [shifts, setShifts] = useState([]);
-  const [schedules, setSchedules] = useState({}); // เก็บตารางเวรเพื่อเอาไปเทียบ
+  const [schedules, setSchedules] = useState({});
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), "yyyy-MM"));
   const [stats, setStats] = useState({ total: 0 });
   
-  // New States
   const [newEmp, setNewEmp] = useState({ name: "", position: "", line_user_id: "" });
   const [selectedEmpId, setSelectedEmpId] = useState("ALL");
   const [individualLogs, setIndividualLogs] = useState([]);
   const [individualStats, setIndividualStats] = useState({ present: 0, late: 0, check_out: 0 });
 
-  // Init Data (โหลดทุกอย่างทีเดียวตอนเข้าเว็บ)
   useEffect(() => {
     fetchShifts();
     fetchEmployees();
@@ -34,12 +31,10 @@ export default function AdminDashboard() {
     if (activeTab === "history" && selectedEmpId !== "ALL") fetchIndividualLogs();
   }, [activeTab, selectedMonth, selectedEmpId]);
 
-  // --- API Fetching ---
   const fetchShifts = async () => { const { data } = await supabase.from("shifts").select("*").order("id"); setShifts(data || []); };
   const fetchEmployees = async () => { const { data } = await supabase.from("employees").select("*").order("id"); setEmployees(data || []); };
   
   const fetchSchedules = async () => {
-    // ดึงตารางงานรวม Join ข้อมูลกะมาด้วยเลย
     const { data } = await supabase.from("employee_schedules").select("*, shifts(name, start_time, end_time)");
     const scheduleMap = {};
     data?.forEach(s => {
@@ -83,7 +78,6 @@ export default function AdminDashboard() {
     setIndividualStats({ present: checkInCount, late: lateCount, check_out: checkOutCount });
   };
 
-  // --- Actions ---
   const handleUpdateShift = async (id, field, value) => { await supabase.from("shifts").update({ [field]: value }).eq("id", id); fetchShifts(); };
   const handleUpdateSchedule = async (empId, day, shiftId, isOff) => {
     const payload = { employee_id: empId, day_of_week: day, shift_id: isOff ? null : shiftId, is_off: isOff };
@@ -97,22 +91,30 @@ export default function AdminDashboard() {
   };
   const handleDeleteEmployee = async (id) => { if(confirm("ลบ?")) { await supabase.from("employees").delete().eq("id", id); fetchEmployees(); } };
   
-  // Notification Buttons
   const handleNotify = async (api) => { if(confirm("ยืนยันส่ง?")) await fetch(api, { method: 'POST' }); };
-  const handleRemindShift = async (shiftName) => { if(confirm(`เรียก ${shiftName}?`)) await fetch('/api/remind-shift', { method: 'POST', body: JSON.stringify({ shiftName }) }); };
   
-  // New Action: ประกาศตารางงาน
+  // ✅ อัปเดตฟังก์ชันเรียกกะ ให้รับ type (check_in / check_out)
+  const handleRemindShift = async (shiftName, type) => {
+     const actionText = type === 'check_out' ? 'ออกงาน' : 'เข้างาน';
+     if(!confirm(`ต้องการเรียก "${shiftName}" ${actionText}?`)) return;
+     
+     await fetch('/api/remind-shift', { 
+        method: 'POST',
+        body: JSON.stringify({ shiftName, type }), // ส่ง type ไปด้วย
+        headers: { 'Content-Type': 'application/json' }
+     });
+     alert("ส่งแจ้งเตือนเรียบร้อย!");
+  };
+  
   const handleNotifySchedule = async () => {
-     if(!confirm("ต้องการประกาศตารางงานสัปดาห์นี้เข้า LINE กลุ่ม?")) return;
-     try { await fetch('/api/notify-schedule', { method: 'POST' }); alert("✅ ประกาศเรียบร้อย!"); } 
-     catch(e) { alert("Error: " + e.message); }
+     if(!confirm("ประกาศตารางงาน?")) return;
+     try { await fetch('/api/notify-schedule', { method: 'POST' }); alert("✅ เรียบร้อย!"); } catch(e) {}
   };
 
-  // Helper: ดึงข้อมูลกะจาก Log โดยเทียบกับตารางเวร (Schedules)
   const getShiftInfoForLog = (log) => {
       if (!log || !schedules[log.employee_id]) return null;
       const date = new Date(log.timestamp);
-      const dayOfWeek = date.getDay(); // 0=อาทิตย์
+      const dayOfWeek = date.getDay(); 
       return schedules[log.employee_id][dayOfWeek]; 
   };
 
@@ -122,23 +124,19 @@ export default function AdminDashboard() {
     <div className="min-h-screen bg-gray-50 font-sans p-4 md:p-6">
       <div className="max-w-6xl mx-auto bg-white min-h-[90vh] rounded-2xl shadow-lg flex flex-col border border-gray-100">
         
-        {/* Navbar */}
         <div className="border-b px-6 py-4 flex flex-col md:flex-row justify-between items-center bg-white sticky top-0 z-20 shadow-sm">
             <h1 className="text-xl font-bold text-gray-800 mb-2 md:mb-0">In the haus HR 🏠</h1>
             <div className="flex bg-gray-100 p-1 rounded-lg shadow-inner overflow-x-auto">
                 {['dashboard', 'history', 'roster', 'employees', 'settings'].map(t => (
-                    <button key={t} onClick={() => setActiveTab(t)}
-                        className={`px-3 py-2 rounded-md text-sm font-medium transition whitespace-nowrap ${activeTab === t ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>
+                    <button key={t} onClick={() => setActiveTab(t)} className={`px-3 py-2 rounded-md text-sm font-medium transition whitespace-nowrap ${activeTab === t ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>
                         {t === 'dashboard' ? '📊 ภาพรวม' : t === 'history' ? '👤 ประวัติ' : t === 'roster' ? '📅 ตารางงาน' : t === 'employees' ? '👥 พนักงาน' : '⚙️ กะงาน'}
                     </button>
                 ))}
             </div>
         </div>
 
-        {/* Content */}
         <div className="p-6 flex-1 bg-white">
             
-            {/* --- TAB 1: DASHBOARD --- */}
             {activeTab === 'dashboard' && (
                 <div className="space-y-6">
                     <div className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border">
@@ -148,51 +146,47 @@ export default function AdminDashboard() {
                         </div>
                     </div>
                     
-                    {/* Control Panel */}
                     <div className="bg-white p-4 rounded-xl shadow-sm border">
                         <h3 className="text-xs font-bold text-gray-400 mb-3 uppercase">🔔 Control Panel</h3>
-                        <div className="flex gap-2 overflow-x-auto pb-2">
+                        <div className="flex flex-wrap gap-3">
+                            {/* ✅ วนลูปสร้างปุ่ม เข้า/ออก สำหรับทุกกะ */}
                             {shifts.map(s => (
-                                <button key={s.id} onClick={() => handleRemindShift(s.name)} className="bg-blue-50 text-blue-700 px-3 py-2 rounded font-bold text-xs whitespace-nowrap border border-blue-200">📢 เรียก {s.name}</button>
+                                <div key={s.id} className="flex flex-col gap-1 bg-gray-50 p-2 rounded border">
+                                    <span className="text-xs font-bold text-center text-gray-500 mb-1">{s.name}</span>
+                                    <div className="flex gap-1">
+                                        <button onClick={() => handleRemindShift(s.name, 'check_in')} className="bg-blue-100 text-blue-700 px-2 py-1 rounded font-bold text-xs hover:bg-blue-200">☀️ เข้า</button>
+                                        <button onClick={() => handleRemindShift(s.name, 'check_out')} className="bg-gray-200 text-gray-700 px-2 py-1 rounded font-bold text-xs hover:bg-gray-300">🌙 ออก</button>
+                                    </div>
+                                </div>
                             ))}
-                            <button onClick={() => handleNotify('/api/notify')} className="bg-green-50 text-green-700 px-3 py-2 rounded font-bold text-xs whitespace-nowrap border border-green-200">✅ สรุปคนมา</button>
-                            <button onClick={() => handleNotify('/api/notify-absence')} className="bg-red-50 text-red-700 px-3 py-2 rounded font-bold text-xs whitespace-nowrap border border-red-200">⚠️ ตามคนขาด</button>
+                            
+                            <div className="w-px bg-gray-200 mx-2"></div> {/* เส้นคั่น */}
+
+                            <button onClick={() => handleNotify('/api/notify')} className="bg-green-50 text-green-700 px-3 py-2 rounded font-bold text-xs border border-green-200 h-fit self-center">✅ สรุปคนมา</button>
+                            <button onClick={() => handleNotify('/api/notify-absence')} className="bg-red-50 text-red-700 px-3 py-2 rounded font-bold text-xs border border-red-200 h-fit self-center">⚠️ ตามคนขาด</button>
                         </div>
                     </div>
 
-                    {/* Latest Logs Table (UPDATED) */}
                     <div>
                         <h3 className="font-bold text-gray-700 mb-3 pl-3 border-l-4 border-blue-500">Log ล่าสุด</h3>
                         <div className="overflow-x-auto rounded-lg border">
                             <table className="w-full text-sm text-left">
                                 <thead className="bg-gray-100 text-gray-600 uppercase text-xs">
-                                    <tr>
-                                        <th className="p-3">เวลา</th>
-                                        <th className="p-3">ชื่อ</th>
-                                        <th className="p-3">สถานะ</th>
-                                        <th className="p-3 text-blue-600">กะของวันนี้</th> {/* แสดงกะ */}
-                                    </tr>
+                                    <tr><th className="p-3">เวลา</th><th className="p-3">ชื่อ</th><th className="p-3">สถานะ</th><th className="p-3 text-blue-600">กะของวันนี้</th></tr>
                                 </thead>
                                 <tbody className="divide-y">
                                     {logs.slice(0, 20).map(log => {
                                         const schedule = getShiftInfoForLog(log);
                                         return (
                                             <tr key={log.id} className="hover:bg-gray-50">
-                                                <td className="p-3 border-r font-mono text-gray-600">
-                                                    {format(parseISO(log.timestamp), "d MMM HH:mm", { locale: th })}
-                                                </td>
+                                                <td className="p-3 border-r font-mono text-gray-600">{format(parseISO(log.timestamp), "d MMM HH:mm", { locale: th })}</td>
                                                 <td className="p-3 font-bold text-gray-700">{log.employees?.name}</td>
                                                 <td className="p-3">
-                                                    {log.action_type === 'check_in' 
-                                                        ? <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold">เข้างาน 🟢</span> 
-                                                        : <span className="bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-bold">ออกงาน 🔴</span>}
+                                                    {log.action_type === 'check_in' ? <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold">เข้างาน 🟢</span> : <span className="bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-bold">ออกงาน 🔴</span>}
                                                 </td>
                                                 <td className="p-3 text-xs">
                                                     {schedule?.shifts ? (
-                                                        <div>
-                                                            <div className="font-bold text-blue-600">{schedule.shifts.name}</div>
-                                                            <div className="text-gray-400">{schedule.shifts.start_time} - {schedule.shifts.end_time}</div>
-                                                        </div>
+                                                        <div><div className="font-bold text-blue-600">{schedule.shifts.name}</div><div className="text-gray-400">{schedule.shifts.start_time} - {schedule.shifts.end_time}</div></div>
                                                     ) : <span className="text-gray-300">- ไม่ระบุ -</span>}
                                                 </td>
                                             </tr>
@@ -205,7 +199,6 @@ export default function AdminDashboard() {
                 </div>
             )}
 
-            {/* --- TAB 2: HISTORY --- */}
             {activeTab === 'history' && (
                 <div className="space-y-4">
                     <div className="flex gap-4 bg-gray-50 p-4 rounded-xl border">
@@ -223,7 +216,7 @@ export default function AdminDashboard() {
                                         <tr key={log.id} className="bg-white">
                                             <td className="p-3">{format(parseISO(log.timestamp), "d MMM", { locale: th })}</td>
                                             <td className="p-3">{format(parseISO(log.timestamp), "HH:mm")}</td>
-                                            <td className="p-3">{log.action_type}</td>
+                                            <td className="p-3">{log.action_type === 'check_in' ? '🟢 เข้า' : '🔴 ออก'}</td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -233,7 +226,6 @@ export default function AdminDashboard() {
                 </div>
             )}
 
-             {/* --- TAB 3: ROSTER --- */}
              {activeTab === 'roster' && (
                 <div>
                      <div className="flex justify-between items-center mb-4 bg-yellow-50 p-4 rounded-lg border border-yellow-200">
@@ -243,10 +235,7 @@ export default function AdminDashboard() {
                     <div className="overflow-x-auto rounded-lg border shadow-sm">
                         <table className="w-full text-sm border-collapse">
                             <thead>
-                                <tr>
-                                    <th className="p-3 text-left min-w-[150px] bg-gray-100 border-b">พนักงาน</th>
-                                    {days.map(d => <th key={d} className="p-3 bg-gray-50 border text-center min-w-[100px]">{d}</th>)}
-                                </tr>
+                                <tr><th className="p-3 text-left min-w-[150px] bg-gray-100 border-b">พนักงาน</th>{days.map(d => <th key={d} className="p-3 bg-gray-50 border text-center min-w-[100px]">{d}</th>)}</tr>
                             </thead>
                             <tbody>
                                 {employees.map(emp => (
@@ -273,7 +262,6 @@ export default function AdminDashboard() {
                 </div>
             )}
             
-            {/* --- TAB 4: EMPLOYEES --- */}
             {activeTab === 'employees' && (
                 <div className="grid md:grid-cols-3 gap-8">
                     <div className="bg-white p-6 rounded-xl border h-fit">
@@ -294,7 +282,6 @@ export default function AdminDashboard() {
                 </div>
             )}
 
-            {/* --- TAB 5: SETTINGS --- */}
              {activeTab === 'settings' && (
                 <div className="max-w-xl mx-auto space-y-4">
                     <h3 className="font-bold">⚙️ ตั้งค่าเวลากะงาน</h3>
@@ -308,7 +295,6 @@ export default function AdminDashboard() {
                             </div>
                         </div>
                     ))}
-                    <div className="text-xs text-gray-500 bg-green-50 p-3 rounded">✅ เปลี่ยนแล้วระบบบันทึกทันที และจะใช้เวลานี้ในการแจ้งเตือนครั้งถัดไป</div>
                 </div>
             )}
         </div>
