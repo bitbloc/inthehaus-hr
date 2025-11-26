@@ -7,11 +7,14 @@ export default function CheckIn() {
   const [status, setStatus] = useState("กำลังระบุตำแหน่ง...");
   const [profile, setProfile] = useState(null);
   const [debugMsg, setDebugMsg] = useState("");
+  
+  // State สำหรับเปิด/ปิด การแสดง User ID
+  const [showId, setShowId] = useState(false);
 
   // --- ตั้งค่าพิกัดร้าน ---
-  const SHOP_LAT = 17.400000; // แก้เป็นพิกัดจริง
+  const SHOP_LAT = 17.400000; // 🔴 อย่าลืมแก้พิกัดตรงนี้ให้เป็นร้านคุณนะครับ
   const SHOP_LONG = 104.700000; 
-  const ALLOWED_RADIUS_KM = 0.05; 
+  const ALLOWED_RADIUS_KM = 0.05; // 50 เมตร
   // --------------------
 
   useEffect(() => {
@@ -26,7 +29,8 @@ export default function CheckIn() {
           getLocation();
         }
       } catch (error) {
-        setStatus("LIFF Error: " + error.message);
+        setStatus("LIFF Error");
+        setDebugMsg(error.message);
       }
     };
     initLiff();
@@ -54,15 +58,26 @@ export default function CheckIn() {
 
   const error = (err) => {
     setStatus("ไม่สามารถดึง GPS ได้");
+    setDebugMsg(err.message);
   };
 
   const handleCheckIn = async (actionType) => { 
     if (!profile) return;
     
-    // Check ก่อนว่าลงทะเบียนหรือยัง
-    const { data: emp } = await supabase.from('employees').select('id, name').eq('line_user_id', profile.userId).single();
-    if (!emp) {
-        alert(`❌ คุณยังไม่ได้ลงทะเบียน!\nUser ID ของคุณคือ: ${profile.userId}\n(กรุณาส่งรหัสนี้ให้ Admin)`);
+    const confirmMsg = actionType === 'check_in' ? "ยืนยันการ เข้างาน?" : "ยืนยันการ ออกงาน?";
+    if (!confirm(confirmMsg)) return;
+
+    setStatus("กำลังบันทึก...");
+    
+    const { data: emp, error: searchError } = await supabase
+      .from('employees')
+      .select('id, name')
+      .eq('line_user_id', profile.userId)
+      .single();
+
+    if (searchError || !emp) {
+        alert("❌ ไม่พบชื่อคุณในระบบ! (กรุณาลงทะเบียนพนักงานก่อน)");
+        setStatus("ไม่พบข้อมูลพนักงาน");
         return;
     }
 
@@ -72,15 +87,26 @@ export default function CheckIn() {
     });
 
     if (!insertError) {
-        // ยิงแจ้งเตือน (ถ้ามี)
+        // ยิงแจ้งเตือน Realtime
         const now = new Date();
         const timeString = `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
-        try { await fetch('/api/notify-realtime', { method: 'POST', body: JSON.stringify({ name: emp.name, action: actionType, time: timeString, locationStatus: status }) }); } catch (e) {}
-        
-        alert(`✅ บันทึกสำเร็จ!`);
+        try {
+            await fetch('/api/notify-realtime', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: emp.name,
+                    action: actionType,
+                    time: timeString,
+                    locationStatus: status
+                })
+            });
+        } catch (e) { console.error("Notify Error", e); }
+
+        alert(`✅ บันทึก ${actionType === 'check_in' ? 'เข้างาน' : 'ออกงาน'} สำเร็จ!`);
         liff.closeWindow();
     } else {
-        alert("บันทึกผิดพลาด");
+        alert("บันทึกผิดพลาด: " + insertError.message);
     }
   };
 
@@ -88,7 +114,8 @@ export default function CheckIn() {
     var R = 6371; 
     var dLat = deg2rad(lat2-lat1);
     var dLon = deg2rad(lon2-lon1); 
-    var a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat1)) * Math.sin(dLon/2) * Math.sin(dLon/2); 
+    var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat1)) * Math.sin(dLon/2) * Math.sin(dLon/2); 
     var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
     return R * c; 
   }
@@ -96,31 +123,60 @@ export default function CheckIn() {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4 font-sans text-center">
-      <div className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-sm">
+      <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-sm">
+        <h1 className="text-2xl font-bold mb-2 text-gray-800">In the haus</h1>
+        <p className="text-gray-500 mb-6 text-sm">ระบบลงเวลาเข้างาน</p>
         
-        {/* ✅✅✅ ส่วนแสดง ID แบบชัดเจนที่สุด (อยู่บนสุด) ✅✅✅ */}
-        <div className="bg-red-50 border-2 border-red-500 p-3 rounded-xl mb-4 text-left">
-            <p className="text-red-600 font-bold text-xs uppercase mb-1">🔥 YOUR USER ID (COPY THIS):</p>
-            <p className="font-mono text-sm break-all select-all bg-white border border-red-200 p-2 rounded">
-                {profile ? profile.userId : "Loading..."}
-            </p>
+        {profile && (
+            <img src={profile.pictureUrl} alt="Profile" className="w-20 h-20 rounded-full mx-auto mb-4 border-4 border-blue-100" />
+        )}
+        
+        <p className="mb-1 text-lg font-medium text-gray-700">
+            {profile ? profile.displayName : "Loading..."}
+        </p>
+
+        {/* ✅✅✅ ส่วนปุ่ม Toggle ซ่อน/แสดง ID ✅✅✅ */}
+        <div className="mb-6">
+            <button 
+                onClick={() => setShowId(!showId)}
+                className="text-xs text-blue-500 hover:text-blue-700 underline mb-2 cursor-pointer"
+            >
+                {showId ? "ซ่อน ID" : "แสดง ID สำหรับลงทะเบียน"}
+            </button>
+
+            {showId && (
+                <div className="bg-slate-100 p-3 rounded-lg border border-slate-200 text-left animate-fade-in-down">
+                    <p className="text-[10px] text-gray-400 font-bold uppercase mb-1">Your Line User ID:</p>
+                    <p className="text-xs font-mono text-slate-700 break-all select-all">
+                        {profile ? profile.userId : "กำลังโหลด..."}
+                    </p>
+                </div>
+            )}
         </div>
-        {/* -------------------------------------------------- */}
+        {/* ------------------------------------------- */}
 
-        <h1 className="text-xl font-bold mb-2 text-gray-800">In the haus</h1>
-        {profile && <img src={profile.pictureUrl} className="w-16 h-16 rounded-full mx-auto mb-2" />}
-        <p className="mb-4 font-bold text-gray-700">{profile?.displayName}</p>
-
-        <div className={`p-3 rounded-lg mb-4 text-sm font-semibold ${status.includes('✅') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
+        <div className={`p-3 rounded-lg mb-6 text-sm font-semibold ${status.includes('✅') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
             {status}
         </div>
         
         {status.includes('✅') && (
-            <div className="flex flex-col gap-3">
-                <button onClick={() => handleCheckIn('check_in')} className="bg-green-600 text-white font-bold py-3 rounded-xl shadow-lg">🟢 เข้างาน</button>
-                <button onClick={() => handleCheckIn('check_out')} className="bg-red-500 text-white font-bold py-3 rounded-xl shadow-lg">🔴 ออกงาน</button>
+            <div className="flex flex-col gap-3 w-full">
+                <button 
+                    onClick={() => handleCheckIn('check_in')}
+                    className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-xl shadow-lg transition transform active:scale-95 flex items-center justify-center"
+                >
+                    🟢 เข้างาน (Check In)
+                </button>
+                <button 
+                    onClick={() => handleCheckIn('check_out')}
+                    className="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-4 rounded-xl shadow-lg transition transform active:scale-95 flex items-center justify-center"
+                >
+                    🔴 ออกงาน (Check Out)
+                </button>
             </div>
         )}
+
+        {debugMsg && <p className="text-xs text-red-400 mt-4 break-words">{debugMsg}</p>}
       </div>
     </div>
   );
