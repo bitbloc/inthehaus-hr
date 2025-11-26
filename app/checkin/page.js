@@ -124,36 +124,40 @@ export default function CheckIn() {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4 font-sans text-center">
       <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-sm">
-        <h1 className="text-2xl font-bold mb-2 text-gray-800">In the haus</h1>
-        <p className="text-gray-500 mb-6 text-sm">ระบบลงเวลาเข้างาน</p>
         
+        {/* ... (ส่วนหัวข้อ In the haus เหมือนเดิม) ... */}
+        <h1 className="text-2xl font-bold mb-2 text-gray-800">In the haus</h1>
+        
+        {/* รูปโปรไฟล์ */}
         {profile && (
             <img src={profile.pictureUrl} alt="Profile" className="w-20 h-20 rounded-full mx-auto mb-4 border-4 border-blue-100" />
         )}
         
-        <p className="mb-1 text-lg font-medium text-gray-700">
-            {profile ? profile.displayName : "Loading..."}
+        {/* ชื่อ LINE */}
+        <p className="mb-4 text-lg font-medium text-gray-700">
+            {profile ? profile.displayName : "กำลังโหลดข้อมูล..."}
         </p>
 
-        {/* ✅✅✅ ส่วนปุ่ม Toggle ซ่อน/แสดง ID ✅✅✅ */}
-        <div className="mb-6">
-            <button 
-                onClick={() => setShowId(!showId)}
-                className="text-xs text-blue-500 hover:text-blue-700 underline mb-2 cursor-pointer"
-            >
-                {showId ? "ซ่อน ID" : "แสดง ID สำหรับลงทะเบียน"}
-            </button>
-
-            {showId && (
-                <div className="bg-slate-100 p-3 rounded-lg border border-slate-200 text-left animate-fade-in-down">
-                    <p className="text-[10px] text-gray-400 font-bold uppercase mb-1">Your Line User ID:</p>
-                    <p className="text-xs font-mono text-slate-700 break-all select-all">
-                        {profile ? profile.userId : "กำลังโหลด..."}
-                    </p>
-                </div>
-            )}
+        {/* ✅✅✅ แก้ใหม่: ให้โชว์กล่อง ID เลย ไม่ต้องกดปุ่ม ✅✅✅ */}
+        <div className="mb-6 bg-blue-50 border-2 border-blue-200 border-dashed p-4 rounded-xl">
+            <p className="text-xs font-bold text-blue-500 uppercase mb-2">👇 รหัสพนักงานของคุณ (Copy ไปให้ Admin)</p>
+            <p className="text-sm font-mono font-bold text-slate-700 break-all select-all bg-white p-2 rounded border">
+                {profile ? profile.userId : "..."}
+            </p>
         </div>
-        {/* ------------------------------------------- */}
+        {/* --------------------------------------------------- */}
+
+        {/* ... (ส่วนปุ่ม Check-in สีเขียว/แดง เหมือนเดิม) ... */}
+        <div className={`p-3 rounded-lg mb-6 text-sm font-semibold ${status.includes('✅') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
+            {status}
+        </div>
+        
+        {/* ... (ปุ่มกดด้านล่างเหมือนเดิม) ... */}
+        {/* ... */}
+
+      </div>
+    </div>
+  );
 
         <div className={`p-3 rounded-lg mb-6 text-sm font-semibold ${status.includes('✅') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
             {status}
