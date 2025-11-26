@@ -6,37 +6,57 @@ const client = new Client({
   channelSecret: process.env.CHANNEL_SECRET,
 });
 
-// รองรับ GET: เอาไว้เปิดใน Browser เพื่อเช็คว่า Link ไม่เสีย
-export async function GET(request) {
-  return NextResponse.json({ status: "Webhook is active!" });
-}
-
-// รองรับ POST: อันนี้ที่ LINE ใช้ยิงเข้ามา
 export async function POST(request) {
   try {
     const body = await request.json();
-    
-    // ✅ ดักจับกรณี LINE กดปุ่ม Verify (มันจะไม่มี events ส่งมา)
+
+    // 1. ดักจับกรณี LINE กดปุ่ม Verify (ส่งค่าว่างมาเทส)
     if (!body.events || body.events.length === 0) {
-      console.log("LINE Webhook verified!");
       return NextResponse.json({ success: true, message: "Webhook verified" });
     }
 
     const events = body.events;
 
-    // วนลูปเช็คทุกข้อความ
+    // 2. วนลูปเช็คข้อความ
     for (const event of events) {
       if (event.type === 'message' && event.message.type === 'text') {
         const text = event.message.text.toLowerCase().trim();
 
-        // เช็คคำสั่ง "id"
+        // --- CASE A: เช็ค ID พนักงาน (พิมพ์ "id") ---
         if (text === 'id' || text === 'checkid') {
           const userId = event.source.userId;
           await client.replyMessage(event.replyToken, {
             type: 'text',
-            text: `รหัสพนักงานของคุณคือ:\n${userId}`
+            text: `👤 User ID ของคุณคือ:\n${userId}`
           });
         }
+
+        // --- CASE B: เช็ค ID กลุ่ม (พิมพ์ "gid") ---
+        if (text === 'gid' || text === 'groupid') {
+           const source = event.source;
+           let replyText = "";
+
+           if (source.type === 'group') {
+             replyText = `🏠 Group ID ของห้องนี้คือ:\n\n${source.groupId}\n\n(Copy รหัสนี้ไปใส่ใน Code แจ้งเตือนครับ)`;
+           } else if (source.type === 'room') {
+             replyText = `Room ID ของห้องนี้คือ:\n\n${source.roomId}`;
+           } else {
+             replyText = "⚠️ นี่คือแชทส่วนตัวครับ ไม่มี Group ID\n(ต้องพิมพ์คำนี้ในกลุ่มไลน์เท่านั้น)";
+           }
+
+           await client.replyMessage(event.replyToken, {
+             type: 'text',
+             text: replyText
+           });
+        }
+      }
+      
+      // 3. ทักทายตอนโดนเชิญเข้ากลุ่ม
+      if (event.type === 'join') {
+        await client.replyMessage(event.replyToken, {
+            type: 'text',
+            text: 'สวัสดีครับ! บอท HR มารายงานตัว 🫡\n\n- พิมพ์ "gid" เพื่อดูรหัสกลุ่มสำหรับตั้งค่าแจ้งเตือน\n- พิมพ์ "id" เพื่อดูรหัสพนักงาน'
+        });
       }
     }
 
@@ -44,7 +64,6 @@ export async function POST(request) {
 
   } catch (error) {
     console.error("Webhook Error:", error);
-    // ส่ง 200 OK กลับไปหลอก LINE เสมอ เพื่อไม่ให้มันฟ้อง Error (แม้หลังบ้านจะพัง)
     return NextResponse.json({ success: false }, { status: 200 }); 
   }
 }
