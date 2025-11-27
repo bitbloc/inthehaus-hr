@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { supabase } from '../../../../lib/supabaseClient';
 import { Client } from '@line/bot-sdk';
 
+// ✅ ใส่ Group ID ตรงนี้ครับ
+const GROUP_ID = 'Cc2c65da5408563ef57ae61dee6ce3c1d';
+
 const client = new Client({
   channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN,
   channelSecret: process.env.CHANNEL_SECRET,
@@ -34,7 +37,7 @@ export async function GET(request) {
         const endMinutes = eHour * 60 + eMin;
 
         // --- LOGIC 1: เตือนเข้างาน (ล่วงหน้า 55-65 นาที) ---
-        // Cron ทำงานทุก 10 นาที ดังนั้นต้องเช็คเป็นช่วง
+        // Cron ทำงานทุก 10 นาที ดังนั้นต้องเช็คเป็นช่วงเวลา
         const diffStart = startMinutes - currentMinutes;
         if (diffStart >= 55 && diffStart <= 65) {
             messages.push({
@@ -78,9 +81,11 @@ export async function GET(request) {
         }
     }
 
-    // 3. ส่งข้อความ
+    // 3. ส่งข้อความ (ถ้ามี)
     if (messages.length > 0) {
-        await client.broadcast(messages.slice(0, 5));
+        // ✅ แก้ตรงนี้: ใช้ pushMessage ระบุ Group ID
+        await client.pushMessage(GROUP_ID, messages.slice(0, 5));
+        
         return NextResponse.json({ success: true, count: messages.length });
     }
 
