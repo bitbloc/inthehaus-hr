@@ -11,9 +11,9 @@ export default function CheckIn() {
   const [showId, setShowId] = useState(false);
 
   // --- ตั้งค่าพิกัดร้าน ---
-  const SHOP_LAT = 17.400000; 
-  const SHOP_LONG = 104.700000; 
-  const ALLOWED_RADIUS_KM = 0.05; 
+  const SHOP_LAT = 17.390110564180162; 
+  const SHOP_LONG = 104.79292673153263; 
+  const ALLOWED_RADIUS_KM = 0.04; 
   // --------------------
 
   useEffect(() => {
