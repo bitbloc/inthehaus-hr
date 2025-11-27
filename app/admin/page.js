@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
-import { format, parseISO, startOfMonth, endOfMonth } from "date-fns";
+import { format, parseISO, startOfMonth, endOfMonth, differenceInMinutes } from "date-fns";
 import { th } from "date-fns/locale";
 
 export default function AdminDashboard() {
@@ -35,7 +35,7 @@ export default function AdminDashboard() {
   const fetchEmployees = async () => { const { data } = await supabase.from("employees").select("*").order("id"); setEmployees(data || []); };
   
   const fetchSchedules = async () => {
-    const { data } = await supabase.from("employee_schedules").select("*, shifts(name, start_time, end_time)");
+    const { data } = await supabase.from("employee_schedules").select("*, shifts(id, name, start_time, end_time)");
     const scheduleMap = {};
     data?.forEach(s => {
         if(!scheduleMap[s.employee_id]) scheduleMap[s.employee_id] = {};
@@ -67,7 +67,6 @@ export default function AdminDashboard() {
       .gte("timestamp", startDate)
       .lte("timestamp", endDate)
       .order("timestamp", { ascending: false });
-
     setIndividualLogs(data || []);
     
     let lateCount = 0, checkOutCount = 0, checkInCount = 0;
@@ -78,6 +77,7 @@ export default function AdminDashboard() {
     setIndividualStats({ present: checkInCount, late: lateCount, check_out: checkOutCount });
   };
 
+  // --- Actions ---
   const handleUpdateShift = async (id, field, value) => { await supabase.from("shifts").update({ [field]: value }).eq("id", id); fetchShifts(); };
   const handleUpdateSchedule = async (empId, day, shiftId, isOff) => {
     const payload = { employee_id: empId, day_of_week: day, shift_id: isOff ? null : shiftId, is_off: isOff };
@@ -90,32 +90,66 @@ export default function AdminDashboard() {
     if (!error) { alert("✅ เพิ่มเรียบร้อย"); setNewEmp({ name: "", position: "", line_user_id: "" }); fetchEmployees(); }
   };
   const handleDeleteEmployee = async (id) => { if(confirm("ลบ?")) { await supabase.from("employees").delete().eq("id", id); fetchEmployees(); } };
-  
   const handleNotify = async (api) => { if(confirm("ยืนยันส่ง?")) await fetch(api, { method: 'POST' }); };
-  
-  // ✅ อัปเดตฟังก์ชันเรียกกะ ให้รับ type (check_in / check_out)
   const handleRemindShift = async (shiftName, type) => {
      const actionText = type === 'check_out' ? 'ออกงาน' : 'เข้างาน';
-     if(!confirm(`ต้องการเรียก "${shiftName}" ${actionText}?`)) return;
-     
-     await fetch('/api/remind-shift', { 
-        method: 'POST',
-        body: JSON.stringify({ shiftName, type }), // ส่ง type ไปด้วย
-        headers: { 'Content-Type': 'application/json' }
-     });
-     alert("ส่งแจ้งเตือนเรียบร้อย!");
+     if(!confirm(`เรียก "${shiftName}" ${actionText}?`)) return;
+     await fetch('/api/remind-shift', { method: 'POST', body: JSON.stringify({ shiftName, type }), headers: { 'Content-Type': 'application/json' }});
+     alert("เรียบร้อย!");
   };
-  
-  const handleNotifySchedule = async () => {
-     if(!confirm("ประกาศตารางงาน?")) return;
-     try { await fetch('/api/notify-schedule', { method: 'POST' }); alert("✅ เรียบร้อย!"); } catch(e) {}
-  };
+  const handleNotifySchedule = async () => { if(confirm("ประกาศตารางงาน?")) try { await fetch('/api/notify-schedule', { method: 'POST' }); alert("✅ เรียบร้อย!"); } catch(e) {} };
 
+  // --- Helper: Get Shift Info ---
   const getShiftInfoForLog = (log) => {
       if (!log || !schedules[log.employee_id]) return null;
       const date = new Date(log.timestamp);
       const dayOfWeek = date.getDay(); 
       return schedules[log.employee_id][dayOfWeek]; 
+  };
+
+  // ✅ Helper: Analyze Late/Early/Shift Change (Logic หลักอยู่ตรงนี้)
+  const analyzeLog = (log, schedule) => {
+      if (!schedule || !schedule.shifts) return { status: 'normal', text: '', displayShift: '' };
+
+      const logDate = new Date(log.timestamp);
+      const shiftName = schedule.shifts.name;
+      let displayShift = shiftName;
+      let statusInfo = null;
+
+      // แปลงเวลา Start/End เป็น Date Object ของวันนั้นๆ
+      const [sH, sM] = schedule.shifts.start_time.split(':');
+      const shiftStart = new Date(logDate); shiftStart.setHours(sH, sM, 0);
+
+      const [eH, eM] = schedule.shifts.end_time.split(':');
+      const shiftEnd = new Date(logDate); shiftEnd.setHours(eH, eM, 0);
+
+      // --- LOGIC 1: เช็คเข้างาน (สาย) ---
+      if (log.action_type === 'check_in') {
+          const diff = differenceInMinutes(logDate, shiftStart);
+          if (diff > 0) {
+              statusInfo = { text: `สาย ${diff} นาที`, color: 'bg-red-100 text-red-700' };
+          } else {
+              statusInfo = { text: `ตรงเวลา`, color: 'bg-green-100 text-green-700' };
+          }
+      }
+
+      // --- LOGIC 2: เช็คออกงาน (ออกก่อน / ควบกะ) ---
+      if (log.action_type === 'check_out') {
+          const diff = differenceInMinutes(shiftEnd, logDate); // (เวลาเลิก - เวลาออกจริง)
+          
+          // 2.1 แปลงร่างเป็นควบกะ: ถ้าเป็นกะเช้า แต่ดันออกหลัง 19:30 (แสดงว่าอยู่ยาว)
+          if (shiftName.includes("เช้า") && logDate.getHours() >= 19 && logDate.getMinutes() >= 30) {
+              displayShift = "🔥 ควบกะ (Auto)";
+          }
+
+          if (diff > 0) {
+              statusInfo = { text: `ออกก่อน ${diff} นาที`, color: 'bg-orange-100 text-orange-700' };
+          } else {
+              statusInfo = { text: `เลิกงานปกติ`, color: 'bg-gray-100 text-gray-700' };
+          }
+      }
+
+      return { statusInfo, displayShift };
   };
 
   const days = ["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์"];
@@ -149,7 +183,6 @@ export default function AdminDashboard() {
                     <div className="bg-white p-4 rounded-xl shadow-sm border">
                         <h3 className="text-xs font-bold text-gray-400 mb-3 uppercase">🔔 Control Panel</h3>
                         <div className="flex flex-wrap gap-3">
-                            {/* ✅ วนลูปสร้างปุ่ม เข้า/ออก สำหรับทุกกะ */}
                             {shifts.map(s => (
                                 <div key={s.id} className="flex flex-col gap-1 bg-gray-50 p-2 rounded border">
                                     <span className="text-xs font-bold text-center text-gray-500 mb-1">{s.name}</span>
@@ -159,35 +192,57 @@ export default function AdminDashboard() {
                                     </div>
                                 </div>
                             ))}
-                            
-                            <div className="w-px bg-gray-200 mx-2"></div> {/* เส้นคั่น */}
-
+                            <div className="w-px bg-gray-200 mx-2"></div>
                             <button onClick={() => handleNotify('/api/notify')} className="bg-green-50 text-green-700 px-3 py-2 rounded font-bold text-xs border border-green-200 h-fit self-center">✅ สรุปคนมา</button>
                             <button onClick={() => handleNotify('/api/notify-absence')} className="bg-red-50 text-red-700 px-3 py-2 rounded font-bold text-xs border border-red-200 h-fit self-center">⚠️ ตามคนขาด</button>
                         </div>
                     </div>
 
                     <div>
-                        <h3 className="font-bold text-gray-700 mb-3 pl-3 border-l-4 border-blue-500">Log ล่าสุด</h3>
+                        <h3 className="font-bold text-gray-700 mb-3 pl-3 border-l-4 border-blue-500">Log ล่าสุด (วิเคราะห์เวลา)</h3>
                         <div className="overflow-x-auto rounded-lg border">
                             <table className="w-full text-sm text-left">
                                 <thead className="bg-gray-100 text-gray-600 uppercase text-xs">
-                                    <tr><th className="p-3">เวลา</th><th className="p-3">ชื่อ</th><th className="p-3">สถานะ</th><th className="p-3 text-blue-600">กะของวันนี้</th></tr>
+                                    <tr>
+                                        <th className="p-3">เวลา</th>
+                                        <th className="p-3">ชื่อ</th>
+                                        <th className="p-3">สถานะ</th>
+                                        <th className="p-3">รายละเอียด (นาที)</th>
+                                        <th className="p-3 text-blue-600">กะของวันนี้</th>
+                                    </tr>
                                 </thead>
                                 <tbody className="divide-y">
-                                    {logs.slice(0, 20).map(log => {
+                                    {logs.slice(0, 30).map(log => {
                                         const schedule = getShiftInfoForLog(log);
+                                        // เรียกใช้ฟังก์ชันวิเคราะห์ที่เราเขียนเพิ่ม
+                                        const { statusInfo, displayShift } = analyzeLog(log, schedule);
+
                                         return (
                                             <tr key={log.id} className="hover:bg-gray-50">
                                                 <td className="p-3 border-r font-mono text-gray-600">{format(parseISO(log.timestamp), "d MMM HH:mm", { locale: th })}</td>
                                                 <td className="p-3 font-bold text-gray-700">{log.employees?.name}</td>
                                                 <td className="p-3">
-                                                    {log.action_type === 'check_in' ? <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold">เข้างาน 🟢</span> : <span className="bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-bold">ออกงาน 🔴</span>}
+                                                    {log.action_type === 'check_in' ? <span className="text-green-600 font-bold">🟢 เข้างาน</span> : <span className="text-red-500 font-bold">🔴 ออกงาน</span>}
                                                 </td>
+                                                
+                                                {/* คอลัมน์ใหม่: แสดงรายละเอียดนาที */}
+                                                <td className="p-3">
+                                                    {statusInfo ? (
+                                                        <span className={`px-2 py-1 rounded text-xs font-bold ${statusInfo.color}`}>
+                                                            {statusInfo.text}
+                                                        </span>
+                                                    ) : <span className="text-gray-300">-</span>}
+                                                </td>
+
                                                 <td className="p-3 text-xs">
                                                     {schedule?.shifts ? (
-                                                        <div><div className="font-bold text-blue-600">{schedule.shifts.name}</div><div className="text-gray-400">{schedule.shifts.start_time} - {schedule.shifts.end_time}</div></div>
-                                                    ) : <span className="text-gray-300">- ไม่ระบุ -</span>}
+                                                        <div>
+                                                            <div className={`font-bold ${displayShift.includes('Auto') ? 'text-orange-600' : 'text-blue-600'}`}>
+                                                                {displayShift}
+                                                            </div>
+                                                            <div className="text-gray-400">{schedule.shifts.start_time} - {schedule.shifts.end_time}</div>
+                                                        </div>
+                                                    ) : <span className="text-gray-300">- ไม่ระบุเวร -</span>}
                                                 </td>
                                             </tr>
                                         )
@@ -199,6 +254,7 @@ export default function AdminDashboard() {
                 </div>
             )}
 
+            {/* TAB History */}
             {activeTab === 'history' && (
                 <div className="space-y-4">
                     <div className="flex gap-4 bg-gray-50 p-4 rounded-xl border">
@@ -226,6 +282,7 @@ export default function AdminDashboard() {
                 </div>
             )}
 
+             {/* TAB Roster */}
              {activeTab === 'roster' && (
                 <div>
                      <div className="flex justify-between items-center mb-4 bg-yellow-50 p-4 rounded-lg border border-yellow-200">
@@ -262,6 +319,7 @@ export default function AdminDashboard() {
                 </div>
             )}
             
+            {/* TAB Employees */}
             {activeTab === 'employees' && (
                 <div className="grid md:grid-cols-3 gap-8">
                     <div className="bg-white p-6 rounded-xl border h-fit">
@@ -282,6 +340,7 @@ export default function AdminDashboard() {
                 </div>
             )}
 
+             {/* TAB Settings */}
              {activeTab === 'settings' && (
                 <div className="max-w-xl mx-auto space-y-4">
                     <h3 className="font-bold">⚙️ ตั้งค่าเวลากะงาน</h3>
