@@ -4,19 +4,16 @@ import liff from "@line/liff";
 import { supabase } from "../../lib/supabaseClient";
 
 export default function CheckIn() {
-  const [status, setStatus] = useState("กำลังระบุตำแหน่ง...");
+  const [status, setStatus] = useState("กำลังค้นหาพิกัด...");
   const [profile, setProfile] = useState(null);
   const [debugMsg, setDebugMsg] = useState("");
-  
-  // State 1: เก็บสถานะปุ่ม (เข้า หรือ ออก)
   const [lastAction, setLastAction] = useState(null); 
-  // State 2: เก็บสถานะการโชว์ ID (ซ่อน/แสดง)
   const [showId, setShowId] = useState(false);
 
   // --- ตั้งค่าพิกัดร้าน ---
-  const SHOP_LAT = 17.390110564180162; // 🔴 แก้พิกัดร้านตรงนี้
-  const SHOP_LONG = 104.79292673153263; 
-  const ALLOWED_RADIUS_KM = 0.05; // 50 เมตร
+  const SHOP_LAT = 17.400000; 
+  const SHOP_LONG = 104.700000; 
+  const ALLOWED_RADIUS_KM = 0.05; 
   // --------------------
 
   useEffect(() => {
@@ -28,8 +25,6 @@ export default function CheckIn() {
         } else {
           const userProfile = await liff.getProfile();
           setProfile(userProfile);
-          
-          // เช็คสถานะล่าสุดทันที (เข้าหรือออก)
           fetchUserStatus(userProfile.userId); 
           getLocation();
         }
@@ -42,11 +37,9 @@ export default function CheckIn() {
   }, []);
 
   const fetchUserStatus = async (userId) => {
-    // 1. หา ID พนักงาน
     const { data: emp } = await supabase.from('employees').select('id').eq('line_user_id', userId).single();
     if (!emp) return;
 
-    // 2. ดู Log ล่าสุด
     const { data: log } = await supabase
         .from('attendance_logs')
         .select('action_type')
@@ -55,11 +48,8 @@ export default function CheckIn() {
         .limit(1)
         .single();
 
-    if (log) {
-        setLastAction(log.action_type);
-    } else {
-        setLastAction('check_out'); // ยังไม่เคยลงเวลา = พร้อมเข้างาน
-    }
+    if (log) setLastAction(log.action_type);
+    else setLastAction('check_out');
   };
 
   const getLocation = () => {
@@ -76,20 +66,42 @@ export default function CheckIn() {
     const dist = getDistanceFromLatLonInKm(lat, long, SHOP_LAT, SHOP_LONG);
     
     if (dist <= ALLOWED_RADIUS_KM) {
-      setStatus(`✅ อยู่ในพื้นที่ร้าน (ห่าง ${dist.toFixed(3)} กม.)`);
+      setStatus(`✅ อยู่ในพื้นที่ร้าน (${dist.toFixed(3)} กม.)`);
     } else {
-      setStatus(`❌ อยู่นอกพื้นที่ (ห่าง ${dist.toFixed(3)} กม.)`);
+      setStatus(`❌ อยู่นอกพื้นที่ (${dist.toFixed(3)} กม.)`);
     }
   };
 
-  const error = (err) => {
-    setStatus("ไม่สามารถดึง GPS ได้");
-    setDebugMsg(err.message);
+  const error = (err) => { setStatus("ไม่สามารถดึง GPS ได้"); };
+
+  // --- Logic คำนวณสถานะเวลา (สาย/ออกก่อน) ---
+  const calculateTimeStatus = (actionType, shift) => {
+      if (!shift) return "ไม่พบตารางเวร";
+      
+      const now = new Date();
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+      if (actionType === 'check_in') {
+          const [h, m] = shift.start_time.split(':').map(Number);
+          const shiftStart = h * 60 + m;
+          const diff = currentMinutes - shiftStart;
+          
+          if (diff > 0) return `สาย ${diff} นาที ⚠️`;
+          else if (diff < -30) return `มาก่อนเวลา ${Math.abs(diff)} นาที 👍`;
+          else return "ตรงเวลา ✨";
+      } 
+      else { // check_out
+          const [h, m] = shift.end_time.split(':').map(Number);
+          const shiftEnd = h * 60 + m;
+          const diff = shiftEnd - currentMinutes; // เวลาเลิก - เวลาปัจจุบัน
+
+          if (diff > 0) return `ออกก่อนเวลา ${diff} นาที ⚠️`;
+          else return "เลิกงานปกติ 👋";
+      }
   };
 
   const handleCheckIn = async (actionType) => { 
     if (!profile) return;
-    
     const confirmMsg = actionType === 'check_in' ? "ยืนยันการ เข้างาน?" : "ยืนยันการ ออกงาน?";
     if (!confirm(confirmMsg)) return;
 
@@ -97,26 +109,34 @@ export default function CheckIn() {
     setLastAction(actionType); 
     setStatus("กำลังบันทึก...");
     
+    // 1. ดึงข้อมูลพนักงาน + ตารางเวรของวันนี้
+    const todayDay = new Date().getDay(); // 0-6
     const { data: emp, error: searchError } = await supabase
       .from('employees')
-      .select('id, name')
+      .select('id, name, position, employee_schedules(day_of_week, shifts(start_time, end_time))')
       .eq('line_user_id', profile.userId)
+      .eq('employee_schedules.day_of_week', todayDay) // กรองเฉพาะเวรวันนี้
       .single();
 
     if (searchError || !emp) {
-        alert("❌ ไม่พบชื่อคุณในระบบ! (กรุณาลงทะเบียนพนักงานก่อน)");
-        setStatus("ไม่พบข้อมูลพนักงาน");
+        alert("❌ ไม่พบข้อมูลพนักงาน หรือ ไม่มีตารางงานวันนี้");
+        setStatus("ข้อมูลผิดพลาด");
         setLastAction(prevAction);
         return;
     }
 
+    // 2. คำนวณสถานะเวลา
+    const todaySchedule = emp.employee_schedules?.[0]; // เอาเวรแรกที่เจอ
+    const statusDetail = calculateTimeStatus(actionType, todaySchedule?.shifts);
+
+    // 3. บันทึก
     const { error: insertError } = await supabase.from('attendance_logs').insert({
         employee_id: emp.id,
         action_type: actionType,
     });
 
     if (!insertError) {
-        // ยิงแจ้งเตือน Realtime
+        // 4. ส่งแจ้งเตือนพร้อมรายละเอียด
         const now = new Date();
         const timeString = `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
         try {
@@ -125,14 +145,16 @@ export default function CheckIn() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     name: emp.name,
+                    position: emp.position,
                     action: actionType,
                     time: timeString,
-                    locationStatus: status
+                    locationStatus: status,
+                    statusDetail: statusDetail // ส่งรายละเอียดไป
                 })
             });
         } catch (e) { console.error("Notify Error", e); }
 
-        alert(`✅ บันทึก ${actionType === 'check_in' ? 'เข้างาน' : 'ออกงาน'} สำเร็จ!`);
+        alert(`✅ บันทึกสำเร็จ!\nสถานะ: ${statusDetail}`);
         liff.closeWindow();
     } else {
         alert("บันทึกผิดพลาด: " + insertError.message);
@@ -152,65 +174,54 @@ export default function CheckIn() {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4 font-sans text-center">
-      <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-sm">
+      <div className="bg-white p-8 rounded-3xl shadow-xl w-full max-w-sm transition-all duration-300">
         
-        <h1 className="text-xl font-bold mb-2 text-gray-800">In the haus</h1>
-        {profile && <img src={profile.pictureUrl} className="w-16 h-16 rounded-full mx-auto mb-2" />}
-        <p className="mb-2 font-bold text-gray-700">{profile?.displayName}</p>
+        <h1 className="text-2xl font-bold mb-1 text-gray-800 tracking-tight">In the haus</h1>
+        <p className="text-gray-400 text-xs mb-6 uppercase tracking-widest">HR Check-in System</p>
 
-        {/* ✅✅✅ ปุ่มเปิด/ปิด ID (กลับมาแล้ว) ✅✅✅ */}
+        {profile && <img src={profile.pictureUrl} className="w-20 h-20 rounded-full mx-auto mb-3 shadow-md border-4 border-white" />}
+        <p className="mb-1 font-bold text-gray-700 text-lg">{profile?.displayName}</p>
+
         <div className="mb-6">
-            <button 
-                onClick={() => setShowId(!showId)}
-                className="text-xs text-blue-500 hover:text-blue-700 underline mb-2 cursor-pointer"
-            >
-                {showId ? "ซ่อน ID" : "แสดง ID สำหรับลงทะเบียน"}
+            <button onClick={() => setShowId(!showId)} className="text-[10px] text-gray-400 hover:text-gray-600 underline">
+                {showId ? "ซ่อน ID" : "แสดงรหัสพนักงาน"}
             </button>
-
             {showId && (
-                <div className="bg-slate-100 p-3 rounded-lg border border-slate-200 text-left animate-fade-in-down">
-                    <p className="text-[10px] text-gray-400 font-bold uppercase mb-1">Your Line User ID:</p>
-                    <p className="text-xs font-mono text-slate-700 break-all select-all">
-                        {profile ? profile.userId : "กำลังโหลด..."}
-                    </p>
+                <div className="bg-slate-100 p-2 mt-2 rounded border border-slate-200 text-left animate-pulse">
+                    <p className="text-[10px] font-mono text-slate-600 break-all select-all">{profile ? profile.userId : "..."}</p>
                 </div>
             )}
         </div>
-        {/* ------------------------------------------- */}
 
-        <div className={`p-3 rounded-lg mb-6 text-sm font-semibold ${status.includes('✅') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
+        <div className={`py-2 px-4 rounded-full mb-6 text-xs font-bold inline-block shadow-sm ${status.includes('✅') ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-600'}`}>
             {status}
         </div>
         
-        {/* ✅ Logic ปุ่มกดแบบ Smart: โชว์ทีละปุ่ม */}
         {status.includes('✅') && (
-            <div className="flex flex-col gap-3 w-full">
-                
-                {lastAction === null && <p className="text-gray-400 animate-pulse">กำลังตรวจสอบสถานะ...</p>}
+            <div className="flex flex-col gap-4 w-full">
+                {lastAction === null && <p className="text-gray-400 text-sm">ตรวจสอบสถานะ...</p>}
 
                 {lastAction === 'check_out' && (
-                    <button 
-                        onClick={() => handleCheckIn('check_in')}
-                        className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-5 rounded-xl shadow-lg transition transform active:scale-95 flex flex-col items-center justify-center"
-                    >
-                        <span className="text-xl">🟢 เข้างาน</span>
-                        <span className="text-xs opacity-80">(Check In)</span>
+                    <button onClick={() => handleCheckIn('check_in')} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-4 rounded-2xl shadow-lg shadow-emerald-200 transition-all transform active:scale-95 flex items-center justify-center gap-2">
+                        <span className="text-2xl">☀️</span>
+                        <div className="text-left">
+                            <div className="text-sm">สวัสดีตอนเช้า</div>
+                            <div className="text-lg leading-none">ลงเวลาเข้างาน</div>
+                        </div>
                     </button>
                 )}
 
                 {lastAction === 'check_in' && (
-                    <button 
-                        onClick={() => handleCheckIn('check_out')}
-                        className="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-5 rounded-xl shadow-lg transition transform active:scale-95 flex flex-col items-center justify-center"
-                    >
-                        <span className="text-xl">🔴 ออกงาน</span>
-                        <span className="text-xs opacity-80">(Check Out)</span>
+                    <button onClick={() => handleCheckIn('check_out')} className="w-full bg-rose-500 hover:bg-rose-600 text-white font-bold py-4 rounded-2xl shadow-lg shadow-rose-200 transition-all transform active:scale-95 flex items-center justify-center gap-2">
+                        <span className="text-2xl">🌙</span>
+                        <div className="text-left">
+                            <div className="text-sm">เลิกงานแล้ว</div>
+                            <div className="text-lg leading-none">ลงเวลาออกงาน</div>
+                        </div>
                     </button>
                 )}
             </div>
         )}
-
-        {debugMsg && <p className="text-xs text-red-400 mt-4 break-words">{debugMsg}</p>}
       </div>
     </div>
   );
