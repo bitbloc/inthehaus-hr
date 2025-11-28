@@ -16,7 +16,7 @@ export default function AdminDashboard() {
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), "yyyy-MM"));
   const [leaveRequests, setLeaveRequests] = useState([]);
   
-  // --- 2. Payroll States ---
+  // --- 2. Payroll States (ส่วนที่เพิ่มใหม่) ---
   const [payrollConfig, setPayrollConfig] = useState({ ot_rate: 60, double_shift_rate: 1000 });
   const [deductions, setDeductions] = useState([]);
   const [showDeductModal, setShowDeductModal] = useState(false);
@@ -38,7 +38,7 @@ export default function AdminDashboard() {
     fetchEmployees();
     fetchSchedules(); 
     fetchLeaveRequests(); 
-    fetchPayrollConfig();
+    fetchPayrollConfig(); // เรียกดึงค่าเงิน
   }, []);
 
   useEffect(() => {
@@ -46,10 +46,10 @@ export default function AdminDashboard() {
     if (activeTab === "requests") fetchLeaveRequests();
     if (activeTab === "roster") fetchSchedules(); 
     if (activeTab === "history" && selectedEmpId !== "ALL") fetchIndividualLogs();
-    if (activeTab === "payroll") fetchDeductions();
+    if (activeTab === "payroll") fetchDeductions(); // ดึงรายการหักเงิน
   }, [activeTab, selectedMonth, selectedEmpId]);
 
-  // --- API FETCHING FUNCTIONS ---
+  // --- API FETCHING ---
   const fetchShifts = async () => { const { data } = await supabase.from("shifts").select("*").order("id"); setShifts(data || []); };
   const fetchEmployees = async () => { const { data } = await supabase.from("employees").select("*").order("id"); setEmployees(data || []); };
   const fetchSchedules = async () => { 
@@ -66,6 +66,7 @@ export default function AdminDashboard() {
   };
   const fetchLeaveRequests = async () => { const { data } = await supabase.from('leave_requests').select('*, employees(name)').order('created_at', { ascending: false }); setLeaveRequests(data || []); };
   
+  // ✅ Payroll API
   const fetchPayrollConfig = async () => {
       const { data } = await supabase.from('payroll_config').select('*');
       const config = { ot_rate: 60, double_shift_rate: 1000 };
@@ -87,7 +88,6 @@ export default function AdminDashboard() {
           if (log.action_type === 'absent') absentCount++;
           else if (log.action_type === 'check_in') { 
               workDaysSet.add(log.timestamp.split('T')[0]);
-              // Check Late Logic
               const d = new Date(log.timestamp);
               const schedule = schedules[selectedEmpId]?.[d.getDay()];
               if (schedule?.shifts) {
@@ -100,7 +100,7 @@ export default function AdminDashboard() {
       setIndividualStats({ work_days: workDaysSet.size, late: lateCount, absent: absentCount });
   };
 
-  // --- LOGIC: PAYROLL CALCULATION ---
+  // --- LOGIC: PAYROLL CALCULATION (หัวใจหลักของการคำนวณ) ---
   const calculatePayroll = () => {
       return employees.map(emp => {
           let totalSalary = 0;
@@ -108,6 +108,7 @@ export default function AdminDashboard() {
           let totalOTPay = 0;
           let shiftCount = 0;
           
+          // 1. ดึง Log ของคนนี้
           const empLogs = logs.filter(l => l.employee_id === emp.id && l.action_type === 'check_in');
           
           empLogs.forEach(inLog => {
@@ -120,8 +121,10 @@ export default function AdminDashboard() {
               
               if (schedule?.shifts) {
                   const shift = schedule.shifts;
-                  let dailyWage = shift.salary || 500; // Default 500 if not set
+                  // เช็คค่าแรงต่อกะ (ถ้าไม่มีใช้ 500)
+                  let dailyWage = shift.salary || 500;
                   
+                  // เช็คควบกะ
                   if (shift.name.includes("ควบ") || shift.name.includes("Double")) {
                       dailyWage = payrollConfig.double_shift_rate;
                   }
@@ -129,6 +132,7 @@ export default function AdminDashboard() {
                   totalSalary += parseFloat(dailyWage);
                   shiftCount++;
 
+                  // คำนวณ OT
                   if (outLog) {
                       const outTime = new Date(outLog.timestamp);
                       const [eh, em] = shift.end_time.split(':').map(Number);
@@ -136,7 +140,7 @@ export default function AdminDashboard() {
                       
                       const diffMinutes = differenceInMinutes(outTime, shiftEnd);
                       if (diffMinutes > 0) {
-                          const otHours = Math.ceil(diffMinutes / 60); // Ceil minutes to hours
+                          const otHours = Math.ceil(diffMinutes / 60); // ปัดเศษนาทีเป็นชั่วโมง
                           totalOTHours += otHours;
                           totalOTPay += otHours * payrollConfig.ot_rate;
                       }
@@ -144,6 +148,7 @@ export default function AdminDashboard() {
               }
           });
 
+          // 2. คำนวณหักเงิน
           const empDeductions = deductions.filter(d => d.employee_id === emp.id);
           let totalDeduct = 0;
           empDeductions.forEach(d => {
@@ -192,15 +197,14 @@ export default function AdminDashboard() {
       if(confirm("ลบรายการนี้?")) { await supabase.from('payroll_deductions').delete().eq('id', id); fetchDeductions(); }
   };
 
+  // (Helper Actions เดิม)
   const handleUpdateShift = async (id, f, v) => { await supabase.from("shifts").update({ [f]: v }).eq("id", id); fetchShifts(); };
   const handleUpdateSchedule = async (e, d, s, o) => { await supabase.from("employee_schedules").upsert({ employee_id: e, day_of_week: d, shift_id: o ? null : s, is_off: o }, { onConflict: 'employee_id, day_of_week' }); fetchSchedules(); };
-  
   const handleAddEmployee = async (e) => { e.preventDefault(); const { error } = await supabase.from("employees").insert([newEmp]); if (!error) { alert("Success"); setNewEmp({ name: "", position: "", line_user_id: "" }); fetchEmployees(); } };
   const handleDeleteEmployee = async (id) => { if(confirm("Delete?")) { await supabase.from("employees").delete().eq("id", id); fetchEmployees(); } };
   const startEditEmployee = (emp) => { setEditingEmpId(emp.id); setEditFormData({ name: emp.name, position: emp.position }); };
   const cancelEditEmployee = () => { setEditingEmpId(null); setEditFormData({ name: "", position: "" }); };
   const saveEditEmployee = async (id) => { const { error } = await supabase.from("employees").update(editFormData).eq("id", id); if (!error) { alert("Saved"); setEditingEmpId(null); fetchEmployees(); } };
-
   const handleNotify = async (api) => { if(confirm("Send?")) await fetch(api, { method: 'POST' }); };
   const handleRemindShift = async (n, t) => { if(confirm(`Call ${n} ${t}?`)) await fetch('/api/remind-shift', { method: 'POST', body: JSON.stringify({ shiftName: n, type: t }), headers: {'Content-Type': 'application/json'}}); };
   const handleNotifySchedule = async () => { if(confirm("Publish?")) try { await fetch('/api/notify-schedule', { method: 'POST' }); alert("Success"); } catch(e) {} };
@@ -245,22 +249,7 @@ export default function AdminDashboard() {
                 <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 flex items-center justify-between">
                     <div><p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Month</p><input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="text-lg font-bold text-slate-700 bg-transparent outline-none cursor-pointer" /></div>
                 </div>
-                <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100">
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Daily Operations</p>
-                    <div className="flex flex-wrap gap-2 items-center">
-                        {shifts.map(s => (
-                            <div key={s.id} className="flex bg-slate-50 rounded-xl overflow-hidden border border-slate-200">
-                                <button onClick={() => handleRemindShift(s.name, 'check_in')} className="px-3 py-2 text-xs font-bold text-slate-600 hover:bg-blue-100 hover:text-blue-700 transition">☀️ {s.name}</button>
-                                <div className="w-px bg-slate-200"></div>
-                                <button onClick={() => handleRemindShift(s.name, 'check_out')} className="px-3 py-2 text-xs font-bold text-slate-400 hover:bg-rose-100 hover:text-rose-700 transition">🌙</button>
-                            </div>
-                        ))}
-                        <div className="w-px h-8 bg-slate-200 mx-2"></div>
-                        <button onClick={() => handleNotify('/api/notify')} className="px-4 py-2 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-bold hover:bg-emerald-100 transition border border-emerald-100">Summary</button>
-                        <button onClick={() => handleNotify('/api/notify-absence')} className="px-4 py-2 bg-amber-50 text-amber-700 rounded-xl text-xs font-bold hover:bg-amber-100 transition border border-amber-100">Follow Up</button>
-                        <button onClick={handleFinalizeDay} className="px-4 py-2 bg-slate-800 text-white rounded-xl text-xs font-bold hover:bg-slate-900 transition shadow ml-auto">🏁 Cut-off</button>
-                    </div>
-                </div>
+                <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100"><p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Daily Operations</p><div className="flex flex-wrap gap-2 items-center">{shifts.map(s => (<div key={s.id} className="flex bg-slate-50 rounded-xl overflow-hidden border border-slate-200"><button onClick={() => handleRemindShift(s.name, 'check_in')} className="px-3 py-2 text-xs font-bold text-slate-600 hover:bg-blue-100 hover:text-blue-700 transition">☀️ {s.name}</button><div className="w-px bg-slate-200"></div><button onClick={() => handleRemindShift(s.name, 'check_out')} className="px-3 py-2 text-xs font-bold text-slate-400 hover:bg-rose-100 hover:text-rose-700 transition">🌙</button></div>))}<div className="w-px h-8 bg-slate-200 mx-2"></div><button onClick={() => handleNotify('/api/notify')} className="px-4 py-2 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-bold hover:bg-emerald-100 transition border border-emerald-100">Summary</button><button onClick={() => handleNotify('/api/notify-absence')} className="px-4 py-2 bg-amber-50 text-amber-700 rounded-xl text-xs font-bold hover:bg-amber-100 transition border border-amber-100">Follow Up</button><button onClick={handleFinalizeDay} className="px-4 py-2 bg-slate-800 text-white rounded-xl text-xs font-bold hover:bg-slate-900 transition shadow ml-auto">🏁 Cut-off</button></div></div>
                 <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden"><div className="p-6 border-b border-slate-50"><h3 className="font-bold text-lg text-slate-700">Real-time Activity</h3></div><div className="overflow-x-auto"><table className="w-full text-sm text-left"><thead className="bg-slate-50 text-slate-400 uppercase text-xs font-bold"><tr><th className="px-6 py-4">Time</th><th className="px-6 py-4">Name</th><th className="px-6 py-4">Action</th><th className="px-6 py-4">Detail</th></tr></thead><tbody className="divide-y divide-slate-50">{logs.map(log => { const schedule = getShiftInfo(log); const { status, color } = analyzeLog(log, schedule); return (<tr key={log.id} className="hover:bg-slate-50"><td className="px-6 py-4 font-mono text-slate-500">{format(parseISO(log.timestamp), "HH:mm")}</td><td className="px-6 py-4 font-bold text-slate-700">{log.employees?.name}</td><td className="px-6 py-4">{log.action_type === 'check_in' ? '🟢 In' : log.action_type === 'check_out' ? '🔴 Out' : '🚫 Absent'}</td><td className="px-6 py-4"><span className={`px-2 py-1 rounded-md text-xs ${color}`}>{status}</span></td></tr>)})}</tbody></table></div></div>
             </div>
         )}
@@ -376,7 +365,7 @@ export default function AdminDashboard() {
         {activeTab === 'employees' && (
             <div className="grid md:grid-cols-3 gap-8 animate-fade-in-up">
                 <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 h-fit"><h3 className="font-bold text-lg text-slate-700 mb-4">Add Employee</h3><form onSubmit={handleAddEmployee} className="flex flex-col gap-4"><input required placeholder="Name" className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 outline-none" value={newEmp.name} onChange={e => setNewEmp({...newEmp, name: e.target.value})} /><input placeholder="Position" className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 outline-none" value={newEmp.position} onChange={e => setNewEmp({...newEmp, position: e.target.value})} /><input required placeholder="Line User ID" className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 outline-none font-mono text-xs" value={newEmp.line_user_id} onChange={e => setNewEmp({...newEmp, line_user_id: e.target.value})} /><button className="w-full py-3 bg-slate-800 text-white rounded-xl font-bold">Save</button></form></div>
-                <div className="md:col-span-2 bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden"><table className="w-full text-sm text-left"><thead className="bg-slate-50 text-slate-400 uppercase text-xs font-bold"><tr><th className="px-6 py-4">Name</th><th className="px-6 py-4">Position</th><th className="px-6 py-4">Line ID</th><th className="px-6 py-4 text-right">Action</th></tr></thead><tbody className="divide-y divide-slate-50">{employees.map(emp => (<tr key={emp.id} className="hover:bg-slate-50 transition">{editingEmpId === emp.id ? (<><td className="px-6 py-4"><input className="border p-1 rounded w-full" value={editFormData.name} onChange={e => setEditFormData({...editFormData, name: e.target.value})} /></td><td className="px-6 py-4"><input className="border p-1 rounded w-full" value={editFormData.position} onChange={e => setEditFormData({...editFormData, position: e.target.value})} /></td><td className="px-6 py-4 font-mono text-xs">{emp.line_user_id}</td><td className="px-6 py-4 text-right flex gap-2 justify-end"><button onClick={() => saveEditEmployee(emp.id)} className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded text-xs font-bold">Save</button><button onClick={cancelEditEmployee} className="bg-gray-100 text-gray-500 px-2 py-1 rounded text-xs">Cancel</button></td></>) : (<><td className="px-6 py-4 font-bold text-slate-700">{emp.name}</td><td className="px-6 py-4 text-xs text-slate-500">{emp.position}</td><td className="px-6 py-4 font-mono text-xs text-slate-400 truncate max-w-[100px]">{emp.line_user_id}</td><td className="px-6 py-4 text-right flex gap-2 justify-end"><button onClick={() => startEditEmployee(emp)} className="text-blue-500 bg-blue-50 px-2 py-1 rounded font-bold text-xs">Edit</button><button onClick={() => handleDeleteEmployee(emp.id)} className="text-rose-500 bg-rose-50 px-2 py-1 rounded font-bold text-xs">Del</button></td></>)}</tr>))}</tbody></table></div>
+                <div className="md:col-span-2 bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden"><table className="w-full text-sm text-left"><thead className="bg-slate-50 text-slate-400 uppercase text-xs font-bold"><tr><th className="px-6 py-4">Name</th><th className="px-6 py-4">Position</th><th className="px-6 py-4">ID</th><th className="px-6 py-4 text-right">Action</th></tr></thead><tbody className="divide-y divide-slate-50">{employees.map(emp => (<tr key={emp.id} className="hover:bg-slate-50 transition">{editingEmpId === emp.id ? (<><td className="px-6 py-4"><input className="border p-1 rounded w-full" value={editFormData.name} onChange={e => setEditFormData({...editFormData, name: e.target.value})} /></td><td className="px-6 py-4"><input className="border p-1 rounded w-full" value={editFormData.position} onChange={e => setEditFormData({...editFormData, position: e.target.value})} /></td><td className="px-6 py-4 font-mono text-xs">{emp.line_user_id}</td><td className="px-6 py-4 text-right flex gap-2 justify-end"><button onClick={() => saveEditEmployee(emp.id)} className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded font-bold text-xs">Save</button><button onClick={cancelEditEmployee} className="bg-gray-100 text-gray-500 px-2 py-1 rounded text-xs">Cancel</button></td></>) : (<><td className="px-6 py-4 font-bold text-slate-700">{emp.name}</td><td className="px-6 py-4 text-xs text-slate-500">{emp.position}</td><td className="px-6 py-4 font-mono text-xs text-slate-400 truncate max-w-[100px]">{emp.line_user_id}</td><td className="px-6 py-4 text-right flex gap-2 justify-end"><button onClick={() => startEditEmployee(emp)} className="text-blue-500 bg-blue-50 px-2 py-1 rounded font-bold text-xs">Edit</button><button onClick={() => handleDeleteEmployee(emp.id)} className="text-rose-500 bg-rose-50 px-2 py-1 rounded font-bold text-xs">Del</button></td></>)}</tr>))}</tbody></table></div>
             </div>
         )}
 
