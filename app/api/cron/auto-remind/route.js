@@ -45,7 +45,7 @@ export async function GET(request) {
 
         // --- LOGIC 1: เตือนเข้างาน (ขยายเวลาเป็น 50-70 นาที) ---
         // เผื่อ GitHub มาช้าหรือเร็วไปนิดหน่อย
-        if (diffStart >= 50 && diffStart <= 70) {
+        if (diffStart >= 60 && diffStart <= 70) {
             messages.push({
                 type: 'flex',
                 altText: `⏰ แจ้งเตือนเข้างาน ${shift.name}`,
@@ -65,7 +65,7 @@ export async function GET(request) {
         }
 
         // --- LOGIC 2: เตือนเลิกงาน (ขยายเวลาเป็น 5-25 นาที) ---
-        if (diffEnd >= 5 && diffEnd <= 25) {
+        if (diffEnd >= 20 && diffEnd <= 30) {
              messages.push({
                 type: 'flex',
                 altText: `🌙 แจ้งเตือนเลิกงาน ${shift.name}`,
