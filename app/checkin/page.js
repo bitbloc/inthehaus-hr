@@ -2,11 +2,14 @@
 import { useEffect, useState } from "react";
 import liff from "@line/liff";
 import { supabase } from "../../lib/supabaseClient";
+import Link from "next/link"; // ✅ เพิ่ม import Link
 
 export default function CheckIn() {
-  const [status, setStatus] = useState("กำลังค้นหาพิกัด...");
+  const [status, setStatus] = useState("กำลังระบุตำแหน่ง...");
   const [profile, setProfile] = useState(null);
   const [debugMsg, setDebugMsg] = useState("");
+  
+  // State
   const [lastAction, setLastAction] = useState(null); 
   const [showId, setShowId] = useState(false);
 
@@ -74,27 +77,22 @@ export default function CheckIn() {
 
   const error = (err) => { setStatus("ไม่สามารถดึง GPS ได้"); };
 
-  // --- Logic คำนวณสถานะเวลา (สาย/ออกก่อน) ---
+  // คำนวณเวลา (เหมือนเดิม)
   const calculateTimeStatus = (actionType, shift) => {
       if (!shift) return "ไม่พบตารางเวร";
-      
       const now = new Date();
       const currentMinutes = now.getHours() * 60 + now.getMinutes();
-
       if (actionType === 'check_in') {
           const [h, m] = shift.start_time.split(':').map(Number);
           const shiftStart = h * 60 + m;
           const diff = currentMinutes - shiftStart;
-          
           if (diff > 0) return `สาย ${diff} นาที ⚠️`;
           else if (diff < -30) return `มาก่อนเวลา ${Math.abs(diff)} นาที 👍`;
           else return "ตรงเวลา ✨";
-      } 
-      else { // check_out
+      } else { 
           const [h, m] = shift.end_time.split(':').map(Number);
           const shiftEnd = h * 60 + m;
-          const diff = shiftEnd - currentMinutes; // เวลาเลิก - เวลาปัจจุบัน
-
+          const diff = shiftEnd - currentMinutes;
           if (diff > 0) return `ออกก่อนเวลา ${diff} นาที ⚠️`;
           else return "เลิกงานปกติ 👋";
       }
@@ -109,34 +107,30 @@ export default function CheckIn() {
     setLastAction(actionType); 
     setStatus("กำลังบันทึก...");
     
-    // 1. ดึงข้อมูลพนักงาน + ตารางเวรของวันนี้
-    const todayDay = new Date().getDay(); // 0-6
+    const todayDay = new Date().getDay(); 
     const { data: emp, error: searchError } = await supabase
       .from('employees')
       .select('id, name, position, employee_schedules(day_of_week, shifts(start_time, end_time))')
       .eq('line_user_id', profile.userId)
-      .eq('employee_schedules.day_of_week', todayDay) // กรองเฉพาะเวรวันนี้
+      .eq('employee_schedules.day_of_week', todayDay)
       .single();
 
     if (searchError || !emp) {
-        alert("❌ ไม่พบข้อมูลพนักงาน หรือ ไม่มีตารางงานวันนี้");
+        alert("❌ ไม่พบข้อมูล หรือ ไม่มีตารางงานวันนี้");
         setStatus("ข้อมูลผิดพลาด");
         setLastAction(prevAction);
         return;
     }
 
-    // 2. คำนวณสถานะเวลา
-    const todaySchedule = emp.employee_schedules?.[0]; // เอาเวรแรกที่เจอ
+    const todaySchedule = emp.employee_schedules?.[0];
     const statusDetail = calculateTimeStatus(actionType, todaySchedule?.shifts);
 
-    // 3. บันทึก
     const { error: insertError } = await supabase.from('attendance_logs').insert({
         employee_id: emp.id,
         action_type: actionType,
     });
 
     if (!insertError) {
-        // 4. ส่งแจ้งเตือนพร้อมรายละเอียด
         const now = new Date();
         const timeString = `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
         try {
@@ -149,7 +143,7 @@ export default function CheckIn() {
                     action: actionType,
                     time: timeString,
                     locationStatus: status,
-                    statusDetail: statusDetail // ส่งรายละเอียดไป
+                    statusDetail: statusDetail
                 })
             });
         } catch (e) { console.error("Notify Error", e); }
@@ -174,7 +168,7 @@ export default function CheckIn() {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4 font-sans text-center">
-      <div className="bg-white p-8 rounded-3xl shadow-xl w-full max-w-sm transition-all duration-300">
+      <div className="bg-white p-8 rounded-3xl shadow-xl w-full max-w-sm transition-all duration-300 relative">
         
         <h1 className="text-2xl font-bold mb-1 text-gray-800 tracking-tight">In the haus</h1>
         <p className="text-gray-400 text-xs mb-6 uppercase tracking-widest">HR Check-in System</p>
@@ -222,6 +216,14 @@ export default function CheckIn() {
                 )}
             </div>
         )}
+
+        {/* ✅ ปุ่มเมนูลางาน (เพิ่มใหม่ตรงนี้) */}
+        <div className="mt-8 border-t pt-6">
+            <Link href="/leave" className="block w-full py-3 rounded-xl border border-slate-200 text-slate-500 text-sm font-bold hover:bg-slate-50 hover:text-slate-700 transition flex items-center justify-center gap-2">
+               <span>📝</span> ขอลาหยุด / แจ้งลา (Leave)
+            </Link>
+        </div>
+
       </div>
     </div>
   );
