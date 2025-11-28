@@ -14,8 +14,14 @@ export default function AdminDashboard() {
   const [schedules, setSchedules] = useState({});
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), "yyyy-MM"));
   const [stats, setStats] = useState({ total: 0 });
+  
+  // Add New Employee State
   const [newEmp, setNewEmp] = useState({ name: "", position: "", line_user_id: "" });
   
+  // ✅ Edit Employee States (เพิ่มใหม่)
+  const [editingEmpId, setEditingEmpId] = useState(null); // เก็บ ID คนที่กำลังแก้
+  const [editFormData, setEditFormData] = useState({ name: "", position: "" }); // เก็บข้อมูลที่กำลังแก้
+
   // History States
   const [selectedEmpId, setSelectedEmpId] = useState("ALL");
   const [individualLogs, setIndividualLogs] = useState([]);
@@ -62,7 +68,6 @@ export default function AdminDashboard() {
     
     setIndividualLogs(data || []);
     
-    // คำนวณสรุป
     let lateCount = 0;
     const workDaysSet = new Set(); 
 
@@ -82,10 +87,7 @@ export default function AdminDashboard() {
         }
     });
 
-    setIndividualStats({ 
-        work_days: workDaysSet.size, 
-        late: lateCount
-    });
+    setIndividualStats({ work_days: workDaysSet.size, late: lateCount });
   };
 
   // --- Actions ---
@@ -93,6 +95,27 @@ export default function AdminDashboard() {
   const handleUpdateSchedule = async (e, d, s, o) => { await supabase.from("employee_schedules").upsert({ employee_id: e, day_of_week: d, shift_id: o ? null : s, is_off: o }, { onConflict: 'employee_id, day_of_week' }); fetchSchedules(); };
   const handleAddEmployee = async (e) => { e.preventDefault(); const { error } = await supabase.from("employees").insert([newEmp]); if (!error) { alert("เพิ่มพนักงานเรียบร้อย ✅"); setNewEmp({ name: "", position: "", line_user_id: "" }); fetchEmployees(); } };
   const handleDeleteEmployee = async (id) => { if(confirm("ต้องการลบพนักงานคนนี้ใช่ไหม?")) { await supabase.from("employees").delete().eq("id", id); fetchEmployees(); } };
+  
+  // ✅ Edit Employee Functions
+  const startEditEmployee = (emp) => {
+      setEditingEmpId(emp.id);
+      setEditFormData({ name: emp.name, position: emp.position });
+  };
+  const cancelEditEmployee = () => {
+      setEditingEmpId(null);
+      setEditFormData({ name: "", position: "" });
+  };
+  const saveEditEmployee = async (id) => {
+      const { error } = await supabase.from("employees").update(editFormData).eq("id", id);
+      if (!error) {
+          alert("✅ แก้ไขข้อมูลเรียบร้อย");
+          setEditingEmpId(null);
+          fetchEmployees();
+      } else {
+          alert("Error: " + error.message);
+      }
+  };
+
   const handleNotify = async (api) => { if(confirm("ยืนยันการส่งข้อความ?")) await fetch(api, { method: 'POST' }); };
   const handleRemindShift = async (n, t) => { if(confirm(`ส่งแจ้งเตือนเรียก "${n}" ${t === 'check_in' ? 'เข้างาน' : 'ออกงาน'}?`)) await fetch('/api/remind-shift', { method: 'POST', body: JSON.stringify({ shiftName: n, type: t }), headers: {'Content-Type': 'application/json'}}); };
   const handleNotifySchedule = async () => { if(confirm("ประกาศตารางงานเข้ากลุ่ม LINE?")) try { await fetch('/api/notify-schedule', { method: 'POST' }); alert("ประกาศเรียบร้อย ✅"); } catch(e) {} };
@@ -125,7 +148,7 @@ export default function AdminDashboard() {
     <div className="min-h-screen bg-slate-50 font-sans text-slate-800">
       <div className="max-w-7xl mx-auto p-4 md:p-8">
         
-        {/* Header Navigation */}
+        {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
             <div>
                 <h1 className="text-3xl font-bold tracking-tight text-slate-800">In the haus <span className="text-slate-400 font-light">Dashboard</span></h1>
@@ -199,7 +222,7 @@ export default function AdminDashboard() {
             </div>
         )}
 
-        {/* --- TAB 2: HISTORY (Payroll Summary) --- */}
+        {/* --- TAB 2: HISTORY --- */}
         {activeTab === 'history' && (
             <div className="space-y-6 animate-fade-in-up">
                 <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
@@ -235,7 +258,7 @@ export default function AdminDashboard() {
                                         const { status, color } = analyzeLog(log, schedule);
                                         return (
                                             <tr key={log.id} className="hover:bg-slate-50">
-                                                <td className="px-6 py-4 font-bold text-slate-700">{format(parseISO(log.timestamp), "dd MMM", { locale: th })}</td>
+                                                <td className="px-6 py-4 font-bold text-slate-700">{format(parseISO(log.timestamp), "dd MMM yyyy", { locale: th })}</td>
                                                 <td className="px-6 py-4 font-mono text-slate-500">{format(parseISO(log.timestamp), "HH:mm")}</td>
                                                 <td className="px-6 py-4">{log.action_type === 'check_in' ? '🟢 In' : '🔴 Out'}</td>
                                                 <td className="px-6 py-4"><span className={`px-2 py-1 rounded text-xs font-bold ${color}`}>{status}</span></td>
@@ -287,7 +310,7 @@ export default function AdminDashboard() {
             </div>
         )}
 
-        {/* --- TAB 4: EMPLOYEES --- */}
+        {/* --- TAB 4: EMPLOYEES (Editable) --- */}
         {activeTab === 'employees' && (
             <div className="grid md:grid-cols-3 gap-8 animate-fade-in-up">
                 <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 h-fit">
@@ -310,13 +333,37 @@ export default function AdminDashboard() {
                 </div>
                 <div className="md:col-span-2 bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
                     <table className="w-full text-sm text-left">
-                        <thead className="bg-slate-50 text-slate-400 uppercase text-xs font-bold"><tr><th className="px-6 py-4">Name</th><th className="px-6 py-4">Line ID</th><th className="px-6 py-4 text-right">Action</th></tr></thead>
+                        <thead className="bg-slate-50 text-slate-400 uppercase text-xs font-bold"><tr><th className="px-6 py-4">Name</th><th className="px-6 py-4">Position</th><th className="px-6 py-4">Line ID</th><th className="px-6 py-4 text-right">Action</th></tr></thead>
                         <tbody className="divide-y divide-slate-50">
                             {employees.map(emp => (
                                 <tr key={emp.id} className="hover:bg-slate-50 transition">
-                                    <td className="px-6 py-4"><div className="font-bold text-slate-700">{emp.name}</div><div className="text-xs text-slate-400">{emp.position}</div></td>
-                                    <td className="px-6 py-4 font-mono text-xs text-slate-500 truncate max-w-[120px]">{emp.line_user_id}</td>
-                                    <td className="px-6 py-4 text-right"><button onClick={() => handleDeleteEmployee(emp.id)} className="text-rose-500 hover:text-rose-700 bg-rose-50 px-3 py-1.5 rounded-lg text-xs font-bold transition">Delete</button></td>
+                                    {editingEmpId === emp.id ? (
+                                        // Edit Mode
+                                        <>
+                                            <td className="px-6 py-4">
+                                                <input className="border p-1 rounded w-full text-sm" value={editFormData.name} onChange={e => setEditFormData({...editFormData, name: e.target.value})} />
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <input className="border p-1 rounded w-full text-sm" value={editFormData.position} onChange={e => setEditFormData({...editFormData, position: e.target.value})} />
+                                            </td>
+                                            <td className="px-6 py-4 font-mono text-xs text-slate-400">{emp.line_user_id}</td>
+                                            <td className="px-6 py-4 text-right flex justify-end gap-2">
+                                                <button onClick={() => saveEditEmployee(emp.id)} className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded text-xs font-bold">Save</button>
+                                                <button onClick={cancelEditEmployee} className="bg-gray-100 text-gray-500 px-2 py-1 rounded text-xs">Cancel</button>
+                                            </td>
+                                        </>
+                                    ) : (
+                                        // View Mode
+                                        <>
+                                            <td className="px-6 py-4"><div className="font-bold text-slate-700">{emp.name}</div></td>
+                                            <td className="px-6 py-4 text-xs text-slate-500">{emp.position}</td>
+                                            <td className="px-6 py-4 font-mono text-xs text-slate-400 truncate max-w-[100px]">{emp.line_user_id}</td>
+                                            <td className="px-6 py-4 text-right flex justify-end gap-2">
+                                                <button onClick={() => startEditEmployee(emp)} className="text-blue-500 hover:text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg text-xs font-bold transition">✏️ Edit</button>
+                                                <button onClick={() => handleDeleteEmployee(emp.id)} className="text-rose-500 hover:text-rose-700 bg-rose-50 px-3 py-1.5 rounded-lg text-xs font-bold transition">Delete</button>
+                                            </td>
+                                        </>
+                                    )}
                                 </tr>
                             ))}
                         </tbody>
