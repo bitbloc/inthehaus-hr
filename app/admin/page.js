@@ -24,15 +24,20 @@ export default function AdminDashboard() {
   const [individualLogs, setIndividualLogs] = useState([]);
   const [individualStats, setIndividualStats] = useState({ work_days: 0, late: 0, absent: 0 });
 
+  // --- Leave Requests State (New) ---
+  const [leaveRequests, setLeaveRequests] = useState([]);
+
   // --- Init ---
   useEffect(() => {
     fetchShifts();
     fetchEmployees();
     fetchSchedules(); 
+    fetchLeaveRequests(); // ดึงข้อมูลการลา
   }, []);
 
   useEffect(() => {
     if (activeTab === "dashboard") fetchLogs();
+    if (activeTab === "requests") fetchLeaveRequests();
     if (activeTab === "roster") fetchSchedules(); 
     if (activeTab === "history" && selectedEmpId !== "ALL") fetchIndividualLogs();
   }, [activeTab, selectedMonth, selectedEmpId]);
@@ -88,6 +93,12 @@ export default function AdminDashboard() {
     setIndividualStats({ work_days: workDaysSet.size, late: lateCount, absent: absentCount });
   };
 
+  // ✅ Fetch Leave Requests
+  const fetchLeaveRequests = async () => {
+      const { data } = await supabase.from('leave_requests').select('*, employees(name)').order('created_at', { ascending: false });
+      setLeaveRequests(data || []);
+  };
+
   // --- Action Functions ---
   const handleUpdateShift = async (id, f, v) => { await supabase.from("shifts").update({ [f]: v }).eq("id", id); fetchShifts(); };
   const handleUpdateSchedule = async (e, d, s, o) => { await supabase.from("employee_schedules").upsert({ employee_id: e, day_of_week: d, shift_id: o ? null : s, is_off: o }, { onConflict: 'employee_id, day_of_week' }); fetchSchedules(); };
@@ -113,6 +124,16 @@ export default function AdminDashboard() {
       else alert(data.message || "Error");
   };
 
+  // ✅ Approve/Reject Leave
+  const handleLeaveAction = async (id, status) => {
+      if(!confirm(`ยืนยันเปลี่ยนสถานะเป็น "${status}" ?`)) return;
+      const { error } = await supabase.from('leave_requests').update({ status }).eq('id', id);
+      if(!error) { 
+          alert("✅ บันทึกสถานะเรียบร้อย");
+          fetchLeaveRequests(); 
+      }
+  };
+
   // Helper Logic
   const getShiftInfo = (log) => {
       if (!log || !schedules[log.employee_id]) return null;
@@ -120,7 +141,7 @@ export default function AdminDashboard() {
   };
 
   const analyzeLog = (log, schedule) => {
-      if (log.action_type === 'absent') return { status: '❌ ขาดงาน', color: 'text-white bg-rose-500 font-bold px-3 py-1 rounded-full' };
+      if (log.action_type === 'absent') return { status: '🚫 Absent', color: 'text-white bg-rose-500 font-bold px-3 py-1 rounded-full' };
       
       if (!schedule?.shifts) return { status: '', color: '' };
       const d = new Date(log.timestamp);
@@ -151,10 +172,10 @@ export default function AdminDashboard() {
                 <p className="text-sm text-slate-500 mt-1">HR Management System</p>
             </div>
             <div className="flex bg-white p-1.5 rounded-2xl shadow-sm border border-slate-200 overflow-x-auto max-w-full">
-                {['dashboard', 'history', 'roster', 'employees', 'settings'].map(t => (
+                {['dashboard', 'requests', 'history', 'roster', 'employees', 'settings'].map(t => (
                     <button key={t} onClick={() => setActiveTab(t)}
                         className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ease-in-out whitespace-nowrap ${activeTab === t ? 'bg-slate-800 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}>
-                        {t === 'dashboard' ? 'Overview' : t === 'history' ? 'History' : t === 'roster' ? 'Roster' : t === 'employees' ? 'Staff' : 'Settings'}
+                        {t === 'dashboard' ? 'Overview' : t === 'requests' ? '📩 Requests' : t === 'history' ? 'History' : t === 'roster' ? 'Roster' : t === 'employees' ? 'Staff' : 'Settings'}
                     </button>
                 ))}
             </div>
@@ -185,7 +206,7 @@ export default function AdminDashboard() {
                             <button onClick={() => handleNotify('/api/notify')} className="px-4 py-2 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-bold hover:bg-emerald-100 transition border border-emerald-100">Summary</button>
                             <button onClick={() => handleNotify('/api/notify-absence')} className="px-4 py-2 bg-amber-50 text-amber-700 rounded-xl text-xs font-bold hover:bg-amber-100 transition border border-amber-100">Follow Up</button>
                             {/* Finalize Day Button */}
-                            <button onClick={handleFinalizeDay} className="px-4 py-2 bg-slate-800 text-white rounded-xl text-xs font-bold hover:bg-slate-900 transition shadow ml-auto">🏁 ตัดยอด (สิ้นวัน)</button>
+                            <button onClick={handleFinalizeDay} className="px-4 py-2 bg-slate-800 text-white rounded-xl text-xs font-bold hover:bg-slate-900 transition shadow ml-auto">🏁 Cut-off (End Day)</button>
                         </div>
                     </div>
                 </div>
@@ -219,7 +240,48 @@ export default function AdminDashboard() {
             </div>
         )}
 
-        {/* --- TAB 2: HISTORY --- */}
+        {/* --- TAB 2: REQUESTS (คำขอลา) --- */}
+        {activeTab === 'requests' && (
+            <div className="space-y-6 animate-fade-in-up">
+                <h3 className="font-bold text-lg text-slate-700">คำขอลาหยุด (Leave Requests)</h3>
+                <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+                    <table className="w-full text-sm text-left">
+                        <thead className="bg-slate-50 text-slate-400 uppercase text-xs font-bold">
+                            <tr><th className="px-6 py-4">Name</th><th className="px-6 py-4">Date</th><th className="px-6 py-4">Type</th><th className="px-6 py-4">Reason</th><th className="px-6 py-4">Status</th><th className="px-6 py-4 text-right">Action</th></tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                            {leaveRequests.map(req => (
+                                <tr key={req.id} className="hover:bg-slate-50">
+                                    <td className="px-6 py-4 font-bold text-slate-700">{req.employees?.name}</td>
+                                    <td className="px-6 py-4 font-mono">{req.leave_date}</td>
+                                    <td className="px-6 py-4">
+                                        {req.leave_type === 'sick' ? '😷 ป่วย' : req.leave_type === 'business' ? '💼 กิจ' : '🏖️ พักร้อน'}
+                                    </td>
+                                    <td className="px-6 py-4 text-slate-500">{req.reason}</td>
+                                    <td className="px-6 py-4">
+                                        <span className={`px-2 py-1 rounded text-xs font-bold ${
+                                            req.status === 'approved' ? 'bg-green-100 text-green-700' :
+                                            req.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
+                                        }`}>{req.status.toUpperCase()}</span>
+                                    </td>
+                                    <td className="px-6 py-4 text-right gap-2 flex justify-end">
+                                        {req.status === 'pending' && (
+                                            <>
+                                                <button onClick={() => handleLeaveAction(req.id, 'approved')} className="bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-emerald-600 transition">Approve</button>
+                                                <button onClick={() => handleLeaveAction(req.id, 'rejected')} className="bg-rose-50 text-rose-600 px-3 py-1.5 rounded-lg text-xs font-bold border border-rose-200 hover:bg-rose-100 transition">Reject</button>
+                                            </>
+                                        )}
+                                    </td>
+                                </tr>
+                            ))}
+                            {leaveRequests.length === 0 && <tr><td colSpan="6" className="p-8 text-center text-slate-400">ไม่มีคำขอลาใหม่</td></tr>}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        )}
+
+        {/* --- TAB 3: HISTORY --- */}
         {activeTab === 'history' && (
             <div className="space-y-6 animate-fade-in-up">
                 <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
@@ -278,7 +340,7 @@ export default function AdminDashboard() {
             </div>
         )}
 
-        {/* --- TAB 3: ROSTER --- */}
+        {/* --- TAB 4: ROSTER --- */}
         {activeTab === 'roster' && (
             <div className="space-y-6 animate-fade-in-up">
                 <div className="flex justify-between items-center bg-amber-50 p-4 rounded-2xl border border-amber-100">
@@ -315,7 +377,7 @@ export default function AdminDashboard() {
             </div>
         )}
 
-        {/* --- TAB 4: EMPLOYEES (Editable) --- */}
+        {/* --- TAB 5: EMPLOYEES --- */}
         {activeTab === 'employees' && (
             <div className="grid md:grid-cols-3 gap-8 animate-fade-in-up">
                 <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 h-fit">
@@ -323,7 +385,7 @@ export default function AdminDashboard() {
                     <form onSubmit={handleAddEmployee} className="flex flex-col gap-4">
                         <input required placeholder="Full Name" className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 focus:ring-2 focus:ring-slate-800 outline-none transition" value={newEmp.name} onChange={e => setNewEmp({...newEmp, name: e.target.value})} />
                         <input placeholder="Position" className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 focus:ring-2 focus:ring-slate-800 outline-none transition" value={newEmp.position} onChange={e => setNewEmp({...newEmp, position: e.target.value})} />
-                        <input required placeholder="Line User ID" className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 focus:ring-2 focus:ring-slate-800 outline-none font-mono text-xs transition" value={newEmp.line_user_id} onChange={e => setNewEmp({...newEmp, line_user_id: e.target.value})} />
+                        <input required placeholder="Line User ID (U...)" className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 focus:ring-2 focus:ring-slate-800 outline-none font-mono text-xs transition" value={newEmp.line_user_id} onChange={e => setNewEmp({...newEmp, line_user_id: e.target.value})} />
                         <button className="w-full py-3 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-700 transition shadow-lg">Save Employee</button>
                     </form>
                 </div>
@@ -350,7 +412,7 @@ export default function AdminDashboard() {
                                             <td className="px-6 py-4 font-mono text-xs text-slate-400 truncate max-w-[100px]">{emp.line_user_id}</td>
                                             <td className="px-6 py-4 text-right flex justify-end gap-2">
                                                 <button onClick={() => startEditEmployee(emp)} className="text-blue-500 hover:text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg text-xs font-bold transition">Edit</button>
-                                                <button onClick={() => handleDeleteEmployee(emp.id)} className="text-rose-500 hover:text-rose-700 bg-rose-50 px-3 py-1.5 rounded-lg text-xs font-bold transition">Delete</button>
+                                                <button onClick={() => handleDeleteEmployee(emp.id)} className="text-rose-500 hover:text-rose-700 bg-rose-50 px-3 py-1.5 rounded-lg text-xs font-bold transition">Del</button>
                                             </td>
                                         </>
                                     )}
@@ -362,7 +424,7 @@ export default function AdminDashboard() {
             </div>
         )}
 
-        {/* --- TAB 5: SETTINGS --- */}
+        {/* --- TAB 6: SETTINGS --- */}
         {activeTab === 'settings' && (
             <div className="max-w-xl mx-auto space-y-4 animate-fade-in-up">
                 <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
