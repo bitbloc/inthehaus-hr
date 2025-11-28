@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { Client } from '@line/bot-sdk';
 
-// ✅ ใส่ Group ID ของร้าน
+// ✅ Group ID ของร้าน
 const GROUP_ID = 'Cc2c65da5408563ef57ae61dee6ce3c1d';
 
 const client = new Client({
@@ -11,17 +11,32 @@ const client = new Client({
 
 export async function POST(request) {
   try {
-    // รับค่าเพิ่ม: position (ตำแหน่ง), statusDetail (รายละเอียดเวลา เช่น สาย 5 นาที)
     const { name, position, action, time, locationStatus, statusDetail } = await request.json();
 
-    const isCheckIn = action === 'check_in';
-    // สี: เข้า=เขียว, ออก=แดง
-    const color = isCheckIn ? '#10b981' : '#ef4444'; 
-    const title = isCheckIn ? '🟢 ลงเวลาเข้างาน' : '🔴 ลงเวลาออกงาน';
-    
-    // กำหนดสีของสถานะเวลา (ถ้าสาย หรือ ออกก่อน ให้เป็นสีส้มเด่นๆ)
-    const isLateOrEarly = statusDetail.includes('สาย') || statusDetail.includes('ออกก่อน');
-    const statusColor = isLateOrEarly ? '#f59e0b' : '#6b7280';
+    // --- กำหนดค่าตามประเภท Action ---
+    let title = "";
+    let color = "";
+    let labelTime = "เวลา:";
+    let labelStatus = "สถานะ:";
+    let labelLocation = "พิกัด:";
+
+    if (action === 'check_in') {
+        title = '🟢 ลงเวลาเข้างาน';
+        color = '#10b981'; // เขียว
+    } else if (action === 'check_out') {
+        title = '🔴 ลงเวลาออกงาน';
+        color = '#ef4444'; // แดง
+    } else if (action === 'leave_request') {
+        title = '📝 แจ้งขอลาหยุด'; // ✅ แก้หัวข้อ
+        color = '#f59e0b'; // สีส้ม (Amber) ดูเป็นการแจ้งเตือน
+        labelTime = "วันที่:"; // เปลี่ยนคำ
+        labelStatus = "เหตุผล:"; // เปลี่ยนคำ (เพราะเราส่ง reason มาในช่องนี้)
+        labelLocation = "ประเภท:"; // เปลี่ยนคำ (เพราะเราส่ง type มาในช่องนี้)
+    }
+
+    // กำหนดสีของข้อความสถานะ (ถ้าสาย/ออกก่อน ให้เป็นสีส้ม)
+    const isLateOrEarly = statusDetail?.includes('สาย') || statusDetail?.includes('ออกก่อน');
+    const statusTextColor = isLateOrEarly ? '#f59e0b' : '#6b7280';
 
     const message = {
       type: 'flex',
@@ -33,7 +48,7 @@ export async function POST(request) {
           type: 'box',
           layout: 'vertical',
           contents: [
-            // Header: ชื่อและตำแหน่ง
+            // Header
             {
               type: 'box',
               layout: 'horizontal',
@@ -42,10 +57,10 @@ export async function POST(request) {
                 { type: 'text', text: position || 'Staff', size: 'xs', color: '#9ca3af', align: 'end', gravity: 'center' }
               ]
             },
-            // ชื่อพนักงานตัวใหญ่
+            // Name
             { type: 'text', text: name, weight: 'bold', size: 'xl', margin: 'md', color: '#1f2937' },
             { type: 'separator', margin: 'md' },
-            // รายละเอียดเวลา
+            // Details
             {
               type: 'box',
               layout: 'vertical',
@@ -55,22 +70,22 @@ export async function POST(request) {
                 {
                   type: 'box', layout: 'baseline',
                   contents: [
-                    { type: 'text', text: 'เวลา:', size: 'sm', color: '#aaaaaa', flex: 2 },
+                    { type: 'text', text: labelTime, size: 'sm', color: '#aaaaaa', flex: 2 },
                     { type: 'text', text: time, size: 'sm', color: '#1f2937', flex: 4, weight: 'bold' }
                   ]
                 },
                 {
                   type: 'box', layout: 'baseline',
                   contents: [
-                    { type: 'text', text: 'สถานะ:', size: 'sm', color: '#aaaaaa', flex: 2 },
-                    { type: 'text', text: statusDetail, size: 'sm', color: statusColor, flex: 4, weight: isLateOrEarly ? 'bold' : 'regular' }
+                    { type: 'text', text: labelStatus, size: 'sm', color: '#aaaaaa', flex: 2 },
+                    { type: 'text', text: statusDetail || '-', size: 'sm', color: statusTextColor, flex: 4, weight: isLateOrEarly ? 'bold' : 'regular', wrap: true }
                   ]
                 },
                 {
                   type: 'box', layout: 'baseline',
                   contents: [
-                    { type: 'text', text: 'พิกัด:', size: 'sm', color: '#aaaaaa', flex: 2 },
-                    { type: 'text', text: locationStatus.replace('✅ ', '').replace('❌ ', ''), size: 'xs', color: '#9ca3af', flex: 4, wrap: true }
+                    { type: 'text', text: labelLocation, size: 'sm', color: '#aaaaaa', flex: 2 },
+                    { type: 'text', text: locationStatus?.replace('✅ ', '').replace('❌ ', '') || '-', size: 'xs', color: '#9ca3af', flex: 4, wrap: true }
                   ]
                 }
               ]
