@@ -7,26 +7,24 @@ import { th } from "date-fns/locale";
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("dashboard");
   
-  // Data States
+  // --- Data States ---
   const [logs, setLogs] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [shifts, setShifts] = useState([]);
   const [schedules, setSchedules] = useState({});
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), "yyyy-MM"));
-  const [stats, setStats] = useState({ total: 0 });
   
-  // Add New Employee State
+  // --- Employee Management States ---
   const [newEmp, setNewEmp] = useState({ name: "", position: "", line_user_id: "" });
-  
-  // ✅ Edit Employee States (เพิ่มใหม่)
-  const [editingEmpId, setEditingEmpId] = useState(null); // เก็บ ID คนที่กำลังแก้
-  const [editFormData, setEditFormData] = useState({ name: "", position: "" }); // เก็บข้อมูลที่กำลังแก้
+  const [editingEmpId, setEditingEmpId] = useState(null);
+  const [editFormData, setEditFormData] = useState({ name: "", position: "" });
 
-  // History States
+  // --- History States ---
   const [selectedEmpId, setSelectedEmpId] = useState("ALL");
   const [individualLogs, setIndividualLogs] = useState([]);
-  const [individualStats, setIndividualStats] = useState({ work_days: 0, late: 0 });
+  const [individualStats, setIndividualStats] = useState({ work_days: 0, late: 0, absent: 0 });
 
+  // --- Init ---
   useEffect(() => {
     fetchShifts();
     fetchEmployees();
@@ -39,7 +37,7 @@ export default function AdminDashboard() {
     if (activeTab === "history" && selectedEmpId !== "ALL") fetchIndividualLogs();
   }, [activeTab, selectedMonth, selectedEmpId]);
 
-  // --- API ---
+  // --- API Fetching ---
   const fetchShifts = async () => { const { data } = await supabase.from("shifts").select("*").order("id"); setShifts(data || []); };
   const fetchEmployees = async () => { const { data } = await supabase.from("employees").select("*").order("id"); setEmployees(data || []); };
   
@@ -58,7 +56,6 @@ export default function AdminDashboard() {
     const endDate = endOfMonth(parseISO(selectedMonth + "-01")).toISOString();
     const { data } = await supabase.from("attendance_logs").select("*, employees(name)").gte("timestamp", startDate).lte("timestamp", endDate).order("timestamp", { ascending: false });
     setLogs(data || []);
-    setStats({ total: data?.length || 0 }); 
   };
 
   const fetchIndividualLogs = async () => {
@@ -68,64 +65,63 @@ export default function AdminDashboard() {
     
     setIndividualLogs(data || []);
     
+    // Stats Calculation
     let lateCount = 0;
+    let absentCount = 0;
     const workDaysSet = new Set(); 
 
     data?.forEach(log => {
-        if (log.action_type === 'check_in') {
-            const dateKey = log.timestamp.split('T')[0];
-            workDaysSet.add(dateKey); 
-            
+        if (log.action_type === 'absent') {
+            absentCount++;
+        } else if (log.action_type === 'check_in') {
+            workDaysSet.add(log.timestamp.split('T')[0]); 
             const logDate = new Date(log.timestamp);
-            const dayOfWeek = logDate.getDay();
-            const schedule = schedules[selectedEmpId]?.[dayOfWeek];
+            const schedule = schedules[selectedEmpId]?.[logDate.getDay()];
             if (schedule?.shifts) {
                 const [h, m] = schedule.shifts.start_time.split(':');
-                const shiftStart = new Date(logDate); shiftStart.setHours(h, m, 0);
-                if (differenceInMinutes(logDate, shiftStart) > 0) lateCount++;
+                const start = new Date(logDate); start.setHours(h, m, 0);
+                if (differenceInMinutes(logDate, start) > 0) lateCount++;
             }
         }
     });
 
-    setIndividualStats({ work_days: workDaysSet.size, late: lateCount });
+    setIndividualStats({ work_days: workDaysSet.size, late: lateCount, absent: absentCount });
   };
 
-  // --- Actions ---
+  // --- Action Functions ---
   const handleUpdateShift = async (id, f, v) => { await supabase.from("shifts").update({ [f]: v }).eq("id", id); fetchShifts(); };
   const handleUpdateSchedule = async (e, d, s, o) => { await supabase.from("employee_schedules").upsert({ employee_id: e, day_of_week: d, shift_id: o ? null : s, is_off: o }, { onConflict: 'employee_id, day_of_week' }); fetchSchedules(); };
-  const handleAddEmployee = async (e) => { e.preventDefault(); const { error } = await supabase.from("employees").insert([newEmp]); if (!error) { alert("เพิ่มพนักงานเรียบร้อย ✅"); setNewEmp({ name: "", position: "", line_user_id: "" }); fetchEmployees(); } };
-  const handleDeleteEmployee = async (id) => { if(confirm("ต้องการลบพนักงานคนนี้ใช่ไหม?")) { await supabase.from("employees").delete().eq("id", id); fetchEmployees(); } };
   
-  // ✅ Edit Employee Functions
-  const startEditEmployee = (emp) => {
-      setEditingEmpId(emp.id);
-      setEditFormData({ name: emp.name, position: emp.position });
-  };
-  const cancelEditEmployee = () => {
-      setEditingEmpId(null);
-      setEditFormData({ name: "", position: "" });
-  };
-  const saveEditEmployee = async (id) => {
-      const { error } = await supabase.from("employees").update(editFormData).eq("id", id);
-      if (!error) {
-          alert("✅ แก้ไขข้อมูลเรียบร้อย");
-          setEditingEmpId(null);
-          fetchEmployees();
-      } else {
-          alert("Error: " + error.message);
-      }
-  };
+  // Employee Actions
+  const handleAddEmployee = async (e) => { e.preventDefault(); const { error } = await supabase.from("employees").insert([newEmp]); if (!error) { alert("เพิ่มพนักงานเรียบร้อย ✅"); setNewEmp({ name: "", position: "", line_user_id: "" }); fetchEmployees(); } };
+  const handleDeleteEmployee = async (id) => { if(confirm("ต้องการลบพนักงานคนนี้?")) { await supabase.from("employees").delete().eq("id", id); fetchEmployees(); } };
+  const startEditEmployee = (emp) => { setEditingEmpId(emp.id); setEditFormData({ name: emp.name, position: emp.position }); };
+  const cancelEditEmployee = () => { setEditingEmpId(null); setEditFormData({ name: "", position: "" }); };
+  const saveEditEmployee = async (id) => { const { error } = await supabase.from("employees").update(editFormData).eq("id", id); if (!error) { alert("✅ แก้ไขเรียบร้อย"); setEditingEmpId(null); fetchEmployees(); } };
 
-  const handleNotify = async (api) => { if(confirm("ยืนยันการส่งข้อความ?")) await fetch(api, { method: 'POST' }); };
+  // Notifications
+  const handleNotify = async (api) => { if(confirm("ยืนยันส่ง?")) await fetch(api, { method: 'POST' }); };
   const handleRemindShift = async (n, t) => { if(confirm(`ส่งแจ้งเตือนเรียก "${n}" ${t === 'check_in' ? 'เข้างาน' : 'ออกงาน'}?`)) await fetch('/api/remind-shift', { method: 'POST', body: JSON.stringify({ shiftName: n, type: t }), headers: {'Content-Type': 'application/json'}}); };
-  const handleNotifySchedule = async () => { if(confirm("ประกาศตารางงานเข้ากลุ่ม LINE?")) try { await fetch('/api/notify-schedule', { method: 'POST' }); alert("ประกาศเรียบร้อย ✅"); } catch(e) {} };
+  const handleNotifySchedule = async () => { if(confirm("ประกาศตารางงานเข้ากลุ่ม?")) try { await fetch('/api/notify-schedule', { method: 'POST' }); alert("✅ เรียบร้อย"); } catch(e) {} };
+  
+  // Finalize Day (ตัดยอดขาดงาน)
+  const handleFinalizeDay = async () => {
+      if(!confirm("⚠️ ยืนยันการตัดยอดสิ้นวัน?\nระบบจะบันทึก 'ขาดงาน' ให้คนที่ยังไม่ลงเวลาวันนี้ทั้งหมด")) return;
+      const res = await fetch('/api/finalize-day', { method: 'POST' });
+      const data = await res.json();
+      if(data.success) { alert(`✅ บันทึกขาดงานเรียบร้อย: ${data.marked_count} คน`); fetchLogs(); }
+      else alert(data.message || "Error");
+  };
 
+  // Helper Logic
   const getShiftInfo = (log) => {
       if (!log || !schedules[log.employee_id]) return null;
       return schedules[log.employee_id][new Date(log.timestamp).getDay()]; 
   };
 
   const analyzeLog = (log, schedule) => {
+      if (log.action_type === 'absent') return { status: '❌ ขาดงาน', color: 'text-white bg-rose-500 font-bold px-3 py-1 rounded-full' };
+      
       if (!schedule?.shifts) return { status: '', color: '' };
       const d = new Date(log.timestamp);
       const [sh, sm] = schedule.shifts.start_time.split(':');
@@ -135,10 +131,10 @@ export default function AdminDashboard() {
 
       if (log.action_type === 'check_in') {
           const diff = differenceInMinutes(d, start);
-          return diff > 0 ? { status: `สาย ${diff} น.`, color: 'text-orange-600 bg-orange-50' } : { status: `ตรงเวลา`, color: 'text-emerald-600 bg-emerald-50' };
+          return diff > 0 ? { status: `สาย ${diff} น.`, color: 'text-orange-700 bg-orange-100 font-bold' } : { status: `ตรงเวลา`, color: 'text-emerald-700 bg-emerald-100 font-bold' };
       } else {
           const diff = differenceInMinutes(end, d);
-          return diff > 0 ? { status: `ออกก่อน ${diff} น.`, color: 'text-rose-600 bg-rose-50' } : { status: `ปกติ`, color: 'text-slate-500 bg-slate-50' };
+          return diff > 0 ? { status: `ออกก่อน ${diff} น.`, color: 'text-rose-700 bg-rose-100 font-bold' } : { status: `ปกติ`, color: 'text-slate-600 bg-slate-100' };
       }
   };
 
@@ -176,8 +172,8 @@ export default function AdminDashboard() {
                         <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center text-xl">📅</div>
                     </div>
                     <div className="md:col-span-2 bg-white p-5 rounded-3xl shadow-sm border border-slate-100">
-                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Quick Actions</p>
-                        <div className="flex flex-wrap gap-2">
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Daily Operations</p>
+                        <div className="flex flex-wrap gap-2 items-center">
                             {shifts.map(s => (
                                 <div key={s.id} className="flex bg-slate-50 rounded-xl overflow-hidden border border-slate-200">
                                     <button onClick={() => handleRemindShift(s.name, 'check_in')} className="px-3 py-2 text-xs font-bold text-slate-600 hover:bg-blue-100 hover:text-blue-700 transition">☀️ {s.name}</button>
@@ -185,8 +181,11 @@ export default function AdminDashboard() {
                                     <button onClick={() => handleRemindShift(s.name, 'check_out')} className="px-3 py-2 text-xs font-bold text-slate-400 hover:bg-rose-100 hover:text-rose-700 transition">🌙</button>
                                 </div>
                             ))}
+                            <div className="w-px h-8 bg-slate-200 mx-2"></div>
                             <button onClick={() => handleNotify('/api/notify')} className="px-4 py-2 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-bold hover:bg-emerald-100 transition border border-emerald-100">Summary</button>
                             <button onClick={() => handleNotify('/api/notify-absence')} className="px-4 py-2 bg-amber-50 text-amber-700 rounded-xl text-xs font-bold hover:bg-amber-100 transition border border-amber-100">Follow Up</button>
+                            {/* Finalize Day Button */}
+                            <button onClick={handleFinalizeDay} className="px-4 py-2 bg-slate-800 text-white rounded-xl text-xs font-bold hover:bg-slate-900 transition shadow ml-auto">🏁 ตัดยอด (สิ้นวัน)</button>
                         </div>
                     </div>
                 </div>
@@ -195,7 +194,7 @@ export default function AdminDashboard() {
                     <div className="p-6 border-b border-slate-50"><h3 className="font-bold text-lg text-slate-700">Real-time Activity</h3></div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm text-left">
-                            <thead className="bg-slate-50 text-slate-400 uppercase text-xs font-bold"><tr><th className="px-6 py-4">Time</th><th className="px-6 py-4">Name</th><th className="px-6 py-4">Status</th><th className="px-6 py-4">Detail</th><th className="px-6 py-4">Shift</th></tr></thead>
+                            <thead className="bg-slate-50 text-slate-400 uppercase text-xs font-bold"><tr><th className="px-6 py-4">Time</th><th className="px-6 py-4">Name</th><th className="px-6 py-4">Action</th><th className="px-6 py-4">Detail</th></tr></thead>
                             <tbody className="divide-y divide-slate-50">
                                 {logs.map(log => {
                                     const schedule = getShiftInfo(log);
@@ -205,13 +204,11 @@ export default function AdminDashboard() {
                                             <td className="px-6 py-4 font-mono text-slate-500">{format(parseISO(log.timestamp), "HH:mm")} <span className="text-xs text-slate-300 ml-1">{format(parseISO(log.timestamp), "dd/MM")}</span></td>
                                             <td className="px-6 py-4 font-bold text-slate-700">{log.employees?.name}</td>
                                             <td className="px-6 py-4">
-                                                {log.action_type === 'check_in' ? 
-                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700">● In</span> : 
-                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-700">● Out</span>
-                                                }
+                                                {log.action_type === 'check_in' && <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700">● In</span>}
+                                                {log.action_type === 'check_out' && <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-700">● Out</span>}
+                                                {log.action_type === 'absent' && <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-slate-200 text-slate-600">🚫 Absent</span>}
                                             </td>
-                                            <td className="px-6 py-4"><span className={`px-2 py-1 rounded-md text-xs font-bold ${color}`}>{status}</span></td>
-                                            <td className="px-6 py-4 text-xs text-slate-400">{schedule?.shifts?.name || '-'}</td>
+                                            <td className="px-6 py-4"><span className={`px-2 py-1 rounded-md text-xs ${color}`}>{status}</span></td>
                                         </tr>
                                     )
                                 })}
@@ -247,6 +244,10 @@ export default function AdminDashboard() {
                                 <p className="text-xs font-bold text-slate-400 uppercase">Late</p>
                                 <p className="text-3xl font-bold text-orange-500 mt-2">{individualStats.late} <span className="text-sm font-normal text-slate-400">times</span></p>
                             </div>
+                            <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100">
+                                <p className="text-xs font-bold text-slate-400 uppercase">Absent</p>
+                                <p className="text-3xl font-bold text-rose-500 mt-2">{individualStats.absent} <span className="text-sm font-normal text-slate-400">times</span></p>
+                            </div>
                         </div>
 
                         <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
@@ -260,8 +261,12 @@ export default function AdminDashboard() {
                                             <tr key={log.id} className="hover:bg-slate-50">
                                                 <td className="px-6 py-4 font-bold text-slate-700">{format(parseISO(log.timestamp), "dd MMM yyyy", { locale: th })}</td>
                                                 <td className="px-6 py-4 font-mono text-slate-500">{format(parseISO(log.timestamp), "HH:mm")}</td>
-                                                <td className="px-6 py-4">{log.action_type === 'check_in' ? '🟢 In' : '🔴 Out'}</td>
-                                                <td className="px-6 py-4"><span className={`px-2 py-1 rounded text-xs font-bold ${color}`}>{status}</span></td>
+                                                <td className="px-6 py-4">
+                                                    {log.action_type === 'check_in' && '🟢 In'}
+                                                    {log.action_type === 'check_out' && '🔴 Out'}
+                                                    {log.action_type === 'absent' && '🚫 Absent'}
+                                                </td>
+                                                <td className="px-6 py-4"><span className={`px-2 py-1 rounded text-xs ${color}`}>{status}</span></td>
                                             </tr>
                                         )
                                     })}
@@ -316,18 +321,9 @@ export default function AdminDashboard() {
                 <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 h-fit">
                     <h3 className="font-bold text-lg text-slate-700 mb-4">Add Employee</h3>
                     <form onSubmit={handleAddEmployee} className="flex flex-col gap-4">
-                        <div>
-                            <label className="text-xs font-bold text-slate-400 uppercase">Name</label>
-                            <input required placeholder="Full Name" className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 focus:ring-2 focus:ring-slate-800 outline-none transition" value={newEmp.name} onChange={e => setNewEmp({...newEmp, name: e.target.value})} />
-                        </div>
-                        <div>
-                            <label className="text-xs font-bold text-slate-400 uppercase">Position</label>
-                            <input placeholder="Barista, Chef" className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 focus:ring-2 focus:ring-slate-800 outline-none transition" value={newEmp.position} onChange={e => setNewEmp({...newEmp, position: e.target.value})} />
-                        </div>
-                        <div>
-                            <label className="text-xs font-bold text-slate-400 uppercase">Line User ID</label>
-                            <input required placeholder="Uxxxxxxxx..." className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 focus:ring-2 focus:ring-slate-800 outline-none font-mono text-xs transition" value={newEmp.line_user_id} onChange={e => setNewEmp({...newEmp, line_user_id: e.target.value})} />
-                        </div>
+                        <input required placeholder="Full Name" className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 focus:ring-2 focus:ring-slate-800 outline-none transition" value={newEmp.name} onChange={e => setNewEmp({...newEmp, name: e.target.value})} />
+                        <input placeholder="Position" className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 focus:ring-2 focus:ring-slate-800 outline-none transition" value={newEmp.position} onChange={e => setNewEmp({...newEmp, position: e.target.value})} />
+                        <input required placeholder="Line User ID" className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 focus:ring-2 focus:ring-slate-800 outline-none font-mono text-xs transition" value={newEmp.line_user_id} onChange={e => setNewEmp({...newEmp, line_user_id: e.target.value})} />
                         <button className="w-full py-3 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-700 transition shadow-lg">Save Employee</button>
                     </form>
                 </div>
@@ -338,14 +334,9 @@ export default function AdminDashboard() {
                             {employees.map(emp => (
                                 <tr key={emp.id} className="hover:bg-slate-50 transition">
                                     {editingEmpId === emp.id ? (
-                                        // Edit Mode
                                         <>
-                                            <td className="px-6 py-4">
-                                                <input className="border p-1 rounded w-full text-sm" value={editFormData.name} onChange={e => setEditFormData({...editFormData, name: e.target.value})} />
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <input className="border p-1 rounded w-full text-sm" value={editFormData.position} onChange={e => setEditFormData({...editFormData, position: e.target.value})} />
-                                            </td>
+                                            <td className="px-6 py-4"><input className="border p-1 rounded w-full text-sm" value={editFormData.name} onChange={e => setEditFormData({...editFormData, name: e.target.value})} /></td>
+                                            <td className="px-6 py-4"><input className="border p-1 rounded w-full text-sm" value={editFormData.position} onChange={e => setEditFormData({...editFormData, position: e.target.value})} /></td>
                                             <td className="px-6 py-4 font-mono text-xs text-slate-400">{emp.line_user_id}</td>
                                             <td className="px-6 py-4 text-right flex justify-end gap-2">
                                                 <button onClick={() => saveEditEmployee(emp.id)} className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded text-xs font-bold">Save</button>
@@ -353,13 +344,12 @@ export default function AdminDashboard() {
                                             </td>
                                         </>
                                     ) : (
-                                        // View Mode
                                         <>
                                             <td className="px-6 py-4"><div className="font-bold text-slate-700">{emp.name}</div></td>
                                             <td className="px-6 py-4 text-xs text-slate-500">{emp.position}</td>
                                             <td className="px-6 py-4 font-mono text-xs text-slate-400 truncate max-w-[100px]">{emp.line_user_id}</td>
                                             <td className="px-6 py-4 text-right flex justify-end gap-2">
-                                                <button onClick={() => startEditEmployee(emp)} className="text-blue-500 hover:text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg text-xs font-bold transition">✏️ Edit</button>
+                                                <button onClick={() => startEditEmployee(emp)} className="text-blue-500 hover:text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg text-xs font-bold transition">Edit</button>
                                                 <button onClick={() => handleDeleteEmployee(emp.id)} className="text-rose-500 hover:text-rose-700 bg-rose-50 px-3 py-1.5 rounded-lg text-xs font-bold transition">Delete</button>
                                             </td>
                                         </>
@@ -391,7 +381,7 @@ export default function AdminDashboard() {
                     </div>
                     <div className="mt-6 p-4 bg-emerald-50 rounded-2xl flex gap-3 text-emerald-800 text-sm">
                         <span className="text-xl">💡</span>
-                        <div>Changes are saved automatically and will affect the next notification immediately.</div>
+                        <div>Changes are saved automatically.</div>
                     </div>
                 </div>
             </div>
