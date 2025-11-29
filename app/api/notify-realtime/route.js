@@ -1,103 +1,59 @@
 import { NextResponse } from 'next/server';
 import { Client } from '@line/bot-sdk';
 
-// ✅ Group ID ของร้าน
 const GROUP_ID = 'Cc2c65da5408563ef57ae61dee6ce3c1d';
-
-const client = new Client({
-  channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN,
-  channelSecret: process.env.CHANNEL_SECRET,
-});
+const client = new Client({ channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN, channelSecret: process.env.CHANNEL_SECRET });
 
 export async function POST(request) {
   try {
-    const { name, position, action, time, locationStatus, statusDetail } = await request.json();
+    // ✅ รับ photoUrl เพิ่ม
+    const { name, position, action, time, locationStatus, statusDetail, photoUrl } = await request.json();
 
-    // --- กำหนดค่าตามประเภท Action ---
-    let title = "";
-    let color = "";
-    let labelTime = "เวลา:";
-    let labelStatus = "สถานะ:";
-    let labelLocation = "พิกัด:";
-
-    if (action === 'check_in') {
-        title = '🟢 ลงเวลาเข้างาน';
-        color = '#10b981'; // เขียว
-    } else if (action === 'check_out') {
-        title = '🔴 ลงเวลาออกงาน';
-        color = '#ef4444'; // แดง
-    } else if (action === 'leave_request') {
-        title = '📝 แจ้งขอลาหยุด'; // ✅ แก้หัวข้อ
-        color = '#f59e0b'; // สีส้ม (Amber) ดูเป็นการแจ้งเตือน
-        labelTime = "วันที่:"; // เปลี่ยนคำ
-        labelStatus = "เหตุผล:"; // เปลี่ยนคำ (เพราะเราส่ง reason มาในช่องนี้)
-        labelLocation = "ประเภท:"; // เปลี่ยนคำ (เพราะเราส่ง type มาในช่องนี้)
-    }
-
-    // กำหนดสีของข้อความสถานะ (ถ้าสาย/ออกก่อน ให้เป็นสีส้ม)
-    const isLateOrEarly = statusDetail?.includes('สาย') || statusDetail?.includes('ออกก่อน');
-    const statusTextColor = isLateOrEarly ? '#f59e0b' : '#6b7280';
+    let title = "", color = "";
+    if (action === 'check_in') { title = '🟢 เข้างาน'; color = '#10b981'; }
+    else if (action === 'check_out') { title = '🔴 ออกงาน'; color = '#ef4444'; }
+    else { title = '📝 ขอลาหยุด'; color = '#f59e0b'; }
 
     const message = {
       type: 'flex',
       altText: `${name} ${title}`,
       contents: {
         type: 'bubble',
-        size: 'kilo',
+        // ✅ ส่วนแสดงรูป (Hero)
+        hero: photoUrl ? {
+            type: "image",
+            url: photoUrl,
+            size: "full",
+            aspectRatio: "20:13",
+            aspectMode: "cover",
+            action: { type: "uri", uri: photoUrl } // กดรูปเพื่อดูภาพใหญ่
+        } : undefined,
         body: {
           type: 'box',
           layout: 'vertical',
           contents: [
-            // Header
             {
-              type: 'box',
-              layout: 'horizontal',
+              type: 'box', layout: 'horizontal',
               contents: [
-                { type: 'text', text: title, weight: 'bold', size: 'sm', color: color, flex: 0 },
-                { type: 'text', text: position || 'Staff', size: 'xs', color: '#9ca3af', align: 'end', gravity: 'center' }
+                { type: 'text', text: title, weight: 'bold', size: 'md', color: color },
+                { type: 'text', text: position || '', size: 'xs', color: '#aaaaaa', align: 'end', gravity: 'center' }
               ]
             },
-            // Name
             { type: 'text', text: name, weight: 'bold', size: 'xl', margin: 'md', color: '#1f2937' },
             { type: 'separator', margin: 'md' },
-            // Details
             {
-              type: 'box',
-              layout: 'vertical',
-              margin: 'md',
-              spacing: 'sm',
+              type: 'box', layout: 'vertical', margin: 'md', spacing: 'sm',
               contents: [
-                {
-                  type: 'box', layout: 'baseline',
-                  contents: [
-                    { type: 'text', text: labelTime, size: 'sm', color: '#aaaaaa', flex: 2 },
-                    { type: 'text', text: time, size: 'sm', color: '#1f2937', flex: 4, weight: 'bold' }
-                  ]
-                },
-                {
-                  type: 'box', layout: 'baseline',
-                  contents: [
-                    { type: 'text', text: labelStatus, size: 'sm', color: '#aaaaaa', flex: 2 },
-                    { type: 'text', text: statusDetail || '-', size: 'sm', color: statusTextColor, flex: 4, weight: isLateOrEarly ? 'bold' : 'regular', wrap: true }
-                  ]
-                },
-                {
-                  type: 'box', layout: 'baseline',
-                  contents: [
-                    { type: 'text', text: labelLocation, size: 'sm', color: '#aaaaaa', flex: 2 },
-                    { type: 'text', text: locationStatus?.replace('✅ ', '').replace('❌ ', '') || '-', size: 'xs', color: '#9ca3af', flex: 4, wrap: true }
-                  ]
-                }
+                { type: 'box', layout: 'baseline', contents: [{ type: 'text', text: 'เวลา:', size: 'sm', color: '#aaaaaa', flex: 2 }, { type: 'text', text: time, size: 'sm', color: '#1f2937', flex: 4, weight: 'bold' }] },
+                { type: 'box', layout: 'baseline', contents: [{ type: 'text', text: 'สถานะ:', size: 'sm', color: '#aaaaaa', flex: 2 }, { type: 'text', text: statusDetail || '-', size: 'sm', color: '#f59e0b', flex: 4, wrap: true }] }
               ]
             }
           ]
-        },
-        styles: { footer: { separator: true } }
+        }
       }
     };
 
     await client.pushMessage(GROUP_ID, [message]); 
-    
     return NextResponse.json({ success: true });
 
   } catch (error) {
