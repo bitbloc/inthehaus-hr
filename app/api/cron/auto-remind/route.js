@@ -31,27 +31,29 @@ export async function GET(request) {
     let debugLog = [];
 
     for (const shift of shifts) {
-        // ดึงเวลาแจ้งเตือนที่ตั้งไว้ (ถ้าไม่มี ให้ข้าม)
-        if (!shift.notify_time_in || !shift.notify_time_out) continue;
+        if (!shift.notify_time_in && !shift.notify_time_out) continue;
 
         // แปลงเวลา Alert In
-        const [hIn, mIn] = shift.notify_time_in.split(':').map(Number);
-        const alertInMinutes = hIn * 60 + mIn;
+        let diffIn = 999;
+        if (shift.notify_time_in) {
+            const [hIn, mIn] = shift.notify_time_in.split(':').map(Number);
+            const alertInMinutes = hIn * 60 + mIn;
+            diffIn = Math.abs(currentTotalMinutes - alertInMinutes);
+        }
 
         // แปลงเวลา Alert Out
-        const [hOut, mOut] = shift.notify_time_out.split(':').map(Number);
-        const alertOutMinutes = hOut * 60 + mOut;
+        let diffOut = 999;
+        if (shift.notify_time_out) {
+            const [hOut, mOut] = shift.notify_time_out.split(':').map(Number);
+            const alertOutMinutes = hOut * 60 + mOut;
+            diffOut = Math.abs(currentTotalMinutes - alertOutMinutes);
+        }
 
-        const diffIn = Math.abs(currentTotalMinutes - alertInMinutes);
-        const diffOut = Math.abs(currentTotalMinutes - alertOutMinutes);
+        debugLog.push(`${shift.name}: In-Diff ${diffIn}m, Out-Diff ${diffOut}m`);
 
-        debugLog.push(`${shift.name}: In ${diffIn}m ago, Out ${diffOut}m ago`);
-
-        // --- Logic: ถ้าเวลาปัจจุบัน ตรงกับเวลาแจ้งเตือน (บวกลบไม่เกิน 5 นาที) ---
-        // (เผื่อ Cron มาช้า/เร็ว นิดหน่อย)
-        
+        // ✅✅✅ แก้ตรงนี้: ขยายเวลาเป็น <= 7 นาที (เพื่อรองรับ Delay ของ Cron)
         // 1. แจ้งเข้า
-        if (diffIn <= 5) {
+        if (diffIn <= 7) {
             messages.push({
                 type: 'flex',
                 altText: `⏰ แจ้งเตือนเข้างาน ${shift.name}`,
@@ -71,7 +73,7 @@ export async function GET(request) {
         }
 
         // 2. แจ้งออก
-        if (diffOut <= 5) {
+        if (diffOut <= 7) {
              messages.push({
                 type: 'flex',
                 altText: `🌙 แจ้งเตือนเลิกงาน ${shift.name}`,
@@ -81,7 +83,7 @@ export async function GET(request) {
                   body: {
                     type: 'box', layout: 'vertical',
                     contents: [
-                      { type: 'text', text: `กะ: ${shift.name}`, weight: 'bold', size: 'lg', color: '#333333' },
+                      { type: 'text', text: `กะ: ${shift.name}`, weight: 'bold', size: 'lg' },
                       { type: 'text', text: `เวลาเลิก: ${shift.end_time}`, size: 'md', color: '#ff334b', margin: 'md' },
                       { type: 'text', text: 'อย่าลืมกด Check-out นะครับ!', size: 'sm', color: '#aaaaaa', margin: 'xs' }
                     ]
@@ -94,7 +96,7 @@ export async function GET(request) {
 
     if (messages.length > 0) {
         await client.pushMessage(GROUP_ID, messages.slice(0, 5));
-        return NextResponse.json({ success: true, count: messages.length });
+        return NextResponse.json({ success: true, count: messages.length, debug: debugLog });
     }
 
     return NextResponse.json({ success: true, message: "No alert time matched", debug: debugLog });
