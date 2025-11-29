@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabase } from '../../../../lib/supabaseClient';
 import { Client } from '@line/bot-sdk';
 
-// ✅ ใส่ Group ID (ผมใส่ .trim() กันเหนียว เผื่อมีเว้นวรรคตอนก๊อปมา)
+// ✅ ใส่ Group ID (ผมใส่ .trim() กันเหนียว)
 const GROUP_ID = 'Cc2c65da5408563ef57ae61dee6ce3c1d'.trim();
 
 const client = new Client({
@@ -14,7 +14,6 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request) {
   try {
-    // 1. เวลาปัจจุบัน (UTC+7)
     const now = new Date();
     const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
     const thaiTime = new Date(utc + (3600000 * 7));
@@ -32,7 +31,6 @@ export async function GET(request) {
     let debugLog = [];
 
     for (const shift of shifts) {
-        // ข้ามถ้าไม่ได้ตั้งเวลา
         if (!shift.notify_time_in && !shift.notify_time_out) continue;
 
         let diffIn = 9999;
@@ -63,7 +61,12 @@ export async function GET(request) {
                 altText: `⏰ แจ้งเตือนเข้างาน ${shift.name}`,
                 contents: {
                   type: 'bubble',
-                  header: { backgroundColor: '#ff9900', layout: 'vertical', contents: [{ type: 'text', text: `⏰ เตรียมตัวเข้างาน`, color: '#ffffff', weight: 'bold' }] },
+                  header: { 
+                      type: 'box', // ✅ เพิ่มบรรทัดนี้ (สำคัญมาก)
+                      layout: 'vertical', 
+                      backgroundColor: '#ff9900', 
+                      contents: [{ type: 'text', text: `⏰ เตรียมตัวเข้างาน`, color: '#ffffff', weight: 'bold' }] 
+                  },
                   body: {
                     type: 'box', layout: 'vertical',
                     contents: [
@@ -83,7 +86,12 @@ export async function GET(request) {
                 altText: `🌙 แจ้งเตือนเลิกงาน ${shift.name}`,
                 contents: {
                   type: 'bubble',
-                  header: { backgroundColor: '#333333', layout: 'vertical', contents: [{ type: 'text', text: '🌙 ได้เวลาเลิกงานแล้ว', color: '#ffffff', weight: 'bold' }] },
+                  header: { 
+                      type: 'box', // ✅ เพิ่มบรรทัดนี้ (สำคัญมาก)
+                      layout: 'vertical', 
+                      backgroundColor: '#333333', 
+                      contents: [{ type: 'text', text: '🌙 ได้เวลาเลิกงานแล้ว', color: '#ffffff', weight: 'bold' }] 
+                  },
                   body: {
                     type: 'box', layout: 'vertical',
                     contents: [
@@ -98,14 +106,13 @@ export async function GET(request) {
         }
     }
 
-    // 3. ส่งข้อความ (พร้อมดัก Error 400 แบบละเอียด)
+    // 3. ส่งข้อความ
     if (messages.length > 0) {
         try {
             console.log("🚀 Pushing messages:", JSON.stringify(messages));
             await client.pushMessage(GROUP_ID, messages.slice(0, 5));
             return NextResponse.json({ success: true, count: messages.length, debug: debugLog });
         } catch (lineError) {
-            // 🚨 นี่คือจุดสำคัญ: ดึงรายละเอียด Error จาก LINE
             console.error("LINE API Error:", lineError.originalError?.response?.data);
             return NextResponse.json({ 
                 error: "LINE_API_ERROR", 
