@@ -37,15 +37,20 @@ export async function POST(request) {
     const isLateOrEarly = statusDetail?.includes('สาย') || statusDetail?.includes('ออกก่อน');
     const statusTextColor = isLateOrEarly ? '#f59e0b' : '#6b7280'; // ส้ม หรือ เทา
 
-    // Clean ข้อความพิกัด (เอา icon ✅❌ ออกเพื่อให้ดูสะอาดตา)
+    // Clean ข้อความพิกัด
     const cleanLocation = locationStatus?.replace('✅ ', '').replace('❌ ', '') || '-';
+
+    // ✅ แก้ไข URL ให้ถูกต้อง (เอา Markdown link ออก)
+    const validPhotoUrl = photoUrl && photoUrl.startsWith('http') 
+        ? photoUrl 
+        : 'https://via.placeholder.com/150?text=No+Img';
 
     const message = {
       type: 'flex',
       altText: `${name} ${title}`,
       contents: {
         type: 'bubble',
-        size: 'kilo', // ขนาดกล่องกำลังดี
+        size: 'kilo',
         body: {
           type: 'box',
           layout: 'vertical',
@@ -61,7 +66,7 @@ export async function POST(request) {
             },
             { type: 'separator', margin: 'md' },
             
-            // 2. เนื้อหาหลัก (จัดแบบ แนวนอน: รูปซ้าย - ข้อความขวา)
+            // 2. เนื้อหาหลัก
             {
               type: 'box',
               layout: 'horizontal',
@@ -71,12 +76,12 @@ export async function POST(request) {
                 // 📸 2.1 รูปภาพ (Icon)
                 {
                   type: 'image',
-                  url: photoUrl || '[https://via.placeholder.com/150?text=No+Img](https://via.placeholder.com/150?text=No+Img)', // Fallback ถ้าไม่มีรูป
-                  size: 'lg', // ขนาดรูป (sm, md, lg, xl, xxl)
-                  aspectRatio: '1:1', // จัตุรัส
+                  url: validPhotoUrl, // ✅ ใช้ตัวแปรที่แก้แล้ว
+                  size: 'lg',
+                  aspectRatio: '1:1',
                   aspectMode: 'cover',
-                  borderRadius: 'md', // มุมมน
-                  action: { type: 'uri', uri: photoUrl }, // กดรูปเพื่อดูภาพใหญ่
+                  borderRadius: 'md',
+                  action: { type: 'uri', uri: validPhotoUrl },
                   flex: 3
                 },
                 // 📝 2.2 รายละเอียด (ขวามือ)
@@ -97,7 +102,7 @@ export async function POST(request) {
                                     { type: 'text', text: time, color: '#4b5563', size: 'xs', flex: 2, weight: 'bold' }
                                 ]
                             },
-                            // สถานะ (สาย/ปกติ)
+                            // สถานะ
                             {
                                 type: 'box', layout: 'baseline', spacing: 'sm',
                                 contents: [
@@ -125,11 +130,13 @@ export async function POST(request) {
       }
     };
 
+    // ส่งข้อความ
     await client.pushMessage(GROUP_ID, [message]); 
     
     return NextResponse.json({ success: true });
 
   } catch (error) {
+    console.error("Notify Error:", error); // ✅ เพิ่ม Log เพื่อดู Error ใน Vercel
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
