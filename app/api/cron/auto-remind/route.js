@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { supabase } from '../../../../lib/supabaseClient';
 import { Client } from '@line/bot-sdk';
 
-const GROUP_ID = 'Cc2c65da5408563ef57ae61dee6ce3c1d';
+// ✅ ใส่ Group ID (ผมใส่ .trim() กันเหนียว เผื่อมีเว้นวรรคตอนก๊อปมา)
+const GROUP_ID = 'Cc2c65da5408563ef57ae61dee6ce3c1d'.trim();
 
 const client = new Client({
   channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN,
@@ -31,35 +32,38 @@ export async function GET(request) {
     let debugLog = [];
 
     for (const shift of shifts) {
+        // ข้ามถ้าไม่ได้ตั้งเวลา
         if (!shift.notify_time_in && !shift.notify_time_out) continue;
 
-        // แปลงเวลา Alert In
-        let diffIn = 999;
+        let diffIn = 9999;
+        let diffOut = 9999;
+
+        // คำนวณเวลาเข้า
         if (shift.notify_time_in) {
             const [hIn, mIn] = shift.notify_time_in.split(':').map(Number);
             const alertInMinutes = hIn * 60 + mIn;
             diffIn = Math.abs(currentTotalMinutes - alertInMinutes);
         }
 
-        // แปลงเวลา Alert Out
-        let diffOut = 999;
+        // คำนวณเวลาออก
         if (shift.notify_time_out) {
             const [hOut, mOut] = shift.notify_time_out.split(':').map(Number);
             const alertOutMinutes = hOut * 60 + mOut;
             diffOut = Math.abs(currentTotalMinutes - alertOutMinutes);
         }
 
-        debugLog.push(`${shift.name}: In-Diff ${diffIn}m, Out-Diff ${diffOut}m`);
+        debugLog.push(`${shift.name}: In-Diff=${diffIn}, Out-Diff=${diffOut}`);
 
-        // ✅✅✅ แก้ตรงนี้: ขยายเวลาเป็น <= 7 นาที (เพื่อรองรับ Delay ของ Cron)
+        // --- Logic: ช่วงเวลา ±5 นาที ---
+        
         // 1. แจ้งเข้า
-        if (diffIn <= 7) {
+        if (diffIn <= 5) {
             messages.push({
                 type: 'flex',
                 altText: `⏰ แจ้งเตือนเข้างาน ${shift.name}`,
                 contents: {
                   type: 'bubble',
-                  header: { backgroundColor: '#ff9900', layout: 'vertical', contents: [{ type: 'text', text: '⏰ ได้เวลาเตรียมตัวเข้างาน', color: '#ffffff', weight: 'bold' }] },
+                  header: { backgroundColor: '#ff9900', layout: 'vertical', contents: [{ type: 'text', text: `⏰ เตรียมตัวเข้างาน`, color: '#ffffff', weight: 'bold' }] },
                   body: {
                     type: 'box', layout: 'vertical',
                     contents: [
@@ -73,7 +77,7 @@ export async function GET(request) {
         }
 
         // 2. แจ้งออก
-        if (diffOut <= 7) {
+        if (diffOut <= 5) {
              messages.push({
                 type: 'flex',
                 altText: `🌙 แจ้งเตือนเลิกงาน ${shift.name}`,
@@ -83,7 +87,7 @@ export async function GET(request) {
                   body: {
                     type: 'box', layout: 'vertical',
                     contents: [
-                      { type: 'text', text: `กะ: ${shift.name}`, weight: 'bold', size: 'lg' },
+                      { type: 'text', text: `กะ: ${shift.name}`, weight: 'bold', size: 'lg', color: '#333333' },
                       { type: 'text', text: `เวลาเลิก: ${shift.end_time}`, size: 'md', color: '#ff334b', margin: 'md' },
                       { type: 'text', text: 'อย่าลืมกด Check-out นะครับ!', size: 'sm', color: '#aaaaaa', margin: 'xs' }
                     ]
@@ -94,14 +98,26 @@ export async function GET(request) {
         }
     }
 
+    // 3. ส่งข้อความ (พร้อมดัก Error 400 แบบละเอียด)
     if (messages.length > 0) {
-        await client.pushMessage(GROUP_ID, messages.slice(0, 5));
-        return NextResponse.json({ success: true, count: messages.length, debug: debugLog });
+        try {
+            console.log("🚀 Pushing messages:", JSON.stringify(messages));
+            await client.pushMessage(GROUP_ID, messages.slice(0, 5));
+            return NextResponse.json({ success: true, count: messages.length, debug: debugLog });
+        } catch (lineError) {
+            // 🚨 นี่คือจุดสำคัญ: ดึงรายละเอียด Error จาก LINE
+            console.error("LINE API Error:", lineError.originalError?.response?.data);
+            return NextResponse.json({ 
+                error: "LINE_API_ERROR", 
+                details: lineError.originalError?.response?.data || lineError.message,
+                debug: debugLog
+            }, { status: 500 });
+        }
     }
 
-    return NextResponse.json({ success: true, message: "No alert time matched", debug: debugLog });
+    return NextResponse.json({ success: true, message: "No match", debug: debugLog, time: timeString });
 
   } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "SERVER_CRASH", details: error.message }, { status: 500 });
   }
 }
