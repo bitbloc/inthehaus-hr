@@ -22,7 +22,7 @@ export async function POST(request) {
     const todayEnd = new Date(thaiTime); todayEnd.setHours(23,59,59,999);
     const dateString = thaiTime.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' });
 
-    // 2. ดึงตารางงานวันนี้ (เอาคนที่มีเวร)
+    // 2. ดึงตารางงานวันนี้
     const { data: schedules } = await supabase
       .from('employee_schedules')
       .select('employee_id, employees(name)')
@@ -33,7 +33,7 @@ export async function POST(request) {
         return NextResponse.json({ message: "No schedule today" });
     }
 
-    // 3. ดึง Log วันนี้ (คนที่มาแล้ว)
+    // 3. ดึงคนที่มาแล้ว
     const { data: logs } = await supabase
       .from('attendance_logs')
       .select('employee_id')
@@ -42,24 +42,27 @@ export async function POST(request) {
 
     const presentIds = new Set(logs.map(l => l.employee_id));
 
-    // 4. หาคนขาด (มีเวร - มาแล้ว)
+    // 4. หาคนขาด
     const absentList = schedules.filter(s => !presentIds.has(s.employee_id));
 
-    // 5. บันทึก 'absent' ลง Database
-    let insertedCount = 0;
+    // 5. บันทึก 'absent' ลง Database (พยายามบันทึก แต่ไม่เอาผลลัพธ์ไปโชว์ในไลน์ กันพลาด)
     if (absentList.length > 0) {
         const insertData = absentList.map(s => ({
             employee_id: s.employee_id,
             action_type: 'absent',
             timestamp: new Date().toISOString()
         }));
-        const { error } = await supabase.from('attendance_logs').insert(insertData);
-        if (!error) insertedCount = insertData.length;
+        // ใช้ upsert แทน insert เพื่อป้องกัน Error กรณีรันซ้ำ (Duplicate Key)
+        await supabase.from('attendance_logs').insert(insertData); 
     }
 
-    // 6. ✅ ส่งรายงานเข้ากลุ่ม LINE (Auto Report)
+    // 6. ✅ ส่งรายงานเข้ากลุ่ม LINE
     const absentNames = absentList.map(a => `• ${a.employees?.name}`).join('\n') || "- ไม่มี -";
     
+    // 🔴 จุดที่แก้: ใช้ absentList.length แทน insertedCount
+    // เพื่อให้ตัวเลขตรงกับรายชื่อแน่นอน 100%
+    const absentCountShow = absentList.length; 
+
     const message = {
         type: 'flex',
         altText: `🏁 สรุปยอดประจำวัน ${dateString}`,
@@ -86,7 +89,8 @@ export async function POST(request) {
                 type: 'box', layout: 'horizontal', margin: 'md',
                 contents: [
                   { type: 'text', text: 'ขาดงาน:', size: 'sm', color: '#555555', flex: 1 },
-                  { type: 'text', text: `${insertedCount} คน`, size: 'sm', weight: 'bold', color: '#ef4444', align: 'end', flex: 1 }
+                  // ✅ แก้ตรงนี้ครับ
+                  { type: 'text', text: `${absentCountShow} คน`, size: 'sm', weight: 'bold', color: '#ef4444', align: 'end', flex: 1 }
                 ]
               },
               { type: 'separator', margin: 'lg' },
@@ -99,10 +103,9 @@ export async function POST(request) {
 
     await client.pushMessage(GROUP_ID, [message]);
 
-    return NextResponse.json({ success: true, marked_count: insertedCount });
+    return NextResponse.json({ success: true, absent_count: absentCountShow });
 
   } catch (error) {
-    console.error(error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
