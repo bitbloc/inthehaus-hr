@@ -153,7 +153,7 @@ export default function CheckIn() {
                     disabled={isUploading}
                     className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-2xl shadow-lg font-bold flex items-center justify-center gap-2 transition-all active:scale-95"
                 >
-                    {isUploading ? "⏳ กำลังอัปโหลด..." : "📸 ถ่ายรูปหน้างาน (บังคับ)"}
+                    {isUploading ? "⏳ กำลังอัปโหลด..." : "ถ่ายรูปยืนยัน'เข้า-ออก'งาน"}
                 </button>
             </div>
         )}
