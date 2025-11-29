@@ -185,8 +185,8 @@ export default function AdminDashboard() {
                                 <div key={shift.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
                                     <div className="font-bold text-slate-700 text-sm w-1/3">{shift.name}</div>
                                     <div className="flex gap-4 w-2/3">
-                                        <div className="flex-1"><label className="text-[10px] text-slate-400 font-bold uppercase mb-1">Check-In Alert</label><input type="time" className="w-full p-2 rounded-xl border border-slate-200 text-center font-bold text-orange-500" value={shift.notify_time_in || '09:30'} onChange={(e) => handleUpdateShift(shift.id, 'notify_time_in', e.target.value)} /></div>
-                                        <div className="flex-1"><label className="text-[10px] text-slate-400 font-bold uppercase mb-1">Check-Out Alert</label><input type="time" className="w-full p-2 rounded-xl border border-slate-200 text-center font-bold text-rose-500" value={shift.notify_time_out || '18:30'} onChange={(e) => handleUpdateShift(shift.id, 'notify_time_out', e.target.value)} /></div>
+                                        <div className="flex-1"><label className="text-[10px] text-slate-400 font-bold uppercase mb-1">Check-In Alert</label><input type="time" className="w-full p-2 rounded-xl border border-slate-200 text-center font-bold text-orange-500" value={shift.notify_time_in || ''} onChange={(e) => handleUpdateShift(shift.id, 'notify_time_in', e.target.value)} /></div>
+                                        <div className="flex-1"><label className="text-[10px] text-slate-400 font-bold uppercase mb-1">Check-Out Alert</label><input type="time" className="w-full p-2 rounded-xl border border-slate-200 text-center font-bold text-rose-500" value={shift.notify_time_out || ''} onChange={(e) => handleUpdateShift(shift.id, 'notify_time_out', e.target.value)} /></div>
                                     </div>
                                 </div>
                             ))}
