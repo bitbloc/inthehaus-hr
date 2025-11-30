@@ -12,6 +12,8 @@ const client = new Client({
 
 export async function POST(request) {
   try {
+    console.log("🏁 Starting Finalize Day Process...");
+
     // 1. กำหนดเวลาปัจจุบัน (UTC+7)
     const now = new Date();
     const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
@@ -22,45 +24,53 @@ export async function POST(request) {
     const todayEnd = new Date(thaiTime); todayEnd.setHours(23,59,59,999);
     const dateString = thaiTime.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' });
 
-    // 2. ดึงตารางงานวันนี้
-    const { data: schedules } = await supabase
+    console.log(`📅 Date: ${dateString}, DayOfWeek: ${dayOfWeek}`);
+
+    // 2. ดึงตารางงานวันนี้ (เอาคนที่มีเวร)
+    const { data: schedules, error: scheduleError } = await supabase
       .from('employee_schedules')
       .select('employee_id, employees(name)')
       .eq('day_of_week', dayOfWeek)
       .eq('is_off', false);
 
+    if (scheduleError) throw new Error("Schedule DB Error: " + scheduleError.message);
+
     if (!schedules || schedules.length === 0) {
-        return NextResponse.json({ message: "No schedule today" });
+        console.log("✅ No schedule today. Exiting.");
+        return NextResponse.json({ message: "No schedule today (Shop Closed?)" });
     }
 
-    // 3. ดึงคนที่มาแล้ว
-    const { data: logs } = await supabase
+    // 3. ดึงคนที่มาแล้ว (Check-in, Leave, หรือ Absent ที่ลงไปแล้ว)
+    const { data: logs, error: logError } = await supabase
       .from('attendance_logs')
       .select('employee_id')
       .gte('timestamp', todayStart.toISOString())
       .lt('timestamp', todayEnd.toISOString());
 
+    if (logError) throw new Error("Log DB Error: " + logError.message);
+
     const presentIds = new Set(logs.map(l => l.employee_id));
 
-    // 4. หาคนขาด
+    // 4. หาคนขาด (มีเวร - มาแล้ว)
+    // กรองเอาเฉพาะคนที่ "ไม่อยู่ใน presentIds"
     const absentList = schedules.filter(s => !presentIds.has(s.employee_id));
 
-    // 5. บันทึก 'absent' ลง Database (พยายามบันทึก แต่ไม่เอาผลลัพธ์ไปโชว์ในไลน์ กันพลาด)
+    console.log(`📊 Total Schedule: ${schedules.length}, Present: ${presentIds.size}, Absent: ${absentList.length}`);
+
+    // 5. บันทึก 'absent' ลง Database (ถ้ามีคนขาด)
     if (absentList.length > 0) {
         const insertData = absentList.map(s => ({
             employee_id: s.employee_id,
             action_type: 'absent',
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString() // ใช้เวลาปัจจุบันบันทึก
         }));
-        // ใช้ upsert แทน insert เพื่อป้องกัน Error กรณีรันซ้ำ (Duplicate Key)
-        await supabase.from('attendance_logs').insert(insertData); 
+
+        const { error: insertError } = await supabase.from('attendance_logs').insert(insertData);
+        if (insertError) throw new Error("Insert Absent Error: " + insertError.message);
     }
 
     // 6. ✅ ส่งรายงานเข้ากลุ่ม LINE
-    const absentNames = absentList.map(a => `• ${a.employees?.name}`).join('\n') || "- ไม่มี -";
-    
-    // 🔴 จุดที่แก้: ใช้ absentList.length แทน insertedCount
-    // เพื่อให้ตัวเลขตรงกับรายชื่อแน่นอน 100%
+    const absentNames = absentList.map(a => `• ${a.employees?.name}`).join('\n') || "- ครบถ้วน -";
     const absentCountShow = absentList.length; 
 
     const message = {
@@ -89,13 +99,12 @@ export async function POST(request) {
                 type: 'box', layout: 'horizontal', margin: 'md',
                 contents: [
                   { type: 'text', text: 'ขาดงาน:', size: 'sm', color: '#555555', flex: 1 },
-                  // ✅ แก้ตรงนี้ครับ
-                  { type: 'text', text: `${absentCountShow} คน`, size: 'sm', weight: 'bold', color: '#ef4444', align: 'end', flex: 1 }
+                  { type: 'text', text: `${absentCountShow} คน`, size: 'sm', weight: 'bold', color: absentCountShow > 0 ? '#ef4444' : '#10b981', align: 'end', flex: 1 }
                 ]
               },
               { type: 'separator', margin: 'lg' },
               { type: 'text', text: 'รายชื่อคนขาด:', margin: 'md', size: 'xs', color: '#9ca3af' },
-              { type: 'text', text: absentNames, margin: 'sm', size: 'xs', color: '#ef4444', wrap: true }
+              { type: 'text', text: absentNames, margin: 'sm', size: 'xs', color: absentCountShow > 0 ? '#ef4444' : '#10b981', wrap: true }
             ]
           }
         }
@@ -103,9 +112,15 @@ export async function POST(request) {
 
     await client.pushMessage(GROUP_ID, [message]);
 
-    return NextResponse.json({ success: true, absent_count: absentCountShow });
+    return NextResponse.json({ success: true, marked_count: absentCountShow });
 
   } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("❌ Finalize Day Error:", error);
+    // ส่ง Error กลับไปดูใน Cron Job
+    return NextResponse.json({ 
+        error: "CRASH", 
+        message: error.message, 
+        stack: error.stack 
+    }, { status: 500 });
   }
 }

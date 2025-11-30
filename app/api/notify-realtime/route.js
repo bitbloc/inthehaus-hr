@@ -11,7 +11,7 @@ const client = new Client({
 
 export async function POST(request) {
   try {
-    const { name, position, action, time, locationStatus, statusDetail } = await request.json();
+    const { name, position, action, time, locationStatus, statusDetail, photoUrl } = await request.json();
 
     // --- กำหนดค่าตามประเภท Action ---
     let title = "";
@@ -34,61 +34,91 @@ export async function POST(request) {
         labelLocation = "ประเภท:";
     }
 
-    // กำหนดสีของข้อความสถานะ
     const isLateOrEarly = statusDetail?.includes('สาย') || statusDetail?.includes('ออกก่อน');
-    const statusTextColor = isLateOrEarly ? '#f59e0b' : '#6b7280'; // ส้ม หรือ เทา
+    const statusTextColor = isLateOrEarly ? '#f59e0b' : '#6b7280'; 
 
-    // Clean ข้อความพิกัด
     const cleanLocation = locationStatus?.replace('✅ ', '').replace('❌ ', '') || '-';
+
+    // ✅ เตรียม Object ของรูปภาพ (กัน Error กรณีไม่มีรูป)
+    const imageComponent = {
+        type: 'image',
+        url: photoUrl || 'https://via.placeholder.com/150?text=No+Img', // รูปสำรองถ้าไม่มี
+        size: 'lg', 
+        aspectRatio: '1:1',
+        aspectMode: 'cover',
+        borderRadius: 'md',
+        flex: 3,
+        // 🔥 จุดที่แก้: ใส่ action ก็ต่อเมื่อมี photoUrl จริงๆ เท่านั้น
+        ...(photoUrl && { 
+            action: { type: 'uri', uri: photoUrl } 
+        })
+    };
 
     const message = {
       type: 'flex',
       altText: `${name} ${title}`,
       contents: {
         type: 'bubble',
-        // ❌ เอาส่วน hero (รูปภาพ) ออกไปแล้วครับ
+        size: 'kilo', 
         body: {
-          type: 'box',
+          type: 'box', // ✅ เช็คแล้ว: box ครบถ้วน
           layout: 'vertical',
           contents: [
-            // 1. หัวข้อ (Action & Position)
+            // 1. หัวข้อ
             {
               type: 'box',
               layout: 'horizontal',
               contents: [
-                { type: 'text', text: title, weight: 'bold', size: 'md', color: color, flex: 0 },
+                { type: 'text', text: title, weight: 'bold', size: 'sm', color: color, flex: 0 },
                 { type: 'text', text: position || 'Staff', size: 'xs', color: '#9ca3af', align: 'end', gravity: 'center' }
               ]
             },
-            // 2. ชื่อพนักงาน (ตัวใหญ่)
-            { type: 'text', text: name, weight: 'bold', size: 'xl', margin: 'md', color: '#1f2937' },
             { type: 'separator', margin: 'md' },
-            // 3. รายละเอียด (เวลา, สถานะ, พิกัด)
+            
+            // 2. เนื้อหาหลัก (แนวนอน: รูป - ข้อความ)
             {
-              type: 'box',
-              layout: 'vertical',
+              type: 'box', // ✅ เช็คแล้ว: box ครบถ้วน
+              layout: 'horizontal',
               margin: 'md',
-              spacing: 'sm',
+              spacing: 'md',
               contents: [
+                // 2.1 รูปภาพ (ใช้ตัวแปรที่เราเตรียมไว้ข้างบน)
+                imageComponent,
+                
+                // 2.2 รายละเอียดขวามือ
                 {
-                  type: 'box', layout: 'baseline',
+                  type: 'box', // ✅ เช็คแล้ว: box ครบถ้วน
+                  layout: 'vertical',
+                  flex: 5,
                   contents: [
-                    { type: 'text', text: labelTime, size: 'sm', color: '#aaaaaa', flex: 2 },
-                    { type: 'text', text: time, size: 'sm', color: '#1f2937', flex: 4, weight: 'bold' }
-                  ]
-                },
-                {
-                  type: 'box', layout: 'baseline',
-                  contents: [
-                    { type: 'text', text: labelStatus, size: 'sm', color: '#aaaaaa', flex: 2 },
-                    { type: 'text', text: statusDetail || '-', size: 'sm', color: statusTextColor, flex: 4, weight: isLateOrEarly ? 'bold' : 'regular', wrap: true }
-                  ]
-                },
-                {
-                  type: 'box', layout: 'baseline',
-                  contents: [
-                    { type: 'text', text: labelLocation, size: 'sm', color: '#aaaaaa', flex: 2 },
-                    { type: 'text', text: cleanLocation, size: 'xs', color: '#9ca3af', flex: 4, wrap: true }
+                    { type: 'text', text: name, weight: 'bold', size: 'md', color: '#1f2937', wrap: true, margin: 'none' },
+                    {
+                        type: 'box', // ✅ เช็คแล้ว: box ครบถ้วน
+                        layout: 'vertical', margin: 'sm', spacing: 'xs',
+                        contents: [
+                            {
+                                type: 'box', layout: 'baseline', spacing: 'sm', // ✅ baseline ต้องมีลูกเป็น text
+                                contents: [
+                                    { type: 'text', text: labelTime, color: '#aaaaaa', size: 'xxs', flex: 1 },
+                                    { type: 'text', text: time, color: '#4b5563', size: 'xs', flex: 2, weight: 'bold' }
+                                ]
+                            },
+                            {
+                                type: 'box', layout: 'baseline', spacing: 'sm',
+                                contents: [
+                                    { type: 'text', text: labelStatus, color: '#aaaaaa', size: 'xxs', flex: 1 },
+                                    { type: 'text', text: statusDetail || '-', color: statusTextColor, size: 'xs', flex: 2, wrap: true }
+                                ]
+                            },
+                            {
+                                type: 'box', layout: 'baseline', spacing: 'sm',
+                                contents: [
+                                    { type: 'text', text: labelLocation, color: '#aaaaaa', size: 'xxs', flex: 1 },
+                                    { type: 'text', text: cleanLocation, color: '#9ca3af', size: 'xxs', flex: 2, wrap: true }
+                                ]
+                            }
+                        ]
+                    }
                   ]
                 }
               ]
@@ -99,12 +129,12 @@ export async function POST(request) {
       }
     };
 
-    // ส่งเข้ากลุ่มโดยตรง
     await client.pushMessage(GROUP_ID, [message]); 
     
     return NextResponse.json({ success: true });
 
   } catch (error) {
+    console.error("Line Notify Error:", error); // เพิ่ม log ให้เห็นใน Vercel
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
