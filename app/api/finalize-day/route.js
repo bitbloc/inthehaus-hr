@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '../../../lib/supabaseClient';
+import { supabase } from '../../../lib/supabaseClient'; // ✅ เพิ่ม import supabase
 import { Client } from '@line/bot-sdk';
 
 const GROUP_ID = 'Cc2c65da5408563ef57ae61dee6ce3c1d';
@@ -9,113 +9,128 @@ const client = new Client({
   channelSecret: process.env.CHANNEL_SECRET,
 });
 
-export const dynamic = 'force-dynamic'; // ห้าม Cache
-
 export async function POST(request) {
   try {
-    console.log("🏁 Starting Finalize Day Process...");
+    const { name, position, action, time, locationStatus, statusDetail } = await request.json();
 
-    // 1. เวลาปัจจุบัน (UTC+7)
-    const now = new Date();
-    const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
-    const thaiTime = new Date(utc + (3600000 * 7));
+    // --- 1. ตรวจสอบสิทธิ์การแจ้งเตือน (Toggle Check) ---
+    // เราจะเช็คว่า "ช่วงเวลานี้" ตรงกับกะไหน และกะนั้นเปิดแจ้งเตือนไว้ไหม
     
-    const dayOfWeek = thaiTime.getDay();
-    const todayStart = new Date(thaiTime); todayStart.setHours(0,0,0,0);
-    const todayEnd = new Date(thaiTime); todayEnd.setHours(23,59,59,999);
-    const dateString = thaiTime.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' });
+    // แปลงเวลาที่กด (HH:mm) เป็นนาที
+    const [h, m] = time.split(':').map(Number);
+    const actionMinutes = h * 60 + m;
 
-    // 2. ดึงตารางงาน (ป้องกันค่า null)
-    const { data: schedules, error: schedError } = await supabase
-      .from('employee_schedules')
-      .select('employee_id, employees(name)')
-      .eq('day_of_week', dayOfWeek)
-      .eq('is_off', false);
+    // ดึงข้อมูลกะงานทั้งหมด
+    const { data: shifts } = await supabase.from('shifts').select('*');
+    
+    let shouldNotify = true; // ค่าเริ่มต้น: ส่งตลอด (ถ้าหากะไม่เจอ)
 
-    if (schedError) throw new Error("Schedule DB Error: " + schedError.message);
-    if (!schedules || schedules.length === 0) {
-        return NextResponse.json({ message: "No schedule today" });
+    if (shifts && shifts.length > 0) {
+        // หากะที่เวลา "ใกล้เคียง" กับเวลากดที่สุด (± 2 ชม.)
+        const matchedShift = shifts.find(s => {
+            if (!s.start_time || !s.end_time) return false;
+            
+            const [sh, sm] = s.start_time.split(':').map(Number);
+            const startMins = sh * 60 + sm;
+            
+            const [eh, em] = s.end_time.split(':').map(Number);
+            const endMins = eh * 60 + em;
+
+            // ถ้ากดเข้างาน: เช็คว่าใกล้เวลาเริ่มกะนี้ไหม
+            if (action === 'check_in' && Math.abs(actionMinutes - startMins) <= 180) return true; // ±3 ชม.
+            
+            // ถ้ากดออกงาน: เช็คว่าใกล้เวลาเลิกกะนี้ไหม
+            if (action === 'check_out' && Math.abs(actionMinutes - endMins) <= 180) return true;
+
+            return false;
+        });
+
+        if (matchedShift) {
+            // ถ้าเจอกะที่ตรงกัน -> เช็คสวิตช์เปิด-ปิดของกะนั้น
+            if (action === 'check_in' && matchedShift.notify_in_enabled === false) shouldNotify = false;
+            if (action === 'check_out' && matchedShift.notify_out_enabled === false) shouldNotify = false;
+        }
     }
 
-    // 3. ดึง Log วันนี้ (ป้องกันค่า null)
-    const { data: logs, error: logError } = await supabase
-      .from('attendance_logs')
-      .select('employee_id')
-      .gte('timestamp', todayStart.toISOString())
-      .lt('timestamp', todayEnd.toISOString());
-
-    if (logError) throw new Error("Log DB Error: " + logError.message);
-
-    // ✅ ใส่ || [] กันพังถ้า logs เป็น null
-    const presentIds = new Set((logs || []).map(l => l.employee_id));
-
-    // 4. หาคนขาด
-    const absentList = schedules.filter(s => !presentIds.has(s.employee_id));
-    const absentCountShow = absentList.length; 
-
-    // 5. บันทึก (ถ้ามีคนขาด)
-    if (absentList.length > 0) {
-        const insertData = absentList.map(s => ({
-            employee_id: s.employee_id,
-            action_type: 'absent',
-            timestamp: new Date().toISOString()
-        }));
-        // ใช้ upsert แทน insert เพื่อไม่ให้ Error ถ้ารันซ้ำ
-        await supabase.from('attendance_logs').upsert(insertData, { onConflict: 'id' }); 
+    if (!shouldNotify) {
+        console.log(`🔕 Notification skipped (Disabled in settings)`);
+        return NextResponse.json({ success: true, message: "Notification disabled" });
     }
 
-    // 6. ส่งไลน์ (ใส่ Try-Catch แยก เพื่อไม่ให้พังทั้งระบบถ้าส่งไม่ได้)
-    let lineStatus = "Sent";
-    try {
-        const absentNames = absentList.map(a => `• ${a.employees?.name}`).join('\n') || "- ครบถ้วน -";
-        const message = {
-            type: 'flex',
-            altText: `🏁 สรุปยอดประจำวัน ${dateString}`,
-            contents: {
-            type: 'bubble',
-            header: {
-                type: 'box', layout: 'vertical', backgroundColor: '#1e293b',
-                contents: [
-                { type: 'text', text: '🏁 สรุปยอดสิ้นวัน (Auto)', color: '#ffffff', weight: 'bold', size: 'lg' },
-                { type: 'text', text: `ประจำวันที่ ${dateString}`, color: '#94a3b8', size: 'xs' }
-                ]
+    // --- 2. สร้างข้อความ (Classic Style - No Image) ---
+    let title = "", color = "", labelTime = "เวลา:", labelStatus = "สถานะ:", labelLocation = "พิกัด:";
+
+    if (action === 'check_in') {
+        title = '🟢 ลงเวลาเข้างาน'; color = '#10b981';
+    } else if (action === 'check_out') {
+        title = '🔴 ลงเวลาออกงาน'; color = '#ef4444';
+    } else if (action === 'leave_request') {
+        title = '📝 แจ้งขอลาหยุด'; color = '#f59e0b';
+        labelTime = "วันที่:"; labelStatus = "เหตุผล:"; labelLocation = "ประเภท:";
+    }
+
+    const isLateOrEarly = statusDetail?.includes('สาย') || statusDetail?.includes('ออกก่อน');
+    const statusTextColor = isLateOrEarly ? '#f59e0b' : '#6b7280'; 
+    const cleanLocation = locationStatus?.replace('✅ ', '').replace('❌ ', '') || '-';
+
+    const message = {
+      type: 'flex',
+      altText: `${name} ${title}`,
+      contents: {
+        type: 'bubble',
+        size: 'kilo',
+        body: {
+          type: 'box',
+          layout: 'vertical',
+          contents: [
+            // หัวข้อ
+            {
+              type: 'box', layout: 'horizontal',
+              contents: [
+                { type: 'text', text: title, weight: 'bold', size: 'sm', color: color, flex: 0 },
+                { type: 'text', text: position || 'Staff', size: 'xs', color: '#9ca3af', align: 'end', gravity: 'center' }
+              ]
             },
-            body: {
-                type: 'box', layout: 'vertical',
-                contents: [
+            // ชื่อ
+            { type: 'text', text: name, weight: 'bold', size: 'xl', margin: 'md', color: '#1f2937' },
+            { type: 'separator', margin: 'md' },
+            // รายละเอียด
+            {
+              type: 'box', layout: 'vertical', margin: 'md', spacing: 'sm',
+              contents: [
                 {
-                    type: 'box', layout: 'horizontal',
-                    contents: [
-                    { type: 'text', text: 'มาทำงาน:', size: 'sm', color: '#555555', flex: 1 },
-                    { type: 'text', text: `${presentIds.size} คน`, size: 'sm', weight: 'bold', color: '#10b981', align: 'end', flex: 1 }
-                    ]
+                  type: 'box', layout: 'baseline',
+                  contents: [
+                    { type: 'text', text: labelTime, size: 'sm', color: '#aaaaaa', flex: 2 },
+                    { type: 'text', text: time, size: 'sm', color: '#1f2937', flex: 4, weight: 'bold' }
+                  ]
                 },
                 {
-                    type: 'box', layout: 'horizontal', margin: 'md',
-                    contents: [
-                    { type: 'text', text: 'ขาดงาน:', size: 'sm', color: '#555555', flex: 1 },
-                    { type: 'text', text: `${absentCountShow} คน`, size: 'sm', weight: 'bold', color: absentCountShow > 0 ? '#ef4444' : '#10b981', align: 'end', flex: 1 }
-                    ]
+                  type: 'box', layout: 'baseline',
+                  contents: [
+                    { type: 'text', text: labelStatus, size: 'sm', color: '#aaaaaa', flex: 2 },
+                    { type: 'text', text: statusDetail || '-', size: 'sm', color: statusTextColor, flex: 4, weight: isLateOrEarly ? 'bold' : 'regular', wrap: true }
+                  ]
                 },
-                { type: 'separator', margin: 'lg' },
-                { type: 'text', text: 'รายชื่อคนขาด:', margin: 'md', size: 'xs', color: '#9ca3af' },
-                { type: 'text', text: absentNames, margin: 'sm', size: 'xs', color: absentCountShow > 0 ? '#ef4444' : '#10b981', wrap: true }
-                ]
+                {
+                  type: 'box', layout: 'baseline',
+                  contents: [
+                    { type: 'text', text: labelLocation, size: 'sm', color: '#aaaaaa', flex: 2 },
+                    { type: 'text', text: cleanLocation, size: 'xs', color: '#9ca3af', flex: 4, wrap: true }
+                  ]
+                }
+              ]
             }
-            }
-        };
-        await client.pushMessage(GROUP_ID, [message]);
+          ]
+        },
+        styles: { footer: { separator: true } }
+      }
+    };
 
-    } catch (lineError) {
-        console.error("LINE Send Failed:", lineError);
-        lineStatus = "Failed (Quota?): " + lineError.message;
-        // ไม่ throw error ต่อ เพื่อให้ API จบการทำงานแบบ 200 OK
-    }
-
-    return NextResponse.json({ success: true, marked_count: absentCountShow, line_status: lineStatus });
+    await client.pushMessage(GROUP_ID, [message]); 
+    return NextResponse.json({ success: true });
 
   } catch (error) {
-    console.error("Critical Error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
