@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '../../../lib/supabaseClient'; // ✅ เพิ่ม import supabase
+import { supabase } from '../../../lib/supabaseClient';
 import { Client } from '@line/bot-sdk';
 
 const GROUP_ID = 'Cc2c65da5408563ef57ae61dee6ce3c1d';
@@ -11,126 +11,136 @@ const client = new Client({
 
 export async function POST(request) {
   try {
-    const { name, position, action, time, locationStatus, statusDetail } = await request.json();
+    // 1. Get today's date range (Local Time logic might be needed if server is UTC)
+    // Assuming server time is close enough or we use UTC dates
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
 
-    // --- 1. ตรวจสอบสิทธิ์การแจ้งเตือน (Toggle Check) ---
-    // เราจะเช็คว่า "ช่วงเวลานี้" ตรงกับกะไหน และกะนั้นเปิดแจ้งเตือนไว้ไหม
-    
-    // แปลงเวลาที่กด (HH:mm) เป็นนาที
-    const [h, m] = time.split(':').map(Number);
-    const actionMinutes = h * 60 + m;
+    // 2. Fetch logs
+    const { data: logs, error } = await supabase
+      .from('attendance_logs')
+      .select('*, employees(name, shifts(name, start_time, end_time))')
+      .gte('timestamp', today.toISOString())
+      .lt('timestamp', tomorrow.toISOString())
+      .order('timestamp', { ascending: true });
 
-    // ดึงข้อมูลกะงานทั้งหมด
-    const { data: shifts } = await supabase.from('shifts').select('*');
-    
-    let shouldNotify = true; // ค่าเริ่มต้น: ส่งตลอด (ถ้าหากะไม่เจอ)
+    if (error) throw error;
 
-    if (shifts && shifts.length > 0) {
-        // หากะที่เวลา "ใกล้เคียง" กับเวลากดที่สุด (± 2 ชม.)
-        const matchedShift = shifts.find(s => {
-            if (!s.start_time || !s.end_time) return false;
-            
-            const [sh, sm] = s.start_time.split(':').map(Number);
-            const startMins = sh * 60 + sm;
-            
-            const [eh, em] = s.end_time.split(':').map(Number);
-            const endMins = eh * 60 + em;
+    // 3. Process logs by employee
+    const empMap = {};
+    logs.forEach(log => {
+      const empId = log.employee_id;
+      if (!empMap[empId]) {
+        empMap[empId] = {
+          name: log.employees?.name || 'Unknown',
+          checkIn: null,
+          checkOut: null,
+          shift: log.employees?.shifts?.name || '-',
+          shiftStart: log.employees?.shifts?.start_time,
+          shiftEnd: log.employees?.shifts?.end_time
+        };
+      }
+      if (log.action_type === 'check_in') empMap[empId].checkIn = new Date(log.timestamp);
+      if (log.action_type === 'check_out') empMap[empId].checkOut = new Date(log.timestamp);
+    });
 
-            // ถ้ากดเข้างาน: เช็คว่าใกล้เวลาเริ่มกะนี้ไหม
-            if (action === 'check_in' && Math.abs(actionMinutes - startMins) <= 180) return true; // ±3 ชม.
-            
-            // ถ้ากดออกงาน: เช็คว่าใกล้เวลาเลิกกะนี้ไหม
-            if (action === 'check_out' && Math.abs(actionMinutes - endMins) <= 180) return true;
+    const reportLines = [];
+    let presentCount = 0;
 
-            return false;
-        });
+    Object.values(empMap).forEach(emp => {
+      presentCount++;
+      // Format time to HH:mm
+      const formatTime = (date) => {
+        if (!date) return '-';
+        // Adjust for timezone if necessary, but assuming Date object handles it or we just take HH:mm from ISO
+        // Since we are in Node environment, new Date(iso) might be UTC. 
+        // We should probably add 7 hours for Thailand if the server is UTC.
+        // But let's try standard methods first. 
+        // To be safe for Thailand time (UTC+7):
+        const thDate = new Date(date.toLocaleString("en-US", { timeZone: "Asia/Bangkok" }));
+        return `${String(thDate.getHours()).padStart(2, '0')}:${String(thDate.getMinutes()).padStart(2, '0')}`;
+      };
 
-        if (matchedShift) {
-            // ถ้าเจอกะที่ตรงกัน -> เช็คสวิตช์เปิด-ปิดของกะนั้น
-            if (action === 'check_in' && matchedShift.notify_in_enabled === false) shouldNotify = false;
-            if (action === 'check_out' && matchedShift.notify_out_enabled === false) shouldNotify = false;
+      const inTime = formatTime(emp.checkIn);
+      const outTime = emp.checkOut ? formatTime(emp.checkOut) : '?';
+
+      let status = 'ปกติ';
+      let color = '#111827'; // Default text color
+
+      // Simple Late Check
+      if (emp.checkIn && emp.shiftStart) {
+        const [sh, sm] = emp.shiftStart.split(':').map(Number);
+        // Create shift start time object for comparison
+        // We need to be careful with timezones here. 
+        // Let's compare minutes from midnight.
+
+        // Get check-in minutes
+        const checkInDate = new Date(emp.checkIn.toLocaleString("en-US", { timeZone: "Asia/Bangkok" }));
+        const checkInMinutes = checkInDate.getHours() * 60 + checkInDate.getMinutes();
+        const shiftStartMinutes = sh * 60 + sm;
+
+        if (checkInMinutes > shiftStartMinutes) {
+          status = 'สาย';
+          color = '#ef4444'; // Red
         }
-    }
+      }
 
-    if (!shouldNotify) {
-        console.log(`🔕 Notification skipped (Disabled in settings)`);
-        return NextResponse.json({ success: true, message: "Notification disabled" });
-    }
+      // Check Early Out or Forgot Out
+      if (!emp.checkOut) {
+        status = 'ยังไม่ออก?';
+        color = '#f59e0b'; // Orange
+      }
 
-    // --- 2. สร้างข้อความ (Classic Style - No Image) ---
-    let title = "", color = "", labelTime = "เวลา:", labelStatus = "สถานะ:", labelLocation = "พิกัด:";
+      reportLines.push({
+        name: emp.name,
+        time: `${inTime} - ${outTime}`,
+        status: status,
+        color: color
+      });
+    });
 
-    if (action === 'check_in') {
-        title = '🟢 ลงเวลาเข้างาน'; color = '#10b981';
-    } else if (action === 'check_out') {
-        title = '🔴 ลงเวลาออกงาน'; color = '#ef4444';
-    } else if (action === 'leave_request') {
-        title = '📝 แจ้งขอลาหยุด'; color = '#f59e0b';
-        labelTime = "วันที่:"; labelStatus = "เหตุผล:"; labelLocation = "ประเภท:";
-    }
-
-    const isLateOrEarly = statusDetail?.includes('สาย') || statusDetail?.includes('ออกก่อน');
-    const statusTextColor = isLateOrEarly ? '#f59e0b' : '#6b7280'; 
-    const cleanLocation = locationStatus?.replace('✅ ', '').replace('❌ ', '') || '-';
-
+    // 4. Construct Message
     const message = {
       type: 'flex',
-      altText: `${name} ${title}`,
+      altText: `สรุปยอดประจำวัน (Cut-off)`,
       contents: {
         type: 'bubble',
-        size: 'kilo',
-        body: {
-          type: 'box',
-          layout: 'vertical',
+        header: {
+          type: 'box', layout: 'vertical',
           contents: [
-            // หัวข้อ
-            {
-              type: 'box', layout: 'horizontal',
-              contents: [
-                { type: 'text', text: title, weight: 'bold', size: 'sm', color: color, flex: 0 },
-                { type: 'text', text: position || 'Staff', size: 'xs', color: '#9ca3af', align: 'end', gravity: 'center' }
-              ]
-            },
-            // ชื่อ
-            { type: 'text', text: name, weight: 'bold', size: 'xl', margin: 'md', color: '#1f2937' },
-            { type: 'separator', margin: 'md' },
-            // รายละเอียด
-            {
-              type: 'box', layout: 'vertical', margin: 'md', spacing: 'sm',
-              contents: [
-                {
-                  type: 'box', layout: 'baseline',
-                  contents: [
-                    { type: 'text', text: labelTime, size: 'sm', color: '#aaaaaa', flex: 2 },
-                    { type: 'text', text: time, size: 'sm', color: '#1f2937', flex: 4, weight: 'bold' }
-                  ]
-                },
-                {
-                  type: 'box', layout: 'baseline',
-                  contents: [
-                    { type: 'text', text: labelStatus, size: 'sm', color: '#aaaaaa', flex: 2 },
-                    { type: 'text', text: statusDetail || '-', size: 'sm', color: statusTextColor, flex: 4, weight: isLateOrEarly ? 'bold' : 'regular', wrap: true }
-                  ]
-                },
-                {
-                  type: 'box', layout: 'baseline',
-                  contents: [
-                    { type: 'text', text: labelLocation, size: 'sm', color: '#aaaaaa', flex: 2 },
-                    { type: 'text', text: cleanLocation, size: 'xs', color: '#9ca3af', flex: 4, wrap: true }
-                  ]
-                }
-              ]
-            }
+            { type: 'text', text: '🏁 Finalize Day', weight: 'bold', size: 'xl', color: '#1f2937' },
+            { type: 'text', text: `สรุปยอดวันที่ ${new Date().toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok' })}`, size: 'xs', color: '#9ca3af' }
           ]
         },
-        styles: { footer: { separator: true } }
+        body: {
+          type: 'box', layout: 'vertical',
+          contents: [
+            { type: 'text', text: `พนักงานที่มาทำงาน: ${presentCount} คน`, weight: 'bold', size: 'sm', margin: 'md' },
+            { type: 'separator', margin: 'md' },
+            ...reportLines.map(line => ({
+              type: 'box', layout: 'horizontal', margin: 'sm',
+              contents: [
+                { type: 'text', text: line.name, size: 'xs', flex: 3, color: '#1f2937' },
+                { type: 'text', text: line.time, size: 'xxs', flex: 3, color: '#6b7280', align: 'center' },
+                { type: 'text', text: line.status, size: 'xs', flex: 2, color: line.color, align: 'end', weight: 'bold' }
+              ]
+            }))
+          ]
+        }
       }
     };
 
-    await client.pushMessage(GROUP_ID, [message]); 
-    return NextResponse.json({ success: true });
+    if (presentCount > 0) {
+      await client.pushMessage(GROUP_ID, [message]);
+      return NextResponse.json({ success: true, message: "Cut-off report sent" });
+    } else {
+      return NextResponse.json({ success: true, message: "No attendance data today" });
+    }
 
   } catch (error) {
+    console.error(error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
