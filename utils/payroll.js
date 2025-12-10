@@ -1,4 +1,4 @@
-```javascript
+
 import { differenceInMinutes, parseISO } from "date-fns";
 
 /**
@@ -100,7 +100,7 @@ export const calculatePayroll = (employees, logs, schedules, shifts, payrollConf
 
                     // --- Late Calculation ---
                     const [sh, sm] = currentShift.start_time.split(':');
-                    const shiftStart = new Date(logDate); 
+                    const shiftStart = new Date(logDate);
                     shiftStart.setHours(sh, sm, 0);
 
                     if (differenceInMinutes(parseISO(firstIn.timestamp), shiftStart) > 0) {
@@ -118,7 +118,7 @@ export const calculatePayroll = (employees, logs, schedules, shifts, payrollConf
                     // Ensure eh_check etc are defined if used, but they were used deep in old code logic
                     // Actually, we can just use the previous logic
                     if (eh < sh_check) {
-                         shiftEnd.setDate(shiftEnd.getDate() + 1);
+                        shiftEnd.setDate(shiftEnd.getDate() + 1);
                     }
 
                     const diffMinutes = differenceInMinutes(outTime, shiftEnd);
