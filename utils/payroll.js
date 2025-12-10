@@ -1,5 +1,5 @@
-
-import { differenceInMinutes } from "date-fns";
+```javascript
+import { differenceInMinutes, parseISO } from "date-fns";
 
 /**
  * Calculates payroll, OT, and attendance stats for all employees.
@@ -60,7 +60,8 @@ export const calculatePayroll = (employees, logs, schedules, shifts, payrollConf
 
             // 2. Separate & Sort Logs
             // Optimization: sort once
-            dailyLogs.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+            // ✅ Fix: Use parseISO for Safari compatibility
+            dailyLogs.sort((a, b) => parseISO(a.timestamp) - parseISO(b.timestamp));
 
             const checkIns = [];
             const checkOuts = [];
@@ -80,7 +81,7 @@ export const calculatePayroll = (employees, logs, schedules, shifts, payrollConf
                 const firstIn = checkIns[0];
                 const lastOut = checkOuts[checkOuts.length - 1];
 
-                const logDate = new Date(firstIn.timestamp);
+                const logDate = parseISO(firstIn.timestamp);
                 const dayOfWeek = logDate.getDay();
 
                 const schedule = schedules[emp.id]?.[dayOfWeek];
@@ -99,26 +100,25 @@ export const calculatePayroll = (employees, logs, schedules, shifts, payrollConf
 
                     // --- Late Calculation ---
                     const [sh, sm] = currentShift.start_time.split(':');
-                    const shiftStart = new Date(logDate);
+                    const shiftStart = new Date(logDate); 
                     shiftStart.setHours(sh, sm, 0);
 
-                    if (differenceInMinutes(new Date(firstIn.timestamp), shiftStart) > 0) {
+                    if (differenceInMinutes(parseISO(firstIn.timestamp), shiftStart) > 0) {
                         lateCount++;
                     }
 
                     // --- OT Calculation ---
-                    const outTime = new Date(lastOut.timestamp);
+                    const outTime = parseISO(lastOut.timestamp);
                     const [eh, em] = currentShift.end_time.split(':').map(Number);
 
                     const shiftEnd = new Date(logDate);
                     shiftEnd.setHours(eh, em, 0);
 
                     const [sh_check, sm_check] = currentShift.start_time.split(':').map(Number);
-                    const [eh_check, em_check] = currentShift.end_time.split(':').map(Number);
-
-                    // Cross-midnight adjustment
-                    if (eh_check < sh_check) {
-                        shiftEnd.setDate(shiftEnd.getDate() + 1);
+                    // Ensure eh_check etc are defined if used, but they were used deep in old code logic
+                    // Actually, we can just use the previous logic
+                    if (eh < sh_check) {
+                         shiftEnd.setDate(shiftEnd.getDate() + 1);
                     }
 
                     const diffMinutes = differenceInMinutes(outTime, shiftEnd);
