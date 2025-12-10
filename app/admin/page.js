@@ -4,6 +4,8 @@ import { supabase } from "../../lib/supabaseClient";
 import { format, parseISO, startOfMonth, endOfMonth, differenceInMinutes } from "date-fns";
 import { th } from "date-fns/locale";
 import * as XLSX from 'xlsx';
+import { calculatePayroll } from "../../utils/payroll";
+import { useMemo } from "react";
 
 export default function AdminDashboard() {
     const [activeTab, setActiveTab] = useState("dashboard");
@@ -116,124 +118,18 @@ export default function AdminDashboard() {
         setIndividualStats({ work_days: workDaysSet.size, late: lateCount, absent: absentCount });
     };
 
-    // --- Logic: Payroll Calculation (Advanced with Group by Date) ---
-    const calculatePayroll = () => {
-        return employees.map(emp => {
-            let totalSalary = 0;
-            let totalOTHours = 0;
-            let totalOTPay = 0;
-            let workDays = 0; // ✅ ตัวแปรนับวันทำงาน
-
-            // Stats Counters
-            let lateCount = 0;
-            let absentCount = 0;
-            let duplicateCount = 0;
-
-            // 1. กรอง Log ของพนักงานคนนี้
-            const empLogs = logs.filter(l => l.employee_id === emp.id);
-
-            // 2. จัดกลุ่ม Log ตาม "วันที่"
-            const logsByDate = {};
-            empLogs.forEach(log => {
-                const dateStr = log.timestamp.split('T')[0];
-                if (!logsByDate[dateStr]) logsByDate[dateStr] = [];
-                logsByDate[dateStr].push(log);
-            });
-
-            // 3. วนลูปทีละวัน
-            Object.keys(logsByDate).forEach(dateStr => {
-                const dailyLogs = logsByDate[dateStr];
-
-                // เช็ควันขาดงาน
-                if (dailyLogs.some(l => l.action_type === 'absent')) {
-                    absentCount++;
-                    return;
-                }
-
-                // แยกเข้า-ออก
-                const checkIns = dailyLogs.filter(l => l.action_type === 'check_in').sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-                const checkOuts = dailyLogs.filter(l => l.action_type === 'check_out').sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-
-                // นับ Duplicate
-                if (checkIns.length > 1 || checkOuts.length > 1) {
-                    duplicateCount += (Math.max(checkIns.length, checkOuts.length) - 1);
-                }
-
-                // ✅ เงื่อนไข: ต้องมี เข้าอย่างน้อย 1 และ ออกอย่างน้อย 1 ถึงจะนับเป็นวันทำงาน
-                if (checkIns.length > 0 && checkOuts.length > 0) {
-                    const firstIn = checkIns[0];
-                    const lastOut = checkOuts[checkOuts.length - 1];
-
-                    const logDate = new Date(firstIn.timestamp);
-                    const dayOfWeek = logDate.getDay();
-
-                    // ดึงข้อมูล Shift จาก State กลาง (เพื่อให้ได้ราคาล่าสุด)
-                    const schedule = schedules[emp.id]?.[dayOfWeek];
-                    const currentShift = shifts.find(s => s.id === schedule?.shift_id);
-
-                    if (currentShift) {
-                        // 1. ค่าแรง
-                        let dailyWage = 0;
-                        if (currentShift.name.includes("ควบ") || currentShift.name.includes("Double")) {
-                            dailyWage = parseFloat(payrollConfig.double_shift_rate);
-                        } else {
-                            dailyWage = parseFloat(currentShift.salary) || 0;
-                        }
-                        totalSalary += dailyWage;
-                        workDays++; // ✅ นับวันทำงาน
-
-                        // 2. เช็คสาย
-                        const [sh, sm] = currentShift.start_time.split(':');
-                        const shiftStart = new Date(logDate); shiftStart.setHours(sh, sm, 0);
-                        if (differenceInMinutes(new Date(firstIn.timestamp), shiftStart) > 0) {
-                            lateCount++;
-                        }
-
-                        // 3. OT
-                        const outTime = new Date(lastOut.timestamp);
-                        const [eh, em] = currentShift.end_time.split(':').map(Number);
-                        // ✅ Fix: Calculate shiftEnd based on logDate
-                        const shiftEnd = new Date(logDate);
-                        shiftEnd.setHours(eh, em, 0);
-
-                        const [sh_check, sm_check] = currentShift.start_time.split(':').map(Number);
-                        const [eh_check, em_check] = currentShift.end_time.split(':').map(Number);
-                        if (eh_check < sh_check) shiftEnd.setDate(shiftEnd.getDate() + 1);
-
-                        const diffMinutes = differenceInMinutes(outTime, shiftEnd);
-                        if (diffMinutes > 0) {
-                            const otHours = Math.ceil(diffMinutes / 60);
-                            totalOTHours += otHours;
-                            totalOTPay += otHours * payrollConfig.ot_rate;
-                        }
-                    }
-                }
-            });
-
-            // 4. หักเงิน
-            const empDeductions = deductions.filter(d => d.employee_id === emp.id);
-            let totalDeduct = 0;
-            empDeductions.forEach(d => {
-                if (d.is_percentage) totalDeduct += (totalSalary + totalOTPay) * (d.amount / 100);
-                else totalDeduct += parseFloat(d.amount);
-            });
-
-            return {
-                emp,
-                workDays, // ✅ ส่งค่าวันทำงานออกไป
-                totalSalary,
-                totalOTHours,
-                totalOTPay,
-                totalDeduct,
-                netSalary: (totalSalary + totalOTPay) - totalDeduct,
-                lateCount,
-                absentCount,
-                duplicateCount
-            };
-        });
-    };
-
-    const payrollData = calculatePayroll();
+    // --- Logic: Payroll Calculation (Optimized & Memoized) ---
+    const payrollData = useMemo(() => {
+        return calculatePayroll(
+            employees,
+            logs,
+            schedules,
+            shifts,
+            payrollConfig,
+            deductions,
+            selectedMonth
+        );
+    }, [employees, logs, schedules, shifts, payrollConfig, deductions, selectedMonth]);
 
     // --- Actions ---
     const handleSavePayrollConfig = async () => { await supabase.from('payroll_config').upsert([{ key: 'ot_rate', value: payrollConfig.ot_rate }, { key: 'double_shift_rate', value: payrollConfig.double_shift_rate }]); alert("✅ Saved"); };

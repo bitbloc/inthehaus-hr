@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabase } from '../../../lib/supabaseClient';
 import { Client } from '@line/bot-sdk';
 
-const GROUP_ID = 'Cc2c65da5408563ef57ae61dee6ce3c1d';
+const GROUP_ID = process.env.LINE_GROUP_ID || 'Cc2c65da5408563ef57ae61dee6ce3c1d';
 
 const client = new Client({
   channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN,
@@ -11,19 +11,24 @@ const client = new Client({
 
 export async function POST(request) {
   try {
-    // 1. Get today's date range (Local Time logic might be needed if server is UTC)
-    // Assuming server time is close enough or we use UTC dates
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    // 1. Get today's date range for Bangkok (UTC+7)
+    const now = new Date();
+    const bangkokOffset = 7 * 60 * 60 * 1000;
+    const nowBkk = new Date(now.getTime() + bangkokOffset);
+
+    // Start of day in BKK (00:00:00) -> Convert back to UTC
+    nowBkk.setUTCHours(0, 0, 0, 0);
+    const startOfDayUTC = new Date(nowBkk.getTime() - bangkokOffset);
+
+    // End of day in BKK -> Start + 24h
+    const endOfDayUTC = new Date(startOfDayUTC.getTime() + 24 * 60 * 60 * 1000);
 
     // 2. Fetch logs
     const { data: logs, error } = await supabase
       .from('attendance_logs')
       .select('*, employees(name, shifts(name, start_time, end_time))')
-      .gte('timestamp', today.toISOString())
-      .lt('timestamp', tomorrow.toISOString())
+      .gte('timestamp', startOfDayUTC.toISOString())
+      .lt('timestamp', endOfDayUTC.toISOString())
       .order('timestamp', { ascending: true });
 
     if (error) throw error;
