@@ -18,6 +18,10 @@ export default function AdminDashboard() {
     const [selectedMonth, setSelectedMonth] = useState(format(new Date(), "yyyy-MM"));
     const [leaveRequests, setLeaveRequests] = useState([]);
 
+    // --- Announcements State ---
+    const [announcements, setAnnouncements] = useState([]);
+    const [newAnnouncement, setNewAnnouncement] = useState("");
+
     // --- Payroll States ---
     const [payrollConfig, setPayrollConfig] = useState({ ot_rate: 60, double_shift_rate: 1000 });
     const [deductions, setDeductions] = useState([]);
@@ -49,6 +53,7 @@ export default function AdminDashboard() {
         if (activeTab === "roster") fetchSchedules();
         if (activeTab === "history" && selectedEmpId !== "ALL") fetchIndividualLogs();
         if (activeTab === "payroll") fetchDeductions();
+        if (activeTab === "announcements") fetchAnnouncements();
     }, [activeTab, selectedMonth, selectedEmpId]);
 
     // --- API Fetching ---
@@ -150,6 +155,30 @@ export default function AdminDashboard() {
     const handleLeaveAction = async (req, newStatus) => { if (!confirm(`Confirm ${newStatus}?`)) return; const { error } = await supabase.from('leave_requests').update({ status: newStatus }).eq('id', req.id); if (!error) { try { await fetch('/api/notify-leave-status', { method: 'POST', body: JSON.stringify({ name: req.employees?.name, date: req.leave_date, type: req.leave_type, reason: req.reason, status: newStatus }), headers: { 'Content-Type': 'application/json' } }); } catch (e) { } alert("Saved & Notified"); fetchLeaveRequests(); } };
     const handleExportExcel = () => { if (selectedEmpId === "ALL" || individualLogs.length === 0) { alert("No data"); return; } const dataToExport = individualLogs.map(log => { const shiftInfo = getShiftInfo(log); const { status, diff } = analyzeLogRaw(log, shiftInfo); return { "Date": format(parseISO(log.timestamp), "dd/MM/yyyy"), "Time": format(parseISO(log.timestamp), "HH:mm:ss"), "Action": log.action_type, "Shift": shiftInfo?.schedule?.shifts?.name || '-', "Status": status, "Diff(min)": diff || 0 }; }); const worksheet = XLSX.utils.json_to_sheet(dataToExport); const workbook = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(workbook, worksheet, "Log"); XLSX.writeFile(workbook, `HR_Log.xlsx`); };
 
+    // --- Announcement Actions ---
+    const fetchAnnouncements = async () => {
+        const { data } = await supabase.from('announcements').select('*').order('created_at', { ascending: false });
+        setAnnouncements(data || []);
+    };
+
+    const handleAddAnnouncement = async (e) => {
+        e.preventDefault();
+        if (!newAnnouncement.trim()) return;
+        const { error } = await supabase.from('announcements').insert({ message: newAnnouncement, is_active: true });
+        if (!error) { setNewAnnouncement(""); fetchAnnouncements(); } else { alert(error.message); }
+    };
+
+    const handleToggleAnnouncement = async (id, currentStatus) => {
+        const { error } = await supabase.from('announcements').update({ is_active: !currentStatus }).eq('id', id);
+        if (!error) fetchAnnouncements();
+    };
+
+    const handleDeleteAnnouncement = async (id) => {
+        if (!confirm("Delete this announcement?")) return;
+        const { error } = await supabase.from('announcements').delete().eq('id', id);
+        if (!error) fetchAnnouncements();
+    };
+
     // Helper Logic
     const getShiftInfo = (log) => {
         if (!log || !schedules[log.employee_id]) return null;
@@ -202,7 +231,8 @@ export default function AdminDashboard() {
                         <p className="text-xs md:text-sm text-slate-500 mt-1">HR Management System</p>
                     </div>
                     <div className="md:hidden w-full"><select value={activeTab} onChange={(e) => setActiveTab(e.target.value)} className="w-full p-3 rounded-xl border border-slate-300 bg-white font-bold text-slate-700 shadow-sm focus:ring-2 focus:ring-slate-800 outline-none"><option value="dashboard">📊 Overview</option><option value="payroll">💰 Payroll</option><option value="requests">📩 Requests</option><option value="history">👤 History</option><option value="roster">📅 Roster</option><option value="employees">👥 Staff</option><option value="settings">⚙️ Settings</option></select></div>
-                    <div className="hidden md:flex bg-white p-1.5 rounded-2xl shadow-sm border border-slate-200 overflow-x-auto max-w-full">{['dashboard', 'payroll', 'requests', 'history', 'roster', 'employees', 'settings'].map(t => (<button key={t} onClick={() => setActiveTab(t)} className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ease-in-out whitespace-nowrap ${activeTab === t ? 'bg-slate-800 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}>{t === 'dashboard' ? 'Overview' : t === 'payroll' ? '💰 Payroll' : t === 'requests' ? 'Requests' : t === 'history' ? 'History' : t === 'roster' ? 'Roster' : t === 'employees' ? 'Staff' : 'Settings'}</button>))}</div>
+                    <div className="hidden md:flex bg-white p-1.5 rounded-2xl shadow-sm border border-slate-200 overflow-x-auto max-w-full">{['dashboard', 'payroll', 'requests', 'history', 'roster', 'employees', 'settings', 'announcements'].map(t => (<button key={t} onClick={() => setActiveTab(t)} className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ease-in-out whitespace-nowrap ${activeTab === t ? 'bg-slate-800 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}>{t === 'dashboard' ? 'Overview' : t === 'payroll' ? '💰 Payroll' : t === 'requests' ? 'Requests' : t === 'history' ? 'History' : t === 'roster' ? 'Roster' : t === 'employees' ? 'Staff' : t === 'announcements' ? '📣 News' : 'Settings'}</button>))}</div>
+
                 </div>
 
                 {/* TAB 1: DASHBOARD */}
@@ -306,6 +336,31 @@ export default function AdminDashboard() {
                                     })}
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* TAB 8: ANNOUNCEMENTS */}
+                {activeTab === 'announcements' && (
+                    <div className="max-w-4xl mx-auto space-y-6 animate-fade-in-up">
+                        <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+                            <h3 className="font-bold text-lg text-slate-700 mb-4">📣 Post Announcement</h3>
+                            <form onSubmit={handleAddAnnouncement} className="flex gap-4">
+                                <input className="flex-1 p-3 rounded-xl border border-slate-200 bg-slate-50 outline-none focus:ring-2 focus:ring-slate-800" placeholder="What's happening today?" value={newAnnouncement} onChange={(e) => setNewAnnouncement(e.target.value)} />
+                                <button type="submit" className="bg-slate-800 text-white px-6 py-3 rounded-xl font-bold shadow hover:bg-slate-900 transition">Post</button>
+                            </form>
+                        </div>
+                        <div className="space-y-4">
+                            {announcements.map(a => (
+                                <div key={a.id} className={`p-5 rounded-2xl border transition flex items-center justify-between ${a.is_active ? 'bg-white border-slate-200 shadow-sm' : 'bg-slate-50 border-slate-100 opacity-70'}`}>
+                                    <div className="flex-1"><p className="font-bold text-slate-700 text-lg">{a.message}</p><p className="text-xs text-slate-400 mt-1">{format(parseISO(a.created_at), "dd MMM yyyy HH:mm")}</p></div>
+                                    <div className="flex items-center gap-3">
+                                        <button onClick={() => handleToggleAnnouncement(a.id, a.is_active)} className={`px-4 py-2 rounded-lg text-xs font-bold transition ${a.is_active ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-500'}`}>{a.is_active ? 'Active' : 'Inactive'}</button>
+                                        <button onClick={() => handleDeleteAnnouncement(a.id)} className="text-slate-400 hover:text-rose-500 p-2">🗑️</button>
+                                    </div>
+                                </div>
+                            ))}
+                            {announcements.length === 0 && <p className="text-center text-slate-400 py-10">No announcements yet.</p>}
                         </div>
                     </div>
                 )}
