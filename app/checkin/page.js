@@ -3,13 +3,19 @@ import { useEffect, useState, useRef } from "react";
 import liff from "@line/liff";
 import { supabase } from "../../lib/supabaseClient";
 import { resizeImage } from "../../utils/imageResizer";
-import Link from "next/link";
 import { format } from "date-fns";
+import { motion, AnimatePresence } from "framer-motion";
+import { clsx } from "clsx";
+import { twMerge } from "tailwind-merge";
+
+function cn(...inputs) {
+  return twMerge(clsx(inputs));
+}
 
 export default function CheckIn() {
   // --- State ---
   const [profile, setProfile] = useState(null);
-  const [status, setStatus] = useState("Checking GPS...");
+  const [status, setStatus] = useState("Checking...");
   const [activeAnnouncement, setActiveAnnouncement] = useState(null);
   const [recentCheckins, setRecentCheckins] = useState([]);
   const [lastAction, setLastAction] = useState(null);
@@ -17,13 +23,10 @@ export default function CheckIn() {
 
   // Interaction State
   const [showCamera, setShowCamera] = useState(false);
-  const [showMoodSelector, setShowMoodSelector] = useState(false); // Post-Checkin State
+  const [showMoodSelector, setShowMoodSelector] = useState(false);
   const [photoUrl, setPhotoUrl] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showMoodOverlay, setShowMoodOverlay] = useState(false);
-  const [currentLogId, setCurrentLogId] = useState(null);
-  const [countdown, setCountdown] = useState(5);
 
   const fileInputRef = useRef(null);
 
@@ -34,8 +37,8 @@ export default function CheckIn() {
 
   // --- Init ---
   useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     const init = async () => {
-      // 1. LIFF
       try {
         await liff.init({ liffId: process.env.NEXT_PUBLIC_LIFF_ID });
         if (!liff.isLoggedIn()) liff.login();
@@ -44,19 +47,16 @@ export default function CheckIn() {
           setProfile(p);
           fetchUserStatus(p.userId);
         }
-      } catch (e) {
-        setStatus("LIFF Error");
-      }
+      } catch (e) { setStatus("LIFF Error"); }
 
-      // 2. GPS
       if (navigator.geolocation) navigator.geolocation.getCurrentPosition(onGeoSuccess, onGeoError);
       else setStatus("GPS Not Supported");
 
-      // 3. Data Fetch
       fetchAnnouncement();
       fetchRecents();
     };
     init();
+    return () => clearInterval(timer);
   }, []);
 
   // --- Fetchers ---
@@ -65,7 +65,7 @@ export default function CheckIn() {
       const res = await fetch('/api/announcements/active');
       const json = await res.json();
       if (json.announcement) setActiveAnnouncement(json.announcement);
-    } catch (e) { console.error("Announcement Error:", e); }
+    } catch (e) { console.error(e); }
   };
 
   const fetchRecents = async () => {
@@ -73,7 +73,7 @@ export default function CheckIn() {
       const res = await fetch('/api/checkins/recent');
       const json = await res.json();
       if (json.recentCheckins) setRecentCheckins(json.recentCheckins);
-    } catch (e) { console.error("Recent Error:", e); }
+    } catch (e) { console.error(e); }
   };
 
   const fetchUserStatus = async (userId) => {
@@ -83,18 +83,24 @@ export default function CheckIn() {
     setLastAction(log ? log.action_type : 'check_out');
   };
 
-  // --- GPS Logic ---
+  // --- GPS ---
   const onGeoSuccess = (position) => {
     const dist = getDistanceFromLatLonInKm(position.coords.latitude, position.coords.longitude, SHOP_LAT, SHOP_LONG);
-    if (dist <= ALLOWED_RADIUS_KM) setStatus("📍 Ready to Check-in");
-    else setStatus(`❌ Out of Range (${dist.toFixed(3)}km)`);
+    if (dist <= ALLOWED_RADIUS_KM) setStatus("📍 Ready");
+    else setStatus(`❌ Range (${dist.toFixed(3)}km)`);
   };
   const onGeoError = () => setStatus("❌ GPS Error");
 
-  // --- Action: Upload Photo ---
+  // --- Actions ---
+  const handleStartCheckIn = () => {
+    if (!status.includes("Ready")) return alert("Please be at the location to check in.");
+    setShowCamera(true);
+    setTimeout(() => fileInputRef.current?.click(), 300);
+  };
+
   const handleFileChange = async (e) => {
     const file = e.target.files[0];
-    if (!file) return;
+    if (!file) { setShowCamera(false); return; }
     try {
       setIsUploading(true);
       const resizedFile = await resizeImage(file, 600, 0.7);
@@ -103,90 +109,75 @@ export default function CheckIn() {
       const { error } = await supabase.storage.from('checkin-photos').upload(filePath, resizedFile);
       if (error) throw error;
       const { data: { publicUrl } } = supabase.storage.from('checkin-photos').getPublicUrl(filePath);
-      setPhotoUrl(publicUrl);
-    } catch (err) { alert("Upload Failed: " + err.message); }
+      submitCheckIn(publicUrl);
+    } catch (err) { alert("Upload Failed: " + err.message); setShowCamera(false); }
     finally { setIsUploading(false); }
   };
 
-  // --- Action: Check-in (Step 1) ---
-  const handleCheckIn = async (actionType) => {
-    if (!profile || !photoUrl) return alert("Photo required!");
-    if (!status.includes("Ready")) return alert("Please be at the location.");
-    if (isSubmitting) return;
-
-    if (!confirm(actionType === 'check_in' ? "Confirm Check-in?" : "Confirm Check-out?")) return;
-
+  const submitCheckIn = async (url) => {
+    if (!profile) return;
     setIsSubmitting(true);
+    const actionType = lastAction === 'check_in' ? 'check_out' : 'check_in';
 
     try {
-      // 1. Get Employee
       const { data: emp } = await supabase.from('employees').select('id, name, position').eq('line_user_id', profile.userId).single();
       if (!emp) throw new Error("Employee not found");
 
-      // 2. Optimistic Update
       const tempLog = {
         id: 'temp-' + Date.now(),
         timestamp: new Date().toISOString(),
         action_type: actionType,
-        employees: { name: emp.name, photo_url: profile.pictureUrl },
-        photo_url: photoUrl,
+        employees: { name: emp.name, photo_url: profile.pictureUrl, position: emp.position },
+        photo_url: url,
         mood_status: null
       };
-      setRecentCheckins(prev => [tempLog, ...prev]);
 
-      // 3. Insert to DB
-      const { data: newLog, error } = await supabase.from('attendance_logs').insert({
+      const pos = emp.position?.toLowerCase() || '';
+      if (!pos.includes('owner') && !pos.includes('develop')) {
+        setRecentCheckins(prev => [tempLog, ...prev]);
+      }
+
+      const { data: inserted, error } = await supabase.from('attendance_logs').insert({
         employee_id: emp.id,
         action_type: actionType,
-        photo_url: photoUrl
+        photo_url: url
       }).select().single();
 
       if (error) throw error;
 
-      // 4. Update State & Trigger Overlay
-      setCurrentLogId(newLog.id);
-      setShowMoodOverlay(true);
-      setCountdown(5); // Start 5s countdown
       setLastAction(actionType);
-
-      // Notify Line (Async) - Don't await to block UI
-      notifyLine(emp, actionType, photoUrl);
+      setShowCamera(false);
+      setShowMoodSelector(true);
+      notifyLine(emp, actionType, url, null);
 
     } catch (err) {
-      alert("Error: " + err.message);
-      fetchRecents(); // Revert optimistic logic on error
-    } finally {
-      setIsSubmitting(false);
-      setPhotoUrl(null); // Reset photo
+      alert(err.message);
+      fetchRecents();
+      setShowCamera(false);
+    } finally { setIsSubmitting(false); }
+  };
+
+  const handleMoodSelect = async (mood) => {
+    setShowMoodSelector(false);
+    setRecentCheckins(prev => {
+      const newArr = [...prev];
+      if (newArr.length > 0 && newArr[0].employees.name === profile.displayName) {
+        newArr[0].mood_status = mood;
+      }
+      return newArr;
+    });
+
+    const { data: emp } = await supabase.from('employees').select('id').eq('line_user_id', profile.userId).single();
+    if (emp) {
+      const { data: log } = await supabase.from('attendance_logs').select('id').eq('employee_id', emp.id).order('timestamp', { ascending: false }).limit(1).single();
+      if (log) {
+        await supabase.from('attendance_logs').update({ mood_status: mood }).eq('id', log.id);
+      }
     }
   };
 
-  // --- Action: Select Mood (Step 2) ---
-  const handleMoodSelect = async (mood) => {
-    if (!currentLogId) return;
-
-    // Optimistic Update locally
-    setRecentCheckins(prev => prev.map(item =>
-      (item.id === currentLogId || item.id.startsWith('temp')) ? { ...item, mood_status: mood } : item
-    ));
-
-    setShowMoodOverlay(false);
-
-    // Update DB
-    await supabase.from('attendance_logs').update({ mood_status: mood }).eq('id', currentLogId);
-  };
-
-  // --- Helpers ---
-  const notifyLine = async (emp, action, url) => {
-    try {
-      await fetch('/api/notify-realtime', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: emp.name, position: emp.position, action, time: format(new Date(), "HH:mm"), locationStatus: "Verified", photoUrl: url
-        })
-      });
-    } catch (e) { console.error("Notify failed", e); }
+  const notifyLine = async (emp, action, url, mood) => {
+    try { fetch('/api/notify-realtime', { method: 'POST', body: JSON.stringify({ name: emp.name, position: emp.position, action, time: format(new Date(), "HH:mm"), locationStatus: "Verified", photoUrl: url, mood }) }); } catch { }
   };
 
   function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
@@ -195,145 +186,166 @@ export default function CheckIn() {
     var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)); return R * c;
   }
 
-  // --- Countdown Logic ---
-  useEffect(() => {
-    if (showMoodOverlay && countdown > 0) {
-      const timer = setTimeout(() => setCountdown(c => c - 1), 1000);
-      return () => clearTimeout(timer);
-    } else if (showMoodOverlay && countdown === 0) {
-      setShowMoodOverlay(false); // Auto close
-    }
-  }, [showMoodOverlay, countdown]);
-
-
-  // --- Render ---
   return (
-    <div className="min-h-screen bg-[#1A1A1A] text-[#E0E0E0] font-sans pb-10">
+    <div className="min-h-screen bg-[#FAFAFA] text-[#27272A] font-sans flex flex-col items-center relative overflow-hidden font-feature-settings-['ss01']">
 
       {/* 1. Header */}
-      <div className="p-6 flex justify-between items-center bg-[#242424] border-b border-[#333]">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight text-white">In the haus</h1>
-          <p className="text-xs text-[#888]">{status}</p>
-        </div>
-        {profile && <img src={profile.pictureUrl} className="w-10 h-10 rounded-full border-2 border-[#39FF14]" />}
-      </div>
+      <motion.div
+        className="w-full p-6 flex justify-between items-center z-10"
+        initial={{ y: -20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+      >
+        <h1 className="text-xl font-bold tracking-tight text-[#27272A]">In the haus</h1>
+        {profile && <img src={profile.pictureUrl} className="w-10 h-10 rounded-full border border-slate-200 shadow-sm" />}
+      </motion.div>
 
       {/* 2. Announcement */}
-      {activeAnnouncement && (
-        <div className="mx-4 mt-6 p-5 bg-[#2D2D2D] border-l-4 border-orange-500 rounded-r-xl shadow-lg animate-fade-in-up">
-          <h3 className="text-orange-500 text-xs font-bold uppercase tracking-wider mb-1">Daily Announcement</h3>
-          <p className="text-white font-medium">{activeAnnouncement.message}</p>
-        </div>
-      )}
-
-      {/* 3. Main Action Area */}
-      <div className="p-6 flex flex-col items-center">
-
-        {/* Photo Preview or Placeholder */}
-        <div
-          onClick={() => !photoUrl && fileInputRef.current.click()}
-          className={`w-full max-w-sm aspect-video rounded-3xl overflow-hidden border-2 flex items-center justify-center relative transition-all active:scale-95 cursor-pointer 
-            ${photoUrl ? 'border-[#39FF14]' : 'border-dashed border-[#444] bg-[#242424] hover:bg-[#2A2A2A]'}`}
-        >
-          {photoUrl ? (
-            <>
-              <img src={photoUrl} className="w-full h-full object-cover" />
-              <button
-                onClick={(e) => { e.stopPropagation(); setPhotoUrl(null); }}
-                className="absolute top-3 right-3 bg-black/50 text-white p-2 rounded-full text-xs backdrop-blur-md"
-              >
-                Retake ❌
-              </button>
-            </>
-          ) : (
-            <div className="flex flex-col items-center gap-2">
-              <span className="text-4xl">📸</span>
-              <span className="text-sm font-bold text-[#888]">Tap to Snap</span>
+      <AnimatePresence>
+        {activeAnnouncement && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="mx-6 w-full max-w-sm bg-white rounded-2xl p-5 shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-slate-100 flex items-start gap-4 z-10"
+          >
+            <div className={`mt-1.5 w-2 h-2 rounded-full ring-4 ${activeAnnouncement.priority > 1 ? 'bg-red-500 ring-red-100' : 'bg-[#10B981] ring-emerald-50'}`}></div>
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Announcement</p>
+              <p className="text-sm font-medium text-[#27272A] leading-relaxed">{activeAnnouncement.message}</p>
             </div>
-          )}
-          <input type="file" accept="image/*" capture="user" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
-        </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-        {/* Action Button */}
-        {photoUrl && (
-          <div className="w-full max-w-sm mt-6 grid grid-cols-2 gap-4 animate-fade-in-up">
-            {lastAction !== 'check_in' && (
-              <button
-                onClick={() => handleCheckIn('check_in')}
-                disabled={isSubmitting}
-                className="col-span-2 bg-[#39FF14] text-black font-extrabold py-5 rounded-2xl shadow-[0_0_20px_rgba(57,255,20,0.3)] hover:shadow-[0_0_30px_rgba(57,255,20,0.5)] transition-all active:scale-95 text-lg"
-              >
-                {isSubmitting ? "Processing..." : "CHECK IN"}
-              </button>
+      {/* 3. Hero */}
+      <div className="flex-1 flex flex-col items-center justify-center w-full z-10 pb-20">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="text-center mb-12"
+        >
+          <h2 className="text-8xl font-light tracking-tighter text-[#27272A]">{format(currentTime, "HH:mm")}</h2>
+          <p className="text-base font-medium text-slate-400 mt-2">{format(currentTime, "EEEE, dd MMMM")}</p>
+          <motion.div
+            animate={{ scale: status.includes('Ready') ? [1, 1.05, 1] : 1 }}
+            transition={{ repeat: Infinity, duration: 2 }}
+            className={cn("mt-6 inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold tracking-wide transition-colors", status.includes('Ready') ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-500')}
+          >
+            <span className={cn("w-2 h-2 rounded-full", status.includes('Ready') ? 'bg-emerald-500' : 'bg-rose-500')}></span>
+            {status}
+          </motion.div>
+        </motion.div>
+
+        {!status.includes('Checking') && (
+          <motion.button
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={handleStartCheckIn}
+            className={cn(
+              "w-44 h-44 rounded-[3rem] flex flex-col items-center justify-center shadow-[0_20px_60px_rgba(16,185,129,0.15)] group relative border",
+              lastAction !== 'check_in' ? 'bg-white border-emerald-50 text-[#10B981]' : 'bg-white border-rose-50 text-[#EF4444]'
             )}
-            {lastAction === 'check_in' && (
-              <button
-                onClick={() => handleCheckIn('check_out')}
-                disabled={isSubmitting}
-                className="col-span-2 bg-[#FF3939] text-white font-extrabold py-5 rounded-2xl shadow-[0_0_20px_rgba(255,57,57,0.3)] hover:shadow-[0_0_30px_rgba(255,57,57,0.5)] transition-all active:scale-95 text-lg"
-              >
-                {isSubmitting ? "Processing..." : "CHECK OUT"}
-              </button>
-            )}
-          </div>
+          >
+            <motion.div
+              className={cn("absolute inset-0 rounded-[3rem] opacity-0 group-hover:opacity-100 transition-opacity duration-500", lastAction !== 'check_in' ? 'bg-emerald-50/50' : 'bg-rose-50/50')}
+            />
+            <span className="text-5xl mb-3 relative z-10">{lastAction !== 'check_in' ? '👋' : '🏠'}</span>
+            <span className="text-xs font-black uppercase tracking-widest relative z-10">{lastAction !== 'check_in' ? 'Check In' : 'Check Out'}</span>
+          </motion.button>
         )}
       </div>
 
-      {/* 4. Recent Check-ins (Square Grid) */}
-      <div className="px-6 mt-2">
-        <h3 className="text-xs font-bold text-[#666] uppercase mb-4 tracking-widest">Recent Activity</h3>
-        <div className="grid grid-cols-3 gap-3">
-          {recentCheckins.map((log) => (
-            <div key={log.id} className="bg-[#2D2D2D] rounded-xl overflow-hidden shadow-sm flex flex-col animate-fade-in-up">
-              <div className="relative aspect-square">
-                <img src={log.photo_url} className="w-full h-full object-cover" />
-                {log.mood_status && (
-                  <div className="absolute bottom-1 right-1 bg-black/60 backdrop-blur px-2 py-0.5 rounded-lg text-xs">
-                    {log.mood_status}
-                  </div>
-                )}
-              </div>
-              <div className="p-2 border-t border-[#333]">
-                <p className="text-[10px] font-bold text-[#E0E0E0] truncate">{log.employees?.name}</p>
-                <p className="text-[9px] text-[#888] font-mono">{format(new Date(log.timestamp), "HH:mm")}</p>
-              </div>
-            </div>
-          ))}
+      {/* 4. Floating Capsules */}
+      <div className="w-full absolute bottom-12 z-0 pointer-events-none">
+        <div className="absolute inset-0 bg-gradient-to-t from-[#FAFAFA] via-[#FAFAFA]/90 to-transparent h-32 -top-32 z-10"></div>
+
+        <div className="flex gap-4 px-8 min-w-max relative z-0 opacity-80">
+          <AnimatePresence>
+            {recentCheckins.map((log, i) => (
+              <motion.div
+                key={log.id}
+                layout
+                initial={{ opacity: 0, x: -20, scale: 0.8 }}
+                animate={{
+                  opacity: 1, x: 0, scale: 1,
+                  y: [0, -5, 0],
+                  transition: { y: { repeat: Infinity, duration: 4, delay: i * 0.2, ease: "easeInOut" } }
+                }}
+                className="flex items-center gap-3 bg-white border border-slate-100 rounded-full pl-1.5 pr-5 py-1.5 shadow-[0_4px_20px_rgba(0,0,0,0.03)]"
+              >
+                <img src={log.employees?.photo_url || log.photo_url} className="w-9 h-9 rounded-full object-cover bg-slate-50 border border-slate-100" />
+                <div className="flex flex-col">
+                  <span className="text-[11px] font-bold text-slate-800">{log.employees?.name?.split(' ')[0]}</span>
+                  <span className="text-[10px] text-slate-400 font-medium">{format(new Date(log.timestamp), "HH:mm")} <span className="ml-1">{log.mood_status}</span></span>
+                </div>
+              </motion.div>
+            ))}
+          </AnimatePresence>
         </div>
       </div>
 
-      {/* 5. Mood Overlay (Success) */}
-      {showMoodOverlay && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex flex-col items-center justify-center p-8 animate-fade-in text-center">
-          <div className="mb-8">
-            <div className="w-20 h-20 bg-[#39FF14] rounded-full flex items-center justify-center text-4xl mb-4 mx-auto shadow-[0_0_30px_#39FF14]">
-              ✓
+      {/* 5. Camera */}
+      <AnimatePresence>
+        {showCamera && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-[#FAFAFA] flex flex-col items-center justify-center p-8"
+          >
+            <div className="text-center mb-8">
+              <h3 className="text-2xl font-bold text-[#27272A] mb-2">Smile! 📸</h3>
+              <p className="text-slate-400">Taking a photo to verify location</p>
             </div>
-            <h2 className="text-2xl font-bold text-white">Recorded!</h2>
-            <p className="text-[#888] text-sm mt-1">Closing in {countdown}s</p>
+
+            <div className="relative w-64 h-64 bg-white rounded-[2rem] border border-slate-100 shadow-[0_20px_40px_rgba(0,0,0,0.05)] flex items-center justify-center overflow-hidden">
+              {isUploading
+                ? <div className="animate-spin w-8 h-8 border-4 border-slate-100 border-t-[#10B981] rounded-full"></div>
+                : <span className="text-6xl grayscale opacity-20">📷</span>
+              }
+            </div>
+
+            <button onClick={() => setShowCamera(false)} className="mt-12 text-slate-400 text-sm font-bold tracking-wide hover:text-[#27272A] transition-colors">CANCEL</button>
+            <input type="file" accept="image/*" capture="user" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 6. Post-Checkin Mood */}
+      <AnimatePresence>
+        {showMoodSelector && (
+          <div className="fixed inset-x-0 bottom-0 z-50 flex flex-col items-center justify-end pointer-events-none">
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/5 pointer-events-auto"
+              onClick={() => setShowMoodSelector(false)}
+            />
+
+            <motion.div
+              initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="w-full bg-white rounded-t-[2.5rem] p-8 pb-12 shadow-[0_-20px_60px_rgba(0,0,0,0.1)] pointer-events-auto relative"
+            >
+              <div className="w-12 h-1 bg-slate-100 rounded-full mx-auto mb-8"></div>
+              <h3 className="text-xl font-bold text-[#27272A] text-center mb-8">How are you feeling?</h3>
+              <div className="flex justify-center gap-4 flex-wrap">
+                {['🔥', '😊', '😐', '😴', '🤒'].map((m) => (
+                  <motion.button
+                    key={m}
+                    whileHover={{ scale: 1.2, rotate: 10 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => handleMoodSelect(m)}
+                    className="w-16 h-16 text-3xl flex items-center justify-center rounded-2xl bg-slate-50 hover:bg-[#10B981] hover:text-white shadow-sm"
+                  >
+                    {m}
+                  </motion.button>
+                ))}
+              </div>
+              <button onClick={() => setShowMoodSelector(false)} className="w-full mt-8 text-slate-300 text-xs font-bold tracking-widest uppercase hover:text-slate-500">Skip</button>
+            </motion.div>
           </div>
-
-          <p className="mb-6 text-lg font-medium text-[#E0E0E0]">How are you feeling?</p>
-
-          <div className="flex gap-4">
-            <button onClick={() => handleMoodSelect('🔥')} className="text-4xl p-4 bg-[#2D2D2D] rounded-2xl hover:bg-[#333] hover:scale-110 transition active:scale-95">🔥</button>
-            <button onClick={() => handleMoodSelect('😊')} className="text-4xl p-4 bg-[#2D2D2D] rounded-2xl hover:bg-[#333] hover:scale-110 transition active:scale-95">😊</button>
-            <button onClick={() => handleMoodSelect('😴')} className="text-4xl p-4 bg-[#2D2D2D] rounded-2xl hover:bg-[#333] hover:scale-110 transition active:scale-95">😴</button>
-            <button onClick={() => handleMoodSelect('🤒')} className="text-4xl p-4 bg-[#2D2D2D] rounded-2xl hover:bg-[#333] hover:scale-110 transition active:scale-95">🤒</button>
-          </div>
-
-          <button onClick={() => setShowMoodOverlay(false)} className="mt-12 text-[#666] underline text-sm">Skip</button>
-        </div>
-      )}
-
-      {/* Footer / Leave Link */}
-      <div className="text-center mt-10">
-        <Link href="/leave" className="text-[#666] text-xs font-bold hover:text-[#39FF14] transition">
-          📝 Request Leave
-        </Link>
-      </div>
-
+        )}
+      </AnimatePresence>
     </div>
   );
 }

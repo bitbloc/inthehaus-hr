@@ -12,11 +12,14 @@
     "@line/bot-sdk": "^10.5.0",
     "@line/liff": "^2.27.3",
     "@supabase/supabase-js": "^2.84.0",
+    "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
+    "framer-motion": "^12.23.26",
     "next": "^16.0.8",
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
     "recharts": "^3.5.0",
+    "tailwind-merge": "^3.4.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
