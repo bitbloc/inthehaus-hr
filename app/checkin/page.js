@@ -12,9 +12,11 @@ export default function CheckIn() {
   const [status, setStatus] = useState("Checking GPS...");
   const [activeAnnouncement, setActiveAnnouncement] = useState(null);
   const [recentCheckins, setRecentCheckins] = useState([]);
-  const [lastAction, setLastAction] = useState(null); // 'check_in' or 'check_out'
+  const [lastAction, setLastAction] = useState(null);
+  const [currentTime, setCurrentTime] = useState(new Date());
 
   // Interaction State
+  const [showCamera, setShowCamera] = useState(false);
   const [photoUrl, setPhotoUrl] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
