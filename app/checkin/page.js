@@ -240,6 +240,28 @@ export default function CheckIn() {
         )}
       </AnimatePresence>
 
+      {/* 2.5 Recent Checkins (Invisible Grid) */}
+      <div className="w-full max-w-md px-6 my-4 z-10">
+        <div className="flex flex-wrap justify-center gap-3">
+          <AnimatePresence>
+            {recentCheckins.slice(0, 5).map((log, i) => (
+              <motion.div
+                key={log.id}
+                layout
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0 }}
+                transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                className="flex items-center gap-2 bg-white/50 backdrop-blur-sm border border-white/40 rounded-full pl-1 pr-3 py-1 soft-shadow hover:bg-white/80 transition-colors"
+              >
+                <img src={log.employees?.photo_url || log.photo_url} className="w-6 h-6 rounded-full object-cover ring-2 ring-white" />
+                <span className="text-[10px] font-medium text-muted-foreground">{log.employees?.name?.split(' ')[0]}</span>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </div>
+      </div>
+
       {/* 3. Hero */}
       <div className="flex-1 flex flex-col items-center justify-center w-full z-10 pb-20">
         <motion.div
@@ -261,71 +283,31 @@ export default function CheckIn() {
 
         {!status.includes('Checking') && (
           <motion.button
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            whileHover={{ scale: 1.05 }}
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.95 }}
             onClick={handleStartCheckIn}
-            className={cn(
-              "w-48 h-48 rounded-[3rem] flex flex-col items-center justify-center soft-shadow-lg group relative border transition-all duration-300",
-              lastAction !== 'check_in' ? 'bg-card border-white text-lime-700 hover:scale-105' : 'bg-card border-white text-rose-500 hover:scale-105'
-            )}
+            className="group relative flex items-center justify-center p-8 transition-all duration-500"
           >
-            <motion.div
-              className={cn("absolute inset-0 rounded-[3rem] opacity-0 group-hover:opacity-100 transition-opacity duration-500", lastAction !== 'check_in' ? 'bg-lime-50/50' : 'bg-rose-50/50')}
-            />
-
-            {/* Icon */}
-            <div className="mb-3 relative z-10">
-              {lastAction !== 'check_in' ? (
-                // Office / Entrance Icon
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-16 h-16">
-                  <path d="M3 21h18" /><path d="M5 21V7l8-4 8 4v14" /><path d="M12 11v4" />
-                </svg>
-              ) : (
-                // Home / Exit Icon
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-16 h-16">
-                  <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" />
-                </svg>
-              )}
+            {/* Minimal Text Button */}
+            <div className={cn(
+              "text-5xl font-bold tracking-tighter transition-all duration-300",
+              lastAction !== 'check_in' ? 'text-primary drop-shadow-[0_10px_10px_rgba(190,242,100,0.3)]' : 'text-rose-500 drop-shadow-[0_10px_10px_rgba(244,63,94,0.3)]'
+            )}>
+              {lastAction !== 'check_in' ? 'เข้างาน' : 'ออกงาน'}
             </div>
 
-            {/* Thai Text */}
-            <span className="text-2xl font-bold tracking-tight relative z-10 font-sans">
-              {lastAction !== 'check_in' ? 'เข้างาน' : 'ออกงาน'}
-            </span>
+            {/* Subtle Ripple/Glow on Hover */}
+            <div className={cn(
+              "absolute inset-0 rounded-full opacity-0 group-hover:opacity-20 blur-2xl transition-opacity duration-500",
+              lastAction !== 'check_in' ? 'bg-primary' : 'bg-rose-500'
+            )} />
           </motion.button>
         )}
       </div>
 
-      {/* 4. Floating Capsules */}
-      <div className="w-full absolute bottom-12 z-0 pointer-events-none">
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/90 to-transparent h-32 -top-32 z-10"></div>
 
-        <div className="flex gap-4 px-8 min-w-max relative z-0 opacity-80">
-          <AnimatePresence>
-            {recentCheckins.map((log, i) => (
-              <motion.div
-                key={log.id}
-                layout
-                initial={{ opacity: 0, x: -20, scale: 0.8 }}
-                animate={{
-                  opacity: 1, x: 0, scale: 1,
-                  y: [0, -5, 0],
-                  transition: { y: { repeat: Infinity, duration: 4, delay: i * 0.2, ease: "easeInOut" } }
-                }}
-                className="flex items-center gap-3 bg-white/80 backdrop-blur-sm border border-white/50 rounded-full pl-1.5 pr-5 py-1.5 soft-shadow"
-              >
-                <img src={log.employees?.photo_url || log.photo_url} className="w-9 h-9 rounded-full object-cover bg-slate-50 border border-slate-100" />
-                <div className="flex flex-col">
-                  <span className="text-[11px] font-bold text-foreground">{log.employees?.name?.split(' ')[0]}</span>
-                  <span className="text-[10px] text-muted-foreground font-medium">{format(new Date(log.timestamp), "HH:mm")} <span className="ml-1">{log.mood_status}</span></span>
-                </div>
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </div>
-      </div>
 
       {/* 5. Camera */}
       <AnimatePresence>
