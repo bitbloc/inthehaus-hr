@@ -1,26 +1,75 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
+  --background: #F5F5F7;
   --foreground: #171717;
+  --primary: #BEF264;
+  --primary-foreground: #171717;
+  --card: #FFFFFF;
+  --card-foreground: #171717;
+  --popover: #FFFFFF;
+  --popover-foreground: #171717;
+  --secondary: #E5E7EB;
+  --secondary-foreground: #1f2937;
+  --muted: #F3F4F6;
+  --muted-foreground: #6B7280;
+  --accent: #D9F99D;
+  --accent-foreground: #171717;
+  --destructive: #EF4444;
+  --destructive-foreground: #FAFAFA;
+  --border: #E5E7EB;
+  --input: #E5E7EB;
+  --ring: #BEF264;
+  --radius: 1.5rem;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --radius-xl: var(--radius);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
+    --primary: #BEF264;
+    --primary-foreground: #000000;
+    --card: #171717;
+    --card-foreground: #ededed;
+    --muted: #262626;
+    --muted-foreground: #a3a3a3;
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.soft-shadow {
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.05),
+              0 4px 12px -4px rgba(0, 0, 0, 0.02);
+}
+
+.soft-shadow-lg {
+  box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.08),
+              0 8px 16px -8px rgba(0, 0, 0, 0.04);
+}
+
+.neo-shadow {
+    box-shadow: 6px 6px 16px #d1d5db, -6px -6px 16px #ffffff;
 }

@@ -204,7 +204,7 @@ export default function CheckIn() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] text-[#27272A] font-sans flex flex-col items-center relative overflow-hidden font-feature-settings-['ss01']">
+    <div className="min-h-screen bg-background text-foreground font-sans flex flex-col items-center relative overflow-hidden font-feature-settings-['ss01']">
 
       {/* 1. Header with Dev Icon */}
       <motion.div
@@ -213,7 +213,7 @@ export default function CheckIn() {
         animate={{ y: 0, opacity: 1 }}
       >
         <div className="flex items-center gap-2">
-          <h1 className="text-xl font-bold tracking-tight text-[#27272A]">In the haus</h1>
+          <h1 className="text-xl font-bold tracking-tight text-foreground">In the haus</h1>
           {/* Dev Bypass Trigger */}
           <button onClick={handleDevLogin} className="opacity-20 hover:opacity-100 transition-opacity">
             ❤️
@@ -229,12 +229,12 @@ export default function CheckIn() {
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9 }}
-            className="mx-6 w-full max-w-sm bg-white rounded-2xl p-5 shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-slate-100 flex items-start gap-4 z-10"
+            className="mx-6 w-full max-w-sm bg-card/80 backdrop-blur-md rounded-3xl p-5 soft-shadow border border-white/50 flex items-start gap-4 z-10"
           >
-            <div className={`mt-1.5 w-2 h-2 rounded-full ring-4 ${activeAnnouncement.priority > 1 ? 'bg-red-500 ring-red-100' : 'bg-[#10B981] ring-emerald-50'}`}></div>
+            <div className={`mt-1.5 w-2 h-2 rounded-full ring-4 ${activeAnnouncement.priority > 1 ? 'bg-red-500 ring-red-100' : 'bg-primary ring-lime-100'}`}></div>
             <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Announcement</p>
-              <p className="text-sm font-medium text-[#27272A] leading-relaxed">{activeAnnouncement.message}</p>
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5">Announcement</p>
+              <p className="text-sm font-medium text-foreground leading-relaxed">{activeAnnouncement.message}</p>
             </div>
           </motion.div>
         )}
@@ -247,14 +247,14 @@ export default function CheckIn() {
           animate={{ opacity: 1 }}
           className="text-center mb-12"
         >
-          <h2 className="text-8xl font-light tracking-tighter text-[#27272A]">{format(currentTime, "HH:mm")}</h2>
-          <p className="text-base font-medium text-slate-400 mt-2">{format(currentTime, "EEEE, dd MMMM")}</p>
+          <h2 className="text-8xl font-light tracking-tighter text-foreground">{format(currentTime, "HH:mm")}</h2>
+          <p className="text-base font-medium text-muted-foreground mt-2">{format(currentTime, "EEEE, dd MMMM")}</p>
           <motion.div
             animate={{ scale: status.includes('Ready') ? [1, 1.05, 1] : 1 }}
             transition={{ repeat: Infinity, duration: 2 }}
-            className={cn("mt-6 inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold tracking-wide transition-colors", status.includes('Ready') ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-500')}
+            className={cn("mt-6 inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold tracking-wide transition-colors", status.includes('Ready') ? 'bg-lime-100 text-lime-700' : 'bg-rose-50 text-rose-500')}
           >
-            <span className={cn("w-2 h-2 rounded-full", status.includes('Ready') ? 'bg-emerald-500' : 'bg-rose-500')}></span>
+            <span className={cn("w-2 h-2 rounded-full", status.includes('Ready') ? 'bg-primary' : 'bg-rose-500')}></span>
             {status}
           </motion.div>
         </motion.div>
@@ -267,12 +267,12 @@ export default function CheckIn() {
             whileTap={{ scale: 0.95 }}
             onClick={handleStartCheckIn}
             className={cn(
-              "w-48 h-48 rounded-[3rem] flex flex-col items-center justify-center shadow-[0_20px_60px_rgba(16,185,129,0.15)] group relative border transition-colors",
-              lastAction !== 'check_in' ? 'bg-white border-emerald-50 text-[#10B981]' : 'bg-white border-rose-50 text-[#EF4444]'
+              "w-48 h-48 rounded-[3rem] flex flex-col items-center justify-center soft-shadow-lg group relative border transition-all duration-300",
+              lastAction !== 'check_in' ? 'bg-card border-white text-lime-700 hover:scale-105' : 'bg-card border-white text-rose-500 hover:scale-105'
             )}
           >
             <motion.div
-              className={cn("absolute inset-0 rounded-[3rem] opacity-0 group-hover:opacity-100 transition-opacity duration-500", lastAction !== 'check_in' ? 'bg-emerald-50/50' : 'bg-rose-50/50')}
+              className={cn("absolute inset-0 rounded-[3rem] opacity-0 group-hover:opacity-100 transition-opacity duration-500", lastAction !== 'check_in' ? 'bg-lime-50/50' : 'bg-rose-50/50')}
             />
 
             {/* Icon */}
@@ -300,7 +300,7 @@ export default function CheckIn() {
 
       {/* 4. Floating Capsules */}
       <div className="w-full absolute bottom-12 z-0 pointer-events-none">
-        <div className="absolute inset-0 bg-gradient-to-t from-[#FAFAFA] via-[#FAFAFA]/90 to-transparent h-32 -top-32 z-10"></div>
+        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/90 to-transparent h-32 -top-32 z-10"></div>
 
         <div className="flex gap-4 px-8 min-w-max relative z-0 opacity-80">
           <AnimatePresence>
@@ -314,12 +314,12 @@ export default function CheckIn() {
                   y: [0, -5, 0],
                   transition: { y: { repeat: Infinity, duration: 4, delay: i * 0.2, ease: "easeInOut" } }
                 }}
-                className="flex items-center gap-3 bg-white border border-slate-100 rounded-full pl-1.5 pr-5 py-1.5 shadow-[0_4px_20px_rgba(0,0,0,0.03)]"
+                className="flex items-center gap-3 bg-white/80 backdrop-blur-sm border border-white/50 rounded-full pl-1.5 pr-5 py-1.5 soft-shadow"
               >
                 <img src={log.employees?.photo_url || log.photo_url} className="w-9 h-9 rounded-full object-cover bg-slate-50 border border-slate-100" />
                 <div className="flex flex-col">
-                  <span className="text-[11px] font-bold text-slate-800">{log.employees?.name?.split(' ')[0]}</span>
-                  <span className="text-[10px] text-slate-400 font-medium">{format(new Date(log.timestamp), "HH:mm")} <span className="ml-1">{log.mood_status}</span></span>
+                  <span className="text-[11px] font-bold text-foreground">{log.employees?.name?.split(' ')[0]}</span>
+                  <span className="text-[10px] text-muted-foreground font-medium">{format(new Date(log.timestamp), "HH:mm")} <span className="ml-1">{log.mood_status}</span></span>
                 </div>
               </motion.div>
             ))}
@@ -367,8 +367,8 @@ export default function CheckIn() {
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
               className="w-full bg-white rounded-t-[2.5rem] p-8 pb-12 shadow-[0_-20px_60px_rgba(0,0,0,0.1)] pointer-events-auto relative"
             >
-              <div className="w-12 h-1 bg-slate-100 rounded-full mx-auto mb-8"></div>
-              <h3 className="text-xl font-bold text-[#27272A] text-center mb-8">How are you feeling?</h3>
+              <div className="w-12 h-1 bg-muted rounded-full mx-auto mb-8"></div>
+              <h3 className="text-xl font-bold text-foreground text-center mb-8">How are you feeling?</h3>
               <div className="flex justify-center gap-4 flex-wrap">
                 {['🔥', '😊', '😐', '😴', '🤒'].map((m) => (
                   <motion.button
@@ -376,7 +376,7 @@ export default function CheckIn() {
                     whileHover={{ scale: 1.2, rotate: 10 }}
                     whileTap={{ scale: 0.9 }}
                     onClick={() => handleMoodSelect(m)}
-                    className="w-16 h-16 text-3xl flex items-center justify-center rounded-2xl bg-slate-50 hover:bg-[#10B981] hover:text-white shadow-sm"
+                    className="w-16 h-16 text-3xl flex items-center justify-center rounded-2xl bg-muted hover:bg-primary hover:text-black soft-shadow transition-colors"
                   >
                     {m}
                   </motion.button>
