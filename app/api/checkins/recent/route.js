@@ -9,8 +9,8 @@ export async function GET() {
     );
 
     try {
-        // Fetch last 10 logs with employee details, sorting by timestamp desc
-        const { data, error } = await supabase
+        // Fetch last 30 logs (to allow for filtering)
+        const { data: logs, error } = await supabase
             .from('attendance_logs')
             .select(`
         id,
@@ -24,11 +24,17 @@ export async function GET() {
         photo_url
       `)
             .order('timestamp', { ascending: false })
-            .limit(10);
+            .limit(30);
 
         if (error) throw error;
 
-        return NextResponse.json({ recentCheckins: data });
+        // Filter out Owner and Develop
+        const filtered = logs.filter(log => {
+            const pos = log.employees?.position?.toLowerCase() || '';
+            return !pos.includes('owner') && !pos.includes('develop');
+        }).slice(0, 15); // Return top 15
+
+        return NextResponse.json({ recentCheckins: filtered });
     } catch (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
