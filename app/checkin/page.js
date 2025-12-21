@@ -28,6 +28,7 @@ export default function CheckIn() {
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedLogId, setSelectedLogId] = useState(null);
+  const [showUserId, setShowUserId] = useState(false);
 
   // Dev Mode State
   const [devMode, setDevMode] = useState(false);
@@ -220,7 +221,27 @@ export default function CheckIn() {
             ❤️
           </button>
         </div>
-        {profile && <img src={profile.pictureUrl} className="w-10 h-10 rounded-full border border-slate-200 shadow-sm" />}
+
+        <div className="flex items-center gap-3">
+          {profile ? (
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setShowUserId(!showUserId)}
+                className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {showUserId ? profile.userId.slice(0, 8) + '...' : 'Show ID'}
+              </button>
+              <img src={profile.pictureUrl} className="w-10 h-10 rounded-full border border-slate-200 shadow-sm" />
+            </div>
+          ) : (
+            <button
+              onClick={() => liff.login()}
+              className="px-4 py-2 bg-[#06C755] text-white rounded-full text-xs font-bold hover:bg-[#05b34d] transition-colors soft-shadow"
+            >
+              LINE Login
+            </button>
+          )}
+        </div>
       </motion.div>
 
       {/* 2. Announcement */}
