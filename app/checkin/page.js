@@ -17,11 +17,10 @@ export default function CheckIn() {
 
   // Interaction State
   const [showCamera, setShowCamera] = useState(false);
+  const [showMoodSelector, setShowMoodSelector] = useState(false); // Post-Checkin State
   const [photoUrl, setPhotoUrl] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Overlay / Mood State
   const [showMoodOverlay, setShowMoodOverlay] = useState(false);
   const [currentLogId, setCurrentLogId] = useState(null);
   const [countdown, setCountdown] = useState(5);

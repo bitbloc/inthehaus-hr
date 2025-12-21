@@ -11,8 +11,10 @@ export async function GET() {
     try {
         const { data, error } = await supabase
             .from('announcements')
-            .select('message, created_at')
+            .select('message, created_at, priority, expires_at')
             .eq('is_active', true)
+            .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
+            .order('priority', { ascending: false })
             .order('created_at', { ascending: false })
             .limit(1)
             .single();

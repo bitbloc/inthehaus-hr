@@ -164,8 +164,17 @@ export default function AdminDashboard() {
     const handleAddAnnouncement = async (e) => {
         e.preventDefault();
         if (!newAnnouncement.trim()) return;
-        const { error } = await supabase.from('announcements').insert({ message: newAnnouncement, is_active: true });
-        if (!error) { setNewAnnouncement(""); fetchAnnouncements(); } else { alert(error.message); }
+
+        const priority = e.target.priority.value || 1;
+        const expires_at = e.target.expires_at.value || null;
+
+        const { error } = await supabase.from('announcements').insert({
+            message: newAnnouncement,
+            is_active: true,
+            priority,
+            expires_at: expires_at ? new Date(expires_at) : null
+        });
+        if (!error) { setNewAnnouncement(""); fetchAnnouncements(); e.target.reset(); } else { alert(error.message); }
     };
 
     const handleToggleAnnouncement = async (id, currentStatus) => {
@@ -345,17 +354,48 @@ export default function AdminDashboard() {
                     <div className="max-w-4xl mx-auto space-y-6 animate-fade-in-up">
                         <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
                             <h3 className="font-bold text-lg text-slate-700 mb-4">📣 Post Announcement</h3>
-                            <form onSubmit={handleAddAnnouncement} className="flex gap-4">
-                                <input className="flex-1 p-3 rounded-xl border border-slate-200 bg-slate-50 outline-none focus:ring-2 focus:ring-slate-800" placeholder="What's happening today?" value={newAnnouncement} onChange={(e) => setNewAnnouncement(e.target.value)} />
-                                <button type="submit" className="bg-slate-800 text-white px-6 py-3 rounded-xl font-bold shadow hover:bg-slate-900 transition">Post</button>
+                            <form onSubmit={handleAddAnnouncement} className="flex flex-col gap-4">
+                                <input
+                                    className="flex-1 p-3 rounded-xl border border-slate-200 bg-slate-50 outline-none focus:ring-2 focus:ring-slate-800"
+                                    placeholder="What's happening today?"
+                                    value={newAnnouncement}
+                                    onChange={(e) => setNewAnnouncement(e.target.value)}
+                                />
+                                <div className="flex gap-4">
+                                    <select className="p-3 rounded-xl border border-slate-200 bg-slate-50 outline-none" name="priority">
+                                        <option value="1">Normal Priority</option>
+                                        <option value="2">High Priority</option>
+                                    </select>
+                                    <input
+                                        type="datetime-local"
+                                        className="p-3 rounded-xl border border-slate-200 bg-slate-50 outline-none"
+                                        name="expires_at"
+                                    />
+                                    <button type="submit" className="bg-slate-800 text-white px-6 py-3 rounded-xl font-bold shadow hover:bg-slate-900 transition flex-1">Post</button>
+                                </div>
                             </form>
                         </div>
+
                         <div className="space-y-4">
                             {announcements.map(a => (
                                 <div key={a.id} className={`p-5 rounded-2xl border transition flex items-center justify-between ${a.is_active ? 'bg-white border-slate-200 shadow-sm' : 'bg-slate-50 border-slate-100 opacity-70'}`}>
-                                    <div className="flex-1"><p className="font-bold text-slate-700 text-lg">{a.message}</p><p className="text-xs text-slate-400 mt-1">{format(parseISO(a.created_at), "dd MMM yyyy HH:mm")}</p></div>
+                                    <div className="flex-1">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            {a.priority > 1 && <span className="text-[10px] bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-bold">HIGH</span>}
+                                            <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-bold">
+                                                {format(parseISO(a.created_at), "dd MMM HH:mm")}
+                                            </span>
+                                            {a.expires_at && <span className="text-[10px] bg-orange-100 text-orange-500 px-2 py-0.5 rounded-full">Exp: {format(parseISO(a.expires_at), "dd/MM")}</span>}
+                                        </div>
+                                        <p className="font-bold text-slate-700 text-lg">{a.message}</p>
+                                    </div>
                                     <div className="flex items-center gap-3">
-                                        <button onClick={() => handleToggleAnnouncement(a.id, a.is_active)} className={`px-4 py-2 rounded-lg text-xs font-bold transition ${a.is_active ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-500'}`}>{a.is_active ? 'Active' : 'Inactive'}</button>
+                                        <button
+                                            onClick={() => handleToggleAnnouncement(a.id, a.is_active)}
+                                            className={`px-4 py-2 rounded-lg text-xs font-bold transition ${a.is_active ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-500'}`}
+                                        >
+                                            {a.is_active ? 'Active' : 'Inactive'}
+                                        </button>
                                         <button onClick={() => handleDeleteAnnouncement(a.id)} className="text-slate-400 hover:text-rose-500 p-2">🗑️</button>
                                     </div>
                                 </div>
