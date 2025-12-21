@@ -28,6 +28,10 @@ export default function CheckIn() {
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Dev Mode State
+  const [devMode, setDevMode] = useState(false);
+  const [showDevLogin, setShowDevLogin] = useState(false);
+
   const fileInputRef = useRef(null);
 
   // --- Constants ---
@@ -59,7 +63,7 @@ export default function CheckIn() {
     return () => clearInterval(timer);
   }, []);
 
-  // --- Fetchers ---
+  // --- Fetchers & Helpers ---
   const fetchAnnouncement = async () => {
     try {
       const res = await fetch('/api/announcements/active');
@@ -83,6 +87,19 @@ export default function CheckIn() {
     setLastAction(log ? log.action_type : 'check_out');
   };
 
+  // --- Dev Mode Logic ---
+  const handleDevLogin = () => {
+    const user = prompt("Username:");
+    const pass = prompt("Password:");
+    if (user === "yuzu" && pass === "1533") {
+      setDevMode(true);
+      setStatus("❤️ Developer Mode");
+      alert("Developer Mode Active: GPS Bypassed");
+    } else {
+      alert("Invalid credentials");
+    }
+  };
+
   // --- GPS ---
   const onGeoSuccess = (position) => {
     const dist = getDistanceFromLatLonInKm(position.coords.latitude, position.coords.longitude, SHOP_LAT, SHOP_LONG);
@@ -93,7 +110,7 @@ export default function CheckIn() {
 
   // --- Actions ---
   const handleStartCheckIn = () => {
-    if (!status.includes("Ready")) return alert("Please be at the location to check in.");
+    if (!devMode && !status.includes("Ready")) return alert("Please be at the location to check in.");
     setShowCamera(true);
     setTimeout(() => fileInputRef.current?.click(), 300);
   };
@@ -189,13 +206,19 @@ export default function CheckIn() {
   return (
     <div className="min-h-screen bg-[#FAFAFA] text-[#27272A] font-sans flex flex-col items-center relative overflow-hidden font-feature-settings-['ss01']">
 
-      {/* 1. Header */}
+      {/* 1. Header with Dev Icon */}
       <motion.div
         className="w-full p-6 flex justify-between items-center z-10"
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
       >
-        <h1 className="text-xl font-bold tracking-tight text-[#27272A]">In the haus</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-xl font-bold tracking-tight text-[#27272A]">In the haus</h1>
+          {/* Dev Bypass Trigger */}
+          <button onClick={handleDevLogin} className="opacity-20 hover:opacity-100 transition-opacity">
+            ❤️
+          </button>
+        </div>
         {profile && <img src={profile.pictureUrl} className="w-10 h-10 rounded-full border border-slate-200 shadow-sm" />}
       </motion.div>
 
@@ -244,15 +267,33 @@ export default function CheckIn() {
             whileTap={{ scale: 0.95 }}
             onClick={handleStartCheckIn}
             className={cn(
-              "w-44 h-44 rounded-[3rem] flex flex-col items-center justify-center shadow-[0_20px_60px_rgba(16,185,129,0.15)] group relative border",
+              "w-48 h-48 rounded-[3rem] flex flex-col items-center justify-center shadow-[0_20px_60px_rgba(16,185,129,0.15)] group relative border transition-colors",
               lastAction !== 'check_in' ? 'bg-white border-emerald-50 text-[#10B981]' : 'bg-white border-rose-50 text-[#EF4444]'
             )}
           >
             <motion.div
               className={cn("absolute inset-0 rounded-[3rem] opacity-0 group-hover:opacity-100 transition-opacity duration-500", lastAction !== 'check_in' ? 'bg-emerald-50/50' : 'bg-rose-50/50')}
             />
-            <span className="text-5xl mb-3 relative z-10">{lastAction !== 'check_in' ? '👋' : '🏠'}</span>
-            <span className="text-xs font-black uppercase tracking-widest relative z-10">{lastAction !== 'check_in' ? 'Check In' : 'Check Out'}</span>
+
+            {/* Icon */}
+            <div className="mb-3 relative z-10">
+              {lastAction !== 'check_in' ? (
+                // Office / Entrance Icon
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-16 h-16">
+                  <path d="M3 21h18" /><path d="M5 21V7l8-4 8 4v14" /><path d="M12 11v4" />
+                </svg>
+              ) : (
+                // Home / Exit Icon
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-16 h-16">
+                  <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" />
+                </svg>
+              )}
+            </div>
+
+            {/* Thai Text */}
+            <span className="text-2xl font-bold tracking-tight relative z-10 font-sans">
+              {lastAction !== 'check_in' ? 'เข้างาน' : 'ออกงาน'}
+            </span>
           </motion.button>
         )}
       </div>
