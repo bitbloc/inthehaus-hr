@@ -190,7 +190,7 @@ export default function AdminDashboard() {
 
     // Helper Logic
     const getShiftInfo = (log) => {
-        if (!log || !schedules[log.employee_id]) return null;
+        if (!log || !schedules[log.employee_id]) return undefined;
 
         let logDate = new Date(log.timestamp);
         // ✅ Fix: If check_out is early morning (e.g. < 09:00), treat as previous day
