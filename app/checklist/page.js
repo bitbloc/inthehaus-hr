@@ -15,11 +15,20 @@ export default function ChecklistPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [filter, setFilter] = useState('All'); // 'All', 'Opening', 'Closing'
+    const [selectedImage, setSelectedImage] = useState(null); // For lightbox
 
     const SHEET_URL = "https://docs.google.com/spreadsheets/d/1AJVcXjwuzlm5U_UPD91wWPKz76jTRrW2VPsL22MR9CU/export?format=csv";
 
     useEffect(() => {
         fetchData();
+    }, []);
+
+    useEffect(() => {
+        const handleEsc = (e) => {
+            if (e.key === 'Escape') setSelectedImage(null);
+        };
+        window.addEventListener('keydown', handleEsc);
+        return () => window.removeEventListener('keydown', handleEsc);
     }, []);
 
     const fetchData = async () => {
@@ -35,12 +44,20 @@ export default function ChecklistPage() {
 
             // Process data to match our needs
             const processedData = jsonData.map((row, index) => {
+                // Robust Type Detection
+                const typeStr = String(row["ช่วงเวลาที่ตรวจสอบ"] || "");
+                const isOpening = typeStr.includes("☀️") || typeStr.includes("เปิด");
+                // Explicitly check for Closing if needed, otherwise default to Closing if not Opening?
+                // Given the 2 types: usually safe to say if not opening, then closing.
+                // But let's be cleaner:
+                const type = isOpening ? "Opening" : "Closing";
+
                 return {
                     id: index,
                     timestamp: parseThaiDate(row["Timestamp"] || row["ประทับเวลา"] || Object.values(row)[0]),
                     staffName: row["ชื่อพนักงาน ( Aka )"],
-                    type: row["ช่วงเวลาที่ตรวจสอบ"]?.includes("เปิด") ? "Opening" : "Closing", // "☀️ เปิดร้าน" or "🌙 ปิดร้าน"
-                    tasks: row["ช่วงเวลาที่ตรวจสอบ"]?.includes("เปิด")
+                    type: type,
+                    tasks: isOpening
                         ? [
                             row["เช็คความพร้อมก่อนเปิด"],
                             row["ระบบเงินและ POS"],
@@ -233,16 +250,20 @@ export default function ChecklistPage() {
                                     {item.photos.length > 0 && (
                                         <div className="flex gap-2 overflow-x-auto pb-2 md:w-1/3 md:grid md:grid-cols-2 md:gap-2 md:overflow-visible h-fit scrollbar-hide">
                                             {item.photos.map((src, i) => (
-                                                <a href={src.replace('thumbnail?', 'view?')} target="_blank" rel="noopener noreferrer" key={i} className="flex-shrink-0 relative group">
+                                                <div
+                                                    key={i}
+                                                    className="flex-shrink-0 relative group cursor-pointer"
+                                                    onClick={() => setSelectedImage(src.replace('thumbnail?', 'view?'))}
+                                                >
                                                     <img
                                                         src={src}
                                                         alt="Evidence"
                                                         loading="lazy"
                                                         referrerPolicy="no-referrer"
-                                                        className="w-24 h-24 md:w-full md:h-24 object-cover rounded-xl bg-muted border border-border"
+                                                        className="w-24 h-24 md:w-full md:h-24 object-cover rounded-xl bg-muted border border-border group-hover:opacity-90 transition-opacity"
                                                         onError={(e) => e.target.style.display = 'none'}
                                                     />
-                                                </a>
+                                                </div>
                                             ))}
                                         </div>
                                     )}
@@ -252,6 +273,36 @@ export default function ChecklistPage() {
                     </AnimatePresence>
                 </div>
             )}
+
+            {/* Lightbox Modal */}
+            <AnimatePresence>
+                {selectedImage && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={() => setSelectedImage(null)}
+                        className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer"
+                    >
+                        <motion.img
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.9, opacity: 0 }}
+                            src={selectedImage}
+                            alt="Full Screen Evidence"
+                            className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl"
+                        />
+                        <button
+                            className="absolute top-4 right-4 text-white p-2 rounded-full bg-black/50 hover:bg-black/70"
+                            onClick={() => setSelectedImage(null)}
+                        >
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }
