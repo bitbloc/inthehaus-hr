@@ -44,7 +44,13 @@ export default function ChecklistPage() {
 
             // Process data to match our needs
             const processedData = jsonData.map((row, index) => {
-                const timestamp = parseThaiDate(row["Timestamp"] || row["ประทับเวลา"] || Object.values(row)[0]);
+                // Helper to find value by trimmed key
+                const getValue = (searchKey) => {
+                    const key = Object.keys(row).find(k => k.trim() === searchKey.trim());
+                    return key ? row[key] : undefined;
+                };
+
+                const timestamp = parseThaiDate(getValue("Timestamp") || getValue("ประทับเวลา") || Object.values(row)[0]);
 
                 // Time-based Categorization
                 // Opening: 10:00 - 16:30
@@ -69,22 +75,20 @@ export default function ChecklistPage() {
                 return {
                     id: index,
                     timestamp: timestamp,
-                    staffName: row["ชื่อพนักงาน ( Aka )"],
+                    staffName: getValue("ชื่อพนักงาน ( Aka )"),
                     type: type,
                     tasks: isOpening
                         ? [
-                            row["เช็คความพร้อมก่อนเปิด"],
-                            row["ระบบเงินและ POS"],
-                            row["ถ่ายรูปหน้าร้านหลังเตรียมเสร็จ"]
+                            getValue("เช็คความพร้อมก่อนเปิด"),
+                            getValue("ระบบเงินและ POS")
                         ]
                         : [
-                            row["ความสะอาดและสต็อก (Cleaning & Stock)"],
-                            row["ระบบเงินและการปิดร้าน (Closing)"],
-                            row["ถ่ายรูปพื้นที่ก่อนปิดร้าน"]
+                            getValue("ความสะอาดและสต็อก (Cleaning & Stock)"),
+                            getValue("ระบบเงินและการปิดร้าน (Closing)")
                         ],
-                    cash: row["ระบุยอดเงินในลิ้นชักก่อนเปิด (บาท)"] || row["ระบุยอดเงินสดปิดร้าน (บาท)"],
+                    cash: getValue("ระบุยอดเงินในลิ้นชักก่อนเปิด (บาท)") || getValue("ระบุยอดเงินสดปิดร้าน (บาท)"),
                     photos: extractPhotoLinks(row),
-                    note: row["หมายเหตุ"],
+                    note: getValue("หมายเหตุ"),
                     raw: row
                 };
             });
@@ -277,7 +281,6 @@ export default function ChecklistPage() {
                                                     <img
                                                         src={photo.thumbnail}
                                                         alt="Evidence"
-                                                        loading="lazy"
                                                         referrerPolicy="no-referrer"
                                                         className="w-24 h-24 md:w-full md:h-24 object-cover rounded-xl bg-muted border border-border group-hover:opacity-90 transition-opacity"
                                                         onError={(e) => e.target.style.display = 'none'}
