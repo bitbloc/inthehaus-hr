@@ -44,17 +44,31 @@ export default function ChecklistPage() {
 
             // Process data to match our needs
             const processedData = jsonData.map((row, index) => {
-                // Robust Type Detection
-                const typeStr = String(row["ช่วงเวลาที่ตรวจสอบ"] || "");
-                const isOpening = typeStr.includes("☀️") || typeStr.includes("เปิด");
-                // Explicitly check for Closing if needed, otherwise default to Closing if not Opening?
-                // Given the 2 types: usually safe to say if not opening, then closing.
-                // But let's be cleaner:
-                const type = isOpening ? "Opening" : "Closing";
+                const timestamp = parseThaiDate(row["Timestamp"] || row["ประทับเวลา"] || Object.values(row)[0]);
+
+                // Time-based Categorization
+                // Opening: 10:00 - 16:30
+                // Closing: 16:30 - 01:00 (next day) and beyond
+                let type = "Closing"; // Default
+                if (isValid(timestamp)) {
+                    const hour = timestamp.getHours();
+                    const minute = timestamp.getMinutes();
+                    const totalMinutes = hour * 60 + minute;
+
+                    // 10:00 (600 min) to 16:30 (990 min)
+                    if (totalMinutes >= 600 && totalMinutes < 990) {
+                        type = "Opening";
+                    }
+                }
+
+                // Fallback to text detection if timestamp is invalid? 
+                // Currently isValid(timestamp) logic handles the main path.
+
+                const isOpening = type === "Opening";
 
                 return {
                     id: index,
-                    timestamp: parseThaiDate(row["Timestamp"] || row["ประทับเวลา"] || Object.values(row)[0]),
+                    timestamp: timestamp,
                     staffName: row["ชื่อพนักงาน ( Aka )"],
                     type: type,
                     tasks: isOpening
@@ -89,7 +103,7 @@ export default function ChecklistPage() {
         const str = String(dateStr);
         let date;
 
-        // Google sheets formats: "25/11/2025, 14:12:50" or "14/12/2025, 0:58:34"
+        // Google sheets formats: "25/11/2025, 14:12:50"
         const parts = str.match(/(\d+)\/(\d+)\/(\d+), (\d+):(\d+):(\d+)/);
         if (parts) {
             const day = parts[1].padStart(2, '0');
@@ -105,13 +119,13 @@ export default function ChecklistPage() {
 
         if (!isValid(date)) {
             console.warn("Invalid date parsed:", dateStr);
-            return new Date(); // Fallback to now to prevent crash
+            return new Date();
         }
         return date;
     }
 
     const extractPhotoLinks = (row) => {
-        const inks = [];
+        const photos = [];
         Object.values(row).forEach(val => {
             if (typeof val === 'string' && val.includes('http')) {
                 const potentialLinks = val.split(',').map(s => s.trim()).filter(s => s.startsWith('http'));
@@ -120,17 +134,22 @@ export default function ChecklistPage() {
                     if (linkStr.includes('drive.google.com')) {
                         const idMatch = linkStr.match(/id=([a-zA-Z0-9_-]+)/);
                         if (idMatch) {
-                            inks.push(`https://drive.google.com/thumbnail?id=${idMatch[1]}&sz=w400`);
+                            photos.push({
+                                thumbnail: `https://drive.google.com/thumbnail?id=${idMatch[1]}&sz=w400`,
+                                full: `https://drive.google.com/uc?export=view&id=${idMatch[1]}`
+                            });
                         } else {
-                            inks.push(linkStr);
+                            photos.push({ thumbnail: linkStr, full: linkStr });
                         }
                     } else {
-                        inks.push(linkStr);
+                        photos.push({ thumbnail: linkStr, full: linkStr });
                     }
                 });
             }
         });
-        return [...new Set(inks)];
+
+        // Remove duplicates based on full url
+        return photos.filter((v, i, a) => a.findIndex(v2 => (v2.full === v.full)) === i);
     }
 
     // Filter and Sort Logic
@@ -249,14 +268,14 @@ export default function ChecklistPage() {
                                     {/* Gallery */}
                                     {item.photos.length > 0 && (
                                         <div className="flex gap-2 overflow-x-auto pb-2 md:w-1/3 md:grid md:grid-cols-2 md:gap-2 md:overflow-visible h-fit scrollbar-hide">
-                                            {item.photos.map((src, i) => (
+                                            {item.photos.map((photo, i) => (
                                                 <div
                                                     key={i}
                                                     className="flex-shrink-0 relative group cursor-pointer"
-                                                    onClick={() => setSelectedImage(src.replace('thumbnail?', 'view?'))}
+                                                    onClick={() => setSelectedImage(photo.full)}
                                                 >
                                                     <img
-                                                        src={src}
+                                                        src={photo.thumbnail}
                                                         alt="Evidence"
                                                         loading="lazy"
                                                         referrerPolicy="no-referrer"
