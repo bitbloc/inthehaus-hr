@@ -5,7 +5,7 @@ import { format, parseISO, startOfMonth, endOfMonth, differenceInMinutes } from 
 import { th } from "date-fns/locale";
 import * as XLSX from 'xlsx';
 import { calculatePayroll } from "../../utils/payroll";
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import StaffModal from "./StaffModal";
 
 export default function AdminDashboard() {
@@ -147,7 +147,21 @@ export default function AdminDashboard() {
     const handleSavePayrollConfig = async () => { await supabase.from('payroll_config').upsert([{ key: 'ot_rate', value: payrollConfig.ot_rate }, { key: 'double_shift_rate', value: payrollConfig.double_shift_rate }]); alert("✅ Saved"); };
     const handleUpdateShiftSalary = async (shiftId, salary) => { await supabase.from('shifts').update({ salary }).eq('id', shiftId); fetchShifts(); };
     const handleAddDeduction = async () => { if (!deductForm.empId || !deductForm.amount) return alert("Info missing"); const { error } = await supabase.from('payroll_deductions').insert({ employee_id: deductForm.empId, month: selectedMonth, amount: deductForm.amount, is_percentage: deductForm.isPercent, reason: deductForm.reason }); if (!error) { alert("Saved"); setShowDeductModal(false); fetchDeductions(); } };
-    const handleDeleteDeduction = async (id) => { if (confirm("Delete?")) { await supabase.from('payroll_deductions').delete().eq('id', id); fetchDeductions(); } };
+
+
+    // Updated handleDeleteEmployee with logging
+    const handleDeleteEmployee = async (id) => {
+        console.log("Attempting soft delete for ID:", id);
+        const { error } = await supabase.from("employees").update({ is_active: false }).eq("id", id);
+        if (error) {
+            console.error("Soft delete failed:", error);
+            alert(`Delete Failed: ${error.message} (Code: ${error.code})`);
+        } else {
+            // alert("Employee deactivated"); // Optional success message
+            fetchEmployees();
+        }
+    };
+
     const handleUpdateShift = async (id, f, v) => { const val = v === '' ? null : v; await supabase.from("shifts").update({ [f]: val }).eq("id", id); fetchShifts(); };
     const handleUpdateSchedule = async (e, d, s, o) => { await supabase.from("employee_schedules").upsert({ employee_id: e, day_of_week: d, shift_id: o ? null : s, is_off: o }, { onConflict: 'employee_id, day_of_week' }); fetchSchedules(); };
     const handleSaveStaff = async (formData) => {
@@ -324,7 +338,7 @@ export default function AdminDashboard() {
                                                 <td className="px-6 py-4 font-mono text-xs text-slate-400 truncate max-w-[100px]">{emp.line_user_id}</td>
                                                 <td className="px-6 py-4 text-right flex gap-2 justify-end whitespace-nowrap">
                                                     <button onClick={() => openEditStaff(emp)} className="text-blue-500 bg-blue-50 px-2 py-1 rounded font-bold text-xs hover:bg-blue-100">Edit</button>
-                                                    <button onClick={() => handleDeleteEmployee(emp.id)} className="text-rose-500 bg-rose-50 px-2 py-1 rounded font-bold text-xs hover:bg-rose-100">Del</button>
+                                                    <LongPressButton onLongPress={() => handleDeleteEmployee(emp.id)} />
                                                 </td>
                                             </tr>
                                         ))}
@@ -511,8 +525,8 @@ export default function AdminDashboard() {
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap">
                                                     <span className={`px-2 py-1 rounded-full text-xs font-bold ${app.status === 'Hired' ? 'bg-emerald-100 text-emerald-700' :
-                                                            app.status === 'Rejected' ? 'bg-rose-100 text-rose-700' :
-                                                                'bg-slate-100 text-slate-600'
+                                                        app.status === 'Rejected' ? 'bg-rose-100 text-rose-700' :
+                                                            'bg-slate-100 text-slate-600'
                                                         }`}>
                                                         {app.status}
                                                     </span>
@@ -551,3 +565,50 @@ export default function AdminDashboard() {
         </div>
     );
 }
+
+// Helper Components
+const LongPressButton = ({ onLongPress }) => {
+    const [pressing, setPressing] = useState(false);
+    const [progress, setProgress] = useState(0);
+    const timerRef = useRef(null);
+
+    const startPress = () => {
+        setPressing(true);
+        let start = Date.now();
+        setProgress(0);
+        timerRef.current = setInterval(() => {
+            const elapsed = Date.now() - start;
+            const p = Math.min((elapsed / 3000) * 100, 100);
+            setProgress(p);
+            if (p >= 100) {
+                clearInterval(timerRef.current);
+                setPressing(false);
+                setProgress(0);
+                onLongPress();
+            }
+        }, 50);
+    };
+
+    const cancelPress = () => {
+        setPressing(false);
+        setProgress(0);
+        if (timerRef.current) clearInterval(timerRef.current);
+    };
+
+    return (
+        <button
+            onMouseDown={startPress}
+            onMouseUp={cancelPress}
+            onMouseLeave={cancelPress}
+            onTouchStart={startPress}
+            onTouchEnd={cancelPress}
+            className="relative overflow-hidden text-rose-500 bg-rose-50 px-2 py-1 rounded font-bold text-xs select-none min-w-[60px]"
+        >
+            <span className="relative z-10">{pressing ? "Hold..." : "Hold Del"}</span>
+            <div
+                className="absolute top-0 left-0 h-full bg-rose-200 transition-all duration-75 z-0"
+                style={{ width: `${progress}%` }}
+            ></div>
+        </button>
+    );
+};
