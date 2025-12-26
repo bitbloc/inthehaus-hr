@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import * as XLSX from "xlsx";
-import { format } from "date-fns";
+import { format, isValid } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -74,12 +74,21 @@ export default function ChecklistPage() {
     const parseThaiDate = (dateStr) => {
         if (!dateStr) return new Date();
         const str = String(dateStr);
+        let date;
+
         // Google sheets formats: "25/11/2025, 14:12:50"
         const parts = str.match(/(\d+)\/(\d+)\/(\d+), (\d+):(\d+):(\d+)/);
         if (parts) {
-            return new Date(`${parts[3]}-${parts[2]}-${parts[1]}T${parts[4]}:${parts[5]}:${parts[6]}`);
+            date = new Date(`${parts[3]}-${parts[2]}-${parts[1]}T${parts[4]}:${parts[5]}:${parts[6]}`);
+        } else {
+            date = new Date(dateStr);
         }
-        return new Date(dateStr);
+
+        if (!isValid(date)) {
+            console.warn("Invalid date parsed:", dateStr);
+            return new Date(); // Fallback to now to prevent crash
+        }
+        return date;
     }
 
     const extractPhotoLinks = (row) => {
@@ -161,7 +170,7 @@ export default function ChecklistPage() {
                                             <div>
                                                 <h3 className="font-bold text-lg leading-tight">{item.staffName}</h3>
                                                 <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">
-                                                    {item.type} • {format(item.timestamp, "dd MMM, HH:mm")}
+                                                    {item.type} • {isValid(item.timestamp) ? format(item.timestamp, "dd MMM, HH:mm") : 'Date Error'}
                                                 </p>
                                             </div>
                                         </div>
