@@ -72,7 +72,6 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
                             onClick={() => setActiveTab(tab.id)}
                             className={`px-4 py-3 text-xs font-bold uppercase tracking-wider transition-all border-b-2 whitespace-nowrap ${activeTab === tab.id ? 'border-slate-800 text-slate-800' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
                         >
-                            {tab.label.replace(/ [a-z]/, (m) => m.toUpperCase())} {/* Hacky capitalize icon label if needed, or just use label directly */}
                             {tab.label}
                         </button>
                     ))}
