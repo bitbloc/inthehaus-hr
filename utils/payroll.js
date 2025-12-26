@@ -36,7 +36,10 @@ export const calculatePayroll = (employees, logs, schedules, shifts, payrollConf
         deductionsMap.get(d.employee_id).push(d);
     });
 
-    return employees.map(emp => {
+    // Filter for active employees only (if is_active field exists)
+    const activeEmployees = employees.filter(e => e.is_active !== false);
+
+    return activeEmployees.map(emp => {
         let totalSalary = 0;
         let totalOTHours = 0;
         let totalOTPay = 0;

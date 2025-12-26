@@ -83,7 +83,7 @@ export default function CheckIn() {
   };
 
   const fetchUserStatus = async (userId) => {
-    const { data: emp } = await supabase.from('employees').select('id').eq('line_user_id', userId).single();
+    const { data: emp } = await supabase.from('employees').select('id').eq('line_user_id', userId).eq('is_active', true).single();
     if (!emp) return;
     const { data: log } = await supabase.from('attendance_logs').select('action_type').eq('employee_id', emp.id).order('timestamp', { ascending: false }).limit(1).single();
     setLastAction(log ? log.action_type : 'check_out');

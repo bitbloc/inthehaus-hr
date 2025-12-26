@@ -19,3 +19,51 @@ CREATE POLICY "Enable read access for all users" ON announcements
 
 CREATE POLICY "Enable insert/update for authenticated users only" ON announcements
     FOR ALL USING (auth.role() = 'authenticated');
+
+-- 
+-- STAFF EXPANSION & JOB APPLICATIONS (Added)
+-- 
+
+-- 1. Job Applications Table
+CREATE TABLE IF NOT EXISTS job_applications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    full_name TEXT NOT NULL,
+    position_applied TEXT NOT NULL,
+    email TEXT,
+    phone TEXT,
+    resume_url TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    status TEXT DEFAULT 'Pending' CHECK (status IN ('Pending', 'Reviewing', 'Interviewed', 'Rejected', 'Hired')),
+    metadata JSONB
+);
+
+-- 2. Staff Table Expansion (employees)
+ALTER TABLE employees 
+ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE,
+ADD COLUMN IF NOT EXISTS name_en TEXT,
+ADD COLUMN IF NOT EXISTS nickname TEXT,
+ADD COLUMN IF NOT EXISTS phone TEXT,
+ADD COLUMN IF NOT EXISTS email TEXT,
+ADD COLUMN IF NOT EXISTS address TEXT,
+ADD COLUMN IF NOT EXISTS id_card TEXT, 
+ADD COLUMN IF NOT EXISTS employment_status TEXT CHECK (employment_status IN ('Probation', 'Fulltime', 'Contract', 'Resigned')),
+ADD COLUMN IF NOT EXISTS job_level TEXT,
+ADD COLUMN IF NOT EXISTS start_date DATE,
+ADD COLUMN IF NOT EXISTS probation_date DATE,
+ADD COLUMN IF NOT EXISTS base_salary NUMERIC,
+ADD COLUMN IF NOT EXISTS bank_account TEXT,
+ADD COLUMN IF NOT EXISTS bank_name TEXT,
+ADD COLUMN IF NOT EXISTS social_security_id TEXT,
+ADD COLUMN IF NOT EXISTS tax_id TEXT,
+ADD COLUMN IF NOT EXISTS education_history JSONB, 
+ADD COLUMN IF NOT EXISTS skills TEXT[],
+ADD COLUMN IF NOT EXISTS emergency_contact TEXT;
+
+-- Enable RLS on job_applications
+ALTER TABLE job_applications ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow public insert for job applications" ON job_applications
+    FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "Allow authenticated read job applications" ON job_applications
+    FOR SELECT USING (auth.role() = 'authenticated');

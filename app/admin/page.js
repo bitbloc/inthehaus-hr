@@ -6,6 +6,7 @@ import { th } from "date-fns/locale";
 import * as XLSX from 'xlsx';
 import { calculatePayroll } from "../../utils/payroll";
 import { useMemo } from "react";
+import StaffModal from "./StaffModal";
 
 export default function AdminDashboard() {
     const [activeTab, setActiveTab] = useState("dashboard");
@@ -17,6 +18,7 @@ export default function AdminDashboard() {
     const [schedules, setSchedules] = useState({});
     const [selectedMonth, setSelectedMonth] = useState(format(new Date(), "yyyy-MM"));
     const [leaveRequests, setLeaveRequests] = useState([]);
+    const [jobApplications, setJobApplications] = useState([]);
 
     // --- Announcements State ---
     const [announcements, setAnnouncements] = useState([]);
@@ -29,9 +31,8 @@ export default function AdminDashboard() {
     const [deductForm, setDeductForm] = useState({ empId: "", amount: "", isPercent: false, reason: "" });
 
     // --- Employee Management States ---
-    const [newEmp, setNewEmp] = useState({ name: "", position: "", line_user_id: "" });
-    const [editingEmpId, setEditingEmpId] = useState(null);
-    const [editFormData, setEditFormData] = useState({ name: "", position: "" });
+    const [showStaffModal, setShowStaffModal] = useState(false);
+    const [editingStaff, setEditingStaff] = useState(null);
 
     // --- History States ---
     const [selectedEmpId, setSelectedEmpId] = useState("ALL");
@@ -54,11 +55,12 @@ export default function AdminDashboard() {
         if (activeTab === "history" && selectedEmpId !== "ALL") fetchIndividualLogs();
         if (activeTab === "payroll") fetchDeductions();
         if (activeTab === "announcements") fetchAnnouncements();
+        if (activeTab === 'applications') fetchJobApplications();
     }, [activeTab, selectedMonth, selectedEmpId]);
 
     // --- API Fetching ---
     const fetchShifts = async () => { const { data } = await supabase.from("shifts").select("*").order("id"); setShifts(data || []); };
-    const fetchEmployees = async () => { const { data } = await supabase.from("employees").select("*").order("id"); setEmployees(data || []); };
+    const fetchEmployees = async () => { const { data } = await supabase.from("employees").select("*").eq("is_active", true).order("id"); setEmployees(data || []); };
 
     const fetchSchedules = async () => {
         const { data } = await supabase.from("employee_schedules").select("*, shifts(id, name, start_time, end_time)");
@@ -80,6 +82,11 @@ export default function AdminDashboard() {
     const fetchLeaveRequests = async () => {
         const { data } = await supabase.from('leave_requests').select('*, employees(name)').order('created_at', { ascending: false });
         setLeaveRequests(data || []);
+    };
+
+    const fetchJobApplications = async () => {
+        const { data } = await supabase.from('job_applications').select('*').order('created_at', { ascending: false });
+        setJobApplications(data || []);
     };
 
     const fetchPayrollConfig = async () => {
@@ -143,11 +150,20 @@ export default function AdminDashboard() {
     const handleDeleteDeduction = async (id) => { if (confirm("Delete?")) { await supabase.from('payroll_deductions').delete().eq('id', id); fetchDeductions(); } };
     const handleUpdateShift = async (id, f, v) => { const val = v === '' ? null : v; await supabase.from("shifts").update({ [f]: val }).eq("id", id); fetchShifts(); };
     const handleUpdateSchedule = async (e, d, s, o) => { await supabase.from("employee_schedules").upsert({ employee_id: e, day_of_week: d, shift_id: o ? null : s, is_off: o }, { onConflict: 'employee_id, day_of_week' }); fetchSchedules(); };
-    const handleAddEmployee = async (e) => { e.preventDefault(); const { error } = await supabase.from("employees").insert([newEmp]); if (!error) { alert("Success"); setNewEmp({ name: "", position: "", line_user_id: "" }); fetchEmployees(); } };
-    const handleDeleteEmployee = async (id) => { if (confirm("Delete?")) { await supabase.from("employees").delete().eq("id", id); fetchEmployees(); } };
-    const startEditEmployee = (emp) => { setEditingEmpId(emp.id); setEditFormData({ name: emp.name, position: emp.position }); };
-    const cancelEditEmployee = () => { setEditingEmpId(null); setEditFormData({ name: "", position: "" }); };
-    const saveEditEmployee = async (id) => { const { error } = await supabase.from("employees").update(editFormData).eq("id", id); if (!error) { alert("Saved"); setEditingEmpId(null); fetchEmployees(); } };
+    const handleSaveStaff = async (formData) => {
+        // Prepare data for DB (remove non-DB fields if any, though our Modal matches logic)
+        // If editingStaff exists, it's an update
+        if (editingStaff) {
+            const { error } = await supabase.from("employees").update(formData).eq("id", editingStaff.id);
+            if (!error) { alert("Saved"); setShowStaffModal(false); fetchEmployees(); } else { alert(error.message); }
+        } else {
+            const { error } = await supabase.from("employees").insert([formData]);
+            if (!error) { alert("Success"); setShowStaffModal(false); fetchEmployees(); } else { alert(error.message); }
+        }
+    };
+
+    const openAddStaff = () => { setEditingStaff(null); setShowStaffModal(true); };
+    const openEditStaff = (emp) => { setEditingStaff(emp); setShowStaffModal(true); };
     const handleNotify = async (api) => { if (confirm("Send?")) await fetch(api, { method: 'POST' }); };
     const handleRemindShift = async (n, t) => { if (confirm(`Call ${n} ${t}?`)) await fetch('/api/remind-shift', { method: 'POST', body: JSON.stringify({ shiftName: n, type: t }), headers: { 'Content-Type': 'application/json' } }); };
     const handleNotifySchedule = async () => { if (confirm("Publish?")) try { await fetch('/api/notify-schedule', { method: 'POST' }); alert("Success"); } catch (e) { } };
@@ -180,6 +196,11 @@ export default function AdminDashboard() {
     const handleToggleAnnouncement = async (id, currentStatus) => {
         const { error } = await supabase.from('announcements').update({ is_active: !currentStatus }).eq('id', id);
         if (!error) fetchAnnouncements();
+    };
+
+    const handleUpdateApplicationStatus = async (id, status) => {
+        const { error } = await supabase.from('job_applications').update({ status }).eq('id', id);
+        if (!error) fetchJobApplications();
     };
 
     const handleDeleteAnnouncement = async (id) => {
@@ -240,7 +261,7 @@ export default function AdminDashboard() {
                         <p className="text-xs md:text-sm text-slate-500 mt-1">HR Management System</p>
                     </div>
                     <div className="md:hidden w-full"><select value={activeTab} onChange={(e) => setActiveTab(e.target.value)} className="w-full p-3 rounded-xl border border-slate-300 bg-white font-bold text-slate-700 shadow-sm focus:ring-2 focus:ring-slate-800 outline-none"><option value="dashboard">📊 Overview</option><option value="payroll">💰 Payroll</option><option value="requests">📩 Requests</option><option value="history">👤 History</option><option value="roster">📅 Roster</option><option value="employees">👥 Staff</option><option value="settings">⚙️ Settings</option></select></div>
-                    <div className="hidden md:flex bg-white p-1.5 rounded-2xl shadow-sm border border-slate-200 overflow-x-auto max-w-full">{['dashboard', 'payroll', 'requests', 'history', 'roster', 'employees', 'settings', 'announcements'].map(t => (<button key={t} onClick={() => setActiveTab(t)} className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ease-in-out whitespace-nowrap ${activeTab === t ? 'bg-slate-800 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}>{t === 'dashboard' ? 'Overview' : t === 'payroll' ? '💰 Payroll' : t === 'requests' ? 'Requests' : t === 'history' ? 'History' : t === 'roster' ? 'Roster' : t === 'employees' ? 'Staff' : t === 'announcements' ? '📣 News' : 'Settings'}</button>))}</div>
+                    <div className="hidden md:flex bg-white p-1.5 rounded-2xl shadow-sm border border-slate-200 overflow-x-auto max-w-full">{['dashboard', 'payroll', 'requests', 'history', 'roster', 'employees', 'settings', 'announcements', 'applications'].map(t => (<button key={t} onClick={() => setActiveTab(t)} className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ease-in-out whitespace-nowrap ${activeTab === t ? 'bg-slate-800 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}>{t === 'dashboard' ? 'Overview' : t === 'payroll' ? '💰 Payroll' : t === 'requests' ? 'Requests' : t === 'history' ? 'History' : t === 'roster' ? 'Roster' : t === 'employees' ? 'Staff' : t === 'announcements' ? '📣 News' : t === 'applications' ? '📄 Jobs' : 'Settings'}</button>))}</div>
 
                 </div>
 
@@ -267,7 +288,59 @@ export default function AdminDashboard() {
                 {activeTab === 'requests' && (<div className="space-y-6 animate-fade-in-up"><h3 className="font-bold text-lg text-slate-700">Leave Requests</h3><div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-sm text-left"><thead className="bg-slate-50 text-slate-400 uppercase text-xs font-bold"><tr><th className="px-6 py-4 whitespace-nowrap">Name</th><th className="px-6 py-4 whitespace-nowrap">Date</th><th className="px-6 py-4 whitespace-nowrap">Type</th><th className="px-6 py-4 whitespace-nowrap">Reason</th><th className="px-6 py-4 whitespace-nowrap">Status</th><th className="px-6 py-4 text-right whitespace-nowrap">Action</th></tr></thead><tbody className="divide-y divide-slate-50">{leaveRequests.map(req => (<tr key={req.id} className="hover:bg-slate-50"><td className="px-6 py-4 font-bold text-slate-700 whitespace-nowrap">{req.employees?.name}</td><td className="px-6 py-4 font-mono whitespace-nowrap">{req.leave_date}</td><td className="px-6 py-4 whitespace-nowrap">{req.leave_type}</td><td className="px-6 py-4 text-slate-500 whitespace-nowrap">{req.reason}</td><td className="px-6 py-4 whitespace-nowrap"><span className={`px-2 py-1 rounded text-xs font-bold ${req.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-yellow-100'}`}>{req.status}</span></td><td className="px-6 py-4 text-right whitespace-nowrap"><button onClick={() => handleLeaveAction(req, 'approved')} className="text-emerald-600 font-bold text-xs mr-2">Approve</button><button onClick={() => handleLeaveAction(req, 'rejected')} className="text-rose-600 font-bold text-xs">Reject</button></td></tr>))}</tbody></table></div></div></div>)}
                 {activeTab === 'history' && (<div className="space-y-6 animate-fade-in-up"><div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100"><div className="flex flex-col md:flex-row justify-between items-end gap-4"><div className="flex-1 w-full"><label className="block text-xs font-bold text-slate-400 uppercase mb-2">Select Employee</label><div className="flex gap-4"><select className="w-full md:w-1/3 p-3 rounded-xl border border-slate-200 bg-slate-50 outline-none" value={selectedEmpId} onChange={(e) => setSelectedEmpId(e.target.value)}><option value="ALL">-- Choose --</option>{employees.map(emp => <option key={emp.id} value={emp.id}>{emp.name}</option>)}</select><input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="p-3 rounded-xl border border-slate-200 bg-slate-50 font-bold text-slate-700 outline-none" /></div></div>{selectedEmpId !== "ALL" && (<button onClick={handleExportExcel} className="bg-green-600 text-white px-6 py-3 rounded-xl font-bold shadow hover:bg-green-700 transition flex items-center gap-2">📥 Export Excel</button>)}</div></div>{selectedEmpId !== "ALL" && (<><div className="grid grid-cols-2 md:grid-cols-4 gap-4"><div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100"><p className="text-xs font-bold text-slate-400 uppercase">Work Days</p><p className="text-3xl font-bold text-slate-800 mt-2">{individualStats.work_days}</p></div><div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100"><p className="text-xs font-bold text-slate-400 uppercase">Late</p><p className="text-3xl font-bold text-orange-500 mt-2">{individualStats.late}</p></div><div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100"><p className="text-xs font-bold text-slate-400 uppercase">Absent</p><p className="text-3xl font-bold text-rose-500 mt-2">{individualStats.absent}</p></div></div><div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-sm text-left"><thead className="bg-slate-50 text-slate-400 uppercase text-xs font-bold"><tr><th className="px-6 py-4 whitespace-nowrap">Date</th><th className="px-6 py-4 whitespace-nowrap">Time</th><th className="px-6 py-4 whitespace-nowrap">Action</th><th className="px-6 py-4 whitespace-nowrap">Note</th></tr></thead><tbody className="divide-y divide-slate-50">{individualLogs.map(log => { const shiftInfo = getShiftInfo(log); const { status, color } = analyzeLog(log, shiftInfo); return (<tr key={log.id} className="hover:bg-slate-50"><td className="px-6 py-4 font-bold text-slate-700 whitespace-nowrap">{format(parseISO(log.timestamp), "dd MMM")}</td><td className="px-6 py-4 font-mono whitespace-nowrap">{format(parseISO(log.timestamp), "HH:mm")}</td><td className="px-6 py-4 whitespace-nowrap">{log.action_type === 'check_in' && '🟢 In'}{log.action_type === 'check_out' && '🔴 Out'}{log.action_type === 'absent' && '🚫 Absent'}</td><td className="px-6 py-4 whitespace-nowrap"><span className={`px-2 py-1 rounded text-xs ${color}`}>{status}</span></td></tr>) })}</tbody></table></div></div></>)}</div>)}
                 {activeTab === 'roster' && (<div className="space-y-6 animate-fade-in-up"><div className="flex justify-between items-center bg-amber-50 p-4 rounded-2xl border border-amber-100"><div className="text-amber-800 text-sm font-bold flex items-center gap-2">📅 Weekly Schedule</div><button onClick={handleNotifySchedule} className="bg-amber-600 text-white px-4 py-2 rounded-xl font-bold text-xs shadow">Publish</button></div><div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden overflow-x-auto"><table className="w-full text-sm border-collapse"><thead><tr><th className="p-4 text-left min-w-[150px] bg-slate-50 border-b font-bold text-slate-500 uppercase text-xs sticky left-0 z-10">Staff</th>{days.map(d => <th key={d} className="p-4 bg-slate-50 border-b text-center min-w-[100px] text-slate-500 text-xs font-bold">{d}</th>)}</tr></thead><tbody>{employees.map(emp => (<tr key={emp.id} className="hover:bg-slate-50 transition"><td className="p-4 border-b border-slate-50 font-bold text-slate-700 bg-white sticky left-0 z-10">{emp.name}</td>{days.map((_, i) => { const s = schedules[emp.id]?.[i]; return (<td key={i} className="p-2 border-b border-slate-50 text-center border-l border-slate-50"><select className={`w-full p-2 rounded-lg text-xs font-bold outline-none cursor-pointer transition ${s?.is_off ? 'bg-slate-100 text-slate-400' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`} value={s?.is_off ? 'OFF' : (s?.shift_id || '')} onChange={(e) => handleUpdateSchedule(emp.id, i, e.target.value === 'OFF' ? null : e.target.value, e.target.value === 'OFF')}><option value="" disabled>-</option>{shifts.map(sh => <option key={sh.id} value={sh.id}>{sh.name}</option>)}<option value="OFF">OFF</option></select></td>) })}</tr>))}</tbody></table></div></div>)}
-                {activeTab === 'employees' && (<div className="grid md:grid-cols-3 gap-8 animate-fade-in-up"><div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 h-fit"><h3 className="font-bold text-lg text-slate-700 mb-4">Add Employee</h3><form onSubmit={handleAddEmployee} className="flex flex-col gap-4"><input required placeholder="Name" className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 outline-none" value={newEmp.name} onChange={e => setNewEmp({ ...newEmp, name: e.target.value })} /><input placeholder="Position" className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 outline-none" value={newEmp.position} onChange={e => setNewEmp({ ...newEmp, position: e.target.value })} /><input required placeholder="Line User ID" className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 outline-none font-mono text-xs" value={newEmp.line_user_id} onChange={e => setNewEmp({ ...newEmp, line_user_id: e.target.value })} /><button className="w-full py-3 bg-slate-800 text-white rounded-xl font-bold">Save</button></form></div><div className="md:col-span-2 bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-sm text-left"><thead className="bg-slate-50 text-slate-400 uppercase text-xs font-bold"><tr><th className="px-6 py-4 whitespace-nowrap">Name</th><th className="px-6 py-4 whitespace-nowrap">Position</th><th className="px-6 py-4 whitespace-nowrap">Line ID</th><th className="px-6 py-4 text-right whitespace-nowrap">Action</th></tr></thead><tbody className="divide-y divide-slate-50">{employees.map(emp => (<tr key={emp.id} className="hover:bg-slate-50 transition">{editingEmpId === emp.id ? (<><td className="px-6 py-4"><input className="border p-1 rounded w-full" value={editFormData.name} onChange={e => setEditFormData({ ...editFormData, name: e.target.value })} /></td><td className="px-6 py-4"><input className="border p-1 rounded w-full" value={editFormData.position} onChange={e => setEditFormData({ ...editFormData, position: e.target.value })} /></td><td className="px-6 py-4 font-mono text-xs">{emp.line_user_id}</td><td className="px-6 py-4 text-right flex gap-2 justify-end"><button onClick={() => saveEditEmployee(emp.id)} className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded font-bold text-xs">Save</button><button onClick={cancelEditEmployee} className="bg-gray-100 text-gray-500 px-2 py-1 rounded text-xs">Cancel</button></td></>) : (<><td className="px-6 py-4 font-bold text-slate-700 whitespace-nowrap">{emp.name}</td><td className="px-6 py-4 text-xs text-slate-500 whitespace-nowrap">{emp.position}</td><td className="px-6 py-4 font-mono text-xs text-slate-400 truncate max-w-[100px]">{emp.line_user_id}</td><td className="px-6 py-4 text-right flex gap-2 justify-end whitespace-nowrap"><button onClick={() => startEditEmployee(emp)} className="text-blue-500 bg-blue-50 px-2 py-1 rounded font-bold text-xs">Edit</button><button onClick={() => handleDeleteEmployee(emp.id)} className="text-rose-500 bg-rose-50 px-2 py-1 rounded font-bold text-xs">Del</button></td></>)}</tr>))}</tbody></table></div></div></div>)}
+                {activeTab === 'employees' && (
+                    <div className="space-y-6 animate-fade-in-up">
+                        <div className="flex justify-between items-center">
+                            <h3 className="font-bold text-lg text-slate-700">Staff Management</h3>
+                            <button onClick={openAddStaff} className="bg-slate-800 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-slate-900 transition shadow-lg flex items-center gap-2">
+                                <span>+</span> Add Staff
+                            </button>
+                        </div>
+                        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm text-left">
+                                    <thead className="bg-slate-50 text-slate-400 uppercase text-xs font-bold">
+                                        <tr>
+                                            <th className="px-6 py-4 whitespace-nowrap">Name</th>
+                                            <th className="px-6 py-4 whitespace-nowrap">Position</th>
+                                            <th className="px-6 py-4 whitespace-nowrap">Status</th>
+                                            <th className="px-6 py-4 whitespace-nowrap">Line ID</th>
+                                            <th className="px-6 py-4 text-right whitespace-nowrap">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-50">
+                                        {employees.map(emp => (
+                                            <tr key={emp.id} className="hover:bg-slate-50 transition">
+                                                <td className="px-6 py-4 font-bold text-slate-700 whitespace-nowrap">
+                                                    <div>{emp.name}</div>
+                                                    <div className="text-[10px] text-slate-400 font-light">{emp.name_en}</div>
+                                                </td>
+                                                <td className="px-6 py-4 text-xs text-slate-500 whitespace-nowrap">{emp.position || emp.job_title}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <span className={`px-2 py-1 rounded-full text-[10px] font-bold ${emp.employment_status === 'Fulltime' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                                                        {emp.employment_status || '-'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 font-mono text-xs text-slate-400 truncate max-w-[100px]">{emp.line_user_id}</td>
+                                                <td className="px-6 py-4 text-right flex gap-2 justify-end whitespace-nowrap">
+                                                    <button onClick={() => openEditStaff(emp)} className="text-blue-500 bg-blue-50 px-2 py-1 rounded font-bold text-xs hover:bg-blue-100">Edit</button>
+                                                    <button onClick={() => handleDeleteEmployee(emp.id)} className="text-rose-500 bg-rose-50 px-2 py-1 rounded font-bold text-xs hover:bg-rose-100">Del</button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <StaffModal
+                            isOpen={showStaffModal}
+                            onClose={() => setShowStaffModal(false)}
+                            onSave={handleSaveStaff}
+                            initialData={editingStaff}
+                            isEditing={!!editingStaff}
+                        />
+                    </div>
+                )}
 
                 {/* TAB 7: SETTINGS (With Notification Toggles) */}
                 {activeTab === 'settings' && (
@@ -401,6 +474,75 @@ export default function AdminDashboard() {
                                 </div>
                             ))}
                             {announcements.length === 0 && <p className="text-center text-slate-400 py-10">No announcements yet.</p>}
+                        </div>
+                    </div>
+                )}
+
+                {/* TAB 9: APPLICATIONS */}
+                {activeTab === 'applications' && (
+                    <div className="space-y-6 animate-fade-in-up">
+                        <h3 className="font-bold text-lg text-slate-700">Job Applications</h3>
+                        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm text-left">
+                                    <thead className="bg-slate-50 text-slate-400 uppercase text-xs font-bold">
+                                        <tr>
+                                            <th className="px-6 py-4 whitespace-nowrap">Date</th>
+                                            <th className="px-6 py-4 whitespace-nowrap">Name</th>
+                                            <th className="px-6 py-4 whitespace-nowrap">Position</th>
+                                            <th className="px-6 py-4 whitespace-nowrap">Contact</th>
+                                            <th className="px-6 py-4 whitespace-nowrap">Status</th>
+                                            <th className="px-6 py-4 text-right whitespace-nowrap">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-50">
+                                        {jobApplications.map(app => (
+                                            <tr key={app.id} className="hover:bg-slate-50">
+                                                <td className="px-6 py-4 font-mono whitespace-nowrap text-xs text-slate-500">
+                                                    {format(parseISO(app.created_at), "dd MMM HH:mm")}
+                                                </td>
+                                                <td className="px-6 py-4 font-bold text-slate-700 whitespace-nowrap">{app.full_name}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <span className="bg-blue-50 text-blue-600 px-2 py-1 rounded text-xs font-bold">{app.position_applied}</span>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-xs">
+                                                    <div>📞 {app.phone}</div>
+                                                    <div className="text-slate-400">{app.email}</div>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <span className={`px-2 py-1 rounded-full text-xs font-bold ${app.status === 'Hired' ? 'bg-emerald-100 text-emerald-700' :
+                                                            app.status === 'Rejected' ? 'bg-rose-100 text-rose-700' :
+                                                                'bg-slate-100 text-slate-600'
+                                                        }`}>
+                                                        {app.status}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 text-right whitespace-nowrap">
+                                                    <select
+                                                        value={app.status}
+                                                        onChange={(e) => handleUpdateApplicationStatus(app.id, e.target.value)}
+                                                        className="bg-slate-50 border border-slate-200 rounded-lg text-xs p-1 outline-none"
+                                                    >
+                                                        <option value="Pending">Pending</option>
+                                                        <option value="Reviewing">Reviewing</option>
+                                                        <option value="Interviewed">Interviewed</option>
+                                                        <option value="Hired">Hired</option>
+                                                        <option value="Rejected">Rejected</option>
+                                                    </select>
+                                                    {app.resume_url && (
+                                                        <a href={app.resume_url} target="_blank" className="ml-2 text-blue-500 hover:underline text-xs font-bold">📄 CV</a>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                        {jobApplications.length === 0 && (
+                                            <tr>
+                                                <td colSpan="6" className="px-6 py-8 text-center text-slate-400">No applications received yet.</td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 )}
