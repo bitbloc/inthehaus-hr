@@ -135,16 +135,21 @@ export default function ChecklistPage() {
                 const potentialLinks = val.split(',').map(s => s.trim()).filter(s => s.startsWith('http'));
                 potentialLinks.forEach(link => {
                     const linkStr = String(link);
-                    if (linkStr.includes('drive.google.com')) {
-                        const idMatch = linkStr.match(/id=([a-zA-Z0-9_-]+)/);
-                        if (idMatch) {
-                            photos.push({
-                                thumbnail: `https://drive.google.com/thumbnail?id=${idMatch[1]}&sz=w400`,
-                                full: `https://drive.google.com/uc?export=view&id=${idMatch[1]}`
-                            });
-                        } else {
-                            photos.push({ thumbnail: linkStr, full: linkStr });
-                        }
+                    let id = null;
+
+                    // Match id=XXX
+                    const idMatch = linkStr.match(/id=([a-zA-Z0-9_-]+)/);
+                    // Match /d/XXX
+                    const dMatch = linkStr.match(/\/d\/([a-zA-Z0-9_-]+)/);
+
+                    if (idMatch) id = idMatch[1];
+                    else if (dMatch) id = dMatch[1];
+
+                    if (id) {
+                        photos.push({
+                            thumbnail: `https://drive.google.com/thumbnail?id=${id}&sz=w400`,
+                            full: `https://drive.google.com/file/d/${id}/preview`
+                        });
                     } else {
                         photos.push({ thumbnail: linkStr, full: linkStr });
                     }
@@ -306,16 +311,23 @@ export default function ChecklistPage() {
                         onClick={() => setSelectedImage(null)}
                         className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer"
                     >
-                        <motion.img
+                        <motion.div
                             initial={{ scale: 0.9, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
                             exit={{ scale: 0.9, opacity: 0 }}
-                            src={selectedImage}
-                            alt="Full Screen Evidence"
-                            className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl"
-                        />
+                            className="w-full max-w-5xl h-[80vh] bg-black rounded-2xl overflow-hidden relative shadow-2xl"
+                            onClick={(e) => e.stopPropagation()} // Prevent closing when clicking iframe area
+                        >
+                            <iframe
+                                src={selectedImage}
+                                className="w-full h-full border-0"
+                                allow="autoplay"
+                                title="Evidence Viewer"
+                            />
+                        </motion.div>
+
                         <button
-                            className="absolute top-4 right-4 text-white p-2 rounded-full bg-black/50 hover:bg-black/70"
+                            className="absolute top-4 right-4 text-white p-2 rounded-full bg-black/50 hover:bg-black/70 z-50"
                             onClick={() => setSelectedImage(null)}
                         >
                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
