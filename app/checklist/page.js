@@ -73,11 +73,9 @@ export default function ChecklistPage() {
 
     const parseThaiDate = (dateStr) => {
         if (!dateStr) return new Date();
+        const str = String(dateStr);
         // Google sheets formats: "25/11/2025, 14:12:50"
-        // We might need custom parsing if `new Date()` fails
-        // But usually JS handles "DD/MM/YYYY, HH:mm:ss" if locale matches or we parse manualy
-        // Let's try simple parsing first
-        const parts = dateStr.match(/(\d+)\/(\d+)\/(\d+), (\d+):(\d+):(\d+)/);
+        const parts = str.match(/(\d+)\/(\d+)\/(\d+), (\d+):(\d+):(\d+)/);
         if (parts) {
             return new Date(`${parts[3]}-${parts[2]}-${parts[1]}T${parts[4]}:${parts[5]}:${parts[6]}`);
         }
@@ -94,18 +92,16 @@ export default function ChecklistPage() {
                 const potentialLinks = val.split(',').map(s => s.trim()).filter(s => s.startsWith('http'));
                 potentialLinks.forEach(link => {
                     // Convert drive open links to view links or thumbnail compatible
-                    // Standard Google Drive generic link handling
-                    if (link.includes('drive.google.com')) {
-                        // Try to convert to a direct image link if possible or just keep as is
-                        // Usually we need `uc?export=view&id=...` for <img> tags
-                        const idMatch = link.match(/id=([a-zA-Z0-9_-]+)/);
+                    const linkStr = String(link);
+                    if (linkStr.includes('drive.google.com')) {
+                        const idMatch = linkStr.match(/id=([a-zA-Z0-9_-]+)/);
                         if (idMatch) {
                             inks.push(`https://drive.google.com/thumbnail?id=${idMatch[1]}&sz=w400`);
                         } else {
-                            inks.push(link);
+                            inks.push(linkStr);
                         }
                     } else {
-                        inks.push(link);
+                        inks.push(linkStr);
                     }
                 });
             }
