@@ -1,0 +1,16 @@
+{
+    "name": "Banff Dashboard",
+    "short_name": "Banff",
+    "description": "Quantified Self & Mindful Tech",
+    "start_url": "/banff",
+    "display": "standalone",
+    "background_color": "#09090b",
+    "theme_color": "#10b981",
+    "icons": [
+        {
+            "src": "/banff/icon",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ]
+}
