@@ -24,6 +24,7 @@ export default function HabitForm() {
             if (!user) {
                 // Fallback for dev/demo if no auth, or handle error
                 console.error("No user logged in");
+                alert("Please sign in to create a habit.");
                 setLoading(false);
                 return;
             }
