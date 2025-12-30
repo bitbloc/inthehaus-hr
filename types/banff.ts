@@ -28,6 +28,7 @@ export interface HabitLog {
 
 export interface DailyMetric {
     id: string;
+    user_id: string;
     date: string; // YYYY-MM-DD
     mood_score: number;
     energy_score: number;

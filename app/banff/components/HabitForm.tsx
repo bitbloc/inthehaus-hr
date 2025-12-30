@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { supabase } from '@/lib/supabaseClient';
 import DaySelector from './DaySelector';
 import { useBanffStore } from '@/store/useBanffStore';
+import { SINGLE_USER_ID } from '../constants';
 
 export default function HabitForm() {
     const [name, setName] = useState('');
@@ -19,18 +20,11 @@ export default function HabitForm() {
         setLoading(true);
 
         try {
-            const { data: { user } } = await supabase.auth.getUser();
-
-            if (!user) {
-                // Fallback for dev/demo if no auth, or handle error
-                console.error("No user logged in");
-                alert("Please sign in to create a habit.");
-                setLoading(false);
-                return;
-            }
+            // SINGLE USER MODE: No Auth Check
+            // const { data: { user } } = await supabase.auth.getUser();
 
             const newHabit = {
-                user_id: user.id, // Ensure user is logged in
+                user_id: SINGLE_USER_ID,
                 title: name,
                 frequency_days: frequencyDays, // null or array
             };

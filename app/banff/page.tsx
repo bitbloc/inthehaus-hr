@@ -13,6 +13,7 @@ import HabitHeatmap from './components/HabitHeatmap';
 import WeeklyChart from './components/WeeklyChart';
 import XPBar from './components/XPBar';
 import LevelUpModal from './components/LevelUpModal';
+import { SINGLE_USER_ID } from './constants';
 
 export default function BanffPage() {
     const { habits, todayLogs, todayMetrics, totalLogs, setHabits, setTodayLogs, setTodayMetrics, setTotalLogs, updateMetricOptimistic } = useBanffStore();
@@ -38,9 +39,10 @@ export default function BanffPage() {
     useEffect(() => {
         const fetchData = async () => {
             const today = getTodayDateString();
-            const user = (await supabase.auth.getUser()).data.user;
+            // const user = (await supabase.auth.getUser()).data.user;
 
             // 1. Fetch Habits
+            // Single User Mode: No auth check needed, just fetch or use generic ID if RLS disabled/open
             const { data: habitsData } = await supabase.from('habits').select('*').eq('is_archived', false);
             if (habitsData) {
                 // Filter for today logic could be here or refined in query if we had backend logic.
@@ -71,6 +73,7 @@ export default function BanffPage() {
             }
 
             // 4. Fetch Metrics (Today)
+            // Use SINGLE_USER_ID or assume only one user's data exists 
             const { data: metricsData } = await supabase.from('daily_metrics').select('*').eq('date', today).maybeSingle();
             if (metricsData) {
                 setTodayMetrics(metricsData);
@@ -78,6 +81,7 @@ export default function BanffPage() {
                 // Initialize if empty? Or just leave null until interaction
                 setTodayMetrics({
                     id: 'temp',
+                    user_id: SINGLE_USER_ID,
                     date: today,
                     mood_score: 50,
                     energy_score: 50,
