@@ -5,6 +5,7 @@ export interface Lifestyle {
     name: string;
     color: string;
     icon: string;
+    xp: number;
 }
 
 export interface Habit {

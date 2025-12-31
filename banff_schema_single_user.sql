@@ -8,6 +8,7 @@ create table if not exists public.lifestyles (
   name text not null,
   color text default '#10B981',
   icon text,
+  xp int default 0,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 

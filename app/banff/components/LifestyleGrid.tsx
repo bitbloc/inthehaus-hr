@@ -1,81 +1,146 @@
 'use client';
 
 import React from 'react';
-import { motion } from 'framer-motion';
-import { FaHeart, FaBrain, FaWallet, FaLeaf, FaPlus } from 'react-icons/fa';
-import { Lifestyle } from '@/types/banff';
+import { motion, AnimatePresence } from 'framer-motion';
+import { FaHeart, FaBrain, FaWallet, FaLeaf, FaPlus, FaCog, FaDumbbell, FaGamepad, FaMoon, FaWater, FaSun, FaStar } from 'react-icons/fa';
+import { useBanffStore } from '@/store/useBanffStore';
 import ColorOrbs from './ColorOrbs';
+import LifestyleForm from './LifestyleForm';
+import LifestyleEditModal from './LifestyleEditModal';
+import { FaTimes } from 'react-icons/fa';
 
-// Map icons roughly for MVP demo
+// Map icons roughly - ideally this should be a shared helper or dynamic
 const ICONS: Record<string, React.ReactNode> = {
     heart: <FaHeart />,
     brain: <FaBrain />,
     wallet: <FaWallet />,
     leaf: <FaLeaf />,
+    dumbbell: <FaDumbbell />,
+    gamepad: <FaGamepad />,
+    moon: <FaMoon />,
+    water: <FaWater />,
+    sun: <FaSun />,
+    star: <FaStar />,
 };
 
-interface LifestyleGridProps {
-    lifestyles: Lifestyle[];
-}
+// Helper for Level Calculation
+const calculateLevel = (xp: number = 0) => {
+    // Simple formula: Level = floor(sqrt(xp / 100)) + 1
+    // e.g. 0-99 = Lv1, 100-399 = Lv2, 400-899 = Lv3...
+    return Math.floor(Math.sqrt(Math.max(0, xp) / 100)) + 1;
+};
 
-import LifestyleForm from './LifestyleForm';
-import { AnimatePresence } from 'framer-motion';
-import { FaTimes } from 'react-icons/fa';
+// Helper for Progress % (within current level)
+const calculateProgress = (xp: number = 0) => {
+    const level = calculateLevel(xp);
+    // XP required for current level start
+    // Reverse formula: xp = (level - 1)^2 * 100
+    const currentLevelBaseXP = Math.pow(level - 1, 2) * 100;
+    const nextLevelBaseXP = Math.pow(level, 2) * 100;
 
-export default function LifestyleGrid({ lifestyles }: LifestyleGridProps) {
+    const xpInLevel = xp - currentLevelBaseXP;
+    const xpNeeded = nextLevelBaseXP - currentLevelBaseXP;
+
+    return Math.min(100, Math.max(0, (xpInLevel / xpNeeded) * 100));
+};
+
+export default function LifestyleGrid() {
+    // Connect to Store
+    const lifestyles = useBanffStore(state => state.lifestyles);
+    const selectedLifestyleId = useBanffStore(state => state.selectedLifestyleId);
+    const setSelectedLifestyleId = useBanffStore(state => state.setSelectedLifestyleId);
+
     const [editingId, setEditingId] = React.useState<string | null>(null);
     const [showAdd, setShowAdd] = React.useState(false);
 
-    // Filter out lifestyles that are already in the list if passed from props
-    // but in this component we might just display what's passed.
-
-    // Quick handle color change (mock for now or wired to store if we passed a handler)
-    const handleColorChange = (id: string, color: string) => {
-        console.log("Color changed", id, color);
+    const handleCardClick = (id: string) => {
+        if (selectedLifestyleId === id) {
+            setSelectedLifestyleId(null); // Deselect
+        } else {
+            setSelectedLifestyleId(id); // Select
+        }
     };
+
+    const handleEditClick = (e: React.MouseEvent, id: string) => {
+        e.stopPropagation();
+        setEditingId(id);
+    };
+
+    const editingLifestyle = React.useMemo(() =>
+        lifestyles.find(l => l.id === editingId),
+        [lifestyles, editingId]);
 
     return (
         <>
             <div className="grid grid-cols-2 gap-3 text-white">
-                {lifestyles.map((item) => (
-                    <motion.div
-                        key={item.id}
-                        layoutId={`lifestyle-${item.id}`}
-                        className="relative bg-zinc-900 border border-zinc-800 rounded-2xl p-4 flex flex-col justify-between h-32 overflow-hidden group hover:border-zinc-700 transition-colors cursor-pointer"
-                        onClick={() => setEditingId(editingId === item.id ? null : item.id)}
-                    >
-                        <div className="flex justify-between items-start">
-                            <div className={`p-2 rounded-full bg-zinc-800 text-zinc-400 group-hover:text-white transition-colors`}>
-                                {ICONS[item.icon] || <FaPlus />}
+                {lifestyles.map((item) => {
+                    const isSelected = selectedLifestyleId === item.id;
+                    const isDimmed = selectedLifestyleId !== null && !isSelected;
+                    const level = calculateLevel(item.xp);
+                    const progress = calculateProgress(item.xp);
+
+                    // Dynamic styling based on selection
+                    const borderColor = item.color?.split('-')[1] || 'emerald'; // approximation
+
+                    return (
+                        <motion.div
+                            key={item.id}
+                            layoutId={`lifestyle-${item.id}`}
+                            className={`
+                                relative rounded-2xl p-4 flex flex-col justify-between h-36 overflow-hidden transition-all duration-300 cursor-pointer
+                                ${isSelected
+                                    ? `bg-zinc-900 border-2 border-${borderColor}-500 shadow-[0_0_20px_rgba(255,255,255,0.1)]`
+                                    : 'bg-zinc-900 border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800'}
+                                ${isDimmed ? 'opacity-30 grayscale-[50%] scale-95' : 'opacity-100 scale-100'}
+                            `}
+                            onClick={() => handleCardClick(item.id)}
+                        >
+                            {/* Header */}
+                            <div className="flex justify-between items-start z-10">
+                                <div className={`p-2 rounded-xl bg-zinc-800/50 text-zinc-400 ${isSelected ? `text-${borderColor}-400 bg-${borderColor}-500/10` : 'group-hover:text-white'} transition-colors`}>
+                                    {ICONS[item.icon] || <FaPlus />}
+                                </div>
+
+                                <button
+                                    onClick={(e) => handleEditClick(e, item.id)}
+                                    className="p-2 text-zinc-600 hover:text-white transition-colors"
+                                >
+                                    <FaCog />
+                                </button>
                             </div>
-                            <div className={`w-3 h-3 rounded-full ${item.color} shadow-[0_0_10px_rgba(255,255,255,0.3)]`} />
-                        </div>
 
-                        <div>
-                            <h3 className="font-bold text-lg tracking-tight">{item.name}</h3>
-                            <p className="text-[10px] text-zinc-500 uppercase tracking-widest">Lv. 1</p>
-                        </div>
+                            {/* Body */}
+                            <div className="z-10 mt-2">
+                                <h3 className={`font-bold text-lg tracking-tight leading-none mb-1 ${isSelected ? 'text-white' : 'text-zinc-200'}`}>
+                                    {item.name}
+                                </h3>
 
-                        {/* Edit Overlay (Color Orbs) */}
-                        {editingId === item.id && (
-                            <motion.div
-                                initial={{ opacity: 0, backdropFilter: 'blur(0px)' }}
-                                animate={{ opacity: 1, backdropFilter: 'blur(8px)' }}
-                                className="absolute inset-0 bg-black/60 z-10 flex flex-col items-center justify-center p-2"
-                            >
-                                <ColorOrbs
-                                    selectedColor={item.color}
-                                    onSelect={(c) => handleColorChange(item.id, c)}
-                                />
-                            </motion.div>
-                        )}
-                    </motion.div>
-                ))}
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">LV. {level}</span>
+                                    {/* XP Bar */}
+                                    <div className="flex-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                                        <motion.div
+                                            className={`h-full bg-${borderColor}-500`}
+                                            initial={{ width: 0 }}
+                                            animate={{ width: `${progress}%` }}
+                                            transition={{ duration: 1, ease: "easeOut" }}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Background Glow for Selected */}
+                            {isSelected && (
+                                <div className={`absolute inset-0 bg-${borderColor}-500/5 z-0`} />
+                            )}
+                        </motion.div>
+                    );
+                })}
 
                 {/* Add New Card */}
                 <button
                     onClick={() => setShowAdd(true)}
-                    className="h-32 rounded-2xl border-2 border-dashed border-zinc-800 flex flex-col items-center justify-center text-zinc-600 hover:text-zinc-400 hover:border-zinc-600 transition-all gap-2"
+                    className={`h-36 rounded-2xl border-2 border-dashed border-zinc-800 flex flex-col items-center justify-center text-zinc-600 hover:text-zinc-400 hover:border-zinc-600 transition-all gap-2 ${selectedLifestyleId ? 'opacity-30' : ''}`}
                 >
                     <FaPlus className="text-xl" />
                     <span className="text-xs font-bold uppercase tracking-widest">Add Soul</span>
@@ -106,6 +171,15 @@ export default function LifestyleGrid({ lifestyles }: LifestyleGridProps) {
                     </>
                 )}
             </AnimatePresence>
+
+            {/* Edit Modal */}
+            {editingLifestyle && (
+                <LifestyleEditModal
+                    isOpen={!!editingLifestyle}
+                    onClose={() => setEditingId(null)}
+                    lifestyle={editingLifestyle}
+                />
+            )}
         </>
     );
 }
