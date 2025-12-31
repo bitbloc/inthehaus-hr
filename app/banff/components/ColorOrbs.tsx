@@ -26,6 +26,7 @@ export default function ColorOrbs({ selectedColor, onSelect }: ColorOrbsProps) {
                 return (
                     <motion.button
                         key={color.name}
+                        type="button"
                         onClick={() => onSelect(color.value)}
                         whileHover={{ scale: 1.2 }}
                         whileTap={{ scale: 0.9 }}

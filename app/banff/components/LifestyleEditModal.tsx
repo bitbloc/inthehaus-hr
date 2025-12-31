@@ -140,7 +140,7 @@ export default function LifestyleEditModal({ isOpen, onClose, lifestyle }: Lifes
                                         className={clsx(
                                             "aspect-square rounded-xl flex items-center justify-center text-lg transition-all",
                                             icon === item.id
-                                                ? `bg-zinc-800 text-white ring-2 ring-${color?.split('-')[1] || 'emerald'}-500 scale-110`
+                                                ? `bg-zinc-800 text-white ring-2 ${color?.startsWith('bg-') ? `ring-${color.split('-')[1]}-500` : 'ring-emerald-500'} scale-110`
                                                 : "bg-zinc-950 text-zinc-600 hover:bg-zinc-800 hover:text-zinc-300"
                                         )}
                                     >
