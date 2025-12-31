@@ -214,8 +214,8 @@ export default function HabitRow({ habit, log, color }: HabitRowProps) {
                 onClose={() => setShowPomodoro(false)}
                 habitTitle={habit.title}
                 onComplete={() => {
-                    // Optional: Mark done?
-                    // toggleHabit(habit.id);
+                    if (!isCompleted) toggleHabit(habit.id);
+                    setShowPomodoro(false);
                 }}
             />
             <HabitEditModal

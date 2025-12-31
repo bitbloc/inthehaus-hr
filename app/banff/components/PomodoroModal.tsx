@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaPlay, FaPause, FaStop, FaTimes } from 'react-icons/fa';
+import { FaPlay, FaPause, FaStop, FaTimes, FaPlus, FaMinus } from 'react-icons/fa';
 
 interface PomodoroModalProps {
     isOpen: boolean;
@@ -20,6 +20,7 @@ const MODES = {
 export default function PomodoroModal({ isOpen, onClose, habitTitle, onComplete }: PomodoroModalProps) {
     const [mode, setMode] = useState<keyof typeof MODES>('WORK');
     const [timeLeft, setTimeLeft] = useState(MODES.WORK.minutes * 60);
+    const [maxTime, setMaxTime] = useState(MODES.WORK.minutes * 60); // Track max for progress
     const [isActive, setIsActive] = useState(false);
 
     useEffect(() => {
@@ -29,11 +30,10 @@ export default function PomodoroModal({ isOpen, onClose, habitTitle, onComplete 
             interval = setInterval(() => {
                 setTimeLeft((prev) => prev - 1);
             }, 1000);
-        } else if (timeLeft === 0) {
+        } else if (timeLeft === 0 && isActive) { // Only finish if it was active
             setIsActive(false);
             // Play sound?
             if (onComplete && mode === 'WORK') onComplete();
-            alert("Timer Finished!");
         }
 
         return () => clearInterval(interval);
@@ -42,13 +42,25 @@ export default function PomodoroModal({ isOpen, onClose, habitTitle, onComplete 
     const toggleTimer = () => setIsActive(!isActive);
     const resetTimer = () => {
         setIsActive(false);
-        setTimeLeft(MODES[mode].minutes * 60);
+        const defaultTime = MODES[mode].minutes * 60;
+        setTimeLeft(defaultTime);
+        setMaxTime(defaultTime);
     };
 
     const switchMode = (newMode: keyof typeof MODES) => {
         setMode(newMode);
         setIsActive(false);
-        setTimeLeft(MODES[newMode].minutes * 60);
+        const newTime = MODES[newMode].minutes * 60;
+        setTimeLeft(newTime);
+        setMaxTime(newTime);
+    };
+
+    const adjustTime = (minutes: number) => {
+        setTimeLeft(prev => {
+            const newVal = Math.max(60, prev + minutes * 60);
+            setMaxTime(newVal); // Update progress base
+            return newVal;
+        });
     };
 
     const formatTime = (seconds: number) => {
@@ -57,7 +69,7 @@ export default function PomodoroModal({ isOpen, onClose, habitTitle, onComplete 
         return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     };
 
-    const progress = 1 - (timeLeft / (MODES[mode].minutes * 60));
+    const progress = 1 - (timeLeft / maxTime);
 
     if (!isOpen) return null;
 
@@ -89,11 +101,23 @@ export default function PomodoroModal({ isOpen, onClose, habitTitle, onComplete 
                         </button>
                     </div>
 
-                    {/* Timer Display */}
-                    <div className="text-center py-8">
-                        <div className={`text-7xl font-mono font-bold ${MODES[mode].color} tracking-tighter`}>
+                    {/* Timer Display with Adjustment controls */}
+                    <div className="flex items-center justify-center gap-4 py-8">
+                        {!isActive && (
+                            <button onClick={() => adjustTime(-5)} className="text-zinc-600 hover:text-white transition-colors p-2">
+                                <FaMinus />
+                            </button>
+                        )}
+
+                        <div className={`text-7xl font-mono font-bold ${MODES[mode].color} tracking-tighter w-64 text-center select-none`}>
                             {formatTime(timeLeft)}
                         </div>
+
+                        {!isActive && (
+                            <button onClick={() => adjustTime(5)} className="text-zinc-600 hover:text-white transition-colors p-2">
+                                <FaPlus />
+                            </button>
+                        )}
                     </div>
 
                     {/* Controls */}
