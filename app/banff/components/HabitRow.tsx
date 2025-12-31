@@ -80,7 +80,7 @@ export default function HabitRow({ habit, log }: HabitRowProps) {
             <motion.div
                 layoutId={`habit-${habit.id}`}
                 className={`
-        relative overflow-hidden group
+        relative group
         p-4 rounded-2xl border transition-all duration-300
         ${isCompleted
                         ? 'bg-emerald-900/20 border-emerald-500/30'
@@ -96,7 +96,7 @@ export default function HabitRow({ habit, log }: HabitRowProps) {
                             animate={{ width: '100%', opacity: 1 }}
                             exit={{ width: '0%', opacity: 0 }}
                             transition={{ type: 'spring', damping: 20, stiffness: 100 }}
-                            className="absolute inset-0 bg-emerald-500/10 z-0"
+                            className="absolute inset-0 bg-emerald-500/10 z-0 rounded-2xl"
                         />
                     )}
                 </AnimatePresence>
@@ -130,7 +130,7 @@ export default function HabitRow({ habit, log }: HabitRowProps) {
                     </div>
 
                     {/* Actions Menu */}
-                    <div className="relative ml-2">
+                    <div className="relative ml-2 z-20">
                         <button
                             onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
                             className="text-zinc-600 hover:text-zinc-400 p-2 rounded-full hover:bg-zinc-800 transition-colors"
