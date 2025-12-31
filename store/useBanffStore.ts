@@ -13,6 +13,8 @@ interface BanffState {
     setLifestyles: (lifestyles: Lifestyle[]) => void;
     setHabits: (habits: Habit[]) => void;
     addHabit: (habit: Habit) => void;
+    deleteHabit: (id: string) => void;
+    updateHabit: (habit: Habit) => void;
     setTodayLogs: (logs: HabitLog[]) => void;
     setTotalLogs: (count: number) => void;
     setTodayMetrics: (metrics: DailyMetric) => void;
@@ -31,6 +33,12 @@ export const useBanffStore = create<BanffState>((set) => ({
     setLifestyles: (lifestyles) => set({ lifestyles }),
     setHabits: (habits) => set({ habits }),
     addHabit: (habit) => set((state) => ({ habits: [...state.habits, habit] })),
+    deleteHabit: (id) => set((state) => ({
+        habits: state.habits.filter(h => h.id !== id)
+    })),
+    updateHabit: (updatedHabit) => set((state) => ({
+        habits: state.habits.map(h => h.id === updatedHabit.id ? updatedHabit : h)
+    })),
     setTodayLogs: (logs) => {
         const logMap: Record<string, HabitLog> = {};
         logs.forEach(log => {
