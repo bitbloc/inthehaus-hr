@@ -37,6 +37,14 @@ export default function HabitHeatmap({ logs }: HabitHeatmapProps) {
         }
     };
 
+    const [isMounted, setIsMounted] = React.useState(false);
+
+    React.useEffect(() => {
+        setIsMounted(true);
+    }, []);
+
+    if (!isMounted) return <div className="grid grid-cols-7 gap-1 w-full max-w-xs mx-auto opacity-0" />;
+
     return (
         <div className="grid grid-cols-7 gap-1 w-full max-w-xs mx-auto">
             {days.map((day, i) => {

@@ -119,8 +119,8 @@ export default function BanffPage() {
 
             {/* Date Display */}
             <div className="space-y-1">
-                <h2 className="text-4xl font-light text-white">{format(new Date(), 'EEEE')}</h2>
-                <p className="text-zinc-500">{format(new Date(), 'MMM d, yyyy')}</p>
+                <h2 className="text-4xl font-light text-white" suppressHydrationWarning>{format(new Date(), 'EEEE')}</h2>
+                <p className="text-zinc-500" suppressHydrationWarning>{format(new Date(), 'MMM d, yyyy')}</p>
             </div>
 
             {/* Weekly Visuals (Morphing) */}

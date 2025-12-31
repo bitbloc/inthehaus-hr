@@ -37,6 +37,16 @@ export default function WeeklyChart({ data }: WeeklyChartProps) {
         { date: 'Sun', mood: 75, energy: 70 },
     ];
 
+    const [isMounted, setIsMounted] = React.useState(false);
+
+    React.useEffect(() => {
+        setIsMounted(true);
+    }, []);
+
+    if (!isMounted) {
+        return <div className="h-64 w-full flex items-center justify-center text-zinc-800">Loading Chart...</div>;
+    }
+
     return (
         <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
