@@ -68,7 +68,44 @@ export const useBanffStore = create<BanffState>((set) => ({
         return { todayLogs: newLogs };
     }),
 
-    updateMetricOptimistic: (key, value) => set((state) => ({
-        todayMetrics: state.todayMetrics ? { ...state.todayMetrics, [key]: value } : null
-    }))
+    updateMetricOptimistic: (key, value) => {
+        set((state) => {
+            const currentMetrics = state.todayMetrics || {
+                id: 'temp',
+                user_id: '00000000-0000-0000-0000-000000000001', // Fallback SINGLE_USER_ID if null, but should be set by init
+                date: getTodayDateString(),
+                mood_score: 50,
+                energy_score: 50,
+                focus_score: 50
+            };
+
+            const newMetrics = { ...currentMetrics, [key]: value };
+
+            // Trigger side effect
+            saveMetricsToDb(newMetrics);
+
+            return { todayMetrics: newMetrics };
+        });
+    }
 }));
+
+// Debounced Saver (outside hook to persist closure)
+import { supabase } from '@/lib/supabaseClient';
+import { debounce } from '@/utils/debounce';
+
+const saveMetricsToDb = debounce(async (metrics: DailyMetric) => {
+    // Upsert to handle both insert and update
+    // Requires database to have unique constraint on (user_id, date)
+    const { error } = await supabase
+        .from('daily_metrics')
+        .upsert({
+            user_id: metrics.user_id,
+            date: metrics.date,
+            mood_score: metrics.mood_score,
+            energy_score: metrics.energy_score,
+            focus_score: metrics.focus_score
+        }, { onConflict: 'user_id, date' }); // Supabase syntax might vary slightly based on client version but usually 'user_id, date' string works if constraint exists
+
+    if (error) console.error("Auto-save metrics failed:", error);
+}, 1000);
+

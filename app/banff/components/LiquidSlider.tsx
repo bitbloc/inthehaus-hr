@@ -1,58 +1,78 @@
 'use client';
 
-import React, { useState } from 'react';
-import { motion, useMotionValue, useTransform } from 'framer-motion';
+import React from 'react';
+import { motion } from 'framer-motion';
+import { IconType } from 'react-icons';
 
 interface LiquidSliderProps {
-    label: string;
-    value: number; // 0-100
-    onChange: (value: number) => void;
-    color?: string; // Tailwind color class prefix e.g 'emerald'
+    value: number;
+    onChange: (val: number) => void;
+    min?: number;
+    max?: number;
+    leftIcon?: React.ReactNode;
+    rightIcon?: React.ReactNode;
+    colorFrom?: string;
+    colorTo?: string;
 }
 
-export default function LiquidSlider({ label, value, onChange, color = 'emerald' }: LiquidSliderProps) {
-    const [isDragging, setIsDragging] = useState(false);
-    // We can use a simple range input for logic, and customize the visual
+export default function LiquidSlider({
+    value,
+    onChange,
+    min = 0,
+    max = 10,
+    leftIcon,
+    rightIcon,
+    colorFrom = 'from-cyan-500',
+    colorTo = 'to-blue-500'
+}: LiquidSliderProps) {
+    const percentage = ((value - min) / (max - min)) * 100;
+
+    const handleInteraction = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+        const x = Math.max(0, Math.min(clientX - rect.left, rect.width));
+        const newValue = Math.round((x / rect.width) * (max - min) + min);
+        onChange(newValue);
+    };
 
     return (
-        <div className="space-y-2">
-            <div className="flex justify-between text-xs uppercase tracking-wider font-bold text-zinc-500">
-                <span>{label}</span>
-                <span>{value}%</span>
-            </div>
+        <div className="flex items-center gap-4 w-full">
+            {/* Left Icon */}
+            <motion.div
+                animate={{ scale: percentage < 30 ? 1.2 : 1, opacity: percentage < 30 ? 1 : 0.5 }}
+                className="text-2xl transition-colors"
+            >
+                {leftIcon}
+            </motion.div>
 
-            <div className="relative h-12 w-full touch-none select-none">
-                {/* Background Track */}
-                <div className="absolute inset-0 bg-zinc-900 rounded-2xl overflow-hidden border border-zinc-800">
-                    {/* Liquid Fill */}
-                    <motion.div
-                        className={`h-full bg-${color}-500/20`}
-                        style={{ width: `${value}%` }}
-                        animate={{ width: `${value}%` }}
-                        transition={{ type: 'spring', bounce: 0, duration: 0.3 }}
-                    >
-                        {/* Shimmer effect could go here */}
-                    </motion.div>
-                </div>
-
-                {/* Input (Invisible but interactive) */}
-                <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    value={value}
-                    onChange={(e) => onChange(parseInt(e.target.value))}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                />
-
-                {/* Knob / Visual Indicator */}
+            {/* Slider Track */}
+            <div
+                className="relative h-12 flex-1 bg-gray-800/50 rounded-full overflow-hidden backdrop-blur-sm border border-white/5 cursor-pointer touch-none"
+                onClick={handleInteraction}
+                onMouseMove={(e) => e.buttons === 1 && handleInteraction(e)}
+                onTouchMove={handleInteraction}
+            >
+                {/* Liquid Fill */}
                 <motion.div
-                    className="absolute top-0 bottom-0 w-1 bg-white/50 pointer-events-none"
-                    style={{ left: `${value}%` }}
-                    animate={{ left: `${value}%` }}
-                    transition={{ type: 'spring', bounce: 0, duration: 0.1 }}
+                    layoutId="liquid-fill"
+                    className={`absolute top-0 left-0 h-full bg-gradient-to-r ${colorFrom} ${colorTo} shadow-[0_0_15px_rgba(255,255,255,0.2)]`}
+                    style={{ width: `${percentage}%` }}
+                    transition={{ type: 'spring', damping: 20, stiffness: 300 }}
                 />
+
+                {/* Number Overlay */}
+                <span className="absolute inset-0 flex items-center justify-center font-bold text-lg text-white mix-blend-overlay pointer-events-none">
+                    {value}
+                </span>
             </div>
+
+            {/* Right Icon */}
+            <motion.div
+                animate={{ scale: percentage > 70 ? 1.2 : 1, opacity: percentage > 70 ? 1 : 0.5 }}
+                className="text-2xl transition-colors"
+            >
+                {rightIcon}
+            </motion.div>
         </div>
     );
 }

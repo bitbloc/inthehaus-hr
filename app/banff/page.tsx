@@ -141,16 +141,14 @@ export default function BanffPage() {
                     </span>
                 </div>
 
-                <div className="space-y-3">
+                <div className="space-y-6">
                     {habits.length === 0 ? (
                         <div className="text-zinc-600 text-center py-8 border border-dashed border-zinc-800 rounded-2xl">
                             No habits for today. <br />
                             <Link href="/banff/settings" className="text-emerald-500 underline">Add one?</Link>
                         </div>
                     ) : (
-                        habits.map(habit => (
-                            <HabitRow key={habit.id} habit={habit} log={todayLogs[habit.id]} />
-                        ))
+                        <HabitGroups habits={habits} logs={todayLogs} />
                     )}
                 </div>
             </section>
