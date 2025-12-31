@@ -104,10 +104,13 @@ export default function HabitRow({ habit, log }: HabitRowProps) {
                     </AnimatePresence>
                 </div>
 
-                {/* Content Container (NO overflow hidden here, to allow menu popup) */}
+                {/* Content Container */}
                 <div className="relative z-10 p-4 flex items-center justify-between">
                     {/* Main Click Area */}
-                    <div className="flex items-center gap-5 flex-1 cursor-pointer" onClick={handleClick}>
+                    <div
+                        className={`flex items-center gap-5 flex-1 transition-colors ${isCompleted ? 'cursor-default opacity-80' : 'cursor-pointer'}`}
+                        onClick={() => !isCompleted && handleClick()}
+                    >
                         {/* Interactive Checkbox */}
                         <div className={`
                             relative w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300
@@ -149,10 +152,11 @@ export default function HabitRow({ habit, log }: HabitRowProps) {
                         <AnimatePresence>
                             {showMenu && (
                                 <motion.div
-                                    initial={{ opacity: 0, scale: 0.9, y: 10 }}
-                                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                                    initial={{ opacity: 0, scale: 0.9, y: 10, x: 0 }}
+                                    animate={{ opacity: 1, scale: 1, y: 0, x: 0 }}
                                     exit={{ opacity: 0, scale: 0.9, y: 10 }}
-                                    className="absolute right-0 top-8 z-50 bg-zinc-900/95 backdrop-blur-xl border border-zinc-700/50 rounded-2xl shadow-2xl w-48 overflow-hidden py-1 ring-1 ring-black/50"
+                                    className="absolute right-0 top-full mt-2 z-50 bg-zinc-900/95 backdrop-blur-xl border border-zinc-700/50 rounded-2xl shadow-2xl w-48 overflow-hidden py-1 ring-1 ring-black/50 origin-top-right"
+                                    style={{ zIndex: 100 }} // Force high Z
                                 >
                                     <div className="flex flex-col text-sm">
                                         <button onClick={handlePomodoro} className="flex items-center gap-3 px-4 py-3 hover:bg-zinc-800 text-zinc-300 text-left">
@@ -161,8 +165,23 @@ export default function HabitRow({ habit, log }: HabitRowProps) {
                                         <button onClick={handleEdit} className="flex items-center gap-3 px-4 py-3 hover:bg-zinc-800 text-zinc-300 text-left">
                                             <FaPen className="text-amber-400" /> Edit
                                         </button>
-                                        <button onClick={handleDelete} className="flex items-center gap-3 px-4 py-3 hover:bg-red-900/20 text-red-400 text-left">
-                                            <FaTrash /> Delete
+
+                                        {/* Undo Option if Completed */}
+                                        {isCompleted && (
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    toggleHabit(habit.id); // Toggle works as undo if logic handles it
+                                                    setShowMenu(false);
+                                                }}
+                                                className="flex items-center gap-3 px-4 py-3 hover:bg-zinc-800 text-zinc-300 text-left border-t border-zinc-800"
+                                            >
+                                                <FaCheck className="text-zinc-500" /> Undo Check-in
+                                            </button>
+                                        )}
+
+                                        <button onClick={handleDelete} className="flex items-center gap-3 px-4 py-3 hover:bg-red-900/20 text-red-400 text-left border-t border-zinc-800">
+                                            <FaTrash /> Delete Habit
                                         </button>
                                     </div>
                                 </motion.div>

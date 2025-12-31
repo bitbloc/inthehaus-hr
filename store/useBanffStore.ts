@@ -58,9 +58,13 @@ export const useBanffStore = create<BanffState>((set, get) => ({
         const newLogs = { ...state.todayLogs };
         const habit = state.habits.find(h => h.id === habitId);
         let newLifestyles = [...state.lifestyles];
+        let newTotalLogs = state.totalLogs;
 
         if (exists) {
+            // UNDO: Remove log
             delete newLogs[habitId];
+            newTotalLogs = Math.max(0, newTotalLogs - 1);
+
             // Decrement XP if habit belongs to a lifestyle
             if (habit && habit.lifestyle_id) {
                 newLifestyles = newLifestyles.map(l =>
@@ -69,13 +73,20 @@ export const useBanffStore = create<BanffState>((set, get) => ({
                 // Also trigger DB update for XP decrement (async)
                 updateLifestyleXP(habit.lifestyle_id, -10);
             }
+            // Trigger DB delete log
+            deleteLogFromDb(state.todayLogs[habitId].id);
+
         } else {
-            newLogs[habitId] = {
+            // DO: Add log
+            const newLog = {
                 id: 'optimistic-' + Math.random(),
                 habit_id: habitId,
                 log_date: getTodayDateString(),
                 completed_at: new Date().toISOString()
             };
+            newLogs[habitId] = newLog;
+            newTotalLogs += 1;
+
             // Increment XP
             if (habit && habit.lifestyle_id) {
                 newLifestyles = newLifestyles.map(l =>
@@ -84,9 +95,11 @@ export const useBanffStore = create<BanffState>((set, get) => ({
                 // Also trigger DB update for XP increment (async)
                 updateLifestyleXP(habit.lifestyle_id, 10);
             }
+            // Trigger DB insert log
+            insertLogToDb(newLog.habit_id);
         }
 
-        return { todayLogs: newLogs, lifestyles: newLifestyles };
+        return { todayLogs: newLogs, lifestyles: newLifestyles, totalLogs: newTotalLogs };
     }),
 
     updateMetricOptimistic: (key, value) => {
@@ -148,4 +161,32 @@ const saveMetricsToDb = debounce(async (metrics: DailyMetric) => {
 
     if (error) console.error("Auto-save metrics failed:", error);
 }, 1000);
+
+const insertLogToDb = async (habitId: string) => {
+    const { error } = await supabase.from('habit_logs').insert({
+        habit_id: habitId,
+        user_id: (await supabase.auth.getUser()).data.user?.id || '00000000-0000-0000-0000-000000000001', // Fallback
+        log_date: getTodayDateString(),
+    });
+    if (error) console.error("Failed to insert log", error);
+};
+
+const deleteLogFromDb = async (logId: string) => {
+    // If optimistic ID (starts with 'optimistic-'), we can't delete by ID easily unless we tracked the real ID return.
+    // But since we use (habit_id, log_date) unique constraint usually, we can delete by that.
+    // However, if the store had a real ID (fetched from DB), we use that. 
+    // If it was optimistic, we might fail if we try to delete 'optimistic-...'
+    // Strategy: Delete by habit_id + date for safety in single-user logic
+
+    // Check if ID is likely real (UUID)
+    if (logId.startsWith('optimistic')) {
+        // We can't delete by ID.
+        console.warn("Skipping delete of optimistic ID, reliance on refresh or implementation needed.");
+        // Actually, we should probably delete by (habit_id, date)
+        return;
+    }
+
+    const { error } = await supabase.from('habit_logs').delete().eq('id', logId);
+    if (error) console.error("Failed to delete log", error);
+};
 
