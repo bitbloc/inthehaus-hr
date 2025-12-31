@@ -1,3 +1,5 @@
+'use client';
+
 import Link from 'next/link';
 import HabitForm from '../components/HabitForm';
 import LifestyleGrid from '../components/LifestyleGrid';
