@@ -52,7 +52,7 @@ export default function LifestyleForm({ onClose }: LifestyleFormProps) {
 
         // DB Update
         const { data, error } = await supabase.from('lifestyles').insert([{
-            name, color, icon, user_id: SINGLE_USER_ID, sort_order: lifestyles.length
+            name, color, icon, user_id: SINGLE_USER_ID
         }]).select().single();
 
         if (data) {
