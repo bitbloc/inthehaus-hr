@@ -61,6 +61,13 @@ export default function BanffPage() {
                 setHabits(todaysHabits);
             }
 
+            // 2. Fetch Lifestyles
+            const { data: lifestylesData } = await supabase.from('lifestyles').select('*');
+            if (lifestylesData) {
+                // @ts-ignore
+                useBanffStore.getState().setLifestyles(lifestylesData);
+            }
+
             // 2. Fetch Logs (Total for XP)
             const { count } = await supabase.from('habit_logs').select('*', { count: 'exact', head: true });
             if (count !== null) setTotalLogs(count);
