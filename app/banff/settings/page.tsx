@@ -34,7 +34,7 @@ export default function BanffSettingsPage() {
                     <h2 className="text-sm font-bold text-zinc-500 uppercase tracking-widest">Soul / Lifestyles</h2>
                     <span className="text-[10px] text-zinc-600 bg-zinc-900 px-2 py-1 rounded">Drag to Reorder</span>
                 </div>
-                <LifestyleGrid lifestyles={lifestyles} />
+                <LifestyleGrid />
             </section>
 
             {/* Active Quests */}
