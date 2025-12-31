@@ -14,7 +14,22 @@ interface HabitRowProps {
     log?: HabitLog;
 }
 
-export default function HabitRow({ habit, log }: HabitRowProps) {
+// Helper to extract base color safely
+const getBaseColor = (colorClass?: string) => {
+    if (!colorClass) return 'emerald';
+    // Expects 'bg-emerald-400'
+    const parts = colorClass.split('-');
+    if (parts.length >= 2) return parts[1];
+    return 'emerald';
+};
+
+interface HabitRowProps {
+    habit: Habit;
+    log?: HabitLog;
+    color?: string; // Expects 'bg-emerald-400' format or similar
+}
+
+export default function HabitRow({ habit, log, color }: HabitRowProps) {
     const toggleHabit = useBanffStore(state => state.toggleHabitOptimistic);
     const deleteHabitInStore = useBanffStore(state => state.deleteHabit);
 
@@ -24,6 +39,7 @@ export default function HabitRow({ habit, log }: HabitRowProps) {
     const [showEdit, setShowEdit] = React.useState(false);
 
     const isCompleted = !!log;
+    const baseColor = getBaseColor(color);
 
     const handleClick = async () => {
         // Toggle Logic (Only when clicking the main row body)
@@ -84,7 +100,7 @@ export default function HabitRow({ habit, log }: HabitRowProps) {
         relative group
         rounded-3xl border transition-all duration-500
         ${isCompleted
-                        ? 'bg-emerald-500/10 border-emerald-500/30'
+                        ? `bg-${baseColor}-500/10 border-${baseColor}-500/30`
                         : 'bg-white/5 border-white/5 hover:border-white/10 hover:bg-white/10'
                     }
         backdrop-blur-md shadow-lg
@@ -99,7 +115,7 @@ export default function HabitRow({ habit, log }: HabitRowProps) {
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
-                                className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 z-0"
+                                className={`absolute inset-0 bg-gradient-to-r from-${baseColor}-500/10 to-${baseColor}-600/10 z-0`}
                             />
                         )}
                     </AnimatePresence>
@@ -116,7 +132,7 @@ export default function HabitRow({ habit, log }: HabitRowProps) {
                         <div className={`
                             relative w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300
                             ${isCompleted
-                                ? 'bg-gradient-to-br from-emerald-400 to-teal-500 shadow-[0_0_12px_rgba(52,211,153,0.6)] scale-110'
+                                ? `bg-gradient-to-br from-${baseColor}-400 to-${baseColor}-500 shadow-[0_0_12px_rgba(255,255,255,0.3)] scale-110` // Simplified shadow to avoid color parsing
                                 : 'bg-zinc-800/50 border border-zinc-600 group-hover:border-emerald-500/50'
                             }
                         `}>
@@ -130,7 +146,7 @@ export default function HabitRow({ habit, log }: HabitRowProps) {
                         </div>
 
                         <div className="flex flex-col">
-                            <span className={`text-base font-medium transition-all duration-300 ${isCompleted ? 'text-emerald-100/70 line-through decoration-emerald-500/50' : 'text-zinc-100 group-hover:text-white'}`}>
+                            <span className={`text-base font-medium transition-all duration-300 ${isCompleted ? `text-${baseColor}-100/70 line-through decoration-${baseColor}-500/50` : 'text-zinc-100 group-hover:text-white'}`}>
                                 {habit.title}
                             </span>
                             {habit.current_streak > 0 && (

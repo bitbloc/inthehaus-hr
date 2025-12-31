@@ -80,7 +80,14 @@ export default function LifestyleGrid() {
                     const progress = calculateProgress(item.xp);
 
                     // Dynamic styling based on selection
-                    const borderColor = item.color?.split('-')[1] || 'emerald'; // approximation
+                    let borderColor = 'emerald';
+                    if (item.color?.startsWith('bg-')) {
+                        borderColor = item.color.split('-')[1];
+                    } else if (item.color?.startsWith('#')) {
+                        // Very rough fallback if hex is used; for now default to emerald to avoid broken classes
+                        // or try to map?
+                        borderColor = 'emerald';
+                    }
 
                     return (
                         <motion.div

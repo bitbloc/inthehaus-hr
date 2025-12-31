@@ -91,7 +91,12 @@ export default function HabitGroups({ habits, logs }: HabitGroupsProps) {
                             {/* Habits List */}
                             <div className="grid gap-3">
                                 {lifestyleHabits.map(habit => (
-                                    <HabitRow key={habit.id} habit={habit} log={logs[habit.id]} />
+                                    <HabitRow
+                                        key={habit.id}
+                                        habit={habit}
+                                        log={logs[habit.id]}
+                                        color={lifestyle.color} // Pass inherited color
+                                    />
                                 ))}
                             </div>
                         </motion.div>
@@ -114,7 +119,7 @@ export default function HabitGroups({ habits, logs }: HabitGroupsProps) {
                         </div>
                         <div className="grid gap-3">
                             {groupedHabits['uncategorized'].map(habit => (
-                                <HabitRow key={habit.id} habit={habit} log={logs[habit.id]} />
+                                <HabitRow key={habit.id} habit={habit} log={logs[habit.id]} color="bg-zinc-400" />
                             ))}
                         </div>
                     </motion.div>
