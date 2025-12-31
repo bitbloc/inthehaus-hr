@@ -5,7 +5,7 @@ import { FaCog, FaUserCircle } from 'react-icons/fa';
 import { format } from 'date-fns';
 import { supabase } from '@/lib/supabaseClient';
 import { useBanffStore } from '@/store/useBanffStore';
-import HabitRow from './components/HabitRow';
+import HabitGroups from './components/HabitGroups';
 import LiquidSlider from './components/LiquidSlider';
 import { getTodayDateString } from '@/utils/date';
 
