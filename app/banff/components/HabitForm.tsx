@@ -10,8 +10,11 @@ import { SINGLE_USER_ID } from '../constants';
 export default function HabitForm() {
     const [name, setName] = useState('');
     const [frequencyDays, setFrequencyDays] = useState<number[] | null>(null);
+    const [lifestyleId, setLifestyleId] = useState<string>('');
     const [loading, setLoading] = useState(false);
-    const addHabitToStore = useBanffStore((state) => state.addHabit); // Need to add this action to store
+
+    const addHabitToStore = useBanffStore((state) => state.addHabit);
+    const lifestyles = useBanffStore((state) => state.lifestyles);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -27,6 +30,7 @@ export default function HabitForm() {
                 user_id: SINGLE_USER_ID,
                 title: name,
                 frequency_days: frequencyDays, // null or array
+                lifestyle_id: lifestyleId || null
             };
 
             const { data, error } = await supabase
@@ -46,6 +50,7 @@ export default function HabitForm() {
             // Reset
             setName('');
             setFrequencyDays(null);
+            setLifestyleId('');
 
             // Success visual (Fly animation could be handled by parent or toast)
             alert("Habit Added!");
@@ -69,6 +74,42 @@ export default function HabitForm() {
                     placeholder="e.g. Read 10 pages"
                     className="w-full bg-transparent border-b border-zinc-700 py-2 text-xl text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500 transition-colors"
                 />
+            </div>
+
+            {/* Lifestyle Selection */}
+            <div className="space-y-3">
+                <label className="text-xs uppercase tracking-wider text-zinc-500 font-bold">Lifestyle Area</label>
+                <div className="grid grid-cols-4 gap-2">
+                    {lifestyles.map(l => (
+                        <button
+                            key={l.id}
+                            type="button"
+                            onClick={() => setLifestyleId(l.id)}
+                            className={`
+                                flex flex-col items-center justify-center p-2 rounded-xl border transition-all
+                                ${lifestyleId === l.id
+                                    ? `bg-zinc-800 border-${l.color?.split('-')[1] || 'emerald'}-500 ring-1 ring-${l.color?.split('-')[1] || 'emerald'}-500`
+                                    : 'bg-zinc-950 border-zinc-800 hover:border-zinc-700 opacity-60 hover:opacity-100'}
+                            `}
+                        >
+                            <div className={`w-3 h-3 rounded-full mb-1 bg-${l.color?.split('-')[1] || 'gray'}-500`} />
+                            <span className="text-[10px] font-medium text-white truncate max-w-full">{l.name}</span>
+                        </button>
+                    ))}
+                    <button
+                        type="button"
+                        onClick={() => setLifestyleId('')}
+                        className={`
+                                flex flex-col items-center justify-center p-2 rounded-xl border transition-all
+                                ${!lifestyleId
+                                ? 'bg-zinc-800 border-zinc-500 ring-1 ring-zinc-500'
+                                : 'bg-zinc-950 border-zinc-800 hover:border-zinc-700 opacity-60 hover:opacity-100'}
+                            `}
+                    >
+                        <div className="w-3 h-3 rounded-full mb-1 bg-zinc-600" />
+                        <span className="text-[10px] font-medium text-white">None</span>
+                    </button>
+                </div>
             </div>
 
             <div className="space-y-2">
