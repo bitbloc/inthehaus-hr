@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import React, { useEffect } from 'react';
-import { FaCog, FaUserCircle } from 'react-icons/fa';
+import { FaCog, FaUserCircle, FaBook } from 'react-icons/fa';
 import { format } from 'date-fns';
 import { supabase } from '@/lib/supabaseClient';
 import { useBanffStore } from '@/store/useBanffStore';
@@ -116,9 +116,14 @@ export default function BanffPage() {
                     </h1>
                     <p className="text-zinc-400 text-xs tracking-wider uppercase">Quantified Self</p>
                 </div>
-                <Link href="/banff/settings" className="p-2 bg-zinc-800/50 rounded-full hover:bg-zinc-700/50 transition-colors">
-                    <FaCog className="text-zinc-400" />
-                </Link>
+                <div className="flex items-center gap-2">
+                    <Link href="/banff/chronicle" className="p-2 bg-zinc-800/50 rounded-full hover:bg-zinc-700/50 transition-colors" title="The Chronicle">
+                        <FaBook className="text-emerald-400" />
+                    </Link>
+                    <Link href="/banff/settings" className="p-2 bg-zinc-800/50 rounded-full hover:bg-zinc-700/50 transition-colors">
+                        <FaCog className="text-zinc-400" />
+                    </Link>
+                </div>
             </header>
 
             {/* XP Bar */}

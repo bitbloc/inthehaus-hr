@@ -79,6 +79,7 @@ export default function HabitRow({ habit, log }: HabitRowProps) {
         <>
             <motion.div
                 layoutId={`habit-${habit.id}`}
+                style={{ zIndex: showMenu ? 50 : 1 }}
                 className={`
         relative group
         rounded-3xl border transition-all duration-500
