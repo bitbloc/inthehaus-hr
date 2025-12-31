@@ -17,9 +17,11 @@ interface HabitEditModalProps {
 export default function HabitEditModal({ habit, isOpen, onClose }: HabitEditModalProps) {
     const [title, setTitle] = useState(habit.title);
     const [frequencyDays, setFrequencyDays] = useState<number[] | null>(habit.frequency_days);
+    const [lifestyleId, setLifestyleId] = useState<string>(habit.lifestyle_id || '');
     const [loading, setLoading] = useState(false);
 
     const updateHabitInStore = useBanffStore(state => state.updateHabit);
+    const lifestyles = useBanffStore(state => state.lifestyles);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -29,7 +31,7 @@ export default function HabitEditModal({ habit, isOpen, onClose }: HabitEditModa
             const updates = {
                 title,
                 frequency_days: frequencyDays,
-                // user_id is implicit/constant, no need to change
+                lifestyle_id: lifestyleId || null
             };
 
             const { error } = await supabase
@@ -77,6 +79,42 @@ export default function HabitEditModal({ habit, isOpen, onClose }: HabitEditModa
                                 onChange={(e) => setTitle(e.target.value)}
                                 className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500 transition-colors"
                             />
+                        </div>
+
+                        {/* Lifestyle Selection */}
+                        <div className="space-y-3">
+                            <label className="text-xs uppercase tracking-wider text-zinc-500 font-bold">Lifestyle Area</label>
+                            <div className="grid grid-cols-4 gap-2">
+                                {lifestyles.map(l => (
+                                    <button
+                                        key={l.id}
+                                        type="button"
+                                        onClick={() => setLifestyleId(l.id)}
+                                        className={`
+                                            flex flex-col items-center justify-center p-2 rounded-xl border transition-all
+                                            ${lifestyleId === l.id
+                                                ? `bg-zinc-800 border-${l.color?.split('-')[1] || 'emerald'}-500 ring-1 ring-${l.color?.split('-')[1] || 'emerald'}-500`
+                                                : 'bg-zinc-950 border-zinc-800 hover:border-zinc-700 opacity-60 hover:opacity-100'}
+                                        `}
+                                    >
+                                        <div className={`w-3 h-3 rounded-full mb-1 bg-${l.color?.split('-')[1] || 'gray'}-500`} />
+                                        <span className="text-[10px] font-medium text-white truncate max-w-full">{l.name}</span>
+                                    </button>
+                                ))}
+                                <button
+                                    type="button"
+                                    onClick={() => setLifestyleId('')}
+                                    className={`
+                                            flex flex-col items-center justify-center p-2 rounded-xl border transition-all
+                                            ${!lifestyleId
+                                            ? 'bg-zinc-800 border-zinc-500 ring-1 ring-zinc-500'
+                                            : 'bg-zinc-950 border-zinc-800 hover:border-zinc-700 opacity-60 hover:opacity-100'}
+                                        `}
+                                >
+                                    <div className="w-3 h-3 rounded-full mb-1 bg-zinc-600" />
+                                    <span className="text-[10px] font-medium text-white">None</span>
+                                </button>
+                            </div>
                         </div>
 
                         <div className="space-y-2">

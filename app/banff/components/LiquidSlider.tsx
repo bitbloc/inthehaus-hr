@@ -31,9 +31,25 @@ export default function LiquidSlider({
 }: LiquidSliderProps) {
     const percentage = ((value - min) / (max - min)) * 100;
 
+    // Color Mapping
+    const COLOR_VARIANTS: Record<string, { from: string; to: string }> = {
+        indigo: { from: 'from-indigo-500', to: 'to-indigo-600' },
+        amber: { from: 'from-amber-400', to: 'to-amber-600' }, // Adjusted for visibility
+        emerald: { from: 'from-emerald-500', to: 'to-emerald-600' },
+        cyan: { from: 'from-cyan-500', to: 'to-cyan-600' },
+        blue: { from: 'from-blue-500', to: 'to-blue-600' },
+        rose: { from: 'from-rose-500', to: 'to-rose-600' },
+        purple: { from: 'from-purple-500', to: 'to-purple-600' },
+    };
+
     // Determine colors
-    const effectiveFrom = colorFrom || (color ? `from-${color}-500` : 'from-cyan-500');
-    const effectiveTo = colorTo || (color ? `to-${color}-600` : 'to-blue-500');
+    let effectiveFrom = colorFrom || 'from-cyan-500';
+    let effectiveTo = colorTo || 'to-blue-500';
+
+    if (color && COLOR_VARIANTS[color]) {
+        effectiveFrom = COLOR_VARIANTS[color].from;
+        effectiveTo = COLOR_VARIANTS[color].to;
+    }
 
     const handleInteraction = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
         const rect = e.currentTarget.getBoundingClientRect();

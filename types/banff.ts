@@ -10,7 +10,7 @@ export interface Lifestyle {
 export interface Habit {
     id: string;
     user_id: string;
-    lifestyle_id: string;
+    lifestyle_id: string | null;
     title: string;
     description?: string;
     frequency_days: number[] | null; // null = everyday, 0-6 = Sun-Sat
