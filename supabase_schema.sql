@@ -57,7 +57,8 @@ ADD COLUMN IF NOT EXISTS social_security_id TEXT,
 ADD COLUMN IF NOT EXISTS tax_id TEXT,
 ADD COLUMN IF NOT EXISTS education_history JSONB, 
 ADD COLUMN IF NOT EXISTS skills TEXT[],
-ADD COLUMN IF NOT EXISTS emergency_contact TEXT;
+ADD COLUMN IF NOT EXISTS emergency_contact TEXT,
+ADD COLUMN IF NOT EXISTS shift_rates JSONB DEFAULT '{}'::jsonb;
 
 -- Enable RLS on job_applications
 ALTER TABLE job_applications ENABLE ROW LEVEL SECURITY;

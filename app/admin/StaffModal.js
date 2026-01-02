@@ -13,6 +13,7 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
         start_date: "", probation_date: "",
         base_salary: "", bank_account: "", bank_name: "",
         social_security_id: "", tax_id: "",
+        shift_rates: { morning: 0, evening: 0, double: 0 },
         emergency_contact: "", skills: [], education_history: []
     });
 
@@ -29,6 +30,7 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
                 start_date: "", probation_date: "",
                 base_salary: "", bank_account: "", bank_name: "",
                 social_security_id: "", tax_id: "",
+                shift_rates: { morning: 0, evening: 0, double: 0 },
                 emergency_contact: "", skills: [], education_history: []
             });
         }
@@ -36,7 +38,18 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
 
     const handleChange = (e) => {
         const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
+        if (name.startsWith('rate_')) {
+            const rateType = name.replace('rate_', '');
+            setFormData(prev => ({
+                ...prev,
+                shift_rates: {
+                    ...prev.shift_rates,
+                    [rateType]: Number(value)
+                }
+            }));
+        } else {
+            setFormData(prev => ({ ...prev, [name]: value }));
+        }
     };
 
     const handleSubmit = (e) => {
@@ -108,7 +121,16 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
 
                         {activeTab === 'compensation' && (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-fade-in">
-                                <FormInput label="Base Salary (THB)" name="base_salary" type="number" value={formData.base_salary} onChange={handleChange} />
+                                <div className="md:col-span-2 bg-yellow-50 p-4 rounded-xl border border-yellow-100 mb-2">
+                                    <h3 className="text-sm font-bold text-yellow-800 mb-2">🏷️ Shift Daily Rates (Pay per Day)</h3>
+                                    <div className="grid grid-cols-3 gap-4">
+                                        <FormInput label="Morning (THB)" name="rate_morning" type="number" value={formData.shift_rates?.morning || ''} onChange={handleChange} placeholder="0" />
+                                        <FormInput label="Evening (THB)" name="rate_evening" type="number" value={formData.shift_rates?.evening || ''} onChange={handleChange} placeholder="0" />
+                                        <FormInput label="Double (THB)" name="rate_double" type="number" value={formData.shift_rates?.double || ''} onChange={handleChange} placeholder="0" />
+                                    </div>
+                                </div>
+
+                                <FormInput label="Base Salary (THB) - Optional" name="base_salary" type="number" value={formData.base_salary} onChange={handleChange} />
                                 <FormInput label="Bank Name" name="bank_name" value={formData.bank_name} onChange={handleChange} placeholder="KBank, SCB..." />
                                 <FormInput label="Account Number" name="bank_account" value={formData.bank_account} onChange={handleChange} mono />
                                 <FormInput label="Social Security ID" name="social_security_id" value={formData.social_security_id} onChange={handleChange} mono />
