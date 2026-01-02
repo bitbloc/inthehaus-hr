@@ -3,11 +3,9 @@ import { differenceInMinutes, parseISO } from "date-fns";
 
 /**
  * Calculates payroll, OT, and attendance stats for all employees.
- * Optimized for performance by reducing array iterations.
- * 
  * @param {Array} employees 
  * @param {Array} logs 
- * @param {Object} schedules - Map of empId -> { dayOfWeek -> schedule }
+ * @param {Object} schedules 
  * @param {Array} shifts 
  * @param {Object} payrollConfig 
  * @param {Array} deductions 
@@ -36,7 +34,6 @@ export const calculatePayroll = (employees, logs, schedules, shifts, payrollConf
         deductionsMap.get(d.employee_id).push(d);
     });
 
-    // Filter for active employees only (if is_active field exists)
     const activeEmployees = employees.filter(e => e.is_active !== false);
 
     return activeEmployees.map(emp => {
@@ -45,10 +42,11 @@ export const calculatePayroll = (employees, logs, schedules, shifts, payrollConf
         let totalOTPay = 0;
         let workDays = 0;
 
-        // Stats Counters
         let lateCount = 0;
         let absentCount = 0;
         let duplicateCount = 0;
+
+        const dailyDetails = []; // To store per-day breakdown
 
         const empLogsByDate = logsMap.get(emp.id) || {};
 
@@ -58,12 +56,11 @@ export const calculatePayroll = (employees, logs, schedules, shifts, payrollConf
             // 1. Check Absent
             if (dailyLogs.some(l => l.action_type === 'absent')) {
                 absentCount++;
+                dailyDetails.push({ date: dateStr, status: 'Absent', wage: 0, ot: 0, note: '-' });
                 return;
             }
 
-            // 2. Separate & Sort Logs
-            // Optimization: sort once
-            // ✅ Fix: Use parseISO for Safari compatibility
+            // 2. Separate & Sort
             dailyLogs.sort((a, b) => parseISO(a.timestamp) - parseISO(b.timestamp));
 
             const checkIns = [];
@@ -79,25 +76,40 @@ export const calculatePayroll = (employees, logs, schedules, shifts, payrollConf
                 duplicateCount += (Math.max(checkIns.length, checkOuts.length) - 1);
             }
 
-            // 4. Process Work Day (Must have In + Out)
+            // 4. Process Work Day
             if (checkIns.length > 0 && checkOuts.length > 0) {
                 const firstIn = checkIns[0];
                 const lastOut = checkOuts[checkOuts.length - 1];
-
                 const logDate = parseISO(firstIn.timestamp);
                 const dayOfWeek = logDate.getDay();
 
                 const schedule = schedules[emp.id]?.[dayOfWeek];
                 const currentShift = shifts.find(s => s.id === schedule?.shift_id);
 
+                let dailyWage = 0;
+                let dailyOT = 0;
+                let dailyOTHours = 0;
+                let status = 'Normal';
+                let lateMins = 0;
+
                 if (currentShift) {
-                    // --- Wage Calculation ---
-                    let dailyWage = 0;
-                    if (currentShift.name.includes("ควบ") || currentShift.name.includes("Double")) {
-                        dailyWage = parseFloat(payrollConfig.double_shift_rate) || 1000;
+                    // --- Wage Calculation (Priority: Employee Shift Rate > Shift General Salary) ---
+                    const shiftKey = currentShift.name.toLowerCase().trim().split(' ')[0]; // dumb match for 'morning', 'evening'
+                    // Robust matching:
+                    const normName = currentShift.name.toLowerCase();
+                    let rateKey = null;
+                    if (normName.includes('เช้า') || normName.includes('morning')) rateKey = 'morning';
+                    else if (normName.includes('ค่ำ') || normName.includes('evening')) rateKey = 'evening';
+                    else if (normName.includes('ควบ') || normName.includes('double')) rateKey = 'double';
+
+                    if (rateKey && emp.shift_rates && emp.shift_rates[rateKey]) {
+                        dailyWage = Number(emp.shift_rates[rateKey]);
                     } else {
-                        dailyWage = parseFloat(currentShift.salary) || 0;
+                        // Fallback to shift Salary or config
+                        if (rateKey === 'double') dailyWage = parseFloat(payrollConfig.double_shift_rate) || 1000;
+                        else dailyWage = parseFloat(currentShift.salary) || 500;
                     }
+
                     totalSalary += dailyWage;
                     workDays++;
 
@@ -106,31 +118,56 @@ export const calculatePayroll = (employees, logs, schedules, shifts, payrollConf
                     const shiftStart = new Date(logDate);
                     shiftStart.setHours(sh, sm, 0);
 
-                    if (differenceInMinutes(parseISO(firstIn.timestamp), shiftStart) > 0) {
+                    const inTimeDiff = differenceInMinutes(parseISO(firstIn.timestamp), shiftStart);
+                    if (inTimeDiff > 0) {
                         lateCount++;
+                        lateMins = inTimeDiff;
+                        status = `Late (${lateMins}m)`;
                     }
 
-                    // --- OT Calculation ---
+                    // --- OT Calculation (Strict Rounding Logic) ---
                     const outTime = parseISO(lastOut.timestamp);
                     const [eh, em] = currentShift.end_time.split(':').map(Number);
-
                     const shiftEnd = new Date(logDate);
                     shiftEnd.setHours(eh, em, 0);
 
-                    const [sh_check, sm_check] = currentShift.start_time.split(':').map(Number);
-                    // Ensure eh_check etc are defined if used, but they were used deep in old code logic
-                    // Actually, we can just use the previous logic
-                    if (eh < sh_check) {
+                    const [sh_check] = currentShift.start_time.split(':');
+                    // Handle overnight shift end
+                    if (eh < Number(sh_check)) {
                         shiftEnd.setDate(shiftEnd.getDate() + 1);
                     }
 
                     const diffMinutes = differenceInMinutes(outTime, shiftEnd);
-                    if (diffMinutes > 0) {
-                        const otHours = Math.ceil(diffMinutes / 60);
-                        totalOTHours += otHours;
-                        totalOTPay += otHours * (parseFloat(payrollConfig.ot_rate) || 60);
+
+                    if (diffMinutes >= 29) { // Rule: < 29 ignored
+                        let hours = Math.floor(diffMinutes / 60);
+                        const remainder = diffMinutes % 60;
+
+                        if (remainder >= 30) {
+                            hours += 1;
+                        }
+
+                        if (hours > 0) {
+                            dailyOTHours = hours;
+                            dailyOT = hours * (parseFloat(payrollConfig.ot_rate) || 50); // Default 50 if config missing
+                            totalOTHours += dailyOTHours;
+                            totalOTPay += dailyOT;
+                        }
                     }
                 }
+
+                dailyDetails.push({
+                    date: dateStr,
+                    shift: currentShift?.name || 'Unknown',
+                    in: formatTime(parseISO(firstIn.timestamp)),
+                    out: formatTime(parseISO(lastOut.timestamp)),
+                    wage: dailyWage,
+                    ot: dailyOT,
+                    ot_hours: dailyOTHours,
+                    status: status
+                });
+            } else {
+                dailyDetails.push({ date: dateStr, status: 'Incomplete', wage: 0, ot: 0 });
             }
         });
 
@@ -155,7 +192,12 @@ export const calculatePayroll = (employees, logs, schedules, shifts, payrollConf
             netSalary: (totalSalary + totalOTPay) - totalDeduct,
             lateCount,
             absentCount,
-            duplicateCount
+            duplicateCount,
+            dailyDetails: dailyDetails.sort((a, b) => a.date.localeCompare(b.date))
         };
     });
+};
+
+const formatTime = (date) => {
+    return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 };

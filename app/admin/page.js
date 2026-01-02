@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Fragment } from "react";
 import { supabase } from "../../lib/supabaseClient";
 import { format, parseISO, startOfMonth, endOfMonth, differenceInMinutes } from "date-fns";
 import { th } from "date-fns/locale";
@@ -38,6 +38,7 @@ export default function AdminDashboard() {
     const [selectedEmpId, setSelectedEmpId] = useState("ALL");
     const [individualLogs, setIndividualLogs] = useState([]);
     const [individualStats, setIndividualStats] = useState({ work_days: 0, late: 0, absent: 0 });
+    const [expandedPayrollRow, setExpandedPayrollRow] = useState(null); // ID of expanded employee row
 
     // --- Init ---
     useEffect(() => {
@@ -291,8 +292,131 @@ export default function AdminDashboard() {
                 {/* TAB 2: PAYROLL (UPDATED with Work Days) */}
                 {activeTab === 'payroll' && (
                     <div className="space-y-6 animate-fade-in-up">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6"><div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100"><h3 className="font-bold text-slate-700 mb-4">⚙️ Rates Config</h3><div className="space-y-3"><div><label className="text-xs font-bold text-slate-400">OT Rate (Baht/Hr)</label><input type="number" className="w-full p-2 border rounded-lg" value={payrollConfig.ot_rate} onChange={e => setPayrollConfig({ ...payrollConfig, ot_rate: e.target.value })} /></div><div><label className="text-xs font-bold text-slate-400">Double Shift Rate (Baht/Day)</label><input type="number" className="w-full p-2 border rounded-lg" value={payrollConfig.double_shift_rate} onChange={e => setPayrollConfig({ ...payrollConfig, double_shift_rate: e.target.value })} /></div><button onClick={handleSavePayrollConfig} className="w-full bg-slate-800 text-white py-2 rounded-lg font-bold text-xs">Save Rates</button></div></div><div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 md:col-span-2"><h3 className="font-bold text-slate-700 mb-4">⚙️ Shift Salary (Baht/Shift)</h3><div className="flex flex-wrap gap-4">{shifts.map(s => (<div key={s.id} className="flex-1 bg-slate-50 p-3 rounded-xl border border-slate-200"><div className="font-bold text-slate-700 mb-2">{s.name}</div><input type="number" className="w-full p-2 border rounded-lg text-center font-bold text-green-600" value={s.salary || 500} onChange={(e) => handleUpdateShiftSalary(s.id, e.target.value)} placeholder="500" /></div>))}</div></div></div>
-                        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden"><div className="p-6 border-b border-slate-50"><h3 className="font-bold text-lg text-slate-700">💰 Monthly Salary Summary ({selectedMonth})</h3></div><div className="overflow-x-auto"><table className="w-full text-sm text-left"><thead className="bg-slate-50 text-slate-400 uppercase text-xs font-bold"><tr><th className="px-6 py-4 whitespace-nowrap">Employee</th><th className="px-6 py-4 text-center whitespace-nowrap">Work Days</th><th className="px-6 py-4 text-right whitespace-nowrap">Wage</th><th className="px-6 py-4 text-right whitespace-nowrap">OT(Hr)</th><th className="px-6 py-4 text-right whitespace-nowrap">OT Pay</th><th className="px-6 py-4 text-right text-red-500 whitespace-nowrap">Deduct</th><th className="px-6 py-4 text-right text-green-600 font-bold text-base whitespace-nowrap">Net</th><th className="px-6 py-4 whitespace-nowrap text-center">Stats (L/A/D)</th><th className="px-6 py-4 text-center whitespace-nowrap">Action</th></tr></thead><tbody className="divide-y divide-slate-50">{payrollData.map((data, index) => (<tr key={index} className="hover:bg-slate-50"><td className="px-6 py-4 font-bold text-slate-700 whitespace-nowrap">{data.emp.name}</td><td className="px-6 py-4 text-center font-bold text-slate-800">{data.workDays}</td><td className="px-6 py-4 text-right">{data.totalSalary.toLocaleString()}</td><td className="px-6 py-4 text-right font-mono text-slate-500">{data.totalOTHours}</td><td className="px-6 py-4 text-right">{data.totalOTPay.toLocaleString()}</td><td className="px-6 py-4 text-right text-red-500 font-bold">{data.totalDeduct > 0 ? `-${data.totalDeduct.toLocaleString()}` : '-'}</td><td className="px-6 py-4 text-right text-green-600 font-bold text-base border-l whitespace-nowrap">{data.netSalary.toLocaleString()} ฿</td><td className="px-6 py-4 text-center"><div className="flex gap-2 justify-center text-xs font-bold"><span className={`px-1.5 py-0.5 rounded ${data.lateCount > 0 ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-300'}`} title="Late">L:{data.lateCount}</span><span className={`px-1.5 py-0.5 rounded ${data.absentCount > 0 ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-300'}`} title="Absent">A:{data.absentCount}</span><span className={`px-1.5 py-0.5 rounded ${data.duplicateCount > 0 ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-300'}`} title="Duplicate">D:{data.duplicateCount}</span></div></td><td className="px-6 py-4 text-center"><button onClick={() => { setShowDeductModal(true); setDeductForm({ ...deductForm, empId: data.emp.id }); }} className="bg-red-50 text-red-600 px-3 py-1 rounded-lg text-xs font-bold hover:bg-red-100 transition whitespace-nowrap">- Deduct</button></td></tr>))}</tbody></table></div></div>
+                        {/* Summary Header */}
+                        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+                            <div className="p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
+                                <div>
+                                    <h3 className="font-bold text-xl text-slate-800">💰 Monthly Salary Summary</h3>
+                                    <p className="text-slate-500 text-xs mt-1">Period: {selectedMonth}</p>
+                                </div>
+                                <div className="text-right">
+                                    <button onClick={() => fetchDeductions()} className="text-xs font-bold text-slate-400 hover:text-slate-600 mr-4">↻ Refresh</button>
+                                    <span className="bg-emerald-100 text-emerald-700 font-bold px-3 py-1 rounded-lg text-xs">Total Net: {payrollData.reduce((a, b) => a + b.netSalary, 0).toLocaleString()} ฿</span>
+                                </div>
+                            </div>
+
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm text-left border-collapse">
+                                    <thead className="bg-slate-50 text-slate-400 uppercase text-xs font-bold">
+                                        <tr>
+                                            <th className="px-6 py-4 w-10"></th>
+                                            <th className="px-6 py-4 whitespace-nowrap">Employee</th>
+                                            <th className="px-6 py-4 text-center whitespace-nowrap">Work Days</th>
+                                            <th className="px-6 py-4 text-right whitespace-nowrap">Wage</th>
+                                            <th className="px-6 py-4 text-right whitespace-nowrap">OT(Hr)</th>
+                                            <th className="px-6 py-4 text-right whitespace-nowrap">OT Pay</th>
+                                            <th className="px-6 py-4 text-right text-red-500 whitespace-nowrap">Deduct</th>
+                                            <th className="px-6 py-4 text-right text-green-600 font-bold text-base whitespace-nowrap">Net</th>
+                                            <th className="px-6 py-4 whitespace-nowrap text-center">Stats (L/A/D)</th>
+                                            <th className="px-6 py-4 text-center whitespace-nowrap">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-50">
+                                        {payrollData.map((data, index) => (
+                                            <Fragment key={data.emp.id}>
+                                                <tr className={`hover:bg-slate-50 transition cursor-pointer ${expandedPayrollRow === data.emp.id ? 'bg-slate-50' : ''}`} onClick={() => setExpandedPayrollRow(expandedPayrollRow === data.emp.id ? null : data.emp.id)}>
+                                                    <td className="px-6 py-4 text-center text-slate-400 font-bold text-xs">
+                                                        {expandedPayrollRow === data.emp.id ? '▼' : '▶'}
+                                                    </td>
+                                                    <td className="px-6 py-4 font-bold text-slate-700 whitespace-nowrap flex items-center gap-3">
+                                                        <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-500">
+                                                            {data.emp.name.charAt(0)}
+                                                        </div>
+                                                        <div>
+                                                            {data.emp.name}
+                                                            <div className="text-[10px] text-slate-400 font-normal">{data.emp.position || 'Staff'}</div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-center font-bold text-slate-800">{data.workDays}</td>
+                                                    <td className="px-6 py-4 text-right font-mono text-slate-600">{data.totalSalary.toLocaleString()}</td>
+                                                    <td className="px-6 py-4 text-right font-mono text-slate-500">{data.totalOTHours}</td>
+                                                    <td className="px-6 py-4 text-right font-mono text-slate-600">{data.totalOTPay.toLocaleString()}</td>
+                                                    <td className="px-6 py-4 text-right text-red-500 font-bold font-mono">{data.totalDeduct > 0 ? `-${data.totalDeduct.toLocaleString()}` : '-'}</td>
+                                                    <td className="px-6 py-4 text-right text-green-600 font-black text-base border-l whitespace-nowrap tracking-tight">{data.netSalary.toLocaleString()} ฿</td>
+                                                    <td className="px-6 py-4 text-center">
+                                                        <div className="flex gap-2 justify-center text-[10px] font-bold">
+                                                            <span className={`px-1.5 py-0.5 rounded ${data.lateCount > 0 ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-300'}`} title="Late">L:{data.lateCount}</span>
+                                                            <span className={`px-1.5 py-0.5 rounded ${data.absentCount > 0 ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-300'}`} title="Absent">A:{data.absentCount}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-center" onClick={(e) => e.stopPropagation()}>
+                                                        <button onClick={() => { setShowDeductModal(true); setDeductForm({ ...deductForm, empId: data.emp.id }); }} className="bg-white border border-red-200 text-red-600 px-3 py-1 rounded-lg text-xs font-bold hover:bg-red-50 transition whitespace-nowrap shadow-sm">
+                                                            - Deduct
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                                {/* Expanded Details Row */}
+                                                {expandedPayrollRow === data.emp.id && (
+                                                    <tr className="bg-slate-50/50">
+                                                        <td colSpan="10" className="p-4 sm:p-6 border-b border-slate-100 shadow-inner">
+                                                            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                                                                <div className="px-4 py-3 bg-slate-100/50 border-b border-slate-200 flex justify-between items-center">
+                                                                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">🗓️ Daily Breakdown: {data.emp.name}</span>
+                                                                    <div className="flex gap-4 text-xs font-mono text-slate-500">
+                                                                        <span>Wage: {data.totalSalary.toLocaleString()}</span>
+                                                                        <span>OT: {data.totalOTPay.toLocaleString()} ({data.totalOTHours}hr)</span>
+                                                                    </div>
+                                                                </div>
+                                                                <table className="w-full text-xs text-left">
+                                                                    <thead className="bg-slate-50 text-slate-400 font-bold border-b border-slate-100">
+                                                                        <tr>
+                                                                            <th className="p-3">Date</th>
+                                                                            <th className="p-3">Shift</th>
+                                                                            <th className="p-3 text-center">In - Out</th>
+                                                                            <th className="p-3 text-right">Wage</th>
+                                                                            <th className="p-3 text-right">OT Pay</th>
+                                                                            <th className="p-3">Status</th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody className="divide-y divide-slate-50">
+                                                                        {data.dailyDetails?.map((day, dIdx) => (
+                                                                            <tr key={dIdx} className="hover:bg-slate-50">
+                                                                                <td className="p-3 font-mono text-slate-500">{format(parseISO(day.date), "dd MMM")}</td>
+                                                                                <td className="p-3 font-bold text-slate-700">{day.shift}</td>
+                                                                                <td className="p-3 text-center font-mono text-slate-600">
+                                                                                    {day.in || '-'} - {day.out || '-'}
+                                                                                </td>
+                                                                                <td className="p-3 text-right font-mono">{day.wage > 0 ? day.wage : '-'}</td>
+                                                                                <td className="p-3 text-right font-mono text-blue-600 font-bold">
+                                                                                    {day.ot > 0 ? `+${day.ot} (${day.ot_hours}h)` : '-'}
+                                                                                </td>
+                                                                                <td className="p-3">
+                                                                                    <span className={`px-2 py-1 rounded text-[10px] font-bold ${day.status.includes('Late') ? 'bg-orange-100 text-orange-600' :
+                                                                                            day.status === 'Absent' ? 'bg-red-100 text-red-600' :
+                                                                                                day.status === 'Normal' ? 'bg-emerald-50 text-emerald-600' :
+                                                                                                    'text-slate-400'
+                                                                                        }`}>
+                                                                                        {day.status}
+                                                                                    </span>
+                                                                                </td>
+                                                                            </tr>
+                                                                        ))}
+                                                                        {(!data.dailyDetails || data.dailyDetails.length === 0) && (
+                                                                            <tr><td colSpan="6" className="p-4 text-center text-slate-300">No attendance records found for this period.</td></tr>
+                                                                        )}
+                                                                    </tbody>
+                                                                </table>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </Fragment>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
                         {deductions.length > 0 && (<div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100"><h3 className="font-bold text-slate-700 mb-4 text-sm">Deductions List</h3><div className="space-y-2">{deductions.map(d => { const empName = employees.find(e => e.id === d.employee_id)?.name; return (<div key={d.id} className="flex justify-between items-center bg-slate-50 p-3 rounded-lg border border-slate-200"><div className="flex gap-3"><span className="font-bold text-slate-700">{empName}</span><span className="text-slate-500">Note: {d.reason}</span></div><div className="flex gap-4 items-center"><span className="font-bold text-red-500">-{d.amount} {d.is_percentage ? '%' : 'THB'}</span><button onClick={() => handleDeleteDeduction(d.id)} className="text-xs text-slate-400 hover:text-red-500">❌</button></div></div>) })}</div></div>)}
                         {showDeductModal && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"><div className="bg-white p-6 rounded-2xl w-full max-w-sm shadow-2xl"><h3 className="font-bold text-lg mb-4 text-red-600">Deduction / Penalty</h3><div className="space-y-3"><div><label className="text-xs font-bold">Amount</label><input type="number" className="w-full p-2 border rounded" autoFocus value={deductForm.amount} onChange={e => setDeductForm({ ...deductForm, amount: e.target.value })} /></div><div className="flex items-center gap-2"><input type="checkbox" checked={deductForm.isPercent} onChange={e => setDeductForm({ ...deductForm, isPercent: e.target.checked })} /><label className="text-sm">Percentage (%)</label></div><div><label className="text-xs font-bold">Reason</label><input type="text" className="w-full p-2 border rounded" placeholder="e.g. Late" value={deductForm.reason} onChange={e => setDeductForm({ ...deductForm, reason: e.target.value })} /></div><div className="flex gap-2 pt-2"><button onClick={handleAddDeduction} className="flex-1 bg-red-600 text-white py-2 rounded-lg font-bold">Save</button><button onClick={() => setShowDeductModal(false)} className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg">Cancel</button></div></div></div></div>)}
                     </div>
