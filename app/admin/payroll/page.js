@@ -34,7 +34,7 @@ export default function PayrollPage() {
             if (error) throw error;
 
             // 2. Group by Employee & Day
-            const daily records = {};
+            const dailyRecords = {};
 
             logs.forEach(log => {
                 const dateKey = format(new Date(log.timestamp), "yyyy-MM-dd");
