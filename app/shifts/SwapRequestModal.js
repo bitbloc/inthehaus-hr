@@ -19,20 +19,23 @@ export default function SwapRequestModal({ isOpen, onClose, currentUser, shiftDa
     const validPeers = employees.filter(emp => {
         if (emp.id === currentUser.id) return false;
 
+        // Restriction: Must be same position
+        if (emp.position !== currentUser.position) return false;
+
         // Check Override First
         const override = overrides?.find(o => String(o.employee_id) === String(emp.id) && o.date === shiftDate);
         if (override) {
-            return override.is_off; // If they have an OFF override, they are free! If !is_off, they are working.
+            return override.is_off; // If OFF, they are available.
         }
 
         // Check Template
         const dayOfWeek = new Date(shiftDate).getDay();
         const schedule = schedules[emp.id]?.[dayOfWeek];
         if (schedule && !schedule.is_off) {
-            return false; // Scheduled to work (and no override saying they are off)
+            return false; // Scheduled to work
         }
 
-        return true; // Likely free
+        return true;
     });
 
     const handleSubmit = async () => {

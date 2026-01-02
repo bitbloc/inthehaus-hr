@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import MyShifts from './MyShifts';
 import Marketplace from './Marketplace';
+import TeamSchedule from './TeamSchedule';
 
 export default function ShiftsPage() {
     // Ideally this comes from Auth Context, but for this prototype matching Admin logic
@@ -112,6 +113,12 @@ export default function ShiftsPage() {
                         <span>🌐</span> ตลาดแลกกะ
                         {poolRequests.length > 0 && <span className="bg-red-500 text-white text-[10px] px-1.5 rounded-full">{poolRequests.length}</span>}
                     </button>
+                    <button
+                        onClick={() => setActiveTab('team')}
+                        className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition ${activeTab === 'team' ? 'bg-slate-800 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+                    >
+                        👥 ทีม
+                    </button>
                 </div>
 
                 {/* Content */}
@@ -119,10 +126,10 @@ export default function ShiftsPage() {
                     {activeTab === 'my-shifts' && (
                         <MyShifts
                             currentUser={currentUser}
-                            employees={employees} // Needed for Modal Peer List
-                            schedules={schedules}
                             shifts={shifts}
+                            schedules={schedules}
                             overrides={overrides}
+                            employees={employees}
                             requests={myRequests}
                         />
                     )}
@@ -131,6 +138,15 @@ export default function ShiftsPage() {
                         <Marketplace
                             currentUser={currentUser}
                             initialRequests={poolRequests}
+                        />
+                    )}
+
+                    {activeTab === 'team' && (
+                        <TeamSchedule
+                            employees={employees}
+                            schedules={schedules}
+                            overrides={overrides}
+                            shifts={shifts}
                         />
                     )}
                 </div>
