@@ -8,6 +8,7 @@ import { format, isSameDay } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
+import NavigationDock from "../_components/NavigationDock";
 import { getEffectiveDailyRoster } from "../../utils/roster_logic";
 
 // --- Icons (Simulated Lucide for cleaner look) ---
@@ -444,33 +445,7 @@ export default function CheckIn() {
       </div>
 
       {/* 5. Navigation Dock (The "Haus" Dock) */}
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-full max-w-sm px-6">
-        <div className="bg-white/70 backdrop-blur-xl border border-white/50 shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1)] rounded-[2rem] p-2 flex justify-between items-center">
-
-          <Link href="/leave" className="flex-1 flex flex-col items-center py-2 gap-1 text-neutral-400 hover:text-neutral-900 transition-colors group">
-            <div className="group-hover:scale-110 transition-transform"><Icons.Plane /></div>
-            <span className="text-[9px] font-bold tracking-wide">LEAVE</span>
-          </Link>
-
-          <div className="w-px h-6 bg-neutral-200/50"></div>
-
-          {/* Current (Active) */}
-          <div className="flex-1 flex flex-col items-center py-2 gap-1 text-neutral-900 font-bold relative">
-            <div className="absolute -top-1 w-1 h-1 bg-neutral-900 rounded-full"></div>
-            <div className="bg-white p-2 rounded-2xl -mt-2 shadow-sm border border-neutral-100">
-              <Icons.Home />
-            </div>
-          </div>
-
-          <div className="w-px h-6 bg-neutral-200/50"></div>
-
-          <Link href="/shifts" className="flex-1 flex flex-col items-center py-2 gap-1 text-neutral-400 hover:text-neutral-900 transition-colors group">
-            <div className="group-hover:scale-110 transition-transform"><Icons.Swap /></div>
-            <span className="text-[9px] font-bold tracking-wide">SWAP</span>
-          </Link>
-
-        </div>
-      </div>
+      <NavigationDock />
 
       {/* 2. Announcement (Z-Index Fix) */}
       <AnimatePresence>

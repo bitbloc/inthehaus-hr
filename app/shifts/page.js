@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabaseClient';
 import MyShifts from './MyShifts';
 import Marketplace from './Marketplace';
 import TeamSchedule from './TeamSchedule';
+import NavigationDock from '../_components/NavigationDock';
 
 export default function ShiftsPage() {
     // Ideally this comes from Auth Context, but for this prototype matching Admin logic
@@ -152,6 +153,8 @@ export default function ShiftsPage() {
                 </div>
 
             </div>
+            <div className="h-24"></div> {/* Spacer for Dock */}
+            <NavigationDock />
         </div>
     );
 }
