@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { startOfMonth, endOfMonth, eachDayOfInterval, format, isSameDay, parseISO, isToday } from 'date-fns';
+import { th } from 'date-fns/locale';
 import SwapRequestModal from './SwapRequestModal';
 import { getEffectiveDailyRoster } from '../../utils/roster_logic';
 
@@ -23,8 +24,8 @@ export default function MyShifts({ currentUser, employees, schedules, shifts, ov
     return (
         <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
             <div className="p-6 border-b border-slate-50 flex justify-between items-center">
-                <h3 className="font-bold text-lg text-slate-700">📅 My Schedule</h3>
-                <div className="text-xs font-bold text-slate-400 uppercase">{format(selectedDate, "MMMM yyyy")}</div>
+                <h3 className="font-bold text-lg text-slate-700">📅 ตารางของฉัน</h3>
+                <div className="text-xs font-bold text-slate-400 uppercase">{format(selectedDate, "MMMM yyyy", { locale: th })}</div>
             </div>
 
             <div className="divide-y divide-slate-50">
@@ -51,7 +52,7 @@ export default function MyShifts({ currentUser, employees, schedules, shifts, ov
                         <div key={dateStr} className={`p-4 flex items-center justify-between hover:bg-slate-50 transition ${isToday(day) ? 'bg-slate-50/50' : ''}`}>
                             <div className="flex items-center gap-4">
                                 <div className={`text-center min-w-[50px] ${isToday(day) ? 'text-blue-600' : 'text-slate-500'}`}>
-                                    <div className="text-xs font-bold uppercase">{format(day, "EEE")}</div>
+                                    <div className="text-xs font-bold uppercase">{format(day, "EEE", { locale: th })}</div>
                                     <div className="text-xl font-black">{format(day, "d")}</div>
                                 </div>
 
@@ -67,7 +68,7 @@ export default function MyShifts({ currentUser, employees, schedules, shifts, ov
                                             </div>
                                         </>
                                     ) : (
-                                        <div className="text-slate-400 font-bold">OFF</div>
+                                        <div className="text-slate-400 font-bold">หยุด</div>
                                     )}
 
                                     {/* Status Indicator */}
@@ -86,7 +87,7 @@ export default function MyShifts({ currentUser, employees, schedules, shifts, ov
                                     onClick={() => handleSwapClick(dateStr, myShift)}
                                     className="px-4 py-2 border border-slate-200 rounded-xl text-slate-500 text-xs font-bold hover:bg-slate-800 hover:text-white transition shadow-sm"
                                 >
-                                    Swap
+                                    แลกเปลี่ยน
                                 </button>
                             )}
                         </div>
@@ -98,7 +99,7 @@ export default function MyShifts({ currentUser, employees, schedules, shifts, ov
                     const myShift = dailyRoster.find(r => String(r.employee.id) === String(currentUser.id));
                     return !myShift;
                 }) && (
-                        <div className="p-8 text-center text-slate-400">No shifts scheduled this month.</div>
+                        <div className="p-8 text-center text-slate-400">ไม่มีกะงานในเดือนนี้</div>
                     )}
             </div>
 
