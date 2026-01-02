@@ -23,7 +23,27 @@ export async function POST(request) {
     // End of day in BKK -> Start + 24h
     const endOfDayUTC = new Date(startOfDayUTC.getTime() + 24 * 60 * 60 * 1000);
 
-    // 2. Fetch logs
+    // 2. Fetch Weather (Bangkok)
+    let weatherQuote = "วันนี้อากาศดี ขอให้พักผ่อนอย่างมีความสุขครับ 🌙";
+    let weatherIcon = "🌙";
+    try {
+      const weatherRes = await fetch('https://api.open-meteo.com/v1/forecast?latitude=13.7563&longitude=100.5018&current_weather=true&timezone=Asia%2FBangkok');
+      const weatherData = await weatherRes.json();
+      const code = weatherData.current_weather?.weathercode;
+
+      // Map WMO codes to Thai messages
+      if (code === 0 || code === 1) {
+        weatherQuote = "ฟ้าใสไร้ฝน กลับบ้านปลอดภัยนะครับ 🌌"; weatherIcon = "✨";
+      } else if (code >= 2 && code <= 48) {
+        weatherQuote = "วันนี้เมฆเยอะหน่อย พักผ่อนเติมพลังมนุษย์ทำงาน! ☁️"; weatherIcon = "☁️";
+      } else if (code >= 51 && code <= 67) {
+        weatherQuote = "ฝนตกปรอยๆ อย่าลืมกางร่มและดูแลสุขภาพด้วยนะครับ ☔"; weatherIcon = "🌧️";
+      } else if (code >= 80) {
+        weatherQuote = "ฝนตกหนัก! เดินทางกลับบ้านระมัดระวังด้วยนะครับ ⛈️"; weatherIcon = "⛈️";
+      }
+    } catch (e) { console.error("Weather fetch failed", e); }
+
+    // 3. Fetch logs
     const { data: logs, error } = await supabase
       .from('attendance_logs')
       .select('*, employees(name, shifts(name, start_time, end_time))')
@@ -33,7 +53,7 @@ export async function POST(request) {
 
     if (error) throw error;
 
-    // 3. Process logs by employee
+    // 4. Process logs by employee
     const empMap = {};
     logs.forEach(log => {
       const empId = log.employee_id;
@@ -56,82 +76,116 @@ export async function POST(request) {
 
     Object.values(empMap).forEach(emp => {
       presentCount++;
-      // Format time to HH:mm
       const formatTime = (date) => {
         if (!date) return '-';
-        // Adjust for timezone if necessary, but assuming Date object handles it or we just take HH:mm from ISO
-        // Since we are in Node environment, new Date(iso) might be UTC. 
-        // We should probably add 7 hours for Thailand if the server is UTC.
-        // But let's try standard methods first. 
-        // To be safe for Thailand time (UTC+7):
         const thDate = new Date(date.toLocaleString("en-US", { timeZone: "Asia/Bangkok" }));
         return `${String(thDate.getHours()).padStart(2, '0')}:${String(thDate.getMinutes()).padStart(2, '0')}`;
       };
 
       const inTime = formatTime(emp.checkIn);
-      const outTime = emp.checkOut ? formatTime(emp.checkOut) : '?';
+      const outTime = emp.checkOut ? formatTime(emp.checkOut) : '--:--';
+
+      // Calculate Duration
+      let durationStr = "";
+      if (emp.checkIn && emp.checkOut) {
+        const diffMs = emp.checkOut - emp.checkIn;
+        const diffHrs = Math.floor(diffMs / 3600000);
+        const diffMins = Math.floor((diffMs % 3600000) / 60000);
+        durationStr = `${diffHrs}h ${diffMins}m`;
+      }
 
       let status = 'ปกติ';
-      let color = '#111827'; // Default text color
+      let color = '#22c55e'; // Green (Normal)
 
-      // Simple Late Check
+      // Late Check
       if (emp.checkIn && emp.shiftStart) {
         const [sh, sm] = emp.shiftStart.split(':').map(Number);
-        // Create shift start time object for comparison
-        // We need to be careful with timezones here. 
-        // Let's compare minutes from midnight.
-
-        // Get check-in minutes
         const checkInDate = new Date(emp.checkIn.toLocaleString("en-US", { timeZone: "Asia/Bangkok" }));
         const checkInMinutes = checkInDate.getHours() * 60 + checkInDate.getMinutes();
         const shiftStartMinutes = sh * 60 + sm;
 
         if (checkInMinutes > shiftStartMinutes) {
           status = 'สาย';
-          color = '#ef4444'; // Red
+          color = '#ef4444'; // Red (Late)
         }
       }
 
-      // Check Early Out or Forgot Out
+      // Check Incomplete
       if (!emp.checkOut) {
-        status = 'ยังไม่ออก?';
-        color = '#f59e0b'; // Orange
+        status = 'ยังไม่ลงออก';
+        color = '#f59e0b'; // Amber
       }
 
       reportLines.push({
         name: emp.name,
         time: `${inTime} - ${outTime}`,
         status: status,
-        color: color
+        color: color,
+        duration: durationStr
       });
     });
 
-    // 4. Construct Message
+    // 5. Construct Beautiful Flex Message
     const message = {
       type: 'flex',
-      altText: `สรุปยอดประจำวัน (Cut-off)`,
+      altText: `สรุปยอดประจำวัน: ${new Date().toLocaleDateString('th-TH')}`,
       contents: {
         type: 'bubble',
+        size: 'mega',
         header: {
-          type: 'box', layout: 'vertical',
+          type: 'box', layout: 'vertical', paddingAll: 'lg', backgroundColor: '#F9FAFB',
           contents: [
-            { type: 'text', text: '🏁 Finalize Day', weight: 'bold', size: 'xl', color: '#1f2937' },
-            { type: 'text', text: `สรุปยอดวันที่ ${new Date().toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok' })}`, size: 'xs', color: '#9ca3af' }
+            { type: 'text', text: 'Daily Summary', weight: 'bold', size: 'sm', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '1px' },
+            { type: 'text', text: 'Finalize Day 🏁', weight: 'bold', size: '3xl', color: '#111827', margin: 'sm' },
+            { type: 'text', text: new Date().toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok', dateStyle: 'full' }), size: 'xs', color: '#9CA3AF', margin: 'xs' }
           ]
         },
         body: {
-          type: 'box', layout: 'vertical',
+          type: 'box', layout: 'vertical', paddingAll: 'lg',
           contents: [
-            { type: 'text', text: `พนักงานที่มาทำงาน: ${presentCount} คน`, weight: 'bold', size: 'sm', margin: 'md' },
-            { type: 'separator', margin: 'md' },
-            ...reportLines.map(line => ({
-              type: 'box', layout: 'horizontal', margin: 'sm',
+            // Weather Quote
+            {
+              type: 'box', layout: 'horizontal', backgroundColor: '#EFF6FF', cornerRadius: 'md', paddingAll: 'md', margin: 'md',
               contents: [
-                { type: 'text', text: line.name, size: 'xs', flex: 3, color: '#1f2937' },
-                { type: 'text', text: line.time, size: 'xxs', flex: 3, color: '#6b7280', align: 'center' },
-                { type: 'text', text: line.status, size: 'xs', flex: 2, color: line.color, align: 'end', weight: 'bold' }
+                { type: 'text', text: weatherIcon, size: 'xxl', flex: 1, align: 'center', gravity: 'center' },
+                { type: 'text', text: weatherQuote, size: 'xs', color: '#1E40AF', flex: 5, wrap: true, gravity: 'center' }
               ]
-            }))
+            },
+            // Stats
+            {
+              type: 'box', layout: 'horizontal', margin: 'lg',
+              contents: [
+                { type: 'text', text: 'พนักงานวันนี้', size: 'sm', color: '#6B7280', flex: 5 },
+                { type: 'text', text: `${presentCount} คน`, size: 'sm', color: '#111827', weight: 'bold', align: 'end', flex: 3 }
+              ]
+            },
+            { type: 'separator', margin: 'lg', color: '#E5E7EB' },
+            // List
+            {
+              type: 'box', layout: 'vertical', margin: 'lg', spacing: 'md',
+              contents: reportLines.map(line => ({
+                type: 'box', layout: 'vertical',
+                contents: [
+                  {
+                    type: 'box', layout: 'horizontal',
+                    contents: [
+                      { type: 'text', text: line.name, size: 'sm', weight: 'bold', color: '#374151', flex: 3 },
+                      { type: 'text', text: line.time, size: 'sm', color: '#111827', align: 'end', flex: 3 },
+                      { type: 'text', text: line.status, size: 'xs', color: '#FFFFFF', align: 'center', weight: 'bold', backgroundColor: line.color, paddingAll: '2px', cornerRadius: 'sm', offsetBottom: '1px', flex: 2 }
+                    ]
+                  },
+                  // Duration Subline
+                  line.duration ? {
+                    type: 'text', text: `⏱️ Total: ${line.duration}`, size: 'xxs', color: '#9CA3AF', margin: 'xs', offsetStart: '2px'
+                  } : { type: 'filler' } // Empty filler if no duration
+                ]
+              }))
+            }
+          ]
+        },
+        footer: {
+          type: 'box', layout: 'vertical', contents: [
+            { type: 'text', text: 'In the haus HR System', size: 'xxs', color: '#D1D5DB', align: 'center' }
           ]
         }
       }
