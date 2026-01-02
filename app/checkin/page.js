@@ -4,11 +4,18 @@ import liff from "@line/liff";
 import { supabase } from "../../lib/supabaseClient";
 import { resizeImage } from "../../utils/imageResizer";
 import Link from "next/link";
-import { format, isSameDay, parseISO } from "date-fns";
+import { format, isSameDay } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { getEffectiveDailyRoster } from "../../utils/roster_logic";
+
+// --- Icons (Simulated Lucide for cleaner look) ---
+const Icons = {
+  Calendar: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2" /><line x1="16" x2="16" y1="2" y2="6" /><line x1="8" x2="8" y1="2" y2="6" /><line x1="3" x2="21" y1="10" y2="10" /></svg>,
+  Wallet: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="14" x="2" y="5" rx="2" ry="2" /><line x1="2" x2="22" y1="10" y2="10" /></svg>,
+  Home: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></svg>
+};
 
 function cn(...inputs) {
   return twMerge(clsx(inputs));
@@ -22,23 +29,19 @@ export default function CheckIn() {
   const [recentCheckins, setRecentCheckins] = useState([]);
   const [lastAction, setLastAction] = useState(null);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [employeeData, setEmployeeData] = useState(null);
 
   // Shift Context
-  const [shiftContext, setShiftContext] = useState(null); // { shiftName, startTime, isLate, isEarly }
+  const [shiftContext, setShiftContext] = useState(null);
 
   // Interaction State
   const [showCamera, setShowCamera] = useState(false);
   const [showMoodSelector, setShowMoodSelector] = useState(false);
-  const [photoUrl, setPhotoUrl] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [selectedLogId, setSelectedLogId] = useState(null);
-  const [showUserId, setShowUserId] = useState(false);
 
   // Dev Mode State
   const [devMode, setDevMode] = useState(false);
-  const [showDevLogin, setShowDevLogin] = useState(false);
-
   const fileInputRef = useRef(null);
 
   // --- Constants ---
@@ -46,7 +49,6 @@ export default function CheckIn() {
   const SHOP_LONG = 104.79292673153263;
   const ALLOWED_RADIUS_KM = 0.05;
 
-  // --- Init ---
   // --- Init ---
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -60,12 +62,12 @@ export default function CheckIn() {
           const p = await liff.getProfile();
           setProfile(p);
           fetchUserStatus(p.userId);
-          fetchMyShift(p.userId); // Fetch shift context
+          fetchMyShift(p.userId);
         }
       } catch (e) { setStatus("LIFF Error"); }
 
       if (navigator.geolocation) {
-        watchId = navigator.geolocation.watchPosition(onGeoSuccess, onGeoError);
+        watchId = navigator.geolocation.watchPosition(onGeoSuccess, onGeoError, { enableHighAccuracy: true });
       } else {
         setStatus("GPS Not Supported");
       }
@@ -81,7 +83,7 @@ export default function CheckIn() {
     };
   }, []);
 
-  // --- Fetchers & Helpers ---
+  // --- Fetchers ---
   const fetchAnnouncement = async () => {
     try {
       const res = await fetch('/api/announcements/active');
@@ -99,24 +101,20 @@ export default function CheckIn() {
   };
 
   const fetchUserStatus = async (userId) => {
-    const { data: emp } = await supabase.from('employees').select('id').eq('line_user_id', userId).eq('is_active', true).single();
+    const { data: emp } = await supabase.from('employees').select('id, position').eq('line_user_id', userId).eq('is_active', true).single();
     if (!emp) return;
+    setEmployeeData(emp);
 
-    // Get the absolute last log
     const { data: log } = await supabase.from('attendance_logs').select('action_type, timestamp').eq('employee_id', emp.id).order('timestamp', { ascending: false }).limit(1).single();
 
     if (log) {
-      // Logic Tweak: Stale Session
-      // If last action was check_in BUT it was from a previous day (not today)
-      // We consider it a "Stale Session" -> Force UI to show "Ready to Check In" (or handle as day start)
       const lastDate = new Date(log.timestamp);
       const today = new Date();
       const isToday = isSameDay(lastDate, today);
 
       if (log.action_type === 'check_in' && !isToday) {
-        // Warning: User forgot to check out
         alert("คุณลืมลงชื่อออกเมื่อวาน ระบบจะเริ่มนับวันใหม่ให้");
-        setLastAction('check_out'); // Force UI to show "Check In" button
+        setLastAction('check_out'); // UI shows Check In
       } else {
         setLastAction(log.action_type);
       }
@@ -134,7 +132,6 @@ export default function CheckIn() {
       const dateStr = format(today, 'yyyy-MM-dd');
       const dayOfWeek = today.getDay();
 
-      // Parallel Fetching for Roster Logic
       const [
         { data: weekly },
         { data: overrides },
@@ -145,22 +142,15 @@ export default function CheckIn() {
         supabase.from('shifts').select('*')
       ]);
 
-      // Construct dummy maps for the logic utility
-      // getEffectiveDailyRoster expects arrays/maps of ALL employees, but we can feed it just this one
       const employees = [{ id: emp.id }];
       const schedules = { [emp.id]: { [dayOfWeek]: weekly || null } };
 
       const effectiveRoster = getEffectiveDailyRoster(employees, schedules, overrides || [], allShifts || [], today);
-
       const myShift = effectiveRoster.find(r => r.employee.id === emp.id);
 
       if (myShift) {
-        // Determine Status (Late/Early)
-        // Simple logic: if now > start_time + grace_period (e.g. 15 mins)
-        // For now, let's just store the shift info
         const nowStr = format(today, 'HH:mm:ss');
-        const isLate = nowStr > myShift.start_time; // Basic String Comparison works for HH:mm:ss if same day
-
+        const isLate = nowStr > myShift.start_time;
         setShiftContext({
           name: myShift.shift_name,
           start: myShift.start_time,
@@ -168,24 +158,20 @@ export default function CheckIn() {
           isLate
         });
       }
-
     } catch (e) { console.error("Shift Fetch Error:", e); }
   };
 
-  // --- Dev Mode Logic ---
+  // --- GPS & Actions ---
   const handleDevLogin = () => {
     const user = prompt("Username:");
     const pass = prompt("Password:");
     if (user === "yuzu" && pass === "1533") {
       setDevMode(true);
       setStatus("❤️ Developer Mode");
-      alert("Developer Mode Active: GPS Bypassed");
-    } else {
-      alert("Invalid credentials");
+      alert("Developer Mode Active");
     }
   };
 
-  // --- GPS ---
   const onGeoSuccess = (position) => {
     const dist = getDistanceFromLatLonInKm(position.coords.latitude, position.coords.longitude, SHOP_LAT, SHOP_LONG);
     if (dist <= ALLOWED_RADIUS_KM) setStatus("📍 Ready");
@@ -193,16 +179,15 @@ export default function CheckIn() {
   };
   const onGeoError = () => setStatus("❌ GPS Error");
 
-  // --- Actions ---
   const handleStartCheckIn = () => {
-    if (isUploading || isSubmitting) return; // 🔒 Logic Tweak: Prevent Double Tap
+    if (isUploading || isSubmitting) return;
     if (!devMode && !status.includes("Ready")) return alert("Please be at the location to check in.");
     setShowCamera(true);
     setTimeout(() => fileInputRef.current?.click(), 300);
   };
 
   const handleFileChange = async (e) => {
-    if (isUploading || isSubmitting) return; // 🔒 Double Protection
+    if (isUploading || isSubmitting) return;
     const file = e.target.files[0];
     if (!file) { setShowCamera(false); return; }
     try {
@@ -241,11 +226,11 @@ export default function CheckIn() {
         setRecentCheckins(prev => [tempLog, ...prev]);
       }
 
-      const { data: inserted, error } = await supabase.from('attendance_logs').insert({
+      const { error } = await supabase.from('attendance_logs').insert({
         employee_id: emp.id,
         action_type: actionType,
         photo_url: url
-      }).select().single();
+      });
 
       if (error) throw error;
 
@@ -292,24 +277,28 @@ export default function CheckIn() {
 
   // --- Render Helpers ---
   const isLate = shiftContext?.isLate && lastAction !== 'check_in';
-  const buttonColor = isLate ? "bg-amber-400 text-black border-amber-300" : (lastAction !== 'check_in' ? "bg-[#171717] text-white border-[#262626]" : "bg-white text-[#171717] border-white");
+  // Dynamic Button Colors
+  const buttonColor = isLate
+    ? "bg-amber-400 text-black border-amber-300 shadow-[0_20px_50px_-12px_rgba(251,191,36,0.5)]"
+    : (lastAction !== 'check_in'
+      ? "bg-[#171717] text-white border-[#262626] shadow-[0_20px_50px_-12px_rgba(0,0,0,0.4)]"
+      : "bg-white text-[#171717] border-white shadow-[0_20px_50px_-12px_rgba(255,255,255,0.4)]");
 
   return (
-    <div className="min-h-screen bg-[#F2F2F2] text-foreground font-sans flex flex-col items-center relative overflow-hidden font-feature-settings-['ss01'] pb-32">
+    <div className="min-h-screen bg-[#F2F2F2] text-neutral-800 font-sans flex flex-col items-center relative overflow-hidden font-feature-settings-['ss01'] pb-32">
 
-      {/* Background Gradient Blob */}
-      <div className="absolute top-[-20%] left-[-10%] w-[150%] h-[80%] bg-gradient-to-b from-blue-50/50 via-purple-50/30 to-transparent rounded-full blur-3xl pointer-events-none" />
+      {/* Background Gradient Blob (Nendo: Soft & Organic) */}
+      <div className="absolute top-[-20%] left-[-10%] w-[150%] h-[80%] bg-gradient-to-b from-blue-100/40 via-purple-100/30 to-transparent rounded-[100%] blur-3xl pointer-events-none" />
 
       {/* 1. Header (Glassmorphism) */}
       <motion.div
-        className="w-full px-6 py-4 flex justify-between items-center z-20 sticky top-0 bg-white/30 backdrop-blur-xl border-b border-white/20"
+        className="w-full px-6 py-4 flex justify-between items-center z-20 sticky top-0 bg-white/60 backdrop-blur-xl border-b border-white/20"
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
       >
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-xl bg-neutral-900 flex items-center justify-center text-white font-bold text-xs shadow-lg">IH</div>
           <span className="text-sm font-semibold tracking-tight text-neutral-800">In the haus</span>
-          {/* Dev Bypass */}
           <button onClick={handleDevLogin} className="opacity-0 hover:opacity-100 transition-opacity text-xs">🛠️</button>
         </div>
 
@@ -318,9 +307,9 @@ export default function CheckIn() {
             <div className="flex items-center gap-3">
               <div className="flex flex-col items-end">
                 <span className="text-xs font-bold text-neutral-800">{profile.displayName}</span>
-                <span className="text-[10px] text-neutral-500 font-medium">{showUserId ? profile.userId.slice(0, 8) : 'Employee'}</span>
+                <span className="text-[10px] text-neutral-500 font-medium">{employeeData?.position || 'Staff'}</span>
               </div>
-              <img src={profile.pictureUrl} onClick={() => setShowUserId(!showUserId)} className="w-10 h-10 rounded-xl object-cover border-2 border-white shadow-sm cursor-pointer" />
+              <img src={profile.pictureUrl} className="w-10 h-10 rounded-xl object-cover border-2 border-white shadow-sm" />
             </div>
           ) : (
             <button onClick={() => liff.login()} className="px-4 py-2 bg-[#06C755] text-white rounded-full text-xs font-bold shadow-sm">LINE Login</button>
@@ -334,24 +323,24 @@ export default function CheckIn() {
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mt-6 mx-6 w-full max-w-sm"
+            className="mt-6 mx-6 w-full max-w-sm z-10"
           >
-            <div className="flex items-center justify-between px-4 py-3 bg-white/40 backdrop-blur-md rounded-2xl border border-white/40 shadow-sm">
+            <div className="flex items-center justify-between px-5 py-3 bg-white/60 backdrop-blur-md rounded-2xl border border-white/60 shadow-sm">
               <div className="flex items-center gap-3">
                 <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center text-lg", isLate ? "bg-amber-100 text-amber-600" : "bg-blue-50 text-blue-500")}>
                   {isLate ? '⚠️' : '📅'}
                 </div>
                 <div>
-                  <h4 className="text-xs font-bold text-neutral-800 uppercase tracking-wide">
+                  <h4 className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">
                     {isLate ? "Running Late" : "Current Shift"}
                   </h4>
-                  <p className="text-sm font-medium text-neutral-600">
+                  <p className="text-sm font-bold text-neutral-700">
                     {shiftContext.start.slice(0, 5)} - {shiftContext.end.slice(0, 5)}
                   </p>
                 </div>
               </div>
               {isLate && (
-                <span className="px-2 py-1 bg-amber-100 text-amber-700 text-[10px] font-bold rounded-md">LATE</span>
+                <span className="px-2 py-1 bg-amber-100 text-amber-700 text-[10px] font-bold rounded-md border border-amber-200">LATE</span>
               )}
             </div>
           </motion.div>
@@ -366,10 +355,10 @@ export default function CheckIn() {
           className="text-center mb-10"
         >
           {/* Dieter Rams Typography: Big, Tight, Clean */}
-          <h2 className="text-9xl font-light tracking-tighter text-neutral-900 leading-[0.8]">
+          <h2 className="text-[6rem] leading-none font-light tracking-tighter text-neutral-900">
             {format(currentTime, "HH:mm")}
           </h2>
-          <p className="text-lg font-medium text-neutral-500 mt-4 tracking-wide">
+          <p className="text-sm font-medium text-neutral-400 mt-2 tracking-widest uppercase">
             {format(currentTime, "EEEE, dd MMMM")}
           </p>
 
@@ -377,13 +366,13 @@ export default function CheckIn() {
             animate={{ scale: status.includes('Ready') ? [1, 1.05, 1] : 1 }}
             transition={{ repeat: Infinity, duration: 2 }}
             className={cn(
-              "mt-8 inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-bold tracking-wide transition-colors border backdrop-blur-sm",
+              "mt-8 inline-flex items-center gap-2 px-4 py-2 rounded-full text-[10px] font-bold tracking-wide transition-colors border backdrop-blur-sm",
               status.includes('Ready')
-                ? 'bg-lime-500/10 text-lime-700 border-lime-500/20'
+                ? 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20'
                 : 'bg-rose-500/10 text-rose-500 border-rose-500/20'
             )}
           >
-            <span className={cn("w-2 h-2 rounded-full animate-pulse", status.includes('Ready') ? 'bg-lime-500' : 'bg-rose-500')}></span>
+            <span className={cn("w-1.5 h-1.5 rounded-full animate-pulse", status.includes('Ready') ? 'bg-emerald-500' : 'bg-rose-500')}></span>
             {status}
           </motion.div>
         </motion.div>
@@ -399,42 +388,43 @@ export default function CheckIn() {
           >
             {/* Squircle Button */}
             <div className={cn(
-              "relative z-10 w-48 h-48 rounded-[3rem] flex flex-col items-center justify-center shadow-[0_20px_50px_-12px_rgba(0,0,0,0.2)] border-b-4 transition-all duration-300",
-              buttonColor,
-              lastAction !== 'check_in' ? 'hover:shadow-[0_30px_60px_-12px_rgba(0,0,0,0.3)]' : ''
+              "relative z-10 w-48 h-48 rounded-[2.5rem] flex flex-col items-center justify-center transition-all duration-300 border-b-4",
+              buttonColor
             )}>
-              <span className="text-4xl mb-1">{lastAction !== 'check_in' ? '👋' : '🏠'}</span>
-              <span className="text-2xl font-bold tracking-tight">
+              <span className="text-4xl mb-2">{lastAction !== 'check_in' ? '☀️' : '🌙'}</span>
+              <span className="text-xl font-bold tracking-tight">
                 {lastAction !== 'check_in' ? 'Check In' : 'Check Out'}
               </span>
-              {isLate && lastAction !== 'check_in' && <span className="text-[10px] uppercase font-bold tracking-widest mt-1 opacity-80">You are late</span>}
+              <span className="text-[10px] opacity-60 mt-1 font-medium">
+                {lastAction !== 'check_in' ? 'Start your day' : 'Good rest!'}
+              </span>
             </div>
           </motion.button>
         )}
       </div>
 
       {/* 4. Recent Checkins (Glass Cards) */}
-      <div className="w-full max-w-md px-6 z-10 mb-8">
-        <h3 className="text-xs font-bold text-neutral-400 uppercase tracking-widest mb-4 ml-2">Recent Activity</h3>
-        <div className="flex flex-col gap-3">
+      <div className="w-full max-w-sm px-6 z-10 mb-8">
+        <h3 className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-4 pl-2">Recent Activity</h3>
+        <div className="flex flex-col gap-2">
           <AnimatePresence>
             {recentCheckins.slice(0, 3).map((log, i) => (
               <motion.div
                 key={log.id}
-                initial={{ opacity: 0, x: -20 }}
+                initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
-                className="flex items-center justify-between p-3 bg-white/60 backdrop-blur-md rounded-2xl border border-white/50 shadow-sm"
+                className="flex items-center justify-between p-3 bg-white/40 backdrop-blur-md rounded-2xl border border-white/40 shadow-sm"
               >
                 <div className="flex items-center gap-3">
-                  <img src={log.employees?.photo_url || log.photo_url} className="w-10 h-10 rounded-full object-cover bg-slate-200" />
+                  <img src={log.employees?.photo_url || log.photo_url} className="w-10 h-10 rounded-full object-cover bg-slate-200 border border-white" />
                   <div>
-                    <p className="text-sm font-bold text-neutral-800">{log.employees?.name?.split(' ')[0]}</p>
-                    <p className="text-[10px] text-neutral-500">{log.action_type === 'check_in' ? 'Arrived' : 'Left Work'}</p>
+                    <p className="text-xs font-bold text-neutral-800">{log.employees?.name?.split(' ')[0]}</p>
+                    <p className="text-[10px] text-neutral-500 font-medium">{log.action_type === 'check_in' ? 'Checked In' : 'Checked Out'}</p>
                   </div>
                 </div>
                 <div className="flex flex-col items-end">
-                  <span className="text-xs font-bold text-neutral-900">{format(new Date(log.timestamp), "HH:mm")}</span>
-                  <span className="text-lg">{log.mood_status || ''}</span>
+                  <span className="text-xs font-bold text-neutral-700 font-mono">{format(new Date(log.timestamp), "HH:mm")}</span>
+                  <span className="text-sm">{log.mood_status || ''}</span>
                 </div>
               </motion.div>
             ))}
@@ -442,23 +432,36 @@ export default function CheckIn() {
         </div>
       </div>
 
-      {/* 5. Navigation Dock (New Feature) */}
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-white/80 backdrop-blur-xl border border-white/40 shadow-2xl rounded-full px-6 py-3 flex items-center gap-8">
-        <Link href="/" className="flex flex-col items-center gap-1 opacity-50 hover:opacity-100 transition-opacity">
-          <div className="w-6 h-6 flex items-center justify-center text-xl">🏠</div>
-        </Link>
-        <div className="flex flex-col items-center gap-1 opacity-100 text-blue-600">
-          <div className="w-12 h-12 bg-blue-500 text-white rounded-2xl flex items-center justify-center text-2xl shadow-lg -mt-8 border-4 border-[#F2F2F2]">📍</div>
+      {/* 5. Navigation Dock (The "Haus" Dock) */}
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-full max-w-sm px-6">
+        <div className="bg-white/70 backdrop-blur-xl border border-white/50 shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1)] rounded-[2rem] p-2 flex justify-between items-center">
+
+          <Link href="/schedule" className="flex-1 flex flex-col items-center py-2 gap-1 text-neutral-400 hover:text-neutral-900 transition-colors group">
+            <div className="group-hover:scale-110 transition-transform"><Icons.Calendar /></div>
+            <span className="text-[9px] font-bold tracking-wide">ROSTER</span>
+          </Link>
+
+          <div className="w-px h-6 bg-neutral-200/50"></div>
+
+          {/* Current (Active) */}
+          <div className="flex-1 flex flex-col items-center py-2 gap-1 text-neutral-900 font-bold relative">
+            <div className="absolute -top-1 w-1 h-1 bg-neutral-900 rounded-full"></div>
+            <div className="bg-white p-2 rounded-2xl -mt-2 shadow-sm border border-neutral-100">
+              <Icons.Home />
+            </div>
+          </div>
+
+          <div className="w-px h-6 bg-neutral-200/50"></div>
+
+          <Link href="/dashboard" className="flex-1 flex flex-col items-center py-2 gap-1 text-neutral-400 hover:text-neutral-900 transition-colors group">
+            <div className="group-hover:scale-110 transition-transform"><Icons.Wallet /></div>
+            <span className="text-[9px] font-bold tracking-wide">WALLET</span>
+          </Link>
+
         </div>
-        <Link href="/shifts" className="flex flex-col items-center gap-1 opacity-50 hover:opacity-100 transition-opacity">
-          <div className="w-6 h-6 flex items-center justify-center text-xl">📅</div>
-        </Link>
-        <Link href="/banff" className="flex flex-col items-center gap-1 opacity-50 hover:opacity-100 transition-opacity">
-          <div className="w-6 h-6 flex items-center justify-center text-xl">🍲</div>
-        </Link>
       </div>
 
-      {/* Camera & Mood (Keep mostly same but update style) */}
+      {/* Camera & Mood (Modals) */}
       <AnimatePresence>
         {showCamera && (
           <motion.div
@@ -481,9 +484,7 @@ export default function CheckIn() {
             <input type="file" accept="image/*" capture="user" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
           </motion.div>
         )}
-      </AnimatePresence>
 
-      <AnimatePresence>
         {showMoodSelector && (
           <div className="fixed inset-x-0 bottom-0 z-50 flex flex-col items-center justify-end pointer-events-none">
             <motion.div
