@@ -11,17 +11,37 @@ const client = new Client({
 
 export async function POST(request) {
   try {
-    // 1. Get today's date range for Bangkok (UTC+7)
-    const now = new Date();
-    const bangkokOffset = 7 * 60 * 60 * 1000;
-    const nowBkk = new Date(now.getTime() + bangkokOffset);
+    // 1. Get date from Query Params or Default to Today
+    const { searchParams } = new URL(request.url);
+    const manualDate = searchParams.get('date'); // YYYY-MM-DD
 
-    // Start of day in BKK (00:00:00) -> Convert back to UTC
-    nowBkk.setUTCHours(0, 0, 0, 0);
-    const startOfDayUTC = new Date(nowBkk.getTime() - bangkokOffset);
+    const now = manualDate ? new Date(manualDate) : new Date();
+    const bangkokOffset = 7 * 60 * 60 * 1000;
+
+    // Create Date Object for BKK time
+    // If manualDate is 2024-01-02, new Date() gives 07:00 UTC if parsed as UTC, we need to be careful.
+    // Simplest: Use the date string to construct the start of day.
+
+    let startOfDayUTC, endOfDayUTC;
+
+    if (manualDate) {
+      // Manual Date (e.g., '2024-01-02') -> implies 00:00:00 BKK on that day
+      // 00:00:00 BKK = Previous Day 17:00:00 UTC
+      const targetDate = new Date(manualDate); // UTC 00:00
+      // Adjust to BKK midnight relative to UTC
+      const bkkMidnightInUtc = new Date(targetDate.getTime() - bangkokOffset);
+      startOfDayUTC = bkkMidnightInUtc;
+    } else {
+      // Today
+      const nowBkk = new Date(now.getTime() + bangkokOffset);
+      nowBkk.setUTCHours(0, 0, 0, 0);
+      startOfDayUTC = new Date(nowBkk.getTime() - bangkokOffset);
+    }
 
     // End of day in BKK -> Start + 24h
-    const endOfDayUTC = new Date(startOfDayUTC.getTime() + 24 * 60 * 60 * 1000);
+    endOfDayUTC = new Date(startOfDayUTC.getTime() + 24 * 60 * 60 * 1000);
+
+    console.log(`Generating report for: ${startOfDayUTC.toISOString()} to ${endOfDayUTC.toISOString()}`);
 
     // 2. Fetch Weather (Bangkok)
     let weatherQuote = "วันนี้อากาศดี ขอให้พักผ่อนอย่างมีความสุขครับ 🌙";
@@ -137,7 +157,7 @@ export async function POST(request) {
           contents: [
             { type: 'text', text: 'Daily Summary', weight: 'bold', size: 'sm', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '1px' },
             { type: 'text', text: 'Finalize Day 🏁', weight: 'bold', size: '3xl', color: '#111827', margin: 'sm' },
-            { type: 'text', text: new Date().toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok', dateStyle: 'full' }), size: 'xs', color: '#9CA3AF', margin: 'xs' }
+            { type: 'text', text: new Date(startOfDayUTC.getTime() + bangkokOffset).toLocaleDateString('th-TH', { timeZone: 'UTC', dateStyle: 'full' }), size: 'xs', color: '#9CA3AF', margin: 'xs' }
           ]
         },
         body: {

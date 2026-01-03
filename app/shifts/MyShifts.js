@@ -114,6 +114,7 @@ export default function MyShifts({ currentUser, employees, schedules, shifts, ov
                     employees={employees}
                     schedules={schedules}
                     overrides={overrides}
+                    shifts={shifts}
                 />
             )}
         </div>

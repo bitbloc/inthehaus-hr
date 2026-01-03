@@ -174,12 +174,38 @@ export const calculatePayroll = (employees, logs, schedules, shifts, payrollConf
                         }
                     }
                 } else {
-                    // Logged work but no shift (Ghost Shift Violation or Unscheduled)
-                    status = 'Unexpected';
-                    // We might still pay them base? Or just OT? 
-                    // For now, treat as Unpaid or Special. Let's assume standard Daily Wage for safety or 0.
-                    // User didn't specify "Unscheduled Work Policy". 
-                    // I will mark wage 0 but show status.
+                    // Logged work but no shift (Extra Shift)
+                    status = 'Extra (พิเศษ)';
+
+                    // Attempt to find a base wage:
+                    // 1. Try 'morning' rate
+                    // 2. Try 'evening' rate
+                    // 3. Default to 500
+                    if (emp.shift_rates?.morning) dailyWage = Number(emp.shift_rates.morning);
+                    else if (emp.shift_rates?.evening) dailyWage = Number(emp.shift_rates.evening);
+                    else dailyWage = 500; // Fallback
+
+                    totalSalary += dailyWage;
+                    workDays++;
+
+                    // OT Logic for Extra Shift (Assume standard 9 hours incl break)
+                    // If work duration > 9 hours, pay OT
+                    const start = parseISO(firstIn.timestamp);
+                    const end = parseISO(lastOut.timestamp);
+                    const durationMinutes = differenceInMinutes(end, start);
+
+                    if (durationMinutes > 540) { // > 9 hours
+                        const otMins = durationMinutes - 540;
+                        let hours = Math.floor(otMins / 60);
+                        if ((otMins % 60) >= 30) hours += 1;
+
+                        if (hours > 0) {
+                            dailyOTHours = hours;
+                            dailyOT = hours * (parseFloat(payrollConfig.ot_rate) || 50);
+                            totalOTHours += dailyOTHours;
+                            totalOTPay += dailyOT;
+                        }
+                    }
                 }
 
                 dailyDetails.push({

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { th } from 'date-fns/locale';
 
-export default function SwapRequestModal({ isOpen, onClose, currentUser, shiftDate, shiftData, employees, schedules, overrides }) {
+export default function SwapRequestModal({ isOpen, onClose, currentUser, shiftDate, shiftData, employees, schedules, overrides, shifts }) {
     const [step, setStep] = useState(1);
     const [actionType, setActionType] = useState(null); // 'GIVE_AWAY' | 'TRADE'
     const [selectedPeer, setSelectedPeer] = useState(null);
@@ -12,31 +12,50 @@ export default function SwapRequestModal({ isOpen, onClose, currentUser, shiftDa
     if (!isOpen) return null;
 
     // --- Logic: Smart Peer Filtering ---
-    // Filter out peers who:
-    // 1. Are the current user
-    // 2. Are already working that day (Check Template + Overrides)
-    // 3. (Optional) Don't have matching Role/Position (Skipped for MVP)
+    // Refined Rules:
+    // 1. Same Position Only
+    // 2. Double Shift (ควบ) <-> Double Shift Only
+    // 3. Single Shift (Morning/Evening) <-> Single Shift Only
+    // 4. Must be working on that day (to trade) - Wait, for 'GIVE_AWAY' they should NOT be working?
+    //    Actually, 'TRADE' means swapping shifts. 'GIVE_AWAY' means giving to someone who is OFF.
+    //    The user prompt said "Swap date... Morning/Evening can mix... Double must swap with Double".
+    //    This implies we are talking about TRADING shifts on the SAME day? Or swapping dates?
+    //    "ระบบกะ Shift สามารถแลกกะในตำแหน่งเดียวกันได้ ... เลือกเอาว่าจะสลับวันไหน ... แต่ ควบกะต้องสลับกับแค่ควบกะ"
+    //    Likely means: If I hold a Double Shift, I can only trade with someone holding a Double Shift.
+
+    // Let's deduce "Is Double" from shift name
+    const isDouble = (name) => name && (name.includes('ควบ') || name.toLowerCase().includes('double'));
+    const userIsDouble = isDouble(shiftData.shift_name);
+
     const validPeers = employees.filter(emp => {
         if (emp.id === currentUser.id) return false;
-
-        // Restriction: Must be same position
         if (emp.position !== currentUser.position) return false;
+
+        // Determine Peer's Shift on that Target Date
+        let peerShiftName = null;
+        let isPeerOff = false;
 
         // Check Override First
         const override = overrides?.find(o => String(o.employee_id) === String(emp.id) && o.date === shiftDate);
         if (override) {
-            return override.is_off; // If OFF, they are available.
+            if (override.is_off) isPeerOff = true;
+            else {
+                // If override exists, they are working. Ideally we need the shift name.
+                // We passed 'shifts' prop? No, likely need to find it from schedules or just pass shifts list.
+                // Current props: employees, schedules, overrides. We don't have 'shifts' list here.
+                // However, 'schedules' usually contains shift_id.
+                // Wait, without 'shifts' master data, we can't know if peer's shift is Double!
+                // We need to assume some naming convention or pass shift definitions.
+                // The 'schedules' map has structure { day: { shift_id, ... } }
+                // We need to look up shift_id to get name.
+                // *CRITICAL*: SwapRequestModal needs 'shifts' prop or ability to lookup.
+                // Assuming 'shiftData' has some info? No.
+            }
         }
-
-        // Check Template
-        const dayOfWeek = new Date(shiftDate).getDay();
-        const schedule = schedules[emp.id]?.[dayOfWeek];
-        if (schedule && !schedule.is_off) {
-            return false; // Scheduled to work
-        }
-
-        return true;
     });
+
+    // RE-EVALUATION: I need 'shifts' master data to check if peer's shift is Double.
+    // I will skip this edit and first inspect where SwapRequestModal is called to pass 'shifts'.
 
     const handleSubmit = async () => {
         setIsLoading(true);

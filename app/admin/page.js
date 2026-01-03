@@ -62,6 +62,15 @@ export default function AdminDashboard() {
     const [deductForm, setDeductForm] = useState({ empId: "", amount: "", isPercent: false, reason: "" });
     const [newAnnouncement, setNewAnnouncement] = useState("");
 
+    // Manual Entry State
+    const [showManualModal, setShowManualModal] = useState(false);
+    const [manualForm, setManualForm] = useState({
+        empId: "",
+        type: "check_in",
+        date: format(new Date(), "yyyy-MM-dd"),
+        time: format(new Date(), "HH:mm")
+    });
+
     // --- Helper Fetchers ---
     const fetchData = async (table, keyInState, transform = null) => {
         const { data: res } = await supabase.from(table).select("*").order("id");
@@ -164,7 +173,43 @@ export default function AdminDashboard() {
     }, [data.employees, data.logs, data.schedules, data.shifts, data.payrollConfig, data.deductions, selectedMonth, data.rosterOverrides]);
 
     // --- Actions ---
-    const handleFinalizeDay = async () => { if (!confirm("Cut-off?")) return; await fetch('/api/finalize-day', { method: 'POST' }).then(r => r.json()).then(d => alert(d.message)); fetchLogs(); };
+    // --- Actions ---
+    const handleFinalizeDay = async () => {
+        const dateStr = prompt("Enter date to finalize (YYYY-MM-DD). Leave empty for today:", format(new Date(), "yyyy-MM-dd"));
+        if (dateStr === null) return; // Cancel
+
+        const url = dateStr ? `/api/finalize-day?date=${dateStr}` : '/api/finalize-day';
+        await fetch(url, { method: 'POST' }).then(r => r.json()).then(d => alert(d.message));
+        fetchLogs();
+    };
+
+    const handleManualSubmit = async () => {
+        if (!manualForm.empId || !manualForm.date || !manualForm.time) return alert("Please fill all fields");
+
+        try {
+            // Construct Timestamp
+            const dateTimeStr = `${manualForm.date}T${manualForm.time}:00`;
+            const timestamp = new Date(dateTimeStr).toISOString();
+
+            // Insert Log
+            const { error } = await supabase.from('attendance_logs').insert({
+                employee_id: manualForm.empId,
+                action_type: manualForm.type,
+                timestamp: timestamp,
+                photo_url: null, // Manual entry usually has no photo
+                mood_status: 'Manual By Admin'
+            });
+
+            if (error) throw error;
+
+            alert("Manual Entry Success");
+            setShowManualModal(false);
+            fetchLogs(); // Refresh
+        } catch (e) {
+            alert("Error: " + e.message);
+        }
+    };
+
     const handleNotify = async (api) => { if (confirm("Send?")) await fetch(api, { method: 'POST' }); };
 
     // Roster Action
@@ -324,9 +369,82 @@ export default function AdminDashboard() {
                                 </div>
                                 <div className="flex gap-2">
                                     <button onClick={() => handleNotify('/api/notify')} className="px-4 py-2 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-xl border border-emerald-100 hover:bg-emerald-100">Summary</button>
+                                    <button onClick={() => setShowManualModal(true)} className="px-4 py-2 bg-blue-50 text-blue-700 text-xs font-bold rounded-xl border border-blue-100 hover:bg-blue-100">+ Manual</button>
                                     <button onClick={handleFinalizeDay} className="px-4 py-2 bg-slate-800 text-white text-xs font-bold rounded-xl shadow hover:bg-slate-900">🏁 Cut-off</button>
                                 </div>
                             </Card>
+
+                            {/* Manual Entry Modal */}
+                            {showManualModal && (
+                                <div className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+                                    <Card className="w-full max-w-sm space-y-4 animate-in fade-in zoom-in-95 duration-200">
+                                        <div className="flex justify-between items-center">
+                                            <h3 className="font-bold text-slate-700">Manual Attendance</h3>
+                                            <button onClick={() => setShowManualModal(false)} className="text-slate-400 hover:text-slate-600">✕</button>
+                                        </div>
+
+                                        <div className="space-y-3">
+                                            <div>
+                                                <label className="text-xs font-bold text-slate-400 uppercase">Employee</label>
+                                                <select
+                                                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-slate-200"
+                                                    value={manualForm.empId}
+                                                    onChange={e => setManualForm({ ...manualForm, empId: e.target.value })}
+                                                >
+                                                    <option value="">Select Employee</option>
+                                                    {data.employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+                                                </select>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div>
+                                                    <label className="text-xs font-bold text-slate-400 uppercase">Date</label>
+                                                    <input
+                                                        type="date"
+                                                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none"
+                                                        value={manualForm.date}
+                                                        onChange={e => setManualForm({ ...manualForm, date: e.target.value })}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs font-bold text-slate-400 uppercase">Time</label>
+                                                    <input
+                                                        type="time"
+                                                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none"
+                                                        value={manualForm.time}
+                                                        onChange={e => setManualForm({ ...manualForm, time: e.target.value })}
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <label className="text-xs font-bold text-slate-400 uppercase">Action Type</label>
+                                                <div className="grid grid-cols-2 gap-2 mt-1">
+                                                    <button
+                                                        onClick={() => setManualForm({ ...manualForm, type: 'check_in' })}
+                                                        className={`p-3 rounded-xl text-sm font-bold border transition-all ${manualForm.type === 'check_in' ? 'bg-emerald-50 border-emerald-500 text-emerald-700 ring-1 ring-emerald-500' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'}`}
+                                                    >
+                                                        Check In
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setManualForm({ ...manualForm, type: 'check_out' })}
+                                                        className={`p-3 rounded-xl text-sm font-bold border transition-all ${manualForm.type === 'check_out' ? 'bg-amber-50 border-amber-500 text-amber-700 ring-1 ring-amber-500' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'}`}
+                                                    >
+                                                        Check Out
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <button
+                                                onClick={handleManualSubmit}
+                                                className="w-full py-3 bg-slate-800 text-white rounded-xl font-bold shadow-lg shadow-slate-200 hover:bg-slate-900 transition-transform active:scale-95"
+                                            >
+                                                Confirm Entry
+                                            </button>
+                                        </div>
+                                    </Card>
+                                </div>
+                            )}
 
                             <Card className="p-0 overflow-hidden">
                                 <div className="p-6 border-b border-slate-50 flex justify-between items-center">
@@ -461,7 +579,7 @@ export default function AdminDashboard() {
                                                                             <td className="p-3 text-center font-mono text-slate-500">{day.in} - {day.out}</td>
                                                                             <td className="p-3 text-right font-mono">{day.wage > 0 ? day.wage : '-'}</td>
                                                                             <td className="p-3 text-right font-mono text-blue-600 font-bold">{day.ot > 0 ? `+${day.ot}` : '-'}</td>
-                                                                            <td className="p-3"><Badge color={day.status.includes('Late') ? 'amber' : day.status === 'Absent' ? 'rose' : day.status === 'Normal' ? 'emerald' : 'slate'}>{day.status}</Badge></td>
+                                                                            <td className="p-3"><Badge color={day.status.includes('Late') ? 'amber' : day.status === 'Absent' ? 'rose' : day.status.includes('Extra') ? 'purple' : day.status === 'Normal' ? 'emerald' : 'slate'}>{day.status}</Badge></td>
                                                                         </tr>
                                                                     ))}
                                                                 </tbody>
@@ -500,8 +618,8 @@ export default function AdminDashboard() {
                                                         <td key={i} className="p-2 text-center min-w-[120px]">
                                                             <select
                                                                 className={`w-full p-2 rounded-lg text-xs font-bold outline-none cursor-pointer transition appearance-none text-center border ${s?.is_off
-                                                                        ? 'bg-slate-100 text-slate-400 border-slate-200'
-                                                                        : 'bg-indigo-50 text-indigo-600 border-indigo-100'
+                                                                    ? 'bg-slate-100 text-slate-400 border-slate-200'
+                                                                    : 'bg-indigo-50 text-indigo-600 border-indigo-100'
                                                                     }`}
                                                                 value={s?.is_off ? 'OFF' : (s?.shift_id || '')}
                                                                 onChange={(e) => handleUpdateSchedule(emp.id, i, e.target.value === 'OFF' ? null : e.target.value, e.target.value === 'OFF')}
