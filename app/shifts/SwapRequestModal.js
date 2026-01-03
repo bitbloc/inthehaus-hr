@@ -31,31 +31,65 @@ export default function SwapRequestModal({ isOpen, onClose, currentUser, shiftDa
         if (emp.id === currentUser.id) return false;
         if (emp.position !== currentUser.position) return false;
 
-        // Determine Peer's Shift on that Target Date
+        // Determine Peer's Shift
+        let isPeerOff = true;
+        let peerShiftDef = null;
         let peerShiftName = null;
-        let isPeerOff = false;
 
-        // Check Override First
+        // 1. Check Override
         const override = overrides?.find(o => String(o.employee_id) === String(emp.id) && o.date === shiftDate);
         if (override) {
-            if (override.is_off) isPeerOff = true;
-            else {
-                // If override exists, they are working. Ideally we need the shift name.
-                // We passed 'shifts' prop? No, likely need to find it from schedules or just pass shifts list.
-                // Current props: employees, schedules, overrides. We don't have 'shifts' list here.
-                // However, 'schedules' usually contains shift_id.
-                // Wait, without 'shifts' master data, we can't know if peer's shift is Double!
-                // We need to assume some naming convention or pass shift definitions.
-                // The 'schedules' map has structure { day: { shift_id, ... } }
-                // We need to look up shift_id to get name.
-                // *CRITICAL*: SwapRequestModal needs 'shifts' prop or ability to lookup.
-                // Assuming 'shiftData' has some info? No.
+            if (!override.is_off) {
+                isPeerOff = false;
+                peerShiftDef = shifts?.find(sh => String(sh.id) === String(override.shift_id));
+                peerShiftName = peerShiftDef?.name;
+            }
+        } else {
+            // 2. Check Template
+            const dayOfWeek = new Date(shiftDate).getDay();
+            const schedule = schedules[emp.id]?.[dayOfWeek];
+            if (schedule && !schedule.is_off) {
+                isPeerOff = false;
+                peerShiftDef = shifts?.find(sh => String(sh.id) === String(schedule.shift_id));
+                peerShiftName = peerShiftDef?.name;
             }
         }
-    });
 
-    // RE-EVALUATION: I need 'shifts' master data to check if peer's shift is Double.
-    // I will skip this edit and first inspect where SwapRequestModal is called to pass 'shifts'.
+        // Logic based on Action Type
+        if (actionType === 'GIVE_AWAY') {
+            // A. Basic: Give to someone who is OFF
+            if (isPeerOff) return true;
+
+            // B. Advanced: Give to someone Working Single (Merge to Double)
+            // Rule: Their shift must NOT overlap with mine, and they must NOT already be Double.
+            const peerIsDouble = isDouble(peerShiftName);
+            if (peerIsDouble) return false; // Prevent triple shift
+
+            if (shiftData.start_time && shiftData.end_time && peerShiftDef) {
+                const s1 = shiftData.start_time;
+                const e1 = shiftData.end_time;
+                const s2 = peerShiftDef.start_time;
+                const e2 = peerShiftDef.end_time;
+
+                // Overlap Check (String comparison works for HH:mm:ss)
+                // Overlap if (Start1 < End2) and (Start2 < End1)
+                if (s1 < e2 && s2 < e1) return false; // Overlap -> Conflict
+
+                return true; // No Overlap -> Can Merge
+            }
+            return false;
+        }
+
+        if (actionType === 'TRADE') {
+            if (isPeerOff) return false; // Trade requires swapping working days
+
+            const peerIsDouble = isDouble(peerShiftName);
+            if (userIsDouble) return peerIsDouble; // Double <-> Double
+            return !peerIsDouble; // Single <-> Single
+        }
+
+        return false;
+    });
 
     const handleSubmit = async () => {
         setIsLoading(true);
