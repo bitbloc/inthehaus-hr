@@ -454,6 +454,7 @@ export default function AdminDashboard() {
                                     <table className="w-full text-sm text-left">
                                         <thead className="bg-slate-50/50 text-slate-400 uppercase text-[10px] font-bold tracking-wider">
                                             <tr>
+                                                <th className="px-6 py-4">Date</th>
                                                 <th className="px-6 py-4">Time</th>
                                                 <th className="px-6 py-4">Photo</th>
                                                 <th className="px-6 py-4">Staff</th>
@@ -466,6 +467,7 @@ export default function AdminDashboard() {
                                                 const status = getShiftStatus(log);
                                                 return (
                                                     <tr key={log.id} className="hover:bg-slate-50/50 transition-colors">
+                                                        <td className="px-6 py-4 font-mono text-slate-500 text-xs">{formatDate(log.timestamp)}</td>
                                                         <td className="px-6 py-4 font-mono text-slate-500 text-xs">{formatTime(log.timestamp)}</td>
                                                         <td className="px-6 py-4">
                                                             {log.photo_url ? (

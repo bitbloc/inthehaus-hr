@@ -116,7 +116,7 @@ export default function CheckIn() {
       const today = new Date();
       const isToday = isSameDay(lastDate, today);
 
-      if (log.action_type === 'check_in' && !isToday) {
+      if (log.action_type === 'check_in' && !isToday && today.getHours() >= 1) {
         alert("คุณลืมลงชื่อออกเมื่อวาน ระบบจะเริ่มนับวันใหม่ให้");
         setLastAction('check_out'); // UI shows Check In
       } else {
