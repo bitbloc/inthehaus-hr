@@ -14,9 +14,9 @@ interface PomodoroModalProps {
 }
 
 const MODES = {
-    WORK: { id: 'work', label: 'Flow', minutes: 25, color: 'text-emerald-400', bg: 'bg-emerald-500' },
-    SHORT: { id: 'short', label: 'Rest', minutes: 5, color: 'text-indigo-400', bg: 'bg-indigo-500' },
-    LONG: { id: 'long', label: 'Recharge', minutes: 15, color: 'text-amber-400', bg: 'bg-amber-500' },
+    WORK: { id: 'work', label: 'โฟกัส', minutes: 25, color: 'text-emerald-400', bg: 'bg-emerald-500' },
+    SHORT: { id: 'short', label: 'พักสั้น', minutes: 5, color: 'text-indigo-400', bg: 'bg-indigo-500' },
+    LONG: { id: 'long', label: 'พักยาว', minutes: 15, color: 'text-amber-400', bg: 'bg-amber-500' },
 };
 
 export default function PomodoroModal({ isOpen, onClose, habitTitle, habitId, onComplete }: PomodoroModalProps) {
@@ -132,8 +132,8 @@ export default function PomodoroModal({ isOpen, onClose, habitTitle, habitId, on
                     {/* Header */}
                     <div className="flex justify-between items-start mb-8">
                         <div>
-                            <h2 className="text-xl font-bold text-white">{habitTitle || (timer.active ? timer.habitTitle : 'Focus Timer')}</h2>
-                            <p className="text-zinc-500 text-xs uppercase tracking-wider">{MODES[localMode].label} Mode</p>
+                            <h2 className="text-xl font-bold text-white">{habitTitle || (timer.active ? timer.habitTitle : 'ตัวจับเวลาโฟกัส')}</h2>
+                            <p className="text-zinc-500 text-xs uppercase tracking-wider">โหมด {MODES[localMode].label}</p>
                         </div>
                         <button onClick={onClose} className="p-2 hover:bg-zinc-800 rounded-full text-zinc-400">
                             <FaTimes />

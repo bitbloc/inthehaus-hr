@@ -58,7 +58,7 @@ export default function HabitHeatmap({ logs }: HabitHeatmapProps) {
                     <div
                         key={dateStr}
                         data-tooltip-id="heatmap-tooltip"
-                        data-tooltip-content={`${dateStr}: ${intensity > 0 ? 'Active' : 'Rest'}`}
+                        data-tooltip-content={`${dateStr}: ${intensity > 0 ? 'มีกิจกรรม' : 'พักผ่อน'}`}
                         className={clsx(
                             "w-full pt-[100%] relative rounded-md transition-colors duration-300",
                             getColor(intensity)

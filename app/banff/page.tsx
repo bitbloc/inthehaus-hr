@@ -6,11 +6,13 @@ import { format, subDays } from 'date-fns';
 import { supabase } from '@/lib/supabaseClient';
 import { useBanffStore } from '@/store/useBanffStore';
 import HabitGroups from './components/HabitGroups';
-import LiquidSlider from './components/LiquidSlider';
 import { getTodayDateString } from '@/utils/date';
 
 import HabitHeatmap from './components/HabitHeatmap';
-import HabitLogTable from './components/HabitLogTable';
+// import HabitLogTable from './components/HabitLogTable'; // Deprecated - Removed
+import SoulCollection from './components/SoulCollection';
+import WeeklyChart from './components/WeeklyChart';
+import HubermanFlow from './components/HubermanFlow';
 import XPBar from './components/XPBar';
 import LevelUpModal from './components/LevelUpModal';
 import { SINGLE_USER_ID } from './constants';
@@ -19,6 +21,7 @@ export default function BanffPage() {
     const { habits, todayLogs, recentLogs, todayMetrics, totalLogs, setHabits, setTodayLogs, setRecentLogs, setTodayMetrics, setTotalLogs, updateMetricOptimistic } = useBanffStore();
     const [showLevelUp, setShowLevelUp] = React.useState(false);
     const [prevLevel, setPrevLevel] = React.useState(1);
+    const [weeklyMetrics, setWeeklyMetrics] = React.useState<any[]>([]);
 
     // XP Logic
     // 1 Log = 10 XP
@@ -26,8 +29,9 @@ export default function BanffPage() {
     const XP_PER_LOG = 10;
     const currentXP = totalLogs * XP_PER_LOG;
     const currentLevel = Math.floor(currentXP / 100) + 1;
-    const nextLevelXP = currentLevel * 100; // Total XP needed for NEXT level (absolute)
-    const xpProgress = currentXP % 100; // XP within current level
+
+    // Derived XP progress
+    const xpProgress = currentXP % 100;
 
     useEffect(() => {
         if (currentLevel > prevLevel && prevLevel !== 1) {
@@ -40,24 +44,18 @@ export default function BanffPage() {
         const fetchData = async () => {
             const today = getTodayDateString();
             const last30Days = subDays(new Date(), 30).toISOString();
+            const last7Days = subDays(new Date(), 6).toISOString(); // 7 days inclusive
 
             // 1. Fetch Habits
-            // Single User Mode: No auth check needed, just fetch or use generic ID if RLS disabled/open
             const { data: habitsData } = await supabase.from('habits').select('*').eq('is_archived', false);
             if (habitsData) {
-                // Filter for today logic could be here or refined in query if we had backend logic.
-                // For now, client side filter (Simple)
-                // Note: DB `frequency_days` is int[]
-
-                const dayOfWeek = new Date().getDay(); // 0-6
                 // @ts-ignore
+                const dayOfWeek = new Date().getDay(); // 0-6
                 const todaysHabits = habitsData.filter((h: any) => {
                     if (h.frequency_days === null) return true;
-                    // @ts-ignore
                     return h.frequency_days.includes(dayOfWeek);
                 });
-
-                // @ts-ignore - type mismatch on frequency_days possibly if JSON vs Array
+                // @ts-ignore
                 setHabits(todaysHabits);
             }
 
@@ -89,20 +87,36 @@ export default function BanffPage() {
             }
 
             // 4. Fetch Metrics (Today)
-            // Use SINGLE_USER_ID or assume only one user's data exists 
             const { data: metricsData } = await supabase.from('daily_metrics').select('*').eq('date', today).maybeSingle();
             if (metricsData) {
                 setTodayMetrics(metricsData);
             } else {
-                // Initialize if empty? Or just leave null until interaction
                 setTodayMetrics({
                     id: 'temp',
                     user_id: SINGLE_USER_ID,
                     date: today,
-                    mood_score: 50,
-                    energy_score: 50,
-                    focus_score: 50
+                    mood_score: 0,
+                    energy_score: 0,
+                    focus_score: 0
                 });
+            }
+
+            // 5. Fetch Weekly Metrics for Chart
+            const { data: weeklyData } = await supabase
+                .from('daily_metrics')
+                .select('*')
+                .gte('date', last7Days)
+                .order('date', { ascending: true });
+
+            if (weeklyData) {
+                const formatted = weeklyData.map((d: any) => ({
+                    date: format(new Date(d.date), 'EEE'),
+                    mood: d.mood_score || 0,
+                    energy: d.energy_score || 0,
+                    focus: d.focus_score || 0
+                }));
+                // Fill missing days if needed? For MVP showing available.
+                setWeeklyMetrics(formatted);
             }
         };
 
@@ -111,6 +125,18 @@ export default function BanffPage() {
 
     const completedCount = Object.keys(todayLogs).length;
     const totalRaw = habits.length;
+
+    const handleHubermanUpdate = (key: string, value: number, noteObject?: any) => {
+        // Update Optimistic Store
+        updateMetricOptimistic(key as any, value);
+
+        // Also update the note separately if provided
+        // We need to extend the store or helper, but wait, updateMetricOptimistic just upserts.
+        // We can call it again for 'note'.
+        if (noteObject) {
+            updateMetricOptimistic('note', noteObject);
+        }
+    };
 
     return (
         <div className="p-6 space-y-8 min-h-screen pb-24">
@@ -123,7 +149,7 @@ export default function BanffPage() {
                     <h1 className="text-2xl font-bold bg-gradient-to-r from-emerald-400 to-teal-500 bg-clip-text text-transparent">
                         Banff.
                     </h1>
-                    <p className="text-zinc-400 text-xs tracking-wider uppercase">Quantified Self</p>
+                    <p className="text-zinc-400 text-xs tracking-wider uppercase">การพัฒนาตนเอง</p>
                 </div>
                 <div className="flex items-center gap-2">
                     <Link href="/banff/chronicle" className="p-2 bg-zinc-800/50 rounded-full hover:bg-zinc-700/50 transition-colors" title="The Chronicle">
@@ -144,28 +170,36 @@ export default function BanffPage() {
                 <p className="text-zinc-500" suppressHydrationWarning>{format(new Date(), 'MMM d, yyyy')}</p>
             </div>
 
-            {/* Recent Activity Table (Replaces Weekly Flow) */}
+            {/* Weekly Flow Chart */}
             <section className="bg-zinc-900/30 p-4 rounded-3xl border border-zinc-800/50 backdrop-blur-sm relative overflow-hidden">
                 <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-sm font-medium text-zinc-400">Recent Activity</h3>
+                    <h3 className="text-sm font-medium text-zinc-400">สถิติรายสัปดาห์</h3>
                 </div>
-                <HabitLogTable logs={recentLogs} />
+                <WeeklyChart data={weeklyMetrics} />
+            </section>
+
+            {/* Recent Souls */}
+            <section className="bg-zinc-900/30 p-4 rounded-3xl border border-zinc-800/50 backdrop-blur-sm relative overflow-hidden">
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-sm font-medium text-zinc-400">Soul ที่สะสมล่าสุด</h3>
+                </div>
+                <SoulCollection logs={recentLogs} />
             </section>
 
             {/* Habits Section */}
             <section className="space-y-4">
                 <div className="flex justify-between items-end">
-                    <h3 className="text-lg font-medium text-emerald-100/90">Today's Habits</h3>
+                    <h3 className="text-lg font-medium text-emerald-100/90">นิสัยที่ต้องทำวันนี้</h3>
                     <span className="text-xs text-emerald-500/80 font-mono bg-emerald-500/10 px-2 py-1 rounded-full">
-                        {completedCount}/{totalRaw} Completed
+                        {completedCount}/{totalRaw} สำเร็จ
                     </span>
                 </div>
 
                 <div className="space-y-6">
                     {habits.length === 0 ? (
                         <div className="text-zinc-600 text-center py-8 border border-dashed border-zinc-800 rounded-2xl">
-                            No habits for today. <br />
-                            <Link href="/banff/settings" className="text-emerald-500 underline">Add one?</Link>
+                            ไม่มีนิสัยที่ต้องทำสำหรับวันนี้ <br />
+                            <Link href="/banff/settings" className="text-emerald-500 underline">เพิ่มนิสัยใหม่?</Link>
                         </div>
                     ) : (
                         <HabitGroups habits={habits} logs={todayLogs} />
@@ -173,37 +207,17 @@ export default function BanffPage() {
                 </div>
             </section>
 
-            {/* Metrics Section */}
+            {/* Metrics Section (Huberman Flow) */}
             <section className="space-y-6 pt-4">
-                <h3 className="text-lg font-medium text-emerald-100/90">Daily Flow</h3>
-                <div className="space-y-4 bg-zinc-900/30 p-6 rounded-3xl border border-zinc-800/50 backdrop-blur-sm">
-                    <LiquidSlider
-                        label="Mood"
-                        value={todayMetrics?.mood_score ?? 50}
-                        onChange={(v) => updateMetricOptimistic('mood_score', v)}
-                        color="indigo"
-                    />
-                    <LiquidSlider
-                        label="Energy"
-                        value={todayMetrics?.energy_score ?? 50}
-                        onChange={(v) => updateMetricOptimistic('energy_score', v)}
-                        color="amber"
-                    />
-                    <LiquidSlider
-                        label="Focus"
-                        value={todayMetrics?.focus_score ?? 50}
-                        onChange={(v) => updateMetricOptimistic('focus_score', v)}
-                        color="emerald"
-                    />
-                </div>
+                <h3 className="text-lg font-medium text-emerald-100/90">กิจวัตรประจำวัน</h3>
+                <HubermanFlow metrics={todayMetrics} onUpdate={handleHubermanUpdate} />
             </section>
 
             {/* Heatmap Section */}
             <section className="pt-4">
-                <h3 className="text-lg font-medium text-emerald-100/90 mb-4">Consistency</h3>
+                <h3 className="text-lg font-medium text-emerald-100/90 mb-4">ความสม่ำเสมอ</h3>
                 <div className="bg-zinc-900/30 p-6 rounded-3xl border border-zinc-800/50">
                     <HabitHeatmap logs={recentLogs} />
-                    {/* Data fetched and passed correctly */}
                 </div>
             </section>
 
