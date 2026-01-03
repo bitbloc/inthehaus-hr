@@ -19,6 +19,17 @@ interface SoulCollectionProps {
     logs: HabitLog[];
 }
 
+const COLOR_STYLES: Record<string, string> = {
+    emerald: 'bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-emerald-500/40',
+    amber: 'bg-gradient-to-br from-amber-400 to-amber-600 shadow-amber-500/40',
+    rose: 'bg-gradient-to-br from-rose-400 to-rose-600 shadow-rose-500/40',
+    indigo: 'bg-gradient-to-br from-indigo-400 to-indigo-600 shadow-indigo-500/40',
+    sky: 'bg-gradient-to-br from-sky-400 to-sky-600 shadow-sky-500/40',
+    violet: 'bg-gradient-to-br from-violet-400 to-violet-600 shadow-violet-500/40',
+    fuchsia: 'bg-gradient-to-br from-fuchsia-400 to-fuchsia-600 shadow-fuchsia-500/40',
+    zinc: 'bg-gradient-to-br from-zinc-400 to-zinc-600 shadow-zinc-500/40',
+};
+
 export default function SoulCollection({ logs }: SoulCollectionProps) {
     const { habits, lifestyles } = useBanffStore();
 
@@ -61,6 +72,9 @@ export default function SoulCollection({ logs }: SoulCollectionProps) {
                 const IconComponent = IconMap[icon as keyof typeof IconMap] || FaIcons.FaCircle;
                 const timeLabel = log.completed_at ? format(parseISO(log.completed_at), 'HH:mm') : '';
 
+                // Fallback to zinc if color not in map
+                const colorClass = COLOR_STYLES[color] || COLOR_STYLES['zinc'];
+
                 return (
                     <div key={log.id} className="relative group">
                         {/* Orb */}
@@ -70,10 +84,9 @@ export default function SoulCollection({ logs }: SoulCollectionProps) {
                             transition={{ delay: index * 0.05, type: 'spring' }}
                             className={`
                                 w-14 h-14 rounded-full 
-                                bg-gradient-to-br from-${color}-400 to-${color}-600 
+                                ${colorClass}
                                 flex items-center justify-center
                                 shadow-[0_0_15px_rgba(0,0,0,0.3)]
-                                shadow-${color}-500/40
                                 cursor-pointer
                                 border border-white/10
                                 relative z-10
