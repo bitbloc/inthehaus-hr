@@ -5,8 +5,10 @@ import { eachDayOfInterval, subDays, format, isSameDay } from 'date-fns';
 import { clsx } from 'clsx';
 import { Tooltip } from 'react-tooltip'; // Use basic css or custom for now if not installed
 
+import { HabitLog } from '@/types/banff';
+
 interface HabitHeatmapProps {
-    logs: { date: string; count: number }[]; // Date string YYYY-MM-DD
+    logs: HabitLog[];
 }
 
 export default function HabitHeatmap({ logs }: HabitHeatmapProps) {
@@ -18,12 +20,13 @@ export default function HabitHeatmap({ logs }: HabitHeatmapProps) {
     });
 
     const getIntensity = (dateStr: string) => {
-        const log = logs.find(l => l.date === dateStr);
-        if (!log) return 0;
+        const dayLogs = logs.filter(l => l.log_date === dateStr);
+        const count = dayLogs.length;
+
         // Simple intensity: 0=none, 1=some, 2=good, 3=great
-        if (log.count >= 5) return 3;
-        if (log.count >= 3) return 2;
-        if (log.count >= 1) return 1;
+        if (count >= 5) return 3;
+        if (count >= 3) return 2;
+        if (count >= 1) return 1;
         return 0;
     };
 

@@ -6,6 +6,7 @@ interface BanffState {
     lifestyles: Lifestyle[];
     habits: Habit[];
     todayLogs: Record<string, HabitLog>; // habit_id -> log
+    recentLogs: HabitLog[]; // Last 30 days for charts/table
     totalLogs: number; // For XP
     todayMetrics: DailyMetric | null;
     selectedLifestyleId: string | null;
@@ -18,8 +19,24 @@ interface BanffState {
     deleteHabit: (id: string) => void;
     updateHabit: (habit: Habit) => void;
     setTodayLogs: (logs: HabitLog[]) => void;
+    setRecentLogs: (logs: HabitLog[]) => void;
     setTotalLogs: (count: number) => void;
     setTodayMetrics: (metrics: DailyMetric) => void;
+
+    // Timer State
+    timer: {
+        active: boolean;
+        mode: 'WORK' | 'SHORT' | 'LONG';
+        endTime: number | null; // Timestamp
+        duration: number; // Minutes
+        habitId: string | null;
+        habitTitle: string | null;
+    };
+
+    // Timer Actions
+    startTimer: (habitId: string | null, habitTitle: string | null, mode: 'WORK' | 'SHORT' | 'LONG', durationMinutes: number) => void;
+    stopTimer: () => void;
+    checkTimer: () => void; // Helper to check completion
 
     toggleHabitOptimistic: (habitId: string) => void;
     updateMetricOptimistic: (key: keyof DailyMetric, value: number | string) => void;
@@ -29,9 +46,19 @@ export const useBanffStore = create<BanffState>((set, get) => ({
     lifestyles: [],
     habits: [],
     todayLogs: {},
+    recentLogs: [],
     totalLogs: 0,
     todayMetrics: null,
     selectedLifestyleId: null,
+
+    timer: {
+        active: false,
+        mode: 'WORK',
+        endTime: null,
+        duration: 25,
+        habitId: null,
+        habitTitle: null
+    },
 
     setLifestyles: (lifestyles) => set({ lifestyles: lifestyles.map(l => ({ ...l, xp: l.xp || 0 })) }),
     setSelectedLifestyleId: (id) => set({ selectedLifestyleId: id }),
@@ -50,8 +77,32 @@ export const useBanffStore = create<BanffState>((set, get) => ({
         });
         set({ todayLogs: logMap });
     },
+    setRecentLogs: (logs) => set({ recentLogs: logs }),
     setTotalLogs: (count) => set({ totalLogs: count }),
     setTodayMetrics: (metrics) => set({ todayMetrics: metrics }),
+
+    startTimer: (habitId, habitTitle, mode, durationMinutes) => set({
+        timer: {
+            active: true,
+            mode,
+            endTime: Date.now() + durationMinutes * 60 * 1000,
+            duration: durationMinutes,
+            habitId,
+            habitTitle
+        }
+    }),
+
+    stopTimer: () => set((state) => ({
+        timer: { ...state.timer, active: false, endTime: null }
+    })),
+
+    checkTimer: () => {
+        const state = get();
+        if (state.timer.active && state.timer.endTime && Date.now() >= state.timer.endTime) {
+            set({ timer: { ...state.timer, active: false } });
+            // Sound and side effects should be handled by the listener
+        }
+    },
 
     toggleHabitOptimistic: (habitId) => set((state) => {
         const exists = !!state.todayLogs[habitId];

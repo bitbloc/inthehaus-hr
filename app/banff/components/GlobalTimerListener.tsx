@@ -1,0 +1,53 @@
+'use client';
+
+import { useEffect, useRef } from 'react';
+import { useBanffStore } from '@/store/useBanffStore';
+
+export default function GlobalTimerListener() {
+    const { timer, checkTimer } = useBanffStore();
+    const audioRef = useRef<HTMLAudioElement | null>(null);
+
+    useEffect(() => {
+        // Initialize simple beep sound or load a file
+        // For simplicity and no assets needed, we can use a generated beep or a CDN file
+        // Or better, just a simple Audio object if we have a file.
+        // I will use a simple online beep sound or handle it via AudioContext for "no assets" dependency.
+        // Actually, let's try to use a base64 Data URI for a simple bell/chime.
+    }, []);
+
+    useEffect(() => {
+        let interval: NodeJS.Timeout;
+
+        if (timer.active && timer.endTime) {
+            interval = setInterval(() => {
+                const now = Date.now();
+                if (now >= timer.endTime!) {
+                    // Timer finished
+                    checkTimer(); // This sets active to false in store
+                    playNotificationSound();
+
+                    // Optional: Show browser notification
+                    if (Notification.permission === 'granted') {
+                        new Notification("Time's up!", {
+                            body: `${timer.habitTitle || 'Focus Session'} Complete`
+                        });
+                    } else if (Notification.permission !== 'denied') {
+                        Notification.requestPermission();
+                    }
+                }
+            }, 1000);
+        }
+
+        return () => clearInterval(interval);
+    }, [timer.active, timer.endTime, checkTimer, timer.habitTitle]);
+
+    const playNotificationSound = () => {
+        // Simple chime
+        const audio = new Audio('https://commondatastorage.googleapis.com/codeskulptor-assets/week7-brrring.m4a'); // Example or use local
+        // Fallback to simple context oscillator if needed, but let's stick to simple for now. 
+        // We can also use a base64 string to avoid external deps.
+        audio.play().catch(e => console.log("Audio play failed (interaction needed first?)", e));
+    };
+
+    return null; // Invisible component
+}

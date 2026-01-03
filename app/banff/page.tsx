@@ -1,8 +1,8 @@
 'use client';
 import Link from 'next/link';
 import React, { useEffect } from 'react';
-import { FaCog, FaUserCircle, FaBook } from 'react-icons/fa';
-import { format } from 'date-fns';
+import { FaCog, FaBook } from 'react-icons/fa';
+import { format, subDays } from 'date-fns';
 import { supabase } from '@/lib/supabaseClient';
 import { useBanffStore } from '@/store/useBanffStore';
 import HabitGroups from './components/HabitGroups';
@@ -10,13 +10,13 @@ import LiquidSlider from './components/LiquidSlider';
 import { getTodayDateString } from '@/utils/date';
 
 import HabitHeatmap from './components/HabitHeatmap';
-import WeeklyChart from './components/WeeklyChart';
+import HabitLogTable from './components/HabitLogTable';
 import XPBar from './components/XPBar';
 import LevelUpModal from './components/LevelUpModal';
 import { SINGLE_USER_ID } from './constants';
 
 export default function BanffPage() {
-    const { habits, todayLogs, todayMetrics, totalLogs, setHabits, setTodayLogs, setTodayMetrics, setTotalLogs, updateMetricOptimistic } = useBanffStore();
+    const { habits, todayLogs, recentLogs, todayMetrics, totalLogs, setHabits, setTodayLogs, setRecentLogs, setTodayMetrics, setTotalLogs, updateMetricOptimistic } = useBanffStore();
     const [showLevelUp, setShowLevelUp] = React.useState(false);
     const [prevLevel, setPrevLevel] = React.useState(1);
 
@@ -39,7 +39,7 @@ export default function BanffPage() {
     useEffect(() => {
         const fetchData = async () => {
             const today = getTodayDateString();
-            // const user = (await supabase.auth.getUser()).data.user;
+            const last30Days = subDays(new Date(), 30).toISOString();
 
             // 1. Fetch Habits
             // Single User Mode: No auth check needed, just fetch or use generic ID if RLS disabled/open
@@ -51,7 +51,7 @@ export default function BanffPage() {
 
                 const dayOfWeek = new Date().getDay(); // 0-6
                 // @ts-ignore
-                const todaysHabits = habitsData.filter(h => {
+                const todaysHabits = habitsData.filter((h: any) => {
                     if (h.frequency_days === null) return true;
                     // @ts-ignore
                     return h.frequency_days.includes(dayOfWeek);
@@ -72,11 +72,20 @@ export default function BanffPage() {
             const { count } = await supabase.from('habit_logs').select('*', { count: 'exact', head: true });
             if (count !== null) setTotalLogs(count);
 
-            // 3. Fetch Today's Logs
-            const { data: logsData } = await supabase.from('habit_logs').select('*').eq('log_date', today);
+            // 3. Fetch Recent Logs (Last 30 Days)
+            const { data: logsData } = await supabase
+                .from('habit_logs')
+                .select('*')
+                .gte('log_date', last30Days)
+                .order('completed_at', { ascending: false });
+
             if (logsData) {
                 // @ts-ignore
-                setTodayLogs(logsData);
+                setRecentLogs(logsData);
+                // Filter for today
+                // @ts-ignore
+                const todayOnly = logsData.filter((l: any) => l.log_date === today);
+                setTodayLogs(todayOnly);
             }
 
             // 4. Fetch Metrics (Today)
@@ -98,7 +107,7 @@ export default function BanffPage() {
         };
 
         fetchData();
-    }, [setHabits, setTodayLogs, setTodayMetrics, setTotalLogs]);
+    }, [setHabits, setTodayLogs, setRecentLogs, setTodayMetrics, setTotalLogs]);
 
     const completedCount = Object.keys(todayLogs).length;
     const totalRaw = habits.length;
@@ -135,13 +144,12 @@ export default function BanffPage() {
                 <p className="text-zinc-500" suppressHydrationWarning>{format(new Date(), 'MMM d, yyyy')}</p>
             </div>
 
-            {/* Weekly Visuals (Morphing) */}
+            {/* Recent Activity Table (Replaces Weekly Flow) */}
             <section className="bg-zinc-900/30 p-4 rounded-3xl border border-zinc-800/50 backdrop-blur-sm relative overflow-hidden">
                 <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-sm font-medium text-zinc-400">Weekly Flow</h3>
+                    <h3 className="text-sm font-medium text-zinc-400">Recent Activity</h3>
                 </div>
-                <WeeklyChart data={[]} />
-                {/* Pass empty data for now, or fetch historical metrics */}
+                <HabitLogTable logs={recentLogs} />
             </section>
 
             {/* Habits Section */}
@@ -194,8 +202,8 @@ export default function BanffPage() {
             <section className="pt-4">
                 <h3 className="text-lg font-medium text-emerald-100/90 mb-4">Consistency</h3>
                 <div className="bg-zinc-900/30 p-6 rounded-3xl border border-zinc-800/50">
-                    <HabitHeatmap logs={[]} />
-                    {/* Needs data fetching logic */}
+                    <HabitHeatmap logs={recentLogs} />
+                    {/* Data fetched and passed correctly */}
                 </div>
             </section>
 
