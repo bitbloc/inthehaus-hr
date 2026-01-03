@@ -88,13 +88,16 @@ export default function BanffPage() {
             }
 
             // 4. Fetch Metrics (Today)
+            const { data: authData } = await supabase.auth.getUser();
+            const userId = authData?.user?.id || SINGLE_USER_ID;
+
             const { data: metricsData } = await supabase.from('daily_metrics').select('*').eq('date', today).maybeSingle();
             if (metricsData) {
                 setTodayMetrics(metricsData);
             } else {
                 setTodayMetrics({
                     id: 'temp',
-                    user_id: SINGLE_USER_ID,
+                    user_id: userId,
                     date: today,
                     mood_score: 0,
                     energy_score: 0,

@@ -245,11 +245,15 @@ import { supabase } from '@/lib/supabaseClient';
 import { debounce } from '@/utils/debounce';
 
 const saveMetricsToDb = debounce(async (metrics: DailyMetric) => {
+    // Get real user ID to ensure RLS passes
+    const { data: { user } } = await supabase.auth.getUser();
+    const finalUserId = user?.id || metrics.user_id;
+
     // Upsert to handle both insert and update
     const { error } = await supabase
         .from('daily_metrics')
         .upsert({
-            user_id: metrics.user_id,
+            user_id: finalUserId,
             date: metrics.date,
             mood_score: metrics.mood_score,
             energy_score: metrics.energy_score,
