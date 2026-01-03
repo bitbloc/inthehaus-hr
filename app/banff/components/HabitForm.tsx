@@ -6,11 +6,14 @@ import { supabase } from '@/lib/supabaseClient';
 import DaySelector from './DaySelector';
 import { useBanffStore } from '@/store/useBanffStore';
 import { SINGLE_USER_ID } from '../constants';
+import { FaWallet } from 'react-icons/fa';
 
 export default function HabitForm() {
     const [name, setName] = useState('');
     const [frequencyDays, setFrequencyDays] = useState<number[] | null>(null);
     const [lifestyleId, setLifestyleId] = useState<string>('');
+    const [moneyValue, setMoneyValue] = useState<number>(0);
+    const [isSaver, setIsSaver] = useState<boolean>(false);
     const [loading, setLoading] = useState(false);
 
     const addHabitToStore = useBanffStore((state) => state.addHabit);
@@ -30,7 +33,9 @@ export default function HabitForm() {
                 user_id: SINGLE_USER_ID,
                 title: name,
                 frequency_days: frequencyDays, // null or array
-                lifestyle_id: lifestyleId || null
+                lifestyle_id: lifestyleId || null,
+                money_value: moneyValue,
+                is_saver: isSaver
             };
 
             const { data, error } = await supabase
@@ -51,6 +56,8 @@ export default function HabitForm() {
             setName('');
             setFrequencyDays(null);
             setLifestyleId('');
+            setMoneyValue(0);
+            setIsSaver(false);
 
             // Success visual (Fly animation could be handled by parent or toast)
             alert("Habit Added!");
@@ -74,6 +81,38 @@ export default function HabitForm() {
                     placeholder="e.g. Read 10 pages"
                     className="w-full bg-transparent border-b border-zinc-700 py-2 text-xl text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500 transition-colors"
                 />
+            </div>
+
+            {/* Virtue Vault Config */}
+            <div className="bg-zinc-950/50 p-4 rounded-xl border border-zinc-800/50 space-y-4">
+                <div className="flex items-center gap-2 mb-2">
+                    <FaWallet className="text-emerald-500" />
+                    <span className="text-sm font-bold text-zinc-300">Virtue Vault Config</span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                        <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold">Value (THB)</label>
+                        <input
+                            type="number"
+                            value={moneyValue}
+                            onChange={(e) => setMoneyValue(parseInt(e.target.value) || 0)}
+                            className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white focus:border-emerald-500 focus:outline-none"
+                            placeholder="0"
+                        />
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold">Type</label>
+                        <select
+                            value={isSaver ? 'saver' : 'earner'}
+                            onChange={(e) => setIsSaver(e.target.value === 'saver')}
+                            className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white focus:border-emerald-500 focus:outline-none"
+                        >
+                            <option value="earner">Earner (Action)</option>
+                            <option value="saver">Saver (Abstinence)</option>
+                        </select>
+                    </div>
+                </div>
             </div>
 
             {/* Lifestyle Selection */}

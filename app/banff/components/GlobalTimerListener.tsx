@@ -42,11 +42,29 @@ export default function GlobalTimerListener() {
     }, [timer.active, timer.endTime, checkTimer, timer.habitTitle]);
 
     const playNotificationSound = () => {
-        // Simple chime
-        const audio = new Audio('https://commondatastorage.googleapis.com/codeskulptor-assets/week7-brrring.m4a'); // Example or use local
-        // Fallback to simple context oscillator if needed, but let's stick to simple for now. 
-        // We can also use a base64 string to avoid external deps.
-        audio.play().catch(e => console.log("Audio play failed (interaction needed first?)", e));
+        try {
+            const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+            if (!AudioContext) return;
+
+            const ctx = new AudioContext();
+            const oscillator = ctx.createOscillator();
+            const gainNode = ctx.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(ctx.destination);
+
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(880, ctx.currentTime); // A5
+            oscillator.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.5); // Drop to A4
+
+            gainNode.gain.setValueAtTime(0.5, ctx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+
+            oscillator.start(ctx.currentTime);
+            oscillator.stop(ctx.currentTime + 0.5);
+        } catch (e) {
+            console.error("Audio beep failed", e);
+        }
     };
 
     return null; // Invisible component

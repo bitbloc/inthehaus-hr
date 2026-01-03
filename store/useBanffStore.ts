@@ -38,6 +38,12 @@ interface BanffState {
     stopTimer: () => void;
     checkTimer: () => void; // Helper to check completion
 
+    // Vault State
+    vaultTransactions: any[]; // VaultTransaction[]
+    vaultBalance: number;
+    setVaultTransactions: (txs: any[]) => void;
+    redeemVault: (amount: number, description: string) => Promise<void>;
+
     toggleHabitOptimistic: (habitId: string) => void;
     updateMetricOptimistic: (key: keyof DailyMetric, value: number | string) => void;
 }
@@ -50,6 +56,10 @@ export const useBanffStore = create<BanffState>((set, get) => ({
     totalLogs: 0,
     todayMetrics: null,
     selectedLifestyleId: null,
+
+    // Vault
+    vaultTransactions: [],
+    vaultBalance: 0,
 
     timer: {
         active: false,
@@ -76,10 +86,41 @@ export const useBanffStore = create<BanffState>((set, get) => ({
             logMap[log.habit_id] = log;
         });
         set({ todayLogs: logMap });
+        // Recalculate balance potentially? 
+        // For MVP, page.tsx calculates initial balance. Here we just maintain generic state updates.
     },
     setRecentLogs: (logs) => set({ recentLogs: logs }),
     setTotalLogs: (count) => set({ totalLogs: count }),
     setTodayMetrics: (metrics) => set({ todayMetrics: metrics }),
+
+    setVaultTransactions: (txs) => set({ vaultTransactions: txs }),
+
+    redeemVault: async (amount, description) => {
+        // Optimistic
+        set(state => ({
+            vaultTransactions: [{
+                id: 'opt-' + Date.now(),
+                amount: -amount,
+                type: 'REDEEM',
+                description,
+                created_at: new Date().toISOString()
+            } as any, ...state.vaultTransactions],
+            vaultBalance: state.vaultBalance - amount
+        }));
+
+        // DB Insert
+        const { error } = await supabase.from('vault_transactions').insert({
+            user_id: (await supabase.auth.getUser()).data.user?.id || '00000000-0000-0000-0000-000000000001',
+            amount: -amount,
+            type: 'REDEEM',
+            description
+        });
+
+        if (error) {
+            console.error("Redeem failed", error);
+            // Revert? For MVP, just log.
+        }
+    },
 
     startTimer: (habitId, habitTitle, mode, durationMinutes) => set({
         timer: {
@@ -110,30 +151,39 @@ export const useBanffStore = create<BanffState>((set, get) => ({
         const habit = state.habits.find(h => h.id === habitId);
         let newLifestyles = [...state.lifestyles];
         let newTotalLogs = state.totalLogs;
+        let newBalance = state.vaultBalance;
 
         if (exists) {
             // UNDO: Remove log
+            const logToRemove = newLogs[habitId];
             delete newLogs[habitId];
             newTotalLogs = Math.max(0, newTotalLogs - 1);
 
-            // Decrement XP if habit belongs to a lifestyle
+            // Decrement XP
             if (habit && habit.lifestyle_id) {
                 newLifestyles = newLifestyles.map(l =>
                     l.id === habit.lifestyle_id ? { ...l, xp: Math.max(0, (l.xp || 0) - 10) } : l
                 );
-                // Also trigger DB update for XP decrement (async)
                 updateLifestyleXP(habit.lifestyle_id, -10);
             }
+
+            // Decrement Money (Refund)
+            // We use the recorded earned_value if available, else habit value
+            const refundValue = logToRemove.earned_value || (habit?.money_value || 0);
+            newBalance -= refundValue;
+
             // Trigger DB delete log
             deleteLogFromDb(state.todayLogs[habitId].id);
 
         } else {
             // DO: Add log
-            const newLog = {
+            const earnedValue = habit?.money_value || 0;
+            const newLog: HabitLog = {
                 id: 'optimistic-' + Math.random(),
                 habit_id: habitId,
                 log_date: getTodayDateString(),
-                completed_at: new Date().toISOString()
+                completed_at: new Date().toISOString(),
+                earned_value: earnedValue
             };
             newLogs[habitId] = newLog;
             newTotalLogs += 1;
@@ -143,21 +193,24 @@ export const useBanffStore = create<BanffState>((set, get) => ({
                 newLifestyles = newLifestyles.map(l =>
                     l.id === habit.lifestyle_id ? { ...l, xp: (l.xp || 0) + 10 } : l
                 );
-                // Also trigger DB update for XP increment (async)
                 updateLifestyleXP(habit.lifestyle_id, 10);
             }
+
+            // Increment Money
+            newBalance += earnedValue;
+
             // Trigger DB insert log
-            insertLogToDb(newLog.habit_id);
+            insertLogToDb(newLog.habit_id, earnedValue);
         }
 
-        return { todayLogs: newLogs, lifestyles: newLifestyles, totalLogs: newTotalLogs };
+        return { todayLogs: newLogs, lifestyles: newLifestyles, totalLogs: newTotalLogs, vaultBalance: newBalance };
     }),
 
     updateMetricOptimistic: (key, value) => {
         set((state) => {
             const currentMetrics = state.todayMetrics || {
                 id: 'temp',
-                user_id: '00000000-0000-0000-0000-000000000001', // Fallback SINGLE_USER_ID if null, but should be set by init
+                user_id: '00000000-0000-0000-0000-000000000001', // Fallback SINGLE_USER_ID
                 date: getTodayDateString(),
                 mood_score: 50,
                 energy_score: 50,
@@ -176,12 +229,6 @@ export const useBanffStore = create<BanffState>((set, get) => ({
 
 // Helper to update XP in DB
 const updateLifestyleXP = async (lifestyleId: string, amount: number) => {
-    // We need to fetch current first to be safe or use an RPC. 
-    // For MVP/Single User, we can just assume the client state is roughly correct 
-    // BUT strictly, we should increment in DB. 
-    // Supabase doesn't have an atomic increment via simple client SDK update easily without RPC.
-    // So we fetch, then update.
-
     try {
         const { data: current } = await supabase.from('lifestyles').select('xp').eq('id', lifestyleId).single();
         if (current) {
@@ -199,7 +246,6 @@ import { debounce } from '@/utils/debounce';
 
 const saveMetricsToDb = debounce(async (metrics: DailyMetric) => {
     // Upsert to handle both insert and update
-    // Requires database to have unique constraint on (user_id, date)
     const { error } = await supabase
         .from('daily_metrics')
         .upsert({
@@ -207,33 +253,26 @@ const saveMetricsToDb = debounce(async (metrics: DailyMetric) => {
             date: metrics.date,
             mood_score: metrics.mood_score,
             energy_score: metrics.energy_score,
-            focus_score: metrics.focus_score
-        }, { onConflict: 'user_id, date' }); // Supabase syntax might vary slightly based on client version but usually 'user_id, date' string works if constraint exists
+            focus_score: metrics.focus_score,
+            note: metrics.note
+        }, { onConflict: 'user_id, date' });
 
     if (error) console.error("Auto-save metrics failed:", error);
 }, 1000);
 
-const insertLogToDb = async (habitId: string) => {
+const insertLogToDb = async (habitId: string, earnedValue: number) => {
     const { error } = await supabase.from('habit_logs').insert({
         habit_id: habitId,
         user_id: (await supabase.auth.getUser()).data.user?.id || '00000000-0000-0000-0000-000000000001', // Fallback
         log_date: getTodayDateString(),
+        earned_value: earnedValue
     });
     if (error) console.error("Failed to insert log", error);
 };
 
 const deleteLogFromDb = async (logId: string) => {
-    // If optimistic ID (starts with 'optimistic-'), we can't delete by ID easily unless we tracked the real ID return.
-    // But since we use (habit_id, log_date) unique constraint usually, we can delete by that.
-    // However, if the store had a real ID (fetched from DB), we use that. 
-    // If it was optimistic, we might fail if we try to delete 'optimistic-...'
-    // Strategy: Delete by habit_id + date for safety in single-user logic
-
-    // Check if ID is likely real (UUID)
     if (logId.startsWith('optimistic')) {
-        // We can't delete by ID.
         console.warn("Skipping delete of optimistic ID, reliance on refresh or implementation needed.");
-        // Actually, we should probably delete by (habit_id, date)
         return;
     }
 

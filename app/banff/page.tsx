@@ -14,6 +14,7 @@ import SoulCollection from './components/SoulCollection';
 import WeeklyChart from './components/WeeklyChart';
 import HubermanFlow from './components/HubermanFlow';
 import XPBar from './components/XPBar';
+import VaultWidget from './components/VaultWidget';
 import LevelUpModal from './components/LevelUpModal';
 import { SINGLE_USER_ID } from './constants';
 
@@ -115,12 +116,32 @@ export default function BanffPage() {
                     energy: d.energy_score || 0,
                     focus: d.focus_score || 0
                 }));
-                // Fill missing days if needed? For MVP showing available.
                 setWeeklyMetrics(formatted);
+            }
+
+            // 6. Calculate Vault Balance
+            // Fetch all logs with earned_value > 0 (or all to be safe) - strictly we need sum.
+            // For MVP we might just fetch 'earned_value' column for all logs?
+            // If user has 10k logs, this is heavy. 
+            // Alternative: RPC 'get_vault_balance'. But we can't create RPC easily.
+            // Let's try fetching just the column.
+            const { data: allLogsValue } = await supabase.from('habit_logs').select('earned_value');
+            const { data: allTxs } = await supabase.from('vault_transactions').select('*');
+
+            if (allLogsValue && allTxs) {
+                const logsSum = allLogsValue.reduce((sum, l: any) => sum + (l.earned_value || 0), 0);
+                const txsSum = allTxs.reduce((sum, t: any) => sum + (t.amount || 0), 0);
+
+                useBanffStore.setState({
+                    vaultBalance: logsSum + txsSum,
+                    vaultTransactions: allTxs
+                });
             }
         };
 
         fetchData();
+
+        // Subscribe to changes? For now, refresh on focus or rely on optimistic.
     }, [setHabits, setTodayLogs, setRecentLogs, setTodayMetrics, setTotalLogs]);
 
     const completedCount = Object.keys(todayLogs).length;
@@ -130,9 +151,6 @@ export default function BanffPage() {
         // Update Optimistic Store
         updateMetricOptimistic(key as any, value);
 
-        // Also update the note separately if provided
-        // We need to extend the store or helper, but wait, updateMetricOptimistic just upserts.
-        // We can call it again for 'note'.
         if (noteObject) {
             updateMetricOptimistic('note', noteObject);
         }
@@ -163,6 +181,11 @@ export default function BanffPage() {
 
             {/* XP Bar */}
             <XPBar currentXP={xpProgress} level={currentLevel} nextLevelXP={100} />
+
+            {/* Vault Widget */}
+            <div className="pt-2">
+                <VaultWidget />
+            </div>
 
             {/* Date Display */}
             <div className="space-y-1">

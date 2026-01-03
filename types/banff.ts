@@ -18,6 +18,9 @@ export interface Habit {
     current_streak: number;
     max_streak: number;
     is_archived: boolean;
+    // Virtue Vault
+    money_value: number; // Value in THB
+    is_saver: boolean; // true = Saver (Abstinence), false = Earner (Action)
 }
 
 export interface HabitLog {
@@ -25,6 +28,16 @@ export interface HabitLog {
     habit_id: string;
     log_date: string; // YYYY-MM-DD
     completed_at: string;
+    earned_value?: number; // Snapshot of value earned
+}
+
+export interface VaultTransaction {
+    id: string;
+    user_id: string;
+    amount: number;
+    type: 'REDEEM' | 'PENALTY' | 'ADJUSTMENT';
+    description: string;
+    created_at: string;
 }
 
 export interface DailyMetric {

@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaTimes, FaSave } from 'react-icons/fa';
+import { FaTimes, FaSave, FaWallet } from 'react-icons/fa';
 import { supabase } from '@/lib/supabaseClient';
 import { useBanffStore } from '@/store/useBanffStore';
 import { Habit } from '@/types/banff';
@@ -18,6 +18,8 @@ export default function HabitEditModal({ habit, isOpen, onClose }: HabitEditModa
     const [title, setTitle] = useState(habit.title);
     const [frequencyDays, setFrequencyDays] = useState<number[] | null>(habit.frequency_days);
     const [lifestyleId, setLifestyleId] = useState<string>(habit.lifestyle_id || '');
+    const [moneyValue, setMoneyValue] = useState<number>(habit.money_value || 0);
+    const [isSaver, setIsSaver] = useState<boolean>(habit.is_saver || false);
     const [loading, setLoading] = useState(false);
 
     const updateHabitInStore = useBanffStore(state => state.updateHabit);
@@ -31,7 +33,9 @@ export default function HabitEditModal({ habit, isOpen, onClose }: HabitEditModa
             const updates = {
                 title,
                 frequency_days: frequencyDays,
-                lifestyle_id: lifestyleId || null
+                lifestyle_id: lifestyleId || null,
+                money_value: moneyValue,
+                is_saver: isSaver
             };
 
             const { error } = await supabase
@@ -122,6 +126,41 @@ export default function HabitEditModal({ habit, isOpen, onClose }: HabitEditModa
                             <DaySelector selectedDays={frequencyDays} onChange={setFrequencyDays} />
                             <p className="text-xs text-zinc-600 text-center pt-2">
                                 {frequencyDays === null ? "Every Day" : "Specific Days"}
+                            </p>
+                        </div>
+
+                        {/* Virtue Vault Config */}
+                        <div className="bg-zinc-950/50 p-4 rounded-xl border border-zinc-800/50 space-y-4">
+                            <div className="flex items-center gap-2 mb-2">
+                                <FaWallet className="text-emerald-500" />
+                                <span className="text-sm font-bold text-zinc-300">Virtue Vault</span>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold">Value (THB)</label>
+                                    <input
+                                        type="number"
+                                        value={moneyValue}
+                                        onChange={(e) => setMoneyValue(parseInt(e.target.value) || 0)}
+                                        className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white focus:border-emerald-500 focus:outline-none"
+                                        placeholder="0"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold">Type</label>
+                                    <select
+                                        value={isSaver ? 'saver' : 'earner'}
+                                        onChange={(e) => setIsSaver(e.target.value === 'saver')}
+                                        className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white focus:border-emerald-500 focus:outline-none"
+                                    >
+                                        <option value="earner">Earner (Action)</option>
+                                        <option value="saver">Saver (Abstinence)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <p className="text-[10px] text-zinc-500">
+                                {isSaver ? "Earn for NOT doing something (e.g. No Alcohol)." : "Earn for DOING something (e.g. Run 5km)."}
                             </p>
                         </div>
 

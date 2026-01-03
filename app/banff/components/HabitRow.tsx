@@ -145,6 +145,23 @@ export default function HabitRow({ habit, log, color }: HabitRowProps) {
                             </motion.div>
                         </div>
 
+                        {/* Money Float Animation */}
+                        <AnimatePresence>
+                            {isCompleted && habit.money_value && habit.money_value > 0 && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: 10, scale: 0.5 }}
+                                    animate={{ opacity: 1, y: -20, scale: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    transition={{ duration: 0.8, ease: "easeOut" }}
+                                    className="absolute left-4 top-0 -mt-2 z-50 pointer-events-none"
+                                >
+                                    <span className="text-emerald-400 font-bold font-mono text-lg drop-shadow-md">
+                                        +฿{habit.money_value}
+                                    </span>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+
                         <div className="flex flex-col">
                             <span className={`text-base font-medium transition-all duration-300 ${isCompleted ? `text-${baseColor}-100/70 line-through decoration-${baseColor}-500/50` : 'text-zinc-100 group-hover:text-white'}`}>
                                 {habit.title}
