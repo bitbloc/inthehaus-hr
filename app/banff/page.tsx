@@ -10,6 +10,7 @@ import { getTodayDateString } from '@/utils/date';
 
 import HabitHeatmap from './components/HabitHeatmap';
 // import HabitLogTable from './components/HabitLogTable'; // Deprecated - Removed
+import TopActivitiesTable from './components/TopActivitiesTable';
 import SoulCollection from './components/SoulCollection';
 import WeeklyChart from './components/WeeklyChart';
 import HubermanFlow from './components/HubermanFlow';
@@ -209,7 +210,8 @@ export default function BanffPage() {
                 <div className="flex justify-between items-center mb-4">
                     <h3 className="text-sm font-medium text-zinc-400">Soul ที่สะสมล่าสุด</h3>
                 </div>
-                <SoulCollection logs={recentLogs} />
+                {/* Top Activities Table (Replaces SoulCollection) */}
+                <TopActivitiesTable logs={recentLogs} habits={habits} lifestyles={useBanffStore.getState().lifestyles} />
             </section>
 
             {/* Habits Section */}
