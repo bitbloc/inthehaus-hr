@@ -49,11 +49,14 @@ export default function HubermanFlow({ metrics, onUpdate }: HubermanFlowProps) {
         if (metrics?.note && metrics.note.startsWith('{')) {
             try {
                 const parsed = JSON.parse(metrics.note);
-                // Only update if different to avoid loop? 
-                // Actually simpler: we trust local state after init. 
+                if (parsed.checklist && Array.isArray(parsed.checklist)) {
+                    // Only update if we have a mismatch to avoid overwriting work in progress?
+                    // Ideally we just set it.
+                    setCheckedItems(parsed.checklist);
+                }
             } catch (e) { }
         }
-    }, [metrics?.id]); // Only on new metric load
+    }, [metrics?.note]); // React to note changes
 
     const calculateScore = (category: 'MOOD' | 'ENERGY' | 'FOCUS', currentChecked: string[]) => {
         const items = PROTOCOLS[category];
@@ -151,7 +154,7 @@ export default function HubermanFlow({ metrics, onUpdate }: HubermanFlowProps) {
                                                     </div>
 
                                                     <div className="flex-1">
-                                                        <span className={`text-sm ${isChecked ? 'text-white' : 'text-zinc-400'}`}>{item.label}</span>
+                                                        <span className={`text-sm ${isChecked ? 'text-zinc-400 line-through opacity-70' : 'text-zinc-300'}`}>{item.label}</span>
                                                     </div>
 
                                                     <Icon className={`text-lg ${isChecked ? `text-${cat.color}-400` : 'text-zinc-600'}`} />
