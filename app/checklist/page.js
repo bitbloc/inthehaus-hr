@@ -16,6 +16,8 @@ export default function ChecklistPage() {
     const [error, setError] = useState(null);
     const [filter, setFilter] = useState('All'); // 'All', 'Opening', 'Closing'
     const [selectedImage, setSelectedImage] = useState(null); // For lightbox
+    const [availableMonths, setAvailableMonths] = useState([]);
+    const [selectedMonth, setSelectedMonth] = useState('');
 
     const SHEET_URL = "https://docs.google.com/spreadsheets/d/1AJVcXjwuzlm5U_UPD91wWPKz76jTRrW2VPsL22MR9CU/export?format=csv";
 
@@ -93,6 +95,23 @@ export default function ChecklistPage() {
                 };
             });
 
+            // Extract available months
+            const months = [...new Set(processedData
+                .filter(item => isValid(item.timestamp))
+                .map(item => format(item.timestamp, 'MMMM yyyy'))
+            )];
+            setAvailableMonths(months);
+
+            // Default to current month if not set
+            if (!selectedMonth && months.length > 0) {
+                const currentMonth = format(new Date(), 'MMMM yyyy');
+                if (months.includes(currentMonth)) {
+                    setSelectedMonth(currentMonth);
+                } else {
+                    setSelectedMonth(months[0]);
+                }
+            }
+
             setData(processedData);
         } catch (err) {
             console.error(err);
@@ -164,6 +183,11 @@ export default function ChecklistPage() {
     // Filter and Sort Logic
     const filteredData = data
         .filter(item => {
+            // Month Filter
+            if (selectedMonth && isValid(item.timestamp)) {
+                if (format(item.timestamp, 'MMMM yyyy') !== selectedMonth) return false;
+            }
+
             if (filter === 'All') return true;
             return item.type === filter;
         })
@@ -177,7 +201,25 @@ export default function ChecklistPage() {
                     <p className="text-muted-foreground">Store opening and closing records</p>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col md:flex-row items-center gap-2">
+                    {/* Month Selector */}
+                    {availableMonths.length > 0 && (
+                        <div className="relative">
+                            <select
+                                value={selectedMonth}
+                                onChange={(e) => setSelectedMonth(e.target.value)}
+                                className="appearance-none pl-4 pr-10 py-2 rounded-xl bg-white border border-border text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm cursor-pointer hover:bg-zinc-50 transition-colors"
+                            >
+                                {availableMonths.map(month => (
+                                    <option key={month} value={month}>{month}</option>
+                                ))}
+                            </select>
+                            <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-zinc-500">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Filter Tabs */}
                     <div className="flex p-1 bg-muted rounded-xl">
                         {['All', 'Opening', 'Closing'].map((f) => (
