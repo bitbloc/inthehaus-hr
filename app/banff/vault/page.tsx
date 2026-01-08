@@ -90,6 +90,14 @@ export default function VaultPage() {
             description: manualDesc || (manualType === 'SPEND' ? 'Manual Spend' : 'Manual Deposit')
         }).select().single();
 
+        console.log('Manual Transaction Result:', { data, error, userId });
+
+        if (error) {
+            console.error("Transaction Error:", error);
+            alert(`Error: ${error.message || error.details || 'Unknown error'}`);
+            return;
+        }
+
         if (data) {
             // Update local store
             useBanffStore.setState(state => ({
