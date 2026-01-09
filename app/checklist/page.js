@@ -123,20 +123,33 @@ export default function ChecklistPage() {
 
     const parseThaiDate = (dateStr) => {
         if (!dateStr) return new Date();
-        const str = String(dateStr);
+        const str = String(dateStr).trim();
         let date;
 
-        // Google sheets formats: "25/11/2025, 14:12:50"
-        const parts = str.match(/(\d+)\/(\d+)\/(\d+), (\d+):(\d+):(\d+)/);
-        if (parts) {
-            const day = parts[1].padStart(2, '0');
-            const month = parts[2].padStart(2, '0');
-            const year = parts[3];
-            const hour = parts[4].padStart(2, '0');
-            const minute = parts[5].padStart(2, '0');
-            const second = parts[6].padStart(2, '0');
+        // Enforce d/m/y parsing for Google Sheet exports
+        // Matches start with d/m/y (allowing 1 or 2 digits)
+        const dateMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+
+        if (dateMatch) {
+            const day = dateMatch[1].padStart(2, '0');
+            const month = dateMatch[2].padStart(2, '0');
+            const year = dateMatch[3];
+
+            let hour = '00';
+            let minute = '00';
+            let second = '00';
+
+            // Look for time component anywhere in the string
+            const timeMatch = str.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+            if (timeMatch) {
+                hour = timeMatch[1].padStart(2, '0');
+                minute = timeMatch[2].padStart(2, '0');
+                if (timeMatch[3]) second = timeMatch[3].padStart(2, '0');
+            }
+
             date = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}`);
         } else {
+            // Fallback for standard ISO or other formats
             date = new Date(dateStr);
         }
 
