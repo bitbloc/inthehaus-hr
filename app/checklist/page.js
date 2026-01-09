@@ -130,8 +130,17 @@ export default function ChecklistPage() {
 
             const processedData = jsonData.map((row, index) => {
                 // Helper: Find value flexibly based on config
-                const findVal = (keyConfig) => {
-                    const possibleKeys = COLUMN_MAP[keyConfig];
+                const findVal = (keyOrList) => {
+                    let possibleKeys = keyOrList;
+
+                    // If string (key name), lookup in map. If array (legacy call), use directly.
+                    if (typeof keyOrList === 'string') {
+                        possibleKeys = COLUMN_MAP[keyOrList];
+                    }
+
+                    // Safety check
+                    if (!possibleKeys || !Array.isArray(possibleKeys)) return undefined;
+
                     for (const key of possibleKeys) {
                         // Case-insensitive match for robustness
                         const actualKey = Object.keys(row).find(k => k.trim().toLowerCase() === key.toLowerCase());
