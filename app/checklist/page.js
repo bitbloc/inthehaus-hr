@@ -161,13 +161,12 @@ export default function ChecklistPage() {
         // "1/1/2026, 4:05:59" -> "1/1/2026 4:05:59"
         const str = String(dateStr).replace(/,/g, ' ').replace(/\s+/g, ' ').trim();
 
-        // Case 2: DD/MM/YYYY HH:mm:ss (Common in TH/UK Sheets)
-        // Try parsing with explicit format
+        // Case 2: DD/MM/YYYY HH:mm:ss (Strict D/M/Y as requested)
+        // Note: removed M/d/yyyy formats to prevent ambiguity.
         const formatsToTry = [
             'd/M/yyyy H:mm:ss',
             'd/M/yyyy HH:mm:ss',
             'dd/MM/yyyy HH:mm:ss',
-            'M/d/yyyy H:mm:ss',
             'yyyy-MM-dd HH:mm:ss',
             'd/M/yyyy H:mm',
             'd/M/yyyy'
@@ -179,8 +178,12 @@ export default function ChecklistPage() {
         }
 
         // Case 3: Fallback to native
-        const nativeParse = new Date(str);
-        if (isValid(nativeParse)) return nativeParse;
+        // CRITICAL: Do NOT use native parser for slash dates (x/x/x) because it often defaults to M/D/Y (US format).
+        // Only allow native parse for things that don't look like our D/M/Y target (e.g. ISO strings).
+        if (!str.includes('/')) {
+            const nativeParse = new Date(str);
+            if (isValid(nativeParse)) return nativeParse;
+        }
 
         return null; // Strict return null to avoid "1970"
     };
