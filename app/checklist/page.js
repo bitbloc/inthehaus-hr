@@ -72,7 +72,8 @@ export default function ChecklistPage() {
             const workbook = XLSX.read(csvText, { type: "string" });
             const sheetName = workbook.SheetNames[0];
             const sheet = workbook.Sheets[sheetName];
-            const jsonData = XLSX.utils.sheet_to_json(sheet);
+            // Use raw: false to get displayed text (e.g. "9/1/26") instead of serial numbers
+            const jsonData = XLSX.utils.sheet_to_json(sheet, { raw: false });
 
             const processedData = jsonData.map((row, index) => {
                 // Helper: Find value flexibly based on config
@@ -151,41 +152,45 @@ export default function ChecklistPage() {
 
         // Case 1: Excel Serial Date (Numbers)
         if (!isNaN(dateStr) && parseFloat(dateStr) > 30000) {
-            // Excel uses 1900 epoch, JS uses 1970. (Serial - 25569) * 86400 * 1000
-            // Adjusted for timezone offsets usually manually
             return new Date((parseFloat(dateStr) - 25569) * 86400 * 1000);
         }
 
-        // Clean string: Normalize
-        // Replace comma with space, then collapse multiple spaces
-        // "1/1/2026, 4:05:59" -> "1/1/2026 4:05:59"
+        // Clean string
         const str = String(dateStr).replace(/,/g, ' ').replace(/\s+/g, ' ').trim();
 
-        // Case 2: DD/MM/YYYY HH:mm:ss (Strict D/M/Y as requested)
-        // Note: removed M/d/yyyy formats to prevent ambiguity.
+        // Case 2: Explicit Formats
         const formatsToTry = [
             'd/M/yyyy H:mm:ss',
             'd/M/yyyy HH:mm:ss',
             'dd/MM/yyyy HH:mm:ss',
             'yyyy-MM-dd HH:mm:ss',
             'd/M/yyyy H:mm',
-            'd/M/yyyy'
+            'd/M/yyyy',
+            // Support 2-digit year (e.g. 9/1/26) -> strictly D/M/YY
+            'd/M/yy H:mm:ss',
+            'd/M/yy'
         ];
 
         for (const fmt of formatsToTry) {
             const parsed = parse(str, fmt, new Date());
-            if (isValid(parsed)) return parsed;
+            if (isValid(parsed)) {
+                // Fix 2-digit year if it parsed to 00xx?
+                // date-fns 'yy' format usually handles 2000 epoch correctly (if reference date is current).
+                // But let's verify. If parsed year is < 100, add 2000.
+                if (parsed.getFullYear() < 100) {
+                    parsed.setFullYear(parsed.getFullYear() + 2000);
+                }
+                return parsed;
+            }
         }
 
-        // Case 3: Fallback to native
-        // CRITICAL: Do NOT use native parser for slash dates (x/x/x) because it often defaults to M/D/Y (US format).
-        // Only allow native parse for things that don't look like our D/M/Y target (e.g. ISO strings).
+        // Case 3: Native Fallback (Restricted)
         if (!str.includes('/')) {
             const nativeParse = new Date(str);
             if (isValid(nativeParse)) return nativeParse;
         }
 
-        return null; // Strict return null to avoid "1970"
+        return null;
     };
 
     // --- Helper: Photo Link Extractor ---
