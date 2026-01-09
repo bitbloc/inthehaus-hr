@@ -15,7 +15,7 @@ function cn(...inputs) {
 // --- Configuration: Column Mapping ---
 // วิธีนี้ช่วยให้แก้ไขง่ายในอนาคต หากมีการเปลี่ยนชื่อหัวข้อใน Google Form
 const COLUMN_MAP = {
-    TIMESTAMP: ["Timestamp", "ประทับเวลา"],
+    TIMESTAMP: ["Timestamp", "ประทับเวลา", "วันที่"],
     STAFF_NAME: ["ชื่อพนักงาน ( Aka )", "Staff Name"],
     OPENING_TASKS: [
         "เช็คความพร้อมก่อนเปิด (Opening Checklist)",
@@ -65,6 +65,7 @@ export default function ChecklistPage() {
         try {
             setLoading(true);
             const res = await fetch(SHEET_URL);
+
             if (!res.ok) throw new Error("Failed to connect to Database (Google Sheet)");
 
             const csvText = await res.text();
@@ -85,7 +86,8 @@ export default function ChecklistPage() {
                 };
 
                 // 1. Parse Date (Critical Fix)
-                const timestampStr = findVal(COLUMN_MAP.TIMESTAMP);
+                // Fallback to first column (Object.values(row)[0]) if named columns fail
+                const timestampStr = findVal(COLUMN_MAP.TIMESTAMP) || Object.values(row)[0];
                 const timestamp = parseGenericDate(timestampStr);
 
                 // 2. Determine Type based on Content (Smart Detection)
