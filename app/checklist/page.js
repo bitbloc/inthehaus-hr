@@ -232,10 +232,14 @@ export default function ChecklistPage() {
     }
 
     // Filter and Sort Logic
+    // Filter and Sort Logic
     const filteredData = data
         .filter(item => {
+            // Must have a valid timestamp to be shown
+            if (!isValid(item.timestamp)) return false;
+
             // Month Filter
-            if (selectedMonth && isValid(item.timestamp)) {
+            if (selectedMonth) {
                 if (format(item.timestamp, 'MMMM yyyy') !== selectedMonth) return false;
             }
 
