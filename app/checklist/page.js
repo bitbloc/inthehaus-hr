@@ -1,30 +1,57 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import * as XLSX from "xlsx";
-import { format, isValid } from "date-fns";
+import { format, isValid, parse, parseISO } from "date-fns";
+import { th } from "date-fns/locale"; // เพิ่ม locale ไทยสำหรับการแสดงผล
 import { motion, AnimatePresence } from "framer-motion";
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 
+// --- Utility: Class Merger ---
 function cn(...inputs) {
     return twMerge(clsx(inputs));
 }
 
+// --- Configuration: Column Mapping ---
+// วิธีนี้ช่วยให้แก้ไขง่ายในอนาคต หากมีการเปลี่ยนชื่อหัวข้อใน Google Form
+const COLUMN_MAP = {
+    TIMESTAMP: ["Timestamp", "ประทับเวลา"],
+    STAFF_NAME: ["ชื่อพนักงาน ( Aka )", "Staff Name"],
+    OPENING_TASKS: [
+        "เช็คความพร้อมก่อนเปิด (Opening Checklist)",
+        "ระบบเงินและ POS (Opening Cash & POS)",
+        "เช็คความพร้อมก่อนเปิด",
+        "ระบบเงินและ POS"
+    ],
+    CLOSING_TASKS: [
+        "ความสะอาดและสต็อก (Cleaning & Stock)",
+        "ระบบเงินและการปิดร้าน (Closing Money & System)",
+        "ความสะอาดและสต็อก (Cleaning & Stock)",
+        "ระบบเงินและการปิดร้าน (Closing)"
+    ],
+    CASH_OPEN: ["ระบุยอดเงินในลิ้นชักก่อนเปิด (บาท)", "Opening Cash"],
+    CASH_CLOSE: ["ระบุยอดเงินสดปิดร้าน (บาท)", "Closing Cash"],
+    NOTE: ["หมายเหตุ (Note)", "หมายเหตุ"],
+};
+
 export default function ChecklistPage() {
+    // State Management
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [filter, setFilter] = useState('All'); // 'All', 'Opening', 'Closing'
-    const [selectedImage, setSelectedImage] = useState(null); // For lightbox
-    const [availableMonths, setAvailableMonths] = useState([]);
+    const [filter, setFilter] = useState('All');
+    const [selectedImage, setSelectedImage] = useState(null);
     const [selectedMonth, setSelectedMonth] = useState('');
 
+    // Google Sheet CSV Endpoint
     const SHEET_URL = "https://docs.google.com/spreadsheets/d/1AJVcXjwuzlm5U_UPD91wWPKz76jTRrW2VPsL22MR9CU/export?format=csv";
 
+    // --- Hooks ---
     useEffect(() => {
         fetchData();
     }, []);
 
+    // Handle ESC key for lightbox
     useEffect(() => {
         const handleEsc = (e) => {
             if (e.key === 'Escape') setSelectedImage(null);
@@ -33,372 +60,352 @@ export default function ChecklistPage() {
         return () => window.removeEventListener('keydown', handleEsc);
     }, []);
 
+    // --- Core Logic: Data Fetching & Processing ---
     const fetchData = async () => {
         try {
             setLoading(true);
             const res = await fetch(SHEET_URL);
-            if (!res.ok) throw new Error("Failed to fetch data");
+            if (!res.ok) throw new Error("Failed to connect to Database (Google Sheet)");
+
             const csvText = await res.text();
             const workbook = XLSX.read(csvText, { type: "string" });
             const sheetName = workbook.SheetNames[0];
             const sheet = workbook.Sheets[sheetName];
             const jsonData = XLSX.utils.sheet_to_json(sheet);
 
-            // Process data to match our needs
             const processedData = jsonData.map((row, index) => {
-                // Helper to find value by trimmed key
-                const getValue = (searchKey) => {
-                    const key = Object.keys(row).find(k => k.trim() === searchKey.trim());
-                    return key ? row[key] : undefined;
+                // Helper: Find value flexibly based on config
+                const findVal = (possibleKeys) => {
+                    if (!Array.isArray(possibleKeys)) possibleKeys = [possibleKeys];
+                    for (const key of possibleKeys) {
+                        const foundKey = Object.keys(row).find(k => k.trim() === key);
+                        if (foundKey && row[foundKey]) return row[foundKey];
+                    }
+                    return undefined;
                 };
 
-                const timestamp = parseThaiDate(getValue("Timestamp") || getValue("ประทับเวลา") || Object.values(row)[0]);
+                // 1. Parse Date (Critical Fix)
+                const timestampStr = findVal(COLUMN_MAP.TIMESTAMP);
+                const timestamp = parseGenericDate(timestampStr);
 
-                // Time-based Categorization
-                // Opening: 10:00 - 16:30
-                // Closing: 16:30 - 01:00 (next day) and beyond
-                let type = "Closing"; // Default
-                if (isValid(timestamp)) {
-                    const hour = timestamp.getHours();
-                    const minute = timestamp.getMinutes();
-                    const totalMinutes = hour * 60 + minute;
+                // 2. Determine Type based on Content (Smart Detection)
+                // แทนที่จะดูเวลา เราดูว่าเขากรอกช่องไหนมา ถ้ากรอกช่องเปิดร้าน ก็คือ Opening
+                const hasOpeningData = findVal(COLUMN_MAP.OPENING_TASKS);
+                const hasClosingData = findVal(COLUMN_MAP.CLOSING_TASKS);
 
-                    // 10:00 (600 min) to 16:30 (990 min)
-                    if (totalMinutes >= 600 && totalMinutes < 990) {
-                        type = "Opening";
+                let type = "Unknown";
+                if (hasOpeningData) type = "Opening";
+                else if (hasClosingData) type = "Closing";
+                else {
+                    // Fallback to time if content is ambiguous
+                    if (isValid(timestamp)) {
+                        const hours = timestamp.getHours();
+                        type = (hours >= 5 && hours < 16) ? "Opening" : "Closing";
                     }
                 }
 
-                // Fallback to text detection if timestamp is invalid? 
-                // Currently isValid(timestamp) logic handles the main path.
-
                 const isOpening = type === "Opening";
+
+                // 3. Extract Tasks
+                // ดึงข้อมูล Task ตามประเภทที่ระบุ
+                const taskKeys = isOpening ? COLUMN_MAP.OPENING_TASKS : COLUMN_MAP.CLOSING_TASKS;
+                let tasks = [];
+                // วนลูปหา value จาก key ที่ match
+                taskKeys.forEach(keyText => {
+                    const val = findVal([keyText]);
+                    if (val) tasks.push(val);
+                });
 
                 return {
                     id: index,
                     timestamp: timestamp,
-                    staffName: getValue("ชื่อพนักงาน ( Aka )"),
+                    staffName: findVal(COLUMN_MAP.STAFF_NAME) || "Unknown Staff",
                     type: type,
-                    tasks: isOpening
-                        ? [
-                            getValue("เช็คความพร้อมก่อนเปิด"),
-                            getValue("ระบบเงินและ POS")
-                        ]
-                        : [
-                            getValue("ความสะอาดและสต็อก (Cleaning & Stock)"),
-                            getValue("ระบบเงินและการปิดร้าน (Closing)")
-                        ],
-                    cash: getValue("ระบุยอดเงินในลิ้นชักก่อนเปิด (บาท)") || getValue("ระบุยอดเงินสดปิดร้าน (บาท)"),
+                    tasks: tasks,
+                    cash: isOpening ? findVal(COLUMN_MAP.CASH_OPEN) : findVal(COLUMN_MAP.CASH_CLOSE),
                     photos: extractPhotoLinks(row),
-                    note: getValue("หมายเหตุ"),
+                    note: findVal(COLUMN_MAP.NOTE),
                     raw: row
                 };
             });
 
-            // Extract available months
-            const months = [...new Set(processedData
+            // Clean Data: Remove invalid dates & Sort
+            const validData = processedData
                 .filter(item => isValid(item.timestamp))
-                .map(item => format(item.timestamp, 'MMMM yyyy'))
-            )];
-            setAvailableMonths(months);
+                .sort((a, b) => b.timestamp - a.timestamp);
 
-            // Default to current month if not set
-            if (!selectedMonth && months.length > 0) {
-                const currentMonth = format(new Date(), 'MMMM yyyy');
-                if (months.includes(currentMonth)) {
-                    setSelectedMonth(currentMonth);
-                } else {
-                    setSelectedMonth(months[0]);
-                }
-            }
-
-            setData(processedData);
+            setData(validData);
         } catch (err) {
-            console.error(err);
+            console.error("Critical Data Error:", err);
             setError(err.message);
         } finally {
             setLoading(false);
         }
     };
 
-    const parseThaiDate = (dateStr) => {
+    // --- Helper: Robust Date Parser ---
+    const parseGenericDate = (dateStr) => {
         if (!dateStr) return null;
 
-        let date;
+        // Case 1: Excel Serial Date (Numbers)
+        if (!isNaN(dateStr) && parseFloat(dateStr) > 30000) {
+            // Excel uses 1900 epoch, JS uses 1970. (Serial - 25569) * 86400 * 1000
+            // Adjusted for timezone offsets usually manually
+            return new Date((parseFloat(dateStr) - 25569) * 86400 * 1000);
+        }
+
         const str = String(dateStr).trim();
-        if (!str) return null;
 
-        // Check if it's an Excel Serial Number (e.g. 45669.5)
-        // Excel base date is Dec 30, 1899.
-        if (!isNaN(dateStr) && parseFloat(dateStr) > 20000) {
-            const excelDate = parseFloat(dateStr);
-            // Conversion roughly: (Serial - 25569) * 86400 * 1000
-            // But base date varies. Standard method:
-            const excelEpoch = new Date(1899, 11, 30);
-            const msPerDay = 86400 * 1000;
-            // Add days
-            const time = excelEpoch.getTime() + excelDate * msPerDay;
-            // Adjustment for timezone? Excel serials are usually local.
-            // But we can return the date object.
-            // Note: Excel leap year bug (1900) - usually negligible for recent dates.
-            date = new Date(time);
+        // Case 2: DD/MM/YYYY HH:mm:ss (Common in TH/UK Sheets)
+        // Try parsing with explicit format
+        const formatsToTry = [
+            'd/M/yyyy H:mm:ss',
+            'd/M/yyyy HH:mm:ss',
+            'dd/MM/yyyy HH:mm:ss',
+            'M/d/yyyy H:mm:ss',
+            'yyyy-MM-dd HH:mm:ss'
+        ];
 
-            // Compensate for local/UTC if needed? Usually Excel serial is "days since 1899 local".
-            // JS Date(time) assumes UTC timestamp if we pass number?
-            // No, new Date(ms) creates a date at that exact UTC time.
-            // If Excel 45669.5 means "Local time", then we need to adjust for timezone offset if we want "Local" representation?
-            // Actually, usually treating it as UTC milliseconds is safe if we don't care about shifting hours across zones too much.
-            // Let's refine:
-            // 45669.5 -> 2025-01-12...
-            // Let's rely on standard formula: (value - 25569) * 86400000.
-            // 25569 is offset for 1970-01-01.
-            date = new Date((excelDate - 25569) * 86400000);
-
-            // The result is a UTC date.
-            // e.g. 2026-01-01T07:00:00Z.
-            // If we display it in local time, it will be 14:00 (UTC+7).
-            // But if the Sheet said "07:00", we want "07:00".
-            // Excel Serial 07:00 is usually just 0.29...
-            // If we want to preserve the "face value" of the date (e.g. it says Jan 1 07:00), we should treat the resulting Date object as if it's in the user's timezone.
-            // But simpler: just return this date. The 1970 issue is mostly because it was treated as "0" or "invalid". Need to confirm via script.
-        }
-        else {
-            // Enforce d/m/y parsing for Google Sheet exports
-            // Matches start with d/m/y (allowing 1 or 2 digits)
-            const dateMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-
-            if (dateMatch) {
-                const day = dateMatch[1].padStart(2, '0');
-                const month = dateMatch[2].padStart(2, '0');
-                const year = dateMatch[3];
-
-                let hour = '00';
-                let minute = '00';
-                let second = '00';
-
-                // Look for time component anywhere in the string
-                const timeMatch = str.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
-                if (timeMatch) {
-                    hour = timeMatch[1].padStart(2, '0');
-                    minute = timeMatch[2].padStart(2, '0');
-                    if (timeMatch[3]) second = timeMatch[3].padStart(2, '0');
-                }
-
-                date = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}`);
-            } else {
-                // Fallback for standard ISO or other formats
-                date = new Date(dateStr);
-            }
+        for (const fmt of formatsToTry) {
+            const parsed = parse(str, fmt, new Date());
+            if (isValid(parsed)) return parsed;
         }
 
-        if (!isValid(date) || date.getFullYear() < 2000) {
-            // Filter out older dates (e.g. 1970) explicitly to be safe
-            return null;
-        }
-        return date;
-    }
+        // Case 3: Fallback to native
+        const nativeParse = new Date(str);
+        if (isValid(nativeParse)) return nativeParse;
 
+        return null;
+    };
+
+    // --- Helper: Photo Link Extractor ---
     const extractPhotoLinks = (row) => {
         const photos = [];
         Object.values(row).forEach(val => {
             if (typeof val === 'string' && val.includes('http')) {
-                const potentialLinks = val.split(',').map(s => s.trim()).filter(s => s.startsWith('http'));
-                potentialLinks.forEach(link => {
-                    const linkStr = String(link);
+                // Split logic for multiple links in one cell
+                const links = val.split(/[\s,]+/).filter(s => s.startsWith('http'));
+                links.forEach(link => {
                     let id = null;
-
-                    // Match id=XXX
-                    const idMatch = linkStr.match(/id=([a-zA-Z0-9_-]+)/);
-                    // Match /d/XXX
-                    const dMatch = linkStr.match(/\/d\/([a-zA-Z0-9_-]+)/);
-
+                    // Google Drive ID Extraction
+                    const idMatch = link.match(/id=([a-zA-Z0-9_-]+)/) || link.match(/\/d\/([a-zA-Z0-9_-]+)/);
                     if (idMatch) id = idMatch[1];
-                    else if (dMatch) id = dMatch[1];
 
                     if (id) {
                         photos.push({
-                            thumbnail: `https://drive.google.com/thumbnail?id=${id}&sz=w400`,
+                            thumbnail: `https://lh3.googleusercontent.com/d/${id}=s400`, // Better optimized Google thumbnail
                             full: `https://drive.google.com/file/d/${id}/preview`
                         });
                     } else {
-                        photos.push({ thumbnail: linkStr, full: linkStr });
+                        // Regular image link
+                        photos.push({ thumbnail: link, full: link });
                     }
                 });
             }
         });
-
-        // Remove duplicates based on full url
+        // Deduplicate
         return photos.filter((v, i, a) => a.findIndex(v2 => (v2.full === v.full)) === i);
-    }
+    };
 
-    // Filter and Sort Logic
-    // Filter and Sort Logic
-    const filteredData = data
-        .filter(item => {
-            // Must have a valid timestamp to be shown
-            if (!isValid(item.timestamp)) return false;
+    // --- Derived State: Months ---
+    const availableMonths = useMemo(() => {
+        const months = [...new Set(data.map(item => format(item.timestamp, 'MMMM yyyy')))];
+        // If current selection is invalid, reset it
+        if (months.length > 0 && !months.includes(selectedMonth)) {
+            // Use setTimeout to avoid render loop warning, or handle in useEffect. 
+            // Here we just let the UI handle empty state or user picks.
+            // Actually, setting default here is safer:
+            if (!selectedMonth) return months;
+        }
+        return months;
+    }, [data]);
 
-            // Month Filter
-            if (selectedMonth) {
-                if (format(item.timestamp, 'MMMM yyyy') !== selectedMonth) return false;
-            }
+    // Set default month on data load
+    useEffect(() => {
+        if (availableMonths.length > 0 && !selectedMonth) {
+            // Default to current month if exists, else first available
+            const current = format(new Date(), 'MMMM yyyy');
+            setSelectedMonth(availableMonths.includes(current) ? current : availableMonths[0]);
+        }
+    }, [availableMonths]);
 
-            if (filter === 'All') return true;
-            return item.type === filter;
-        })
-        .sort((a, b) => b.timestamp - a.timestamp);
 
+    // --- Derived State: Filtered List ---
+    const filteredData = data.filter(item => {
+        const monthMatch = selectedMonth ? format(item.timestamp, 'MMMM yyyy') === selectedMonth : true;
+        const typeMatch = filter === 'All' ? true : item.type === filter;
+        return monthMatch && typeMatch;
+    });
+
+    // --- RENDER ---
     return (
-        <div className="min-h-screen bg-background text-foreground font-sans p-6 md:p-12 font-feature-settings-['ss01'] max-w-4xl mx-auto">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight mb-2">Checklist History</h1>
-                    <p className="text-muted-foreground">Store opening and closing records</p>
-                </div>
+        <div className="min-h-screen bg-[#F5F5F7] text-[#1D1D1F] font-sans p-6 md:p-12 font-feature-settings-['ss01']">
+            <div className="max-w-4xl mx-auto">
 
-                <div className="flex flex-col md:flex-row items-center gap-2">
-                    {/* Month Selector */}
-                    {availableMonths.length > 0 && (
-                        <div className="relative">
-                            <select
-                                value={selectedMonth}
-                                onChange={(e) => setSelectedMonth(e.target.value)}
-                                className="appearance-none pl-4 pr-10 py-2 rounded-xl bg-white border border-border text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm cursor-pointer hover:bg-zinc-50 transition-colors"
-                            >
-                                {availableMonths.map(month => (
-                                    <option key={month} value={month}>{month}</option>
-                                ))}
-                            </select>
-                            <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-zinc-500">
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Filter Tabs */}
-                    <div className="flex p-1 bg-muted rounded-xl">
-                        {['All', 'Opening', 'Closing'].map((f) => (
-                            <button
-                                key={f}
-                                onClick={() => setFilter(f)}
-                                className={cn(
-                                    "px-4 py-2 rounded-lg text-sm font-medium transition-all",
-                                    filter === f ? "bg-white text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-                                )}
-                            >
-                                {f === 'All' ? 'All' : f === 'Opening' ? '☀️ Opening' : '🌙 Closing'}
-                            </button>
-                        ))}
+                {/* Header Section */}
+                <header className="flex flex-col md:flex-row justify-between items-start md:items-end mb-10 gap-6">
+                    <div>
+                        <h1 className="text-4xl font-bold tracking-tight text-black mb-2">Checklist History</h1>
+                        <p className="text-zinc-500 font-medium">บันทึกการเปิด-ปิดร้านประจำวัน</p>
                     </div>
 
-                    <button
-                        onClick={fetchData}
-                        disabled={loading}
-                        className="w-10 h-10 flex items-center justify-center rounded-xl bg-muted hover:bg-muted/80 text-foreground transition-colors"
-                    >
-                        {loading ? <span className="animate-spin">↻</span> : <span>↺</span>}
-                    </button>
-                </div>
-            </div>
+                    <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                        {/* Month Select */}
+                        {availableMonths.length > 0 && (
+                            <div className="relative group">
+                                <select
+                                    value={selectedMonth}
+                                    onChange={(e) => setSelectedMonth(e.target.value)}
+                                    className="appearance-none pl-4 pr-10 py-2.5 rounded-xl bg-white border border-zinc-200 text-sm font-semibold text-zinc-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 shadow-sm hover:border-zinc-300 transition-all cursor-pointer min-w-[160px]"
+                                >
+                                    {availableMonths.map(m => <option key={m} value={m}>{m}</option>)}
+                                </select>
+                                <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-zinc-400">
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" /></svg>
+                                </div>
+                            </div>
+                        )}
 
-            {loading && data.length === 0 ? (
-                <div className="space-y-4">
-                    {[1, 2, 3].map(i => (
-                        <div key={i} className="w-full h-40 bg-card/50 rounded-3xl animate-pulse" />
-                    ))}
-                </div>
-            ) : (
-                <div className="grid gap-6">
-                    <AnimatePresence mode="popLayout">
-                        {filteredData.map((item) => (
-                            <motion.div
-                                key={item.id}
-                                layout
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, scale: 0.9 }}
-                                className="bg-card rounded-3xl p-6 soft-shadow border border-border/50 overflow-hidden relative"
-                            >
-                                {/* Status Strip */}
-                                <div className={cn(
-                                    "absolute top-0 left-0 w-full h-1.5",
-                                    item.type === 'Opening' ? "bg-gradient-to-r from-orange-300 to-yellow-300" : "bg-gradient-to-r from-indigo-400 to-purple-400"
-                                )} />
+                        {/* Filter Tabs - iOS Segmented Control Style */}
+                        <div className="flex p-1 bg-zinc-200/60 rounded-xl backdrop-blur-md">
+                            {['All', 'Opening', 'Closing'].map((f) => (
+                                <button
+                                    key={f}
+                                    onClick={() => setFilter(f)}
+                                    className={cn(
+                                        "px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ease-out duration-200",
+                                        filter === f
+                                            ? "bg-white text-black shadow-[0_2px_8px_rgba(0,0,0,0.08)]"
+                                            : "text-zinc-500 hover:text-zinc-700"
+                                    )}
+                                >
+                                    {f === 'All' ? 'ทั้งหมด' : f === 'Opening' ? '☀️ เปิดร้าน' : '🌙 ปิดร้าน'}
+                                </button>
+                            ))}
+                        </div>
 
-                                <div className="flex flex-col md:flex-row md:items-start gap-6">
-                                    {/* Header Info */}
-                                    <div className="flex-1 min-w-[200px]">
-                                        <div className="flex items-center gap-3 mb-4">
-                                            <div className={cn(
-                                                "w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shadow-sm",
-                                                item.type === 'Opening' ? "bg-orange-50 text-orange-500" : "bg-indigo-50 text-indigo-500"
-                                            )}>
-                                                {item.type === 'Opening' ? '☀️' : '🌙'}
-                                            </div>
+                        {/* Refresh Button */}
+                        <button
+                            onClick={fetchData}
+                            disabled={loading}
+                            className="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-zinc-200 hover:bg-zinc-50 text-zinc-600 transition-all shadow-sm active:scale-95"
+                        >
+                            {loading ? <span className="animate-spin text-lg">⟳</span> : <span className="text-lg">⟳</span>}
+                        </button>
+                    </div>
+                </header>
+
+                {/* Content Area */}
+                {loading && data.length === 0 ? (
+                    <div className="space-y-6">
+                        {[1, 2, 3].map(i => (
+                            <div key={i} className="w-full h-48 bg-white rounded-3xl animate-pulse shadow-sm" />
+                        ))}
+                    </div>
+                ) : (
+                    <div className="grid gap-6">
+                        <AnimatePresence mode="popLayout">
+                            {filteredData.map((item) => (
+                                <motion.div
+                                    key={item.id}
+                                    layout
+                                    initial={{ opacity: 0, scale: 0.98 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    exit={{ opacity: 0, scale: 0.95 }}
+                                    transition={{ duration: 0.3, type: "spring", bounce: 0.2 }}
+                                    className="bg-white rounded-[2rem] p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-zinc-100 overflow-hidden relative group"
+                                >
+                                    {/* Decorative Status Line */}
+                                    <div className={cn(
+                                        "absolute left-0 top-8 bottom-8 w-1.5 rounded-r-lg transition-colors duration-300",
+                                        item.type === 'Opening' ? "bg-orange-400" : "bg-indigo-500"
+                                    )} />
+
+                                    <div className="pl-6">
+                                        <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-6">
+                                            {/* Info Block */}
                                             <div>
-                                                <h3 className="font-bold text-lg leading-tight">{item.staffName}</h3>
-                                                <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">
-                                                    {item.type} • {isValid(item.timestamp) ? format(item.timestamp, "dd MMM, HH:mm") : 'Date Error'}
-                                                </p>
+                                                <div className="flex items-center gap-3 mb-2">
+                                                    <span className={cn(
+                                                        "text-xs font-bold uppercase tracking-wider px-2 py-1 rounded-md",
+                                                        item.type === 'Opening'
+                                                            ? "bg-orange-50 text-orange-600"
+                                                            : "bg-indigo-50 text-indigo-600"
+                                                    )}>
+                                                        {item.type}
+                                                    </span>
+                                                    <span className="text-zinc-400 text-sm font-medium">
+                                                        {format(item.timestamp, "d MMMM yyyy • HH:mm", { locale: th })}
+                                                    </span>
+                                                </div>
+                                                <h3 className="text-2xl font-bold text-zinc-900">{item.staffName}</h3>
                                             </div>
+
+                                            {/* Cash Badge */}
+                                            {item.cash && (
+                                                <div className="flex flex-col items-end">
+                                                    <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">CASH DRAWER</span>
+                                                    <span className="font-mono text-xl font-bold text-zinc-800 tabular-nums">
+                                                        {item.cash} <span className="text-sm text-zinc-400">THB</span>
+                                                    </span>
+                                                </div>
+                                            )}
                                         </div>
 
-                                        {item.cash && (
-                                            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-muted/50 mb-4">
-                                                <span className="text-xs font-bold text-muted-foreground uppercase">Cash</span>
-                                                <span className="font-mono font-medium">{item.cash} THB</span>
+                                        {/* Tasks List */}
+                                        <div className="bg-zinc-50 rounded-2xl p-5 mb-6 space-y-3 border border-zinc-100/50">
+                                            {item.tasks.length > 0 ? (
+                                                item.tasks.flat().map((taskStr, i) => (
+                                                    String(taskStr).split(',').map((t, j) => t.trim() && (
+                                                        <div key={`${i}-${j}`} className="flex items-start gap-3">
+                                                            <div className="mt-1 w-4 h-4 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+                                                                <svg className="w-2.5 h-2.5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
+                                                            </div>
+                                                            <span className="text-zinc-600 text-sm leading-relaxed">{t.trim()}</span>
+                                                        </div>
+                                                    ))
+                                                ))
+                                            ) : (
+                                                <p className="text-zinc-400 text-sm italic">No tasks recorded</p>
+                                            )}
+                                        </div>
+
+                                        {/* Note Section */}
+                                        {item.note && (
+                                            <div className="mb-6 text-sm text-zinc-500 bg-amber-50/50 p-4 rounded-xl border border-amber-100/50">
+                                                <strong className="text-amber-700/80 mr-1">Note:</strong> {item.note}
                                             </div>
                                         )}
 
-                                        <div className="space-y-2">
-                                            {item.tasks.flat().filter(Boolean).map((taskStr, i) => {
-                                                // Sometimes tasks are comma joined in one string
-                                                return String(taskStr).split(',').map((t, j) => (
-                                                    t.trim() && (
-                                                        <div key={`${i}-${j}`} className="flex items-start gap-2 text-sm text-foreground/80">
-                                                            <span className="text-green-500 mt-0.5">✓</span>
-                                                            <span>{t.trim()}</span>
-                                                        </div>
-                                                    )
-                                                ));
-                                            })}
-                                        </div>
-
-                                        {item.note && (
-                                            <div className="mt-4 p-3 bg-yellow-50 text-yellow-800 text-sm rounded-xl border border-yellow-100">
-                                                <span className="font-bold mr-1">Note:</span> {item.note}
+                                        {/* Gallery Grid */}
+                                        {item.photos.length > 0 && (
+                                            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                                                {item.photos.map((photo, i) => (
+                                                    <div
+                                                        key={i}
+                                                        onClick={() => setSelectedImage(photo.full)}
+                                                        className="aspect-square rounded-xl overflow-hidden cursor-pointer relative group shadow-sm hover:shadow-md transition-all"
+                                                    >
+                                                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors z-10" />
+                                                        <img
+                                                            src={photo.thumbnail}
+                                                            alt="Evidence"
+                                                            className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500"
+                                                            onError={(e) => e.target.style.display = 'none'}
+                                                        />
+                                                    </div>
+                                                ))}
                                             </div>
                                         )}
                                     </div>
+                                </motion.div>
+                            ))}
+                        </AnimatePresence>
+                    </div>
+                )}
+            </div>
 
-                                    {/* Gallery */}
-                                    {item.photos.length > 0 && (
-                                        <div className="flex gap-2 overflow-x-auto pb-2 md:w-1/3 md:grid md:grid-cols-2 md:gap-2 md:overflow-visible h-fit scrollbar-hide">
-                                            {item.photos.map((photo, i) => (
-                                                <div
-                                                    key={i}
-                                                    className="flex-shrink-0 relative group cursor-pointer"
-                                                    onClick={() => setSelectedImage(photo.full)}
-                                                >
-                                                    <img
-                                                        src={photo.thumbnail}
-                                                        alt="Evidence"
-                                                        referrerPolicy="no-referrer"
-                                                        className="w-24 h-24 md:w-full md:h-24 object-cover rounded-xl bg-muted border border-border group-hover:opacity-90 transition-opacity"
-                                                        onError={(e) => e.target.style.display = 'none'}
-                                                    />
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            </motion.div>
-                        ))}
-                    </AnimatePresence>
-                </div>
-            )}
-
-            {/* Lightbox Modal */}
+            {/* Lightbox Overlay */}
             <AnimatePresence>
                 {selectedImage && (
                     <motion.div
@@ -406,31 +413,27 @@ export default function ChecklistPage() {
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={() => setSelectedImage(null)}
-                        className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer"
+                        className="fixed inset-0 z-[100] bg-zinc-900/95 backdrop-blur-xl flex items-center justify-center p-4 md:p-10"
                     >
                         <motion.div
-                            initial={{ scale: 0.9, opacity: 0 }}
+                            initial={{ scale: 0.95, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0.9, opacity: 0 }}
-                            className="w-full max-w-5xl h-[80vh] bg-black rounded-2xl overflow-hidden relative shadow-2xl"
-                            onClick={(e) => e.stopPropagation()} // Prevent closing when clicking iframe area
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-full h-full max-w-6xl bg-black rounded-3xl overflow-hidden shadow-2xl relative ring-1 ring-white/10"
                         >
                             <iframe
                                 src={selectedImage}
                                 className="w-full h-full border-0"
                                 allow="autoplay"
-                                title="Evidence Viewer"
                             />
+                            <button
+                                onClick={() => setSelectedImage(null)}
+                                className="absolute top-6 right-6 w-10 h-10 bg-white/10 hover:bg-white/20 text-white rounded-full flex items-center justify-center backdrop-blur-md transition-colors"
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
                         </motion.div>
-
-                        <button
-                            className="absolute top-4 right-4 text-white p-2 rounded-full bg-black/50 hover:bg-black/70 z-50"
-                            onClick={() => setSelectedImage(null)}
-                        >
-                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
                     </motion.div>
                 )}
             </AnimatePresence>
