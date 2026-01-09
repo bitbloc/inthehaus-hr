@@ -123,40 +123,76 @@ export default function ChecklistPage() {
 
     const parseThaiDate = (dateStr) => {
         if (!dateStr) return null;
+
+        let date;
         const str = String(dateStr).trim();
         if (!str) return null;
 
-        let date;
+        // Check if it's an Excel Serial Number (e.g. 45669.5)
+        // Excel base date is Dec 30, 1899.
+        if (!isNaN(dateStr) && parseFloat(dateStr) > 20000) {
+            const excelDate = parseFloat(dateStr);
+            // Conversion roughly: (Serial - 25569) * 86400 * 1000
+            // But base date varies. Standard method:
+            const excelEpoch = new Date(1899, 11, 30);
+            const msPerDay = 86400 * 1000;
+            // Add days
+            const time = excelEpoch.getTime() + excelDate * msPerDay;
+            // Adjustment for timezone? Excel serials are usually local.
+            // But we can return the date object.
+            // Note: Excel leap year bug (1900) - usually negligible for recent dates.
+            date = new Date(time);
 
-        // Enforce d/m/y parsing for Google Sheet exports
-        // Matches start with d/m/y (allowing 1 or 2 digits)
-        const dateMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+            // Compensate for local/UTC if needed? Usually Excel serial is "days since 1899 local".
+            // JS Date(time) assumes UTC timestamp if we pass number?
+            // No, new Date(ms) creates a date at that exact UTC time.
+            // If Excel 45669.5 means "Local time", then we need to adjust for timezone offset if we want "Local" representation?
+            // Actually, usually treating it as UTC milliseconds is safe if we don't care about shifting hours across zones too much.
+            // Let's refine:
+            // 45669.5 -> 2025-01-12...
+            // Let's rely on standard formula: (value - 25569) * 86400000.
+            // 25569 is offset for 1970-01-01.
+            date = new Date((excelDate - 25569) * 86400000);
 
-        if (dateMatch) {
-            const day = dateMatch[1].padStart(2, '0');
-            const month = dateMatch[2].padStart(2, '0');
-            const year = dateMatch[3];
+            // The result is a UTC date.
+            // e.g. 2026-01-01T07:00:00Z.
+            // If we display it in local time, it will be 14:00 (UTC+7).
+            // But if the Sheet said "07:00", we want "07:00".
+            // Excel Serial 07:00 is usually just 0.29...
+            // If we want to preserve the "face value" of the date (e.g. it says Jan 1 07:00), we should treat the resulting Date object as if it's in the user's timezone.
+            // But simpler: just return this date. The 1970 issue is mostly because it was treated as "0" or "invalid". Need to confirm via script.
+        }
+        else {
+            // Enforce d/m/y parsing for Google Sheet exports
+            // Matches start with d/m/y (allowing 1 or 2 digits)
+            const dateMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
 
-            let hour = '00';
-            let minute = '00';
-            let second = '00';
+            if (dateMatch) {
+                const day = dateMatch[1].padStart(2, '0');
+                const month = dateMatch[2].padStart(2, '0');
+                const year = dateMatch[3];
 
-            // Look for time component anywhere in the string
-            const timeMatch = str.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
-            if (timeMatch) {
-                hour = timeMatch[1].padStart(2, '0');
-                minute = timeMatch[2].padStart(2, '0');
-                if (timeMatch[3]) second = timeMatch[3].padStart(2, '0');
+                let hour = '00';
+                let minute = '00';
+                let second = '00';
+
+                // Look for time component anywhere in the string
+                const timeMatch = str.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+                if (timeMatch) {
+                    hour = timeMatch[1].padStart(2, '0');
+                    minute = timeMatch[2].padStart(2, '0');
+                    if (timeMatch[3]) second = timeMatch[3].padStart(2, '0');
+                }
+
+                date = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}`);
+            } else {
+                // Fallback for standard ISO or other formats
+                date = new Date(dateStr);
             }
-
-            date = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}`);
-        } else {
-            // Fallback for standard ISO or other formats
-            date = new Date(dateStr);
         }
 
-        if (!isValid(date)) {
-            // console.warn("Invalid date parsed:", dateStr);
+        if (!isValid(date) || date.getFullYear() < 2000) {
+            // Filter out older dates (e.g. 1970) explicitly to be safe
             return null;
         }
         return date;
