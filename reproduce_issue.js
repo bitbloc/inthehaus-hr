@@ -48,58 +48,84 @@ const parseThaiDate = (dateStr) => {
     return null;
 }
 
+// Custom CSV Parser to bypass XLSX assumptions
+function parseCSV(text) {
+    const rows = [];
+    let currentRow = [];
+    let currentVal = '';
+    let insideQuote = false;
+
+    // Normalize newlines
+    const cleanText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+    for (let i = 0; i < cleanText.length; i++) {
+        const char = cleanText[i];
+        const nextChar = cleanText[i + 1];
+
+        if (char === '"') {
+            if (insideQuote && nextChar === '"') {
+                currentVal += '"';
+                i++; // Skip escaped quote
+            } else {
+                insideQuote = !insideQuote;
+            }
+        } else if (char === ',' && !insideQuote) {
+            currentRow.push(currentVal);
+            currentVal = '';
+        } else if (char === '\n' && !insideQuote) {
+            currentRow.push(currentVal);
+            rows.push(currentRow);
+            currentRow = [];
+            currentVal = '';
+        } else {
+            currentVal += char;
+        }
+    }
+    if (currentVal || currentRow.length > 0) {
+        currentRow.push(currentVal);
+        rows.push(currentRow);
+    }
+    return rows;
+}
+
+// Map CSV array to JSON-like objects (using headers from row 0)
+function csvToJson(rows) {
+    if (rows.length < 2) return [];
+    const headers = rows[0].map(h => h.trim());
+    return rows.slice(1).map((row, idx) => {
+        const obj = {};
+        headers.forEach((h, i) => {
+            if (row[i] !== undefined) obj[h] = row[i];
+        });
+        // Fallback for unnamed columns or access by index
+        obj._rawRow = row;
+        return obj;
+    });
+}
+
 async function run() {
     try {
         console.log("Fetching CSV...");
         const res = await fetch(SHEET_URL);
         const csvText = await res.text();
 
-        const workbook = XLSX.read(csvText, { type: "string" });
-        const sheetName = workbook.SheetNames[0];
-        const sheet = workbook.Sheets[sheetName];
+        console.log("Parsing CSV manually...");
+        const rows = parseCSV(csvText);
+        const jsonData = csvToJson(rows);
 
-        // Use raw: false as per fix
-        const jsonData = XLSX.utils.sheet_to_json(sheet, { raw: false });
+        console.log("Parsed Rows:", jsonData.length);
 
-        console.log("XLSX Parsed Rows:", jsonData.length);
+        console.log("\n--- Debug Raw Values (Rows > 70) ---");
+        jsonData.forEach((row, i) => {
+            const rowIndex = i + 2; // +2 for 1-based and header
+            if (rowIndex > 70) {
+                // Try to find Timestamp
+                const ts = row["Timestamp"] || row["ประทับเวลา"] || row._rawRow && row._rawRow[0];
+                const parsed = parseThaiDate(ts);
 
-        let parsedData = jsonData.map((row, i) => {
-            const getValue = (searchKey) => {
-                const key = Object.keys(row).find(k => k.trim() === searchKey.trim());
-                return key ? row[key] : undefined;
-            };
-
-            const rawTimestamp = getValue("Timestamp") || getValue("ประทับเวลา") || Object.values(row)[0];
-            const parsed = parseThaiDate(rawTimestamp);
-
-            return {
-                row: i + 2,
-                raw: rawTimestamp,
-                parsed: parsed,
-                isValid: isValid(parsed)
-            };
-        });
-
-        // Debug failures for Jan 2026 (Rows > 60)
-        console.log("\n--- Debugging Failures (Rows > 60) ---");
-        parsedData.forEach(d => {
-            if (d.row > 60 && !d.isValid) {
-                console.log(`Row ${d.row} FAILED: Raw="${d.raw}"`);
+                console.log(`Row ${rowIndex}: Raw="${ts}" -> Parsed=${parsed ? format(parsed, 'yyyy-MM-dd HH:mm:ss') : 'NULL'}`);
             }
         });
-
-        // Check all Jan 2026
-        // const jan2026 = parsedData
-        //     .filter(d => d.isValid && d.parsed.getFullYear() === 2026 && d.parsed.getMonth() === 0)
-        //     .sort((a, b) => a.parsed - b.parsed);
-
-        console.log("\n--- Debug Dump (Rows > 70) ---");
-        parsedData.forEach(d => {
-            if (d.row > 70) {
-                console.log(`Row ${d.row}: "${d.raw}" -> ${d.isValid ? format(d.parsed, 'yyyy-MM-dd HH:mm:ss') : 'INVALID'}`);
-            }
-        });
-
     } catch (e) {
         console.error(e);
     }

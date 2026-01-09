@@ -60,6 +60,60 @@ export default function ChecklistPage() {
         return () => window.removeEventListener('keydown', handleEsc);
     }, []);
 
+    // --- Helper: Custom CSV Parser (Bypasses XLSX assumptions) ---
+    const parseCSV = (text) => {
+        const rows = [];
+        let currentRow = [];
+        let currentVal = '';
+        let insideQuote = false;
+
+        // Normalize newlines
+        const cleanText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+        for (let i = 0; i < cleanText.length; i++) {
+            const char = cleanText[i];
+            const nextChar = cleanText[i + 1];
+
+            if (char === '"') {
+                if (insideQuote && nextChar === '"') {
+                    currentVal += '"';
+                    i++; // Skip escaped quote
+                } else {
+                    insideQuote = !insideQuote;
+                }
+            } else if (char === ',' && !insideQuote) {
+                currentRow.push(currentVal);
+                currentVal = '';
+            } else if (char === '\n' && !insideQuote) {
+                currentRow.push(currentVal);
+                rows.push(currentRow);
+                currentRow = [];
+                currentVal = '';
+            } else {
+                currentVal += char;
+            }
+        }
+        if (currentVal || currentRow.length > 0) {
+            currentRow.push(currentVal);
+            rows.push(currentRow);
+        }
+        return rows;
+    };
+
+    const csvToJson = (rows) => {
+        if (rows.length < 2) return [];
+        const headers = rows[0].map(h => h.trim());
+        return rows.slice(1).map((row, idx) => {
+            const obj = {};
+            headers.forEach((h, i) => {
+                if (row[i] !== undefined) obj[h] = row[i];
+            });
+            // Fallback for unnamed columns or access by index
+            obj._rawRow = row;
+            return obj;
+        });
+    };
+
     // --- Core Logic: Data Fetching & Processing ---
     const fetchData = async () => {
         try {
@@ -69,32 +123,36 @@ export default function ChecklistPage() {
             if (!res.ok) throw new Error("Failed to connect to Database (Google Sheet)");
 
             const csvText = await res.text();
-            const workbook = XLSX.read(csvText, { type: "string" });
-            const sheetName = workbook.SheetNames[0];
-            const sheet = workbook.Sheets[sheetName];
-            // Use raw: false to get displayed text (e.g. "9/1/26") instead of serial numbers
-            const jsonData = XLSX.utils.sheet_to_json(sheet, { raw: false });
+
+            // Use custom parser instead of XLSX
+            const rows = parseCSV(csvText);
+            const jsonData = csvToJson(rows);
 
             const processedData = jsonData.map((row, index) => {
                 // Helper: Find value flexibly based on config
-                const findVal = (possibleKeys) => {
-                    if (!Array.isArray(possibleKeys)) possibleKeys = [possibleKeys];
+                const findVal = (keyConfig) => {
+                    const possibleKeys = COLUMN_MAP[keyConfig];
                     for (const key of possibleKeys) {
-                        const foundKey = Object.keys(row).find(k => k.trim() === key);
-                        if (foundKey && row[foundKey]) return row[foundKey];
+                        // Case-insensitive match for robustness
+                        const actualKey = Object.keys(row).find(k => k.trim().toLowerCase() === key.toLowerCase());
+                        if (actualKey) return row[actualKey];
                     }
                     return undefined;
                 };
 
                 // 1. Parse Date (Critical Fix)
-                // Fallback to first column (Object.values(row)[0]) if named columns fail
-                const timestampStr = findVal(COLUMN_MAP.TIMESTAMP) || Object.values(row)[0];
-                const timestamp = parseGenericDate(timestampStr);
+                // Fallback for timestamp: Try specific headers, then try first column
+                let timestampVal = findVal('TIMESTAMP');
+                if (!timestampVal) {
+                    // Fallback to first column (index 0) if headers fail
+                    timestampVal = row._rawRow && row._rawRow[0];
+                }
+                const timestamp = parseGenericDate(timestampVal);
 
                 // 2. Determine Type based on Content (Smart Detection)
                 // แทนที่จะดูเวลา เราดูว่าเขากรอกช่องไหนมา ถ้ากรอกช่องเปิดร้าน ก็คือ Opening
-                const hasOpeningData = findVal(COLUMN_MAP.OPENING_TASKS);
-                const hasClosingData = findVal(COLUMN_MAP.CLOSING_TASKS);
+                const hasOpeningData = findVal('OPENING_TASKS');
+                const hasClosingData = findVal('CLOSING_TASKS');
 
                 let type = "Unknown";
                 if (hasOpeningData) type = "Opening";
