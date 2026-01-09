@@ -122,8 +122,10 @@ export default function ChecklistPage() {
     };
 
     const parseThaiDate = (dateStr) => {
-        if (!dateStr) return new Date();
+        if (!dateStr) return null;
         const str = String(dateStr).trim();
+        if (!str) return null;
+
         let date;
 
         // Enforce d/m/y parsing for Google Sheet exports
@@ -154,8 +156,8 @@ export default function ChecklistPage() {
         }
 
         if (!isValid(date)) {
-            console.warn("Invalid date parsed:", dateStr);
-            return new Date();
+            // console.warn("Invalid date parsed:", dateStr);
+            return null;
         }
         return date;
     }
