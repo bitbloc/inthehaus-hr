@@ -156,7 +156,10 @@ export default function ChecklistPage() {
             return new Date((parseFloat(dateStr) - 25569) * 86400 * 1000);
         }
 
-        const str = String(dateStr).trim();
+        // Clean string: Normalize
+        // Replace comma with space, then collapse multiple spaces
+        // "1/1/2026, 4:05:59" -> "1/1/2026 4:05:59"
+        const str = String(dateStr).replace(/,/g, ' ').replace(/\s+/g, ' ').trim();
 
         // Case 2: DD/MM/YYYY HH:mm:ss (Common in TH/UK Sheets)
         // Try parsing with explicit format
@@ -165,7 +168,9 @@ export default function ChecklistPage() {
             'd/M/yyyy HH:mm:ss',
             'dd/MM/yyyy HH:mm:ss',
             'M/d/yyyy H:mm:ss',
-            'yyyy-MM-dd HH:mm:ss'
+            'yyyy-MM-dd HH:mm:ss',
+            'd/M/yyyy H:mm',
+            'd/M/yyyy'
         ];
 
         for (const fmt of formatsToTry) {
@@ -177,7 +182,7 @@ export default function ChecklistPage() {
         const nativeParse = new Date(str);
         if (isValid(nativeParse)) return nativeParse;
 
-        return null;
+        return null; // Strict return null to avoid "1970"
     };
 
     // --- Helper: Photo Link Extractor ---
