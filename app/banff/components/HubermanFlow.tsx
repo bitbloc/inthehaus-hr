@@ -6,82 +6,33 @@ import {
     FaSun, FaCoffee, FaPen,
     FaClock, FaWalking, FaPalette, FaBroom,
     FaListUl, FaTv, FaBan,
-    FaChevronDown, FaChevronUp, FaInfoCircle
+    FaChevronDown, FaChevronUp, FaInfoCircle,
+    FaPlus, FaTrash
 } from 'react-icons/fa';
+import * as FaIcons from 'react-icons/fa';
+import { useBanffStore } from '@/store/useBanffStore';
+import AddProtocolModal from './AddProtocolModal';
+import { supabase } from '@/lib/supabaseClient';
 
-// Daily Protocols Data
-const PROTOCOLS = {
+// Protocol Metadata (Static info)
+const PROTOCOL_META = {
     MORNING: {
         title: 'Morning Protocol',
         subtitle: '"Cache Clearing" (07:00 - 09:00)',
         color: 'amber', // Maps to ENERGY (Yellow/Amber)
         metricKey: 'energy_score',
-        items: [
-            {
-                id: 'delayed_input',
-                label: 'Delayed Input (30 นาทีแรก)',
-                desc: 'ห้ามจับมือถือ/ข่าว. ตื่นมาดื่มน้ำ ดูต้นไม้ หรือชงกาแฟ (โฟกัสกลิ่น/เสียง).',
-                why: 'ป้องกันสมอง Boot up เร็วเกินไป. บังคับให้อยู่ในโหมด Sensing ก่อน Thinking.',
-                icon: FaCoffee,
-                weight: 50
-            },
-            {
-                id: 'brain_dump',
-                label: 'Unfiltered Brain Dump (10 นาที)',
-                desc: 'เขียน Morning Pages. ขีดเส้นใต้ 1 อย่างที่ต้องทำวันนี้. ที่เหลือเขียน "Pending".',
-                why: 'ลด Noise ระหว่างวัน ไม่ให้รู้สึกผิดลึกๆ ว่าลืมทำอะไร.',
-                icon: FaPen,
-                weight: 50
-            },
-        ]
     },
     DAYTIME: {
         title: 'Daytime Protocol',
         subtitle: '"Reality Anchoring" (10:00 - 17:00)',
         color: 'emerald', // Maps to FOCUS (Green/Emerald)
         metricKey: 'focus_score',
-        items: [
-            {
-                id: 'good_enough',
-                label: 'The "Good Enough" Timer',
-                desc: 'ตั้งเวลาทำงาน (เช่น 45 นาที). พอหมดเวลาถามตัวเอง "ดีระดับ 80% หรือยัง?" ถ้าถึงแล้วให้พอ.',
-                why: 'แก้ Perfectionism. ท่องไว้ "Done is better than perfect."',
-                icon: FaClock,
-                weight: 50
-            },
-            {
-                id: 'sensing_break',
-                label: 'Active Sensing Break (ทุก 2 ชม.)',
-                desc: 'เมื่อหัวบวม ให้ลุกทันที. วาดรูปสั้นๆ, ล้างจาน, รดน้ำต้นไม้.',
-                why: 'การดึงตัวเองกลับมาอยู่กับ "ผัสสะ" ทางกายภาพ คือยาแก้แพ้ Overthinking.',
-                icon: FaWalking,
-                weight: 50
-            },
-        ]
     },
     EVENING: {
         title: 'Evening Protocol',
         subtitle: '"System Shutdown" (19:00 - 22:00)',
         color: 'indigo', // Maps to MOOD (Blue/Indigo)
         metricKey: 'mood_score',
-        items: [
-            {
-                id: 'not_to_do',
-                label: 'The "Not-To-Do" List',
-                desc: 'เช็คว่าวันนี้สำเร็จในการ "ไม่ทำ" อะไรบ้าง (เช่น ไม่ตอบไลน์หลัง 2 ทุ่ม).',
-                why: 'ฝึกให้เห็นคุณค่าของการ "ปฏิเสธ" และการ "หยุด".',
-                icon: FaListUl,
-                weight: 50
-            },
-            {
-                id: 'passive_ent',
-                label: 'Passive Entertainment (Low-Res)',
-                desc: 'ดูหนังเก่า/Sitcom ที่ไม่ต้องลุ้น. ห้ามดูอะไรที่ "พัฒนาตัวเอง" หลัง 3 ทุ่ม.',
-                why: 'หยุดสมองส่วน Ni (คาดเดาอนาคต).',
-                icon: FaTv,
-                weight: 50
-            },
-        ]
     }
 };
 
@@ -91,7 +42,10 @@ interface HubermanFlowProps {
 }
 
 export default function HubermanFlow({ metrics, onUpdate }: HubermanFlowProps) {
+    const { protocolActivities, deleteProtocolActivity } = useBanffStore();
     const [openCategory, setOpenCategory] = useState<string | null>('MORNING');
+    const [showAddModal, setShowAddModal] = useState(false);
+    const [addCategory, setAddCategory] = useState<'MORNING' | 'DAYTIME' | 'EVENING'>('MORNING');
 
     // Parse existing checklist from note if available
     const [checkedItems, setCheckedItems] = useState<string[]>(() => {
@@ -115,16 +69,25 @@ export default function HubermanFlow({ metrics, onUpdate }: HubermanFlowProps) {
         }
     }, [metrics?.note]);
 
-    const calculateScore = (categoryKey: string, currentChecked: string[]) => {
-        // @ts-ignore
-        const categoryData = PROTOCOLS[categoryKey];
-        if (!categoryData) return 0;
+    const getCategoryItems = (category: string) => {
+        return protocolActivities.filter(p => p.category === category);
+    };
 
-        let score = 0;
-        categoryData.items.forEach((item: any) => {
-            if (currentChecked.includes(item.id)) score += item.weight;
+    const calculateScore = (categoryKey: string, currentChecked: string[]) => {
+        const items = getCategoryItems(categoryKey);
+        if (items.length === 0) return 0;
+
+        let totalWeight = items.reduce((sum, item) => sum + (item.weight || 1), 0);
+        let checkedWeight = 0;
+
+        items.forEach(item => {
+            if (currentChecked.includes(item.id)) {
+                checkedWeight += (item.weight || 1);
+            }
         });
-        return Math.min(100, score);
+
+        if (totalWeight === 0) return 0;
+        return Math.round((checkedWeight / totalWeight) * 100);
     };
 
     const handleToggle = (itemId: string, categoryKey: string) => {
@@ -138,7 +101,7 @@ export default function HubermanFlow({ metrics, onUpdate }: HubermanFlowProps) {
         const newScore = calculateScore(categoryKey, newChecked);
 
         // @ts-ignore
-        const metricKey = PROTOCOLS[categoryKey].metricKey;
+        const metricKey = PROTOCOL_META[categoryKey].metricKey;
 
         // Create new Note object to persist checklist state
         const newNote = JSON.stringify({ checklist: newChecked });
@@ -146,21 +109,38 @@ export default function HubermanFlow({ metrics, onUpdate }: HubermanFlowProps) {
         onUpdate(metricKey, newScore, newNote);
     };
 
+    const handleDelete = async (e: React.MouseEvent, id: string) => {
+        e.stopPropagation();
+        if (!confirm('Are you sure you want to delete this activity?')) return;
+
+        const { error } = await supabase.from('protocol_activities').delete().eq('id', id);
+        if (!error) {
+            deleteProtocolActivity(id);
+        } else {
+            alert('Failed to delete');
+        }
+    };
+
     // Helper to get current score for a category based on metrics props
-    // We can't rely solely on 'checkedItems' for initial render of the score number 
-    // because metrics prop is the source of truth for the DB value.
     const getCategoryScore = (catKey: string) => {
         // @ts-ignore
-        const key = PROTOCOLS[catKey].metricKey;
+        const key = PROTOCOL_META[catKey].metricKey;
         return metrics?.[key] || 0;
     };
 
     return (
         <div className="space-y-4">
-            {(Object.keys(PROTOCOLS) as Array<keyof typeof PROTOCOLS>).map((key) => {
-                const category = PROTOCOLS[key];
+            <AddProtocolModal
+                isOpen={showAddModal}
+                onClose={() => setShowAddModal(false)}
+                category={addCategory}
+            />
+
+            {(Object.keys(PROTOCOL_META) as Array<keyof typeof PROTOCOL_META>).map((key) => {
+                const category = PROTOCOL_META[key];
                 const isOpen = openCategory === key;
                 const score = getCategoryScore(key);
+                const items = getCategoryItems(key);
 
                 return (
                     <motion.div
@@ -195,54 +175,81 @@ export default function HubermanFlow({ metrics, onUpdate }: HubermanFlowProps) {
                                     className="border-t border-zinc-800/50 bg-zinc-900/30"
                                 >
                                     <div className="p-4 space-y-3">
-                                        {category.items.map((item) => {
-                                            const isChecked = checkedItems.includes(item.id);
-                                            const Icon = item.icon;
-                                            return (
-                                                <div
-                                                    key={item.id}
-                                                    onClick={() => handleToggle(item.id, key)}
-                                                    className={`
+                                        {items.length === 0 ? (
+                                            <div className="text-center py-4 text-zinc-600 text-sm italic">
+                                                No activities yet. Add one to start.
+                                            </div>
+                                        ) : (
+                                            items.map((item) => {
+                                                const isChecked = checkedItems.includes(item.id);
+                                                // @ts-ignore
+                                                const Icon = FaIcons[item.icon] || FaCoffee;
+
+                                                return (
+                                                    <div
+                                                        key={item.id}
+                                                        onClick={() => handleToggle(item.id, key)}
+                                                        className={`
                                                         relative overflow-hidden group
                                                         flex flex-col gap-2 p-4 rounded-2xl cursor-pointer transition-all duration-300
                                                         border
                                                         ${isChecked
-                                                            ? `bg-${category.color}-900/10 border-${category.color}-500/30`
-                                                            : 'bg-zinc-800/20 border-zinc-800/50 hover:bg-zinc-800/40 hover:border-zinc-700'}
+                                                                ? `bg-${category.color}-900/10 border-${category.color}-500/30`
+                                                                : 'bg-zinc-800/20 border-zinc-800/50 hover:bg-zinc-800/40 hover:border-zinc-700'}
                                                     `}
-                                                >
-                                                    <div className="flex items-start gap-4">
-                                                        {/* Checkbox */}
-                                                        <div className={`
+                                                    >
+                                                        <div className="flex items-start gap-4">
+                                                            {/* Checkbox */}
+                                                            <div className={`
                                                             mt-1 w-6 h-6 rounded-full border flex-shrink-0 flex items-center justify-center transition-all duration-300
                                                             ${isChecked
-                                                                ? `bg-${category.color}-500 border-${category.color}-500 text-black scale-110`
-                                                                : `border-zinc-600 text-transparent group-hover:border-${category.color}-400/50`}
+                                                                    ? `bg-${category.color}-500 border-${category.color}-500 text-black scale-110`
+                                                                    : `border-zinc-600 text-transparent group-hover:border-${category.color}-400/50`}
                                                         `}>
-                                                            <FaSun className="w-3 h-3" />
-                                                        </div>
-
-                                                        {/* Content */}
-                                                        <div className="flex-1 space-y-1">
-                                                            <div className="flex items-center gap-2">
-                                                                <span className={`font-medium text-base ${isChecked ? 'text-zinc-300 line-through opacity-70' : 'text-zinc-200'}`}>
-                                                                    {item.label}
-                                                                </span>
-                                                                <Icon className={`mx-2 text-sm ${isChecked ? `text-${category.color}-400/50` : 'text-zinc-500'}`} />
+                                                                <FaSun className="w-3 h-3" />
                                                             </div>
-                                                            <p className={`text-sm leading-relaxed ${isChecked ? 'text-zinc-500' : 'text-zinc-400'}`}>
-                                                                {item.desc}
-                                                            </p>
-                                                            {/* Why Section */}
-                                                            <div className={`text-xs mt-2 p-2 rounded-lg flex gap-2 items-start ${isChecked ? 'bg-zinc-900/30 text-zinc-600' : 'bg-zinc-900/50 text-zinc-500'}`}>
-                                                                <FaInfoCircle className="flex-shrink-0 mt-0.5" />
-                                                                <span><strong className="opacity-80">Why:</strong> {item.why}</span>
+
+                                                            {/* Content */}
+                                                            <div className="flex-1 space-y-1">
+                                                                <div className="flex items-center justify-between">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className={`font-medium text-base ${isChecked ? 'text-zinc-300 line-through opacity-70' : 'text-zinc-200'}`}>
+                                                                            {item.label}
+                                                                        </span>
+                                                                        <Icon className={`mx-2 text-sm ${isChecked ? `text-${category.color}-400/50` : 'text-zinc-500'}`} />
+                                                                    </div>
+                                                                    {/* Delete Button (Visible on Hover) */}
+                                                                    <button
+                                                                        onClick={(e) => handleDelete(e, item.id)}
+                                                                        className="opacity-0 group-hover:opacity-100 p-2 text-zinc-600 hover:text-red-400 transition-opacity"
+                                                                        title="Delete activity"
+                                                                    >
+                                                                        <FaTrash />
+                                                                    </button>
+                                                                </div>
+
+                                                                {item.description && (
+                                                                    <p className={`text-sm leading-relaxed ${isChecked ? 'text-zinc-500' : 'text-zinc-400'}`}>
+                                                                        {item.description}
+                                                                    </p>
+                                                                )}
                                                             </div>
                                                         </div>
                                                     </div>
-                                                </div>
-                                            );
-                                        })}
+                                                );
+                                            })
+                                        )}
+
+                                        {/* Add Button */}
+                                        <button
+                                            onClick={() => {
+                                                setAddCategory(key);
+                                                setShowAddModal(true);
+                                            }}
+                                            className="w-full py-3 rounded-2xl border border-dashed border-zinc-800 text-zinc-500 hover:text-emerald-400 hover:border-emerald-500/50 hover:bg-emerald-500/10 transition-all flex items-center justify-center gap-2 text-sm font-medium"
+                                        >
+                                            <FaPlus /> Add Activity
+                                        </button>
                                     </div>
                                 </motion.div>
                             )}
@@ -253,3 +260,4 @@ export default function HubermanFlow({ metrics, onUpdate }: HubermanFlowProps) {
         </div>
     );
 }
+

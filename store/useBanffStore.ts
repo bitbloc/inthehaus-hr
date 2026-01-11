@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Lifestyle, Habit, HabitLog, DailyMetric } from '../types/banff';
+import { Lifestyle, Habit, HabitLog, DailyMetric, ProtocolActivity } from '../types/banff';
 import { getTodayDateString } from '../utils/date';
 
 interface BanffState {
@@ -10,6 +10,7 @@ interface BanffState {
     totalLogs: number; // For XP
     todayMetrics: DailyMetric | null;
     selectedLifestyleId: string | null;
+    protocolActivities: ProtocolActivity[];
 
     // Actions
     setLifestyles: (lifestyles: Lifestyle[]) => void;
@@ -22,6 +23,11 @@ interface BanffState {
     setRecentLogs: (logs: HabitLog[]) => void;
     setTotalLogs: (count: number) => void;
     setTodayMetrics: (metrics: DailyMetric) => void;
+
+    // Protocol Actions
+    setProtocolActivities: (activities: ProtocolActivity[]) => void;
+    addProtocolActivity: (activity: ProtocolActivity) => void;
+    deleteProtocolActivity: (id: string) => void;
 
     // Timer State
     timer: {
@@ -56,6 +62,7 @@ export const useBanffStore = create<BanffState>((set, get) => ({
     totalLogs: 0,
     todayMetrics: null,
     selectedLifestyleId: null,
+    protocolActivities: [],
 
     // Vault
     vaultTransactions: [],
@@ -92,6 +99,12 @@ export const useBanffStore = create<BanffState>((set, get) => ({
     setRecentLogs: (logs) => set({ recentLogs: logs }),
     setTotalLogs: (count) => set({ totalLogs: count }),
     setTodayMetrics: (metrics) => set({ todayMetrics: metrics }),
+
+    setProtocolActivities: (activities) => set({ protocolActivities: activities }),
+    addProtocolActivity: (activity) => set((state) => ({ protocolActivities: [...state.protocolActivities, activity] })),
+    deleteProtocolActivity: (id) => set((state) => ({
+        protocolActivities: state.protocolActivities.filter(a => a.id !== id)
+    })),
 
     setVaultTransactions: (txs) => set({ vaultTransactions: txs }),
 

@@ -50,4 +50,16 @@ export interface DailyMetric {
     note?: string;
 }
 
+
 export type DayOfWeek = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+
+export interface ProtocolActivity {
+    id: string;
+    user_id: string;
+    category: 'MORNING' | 'DAYTIME' | 'EVENING';
+    label: string;
+    description?: string;
+    icon?: string;
+    weight: number;
+    is_default: boolean;
+}

@@ -20,7 +20,7 @@ import LevelUpModal from './components/LevelUpModal';
 import { SINGLE_USER_ID } from './constants';
 
 export default function BanffPage() {
-    const { habits, todayLogs, recentLogs, todayMetrics, totalLogs, setHabits, setTodayLogs, setRecentLogs, setTodayMetrics, setTotalLogs, updateMetricOptimistic } = useBanffStore();
+    const { habits, todayLogs, recentLogs, todayMetrics, totalLogs, setHabits, setTodayLogs, setRecentLogs, setTodayMetrics, setTotalLogs, updateMetricOptimistic, setProtocolActivities } = useBanffStore();
     const [showLevelUp, setShowLevelUp] = React.useState(false);
     const [prevLevel, setPrevLevel] = React.useState(1);
     const [weeklyMetrics, setWeeklyMetrics] = React.useState<any[]>([]);
@@ -140,6 +140,13 @@ export default function BanffPage() {
                     vaultBalance: logsSum + txsSum,
                     vaultTransactions: allTxs
                 });
+            }
+
+            // 7. Fetch Protocol Activities
+            const { data: protocolData } = await supabase.from('protocol_activities').select('*').order('created_at', { ascending: true });
+            if (protocolData) {
+                // @ts-ignore
+                setProtocolActivities(protocolData);
             }
         };
 
