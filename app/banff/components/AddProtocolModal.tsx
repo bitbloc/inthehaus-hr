@@ -24,6 +24,12 @@ const ICONS = [
     { name: 'FaMusic', icon: FaMusic },
 ];
 
+const CATEGORY_DISPLAY_MAP = {
+    MORNING: 'พลังงาน (Energy)',
+    DAYTIME: 'สมาธิ (Focus)',
+    EVENING: 'อารมณ์ (Mood)',
+};
+
 export default function AddProtocolModal({ isOpen, onClose, category, initialData }: AddProtocolModalProps & { initialData?: ProtocolActivity }) {
     const { addProtocolActivity, updateProtocolActivity } = useBanffStore();
     const [label, setLabel] = useState(initialData?.label || '');
@@ -115,7 +121,7 @@ export default function AddProtocolModal({ isOpen, onClose, category, initialDat
                     <FaTimes />
                 </button>
 
-                <h2 className="text-xl font-bold text-white mb-1">{initialData ? 'Edit' : 'Add'} {category} Activity</h2>
+                <h2 className="text-xl font-bold text-white mb-1">{initialData ? 'Edit' : 'Add'} {CATEGORY_DISPLAY_MAP[category]} Activity</h2>
                 <p className="text-sm text-zinc-500 mb-6">{initialData ? 'Modify your routine details.' : 'Create a new routine for your protocol.'}</p>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
