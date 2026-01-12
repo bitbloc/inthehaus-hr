@@ -17,19 +17,19 @@ import { supabase } from '@/lib/supabaseClient';
 // Protocol Metadata (Static info)
 const PROTOCOL_META = {
     MORNING: {
-        title: 'Morning Protocol',
+        title: 'พลังงาน (Energy)',
         subtitle: '"Cache Clearing" (07:00 - 09:00)',
         color: 'amber', // Maps to ENERGY (Yellow/Amber)
         metricKey: 'energy_score',
     },
     DAYTIME: {
-        title: 'Daytime Protocol',
+        title: 'สมาธิ (Focus)',
         subtitle: '"Reality Anchoring" (10:00 - 17:00)',
         color: 'emerald', // Maps to FOCUS (Green/Emerald)
         metricKey: 'focus_score',
     },
     EVENING: {
-        title: 'Evening Protocol',
+        title: 'อารมณ์ (Mood)',
         subtitle: '"System Shutdown" (19:00 - 22:00)',
         color: 'indigo', // Maps to MOOD (Blue/Indigo)
         metricKey: 'mood_score',
