@@ -46,6 +46,7 @@ export default function HubermanFlow({ metrics, onUpdate }: HubermanFlowProps) {
     const [openCategory, setOpenCategory] = useState<string | null>('MORNING');
     const [showAddModal, setShowAddModal] = useState(false);
     const [addCategory, setAddCategory] = useState<'MORNING' | 'DAYTIME' | 'EVENING'>('MORNING');
+    const [editingActivity, setEditingActivity] = useState<any>(null);
 
     // Parse existing checklist from note if available
     const [checkedItems, setCheckedItems] = useState<string[]>(() => {
@@ -132,8 +133,12 @@ export default function HubermanFlow({ metrics, onUpdate }: HubermanFlowProps) {
         <div className="space-y-4">
             <AddProtocolModal
                 isOpen={showAddModal}
-                onClose={() => setShowAddModal(false)}
+                onClose={() => {
+                    setShowAddModal(false);
+                    setEditingActivity(null);
+                }}
                 category={addCategory}
+                initialData={editingActivity}
             />
 
             {(Object.keys(PROTOCOL_META) as Array<keyof typeof PROTOCOL_META>).map((key) => {
@@ -219,6 +224,18 @@ export default function HubermanFlow({ metrics, onUpdate }: HubermanFlowProps) {
                                                                         <Icon className={`mx-2 text-sm ${isChecked ? `text-${category.color}-400/50` : 'text-zinc-500'}`} />
                                                                     </div>
                                                                     {/* Delete Button (Visible on Hover) */}
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            setEditingActivity(item);
+                                                                            setAddCategory(key as any);
+                                                                            setShowAddModal(true);
+                                                                        }}
+                                                                        className="opacity-0 group-hover:opacity-100 p-2 text-zinc-600 hover:text-emerald-400 transition-opacity"
+                                                                        title="Edit activity"
+                                                                    >
+                                                                        <FaPen />
+                                                                    </button>
                                                                     <button
                                                                         onClick={(e) => handleDelete(e, item.id)}
                                                                         className="opacity-0 group-hover:opacity-100 p-2 text-zinc-600 hover:text-red-400 transition-opacity"

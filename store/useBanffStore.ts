@@ -27,6 +27,7 @@ interface BanffState {
     // Protocol Actions
     setProtocolActivities: (activities: ProtocolActivity[]) => void;
     addProtocolActivity: (activity: ProtocolActivity) => void;
+    updateProtocolActivity: (activity: ProtocolActivity) => void;
     deleteProtocolActivity: (id: string) => void;
 
     // Timer State
@@ -102,6 +103,9 @@ export const useBanffStore = create<BanffState>((set, get) => ({
 
     setProtocolActivities: (activities) => set({ protocolActivities: activities }),
     addProtocolActivity: (activity) => set((state) => ({ protocolActivities: [...state.protocolActivities, activity] })),
+    updateProtocolActivity: (activity) => set((state) => ({
+        protocolActivities: state.protocolActivities.map(a => a.id === activity.id ? activity : a)
+    })),
     deleteProtocolActivity: (id) => set((state) => ({
         protocolActivities: state.protocolActivities.filter(a => a.id !== id)
     })),

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useBanffStore } from '@/store/useBanffStore';
 import { ProtocolActivity } from '@/types/banff';
@@ -24,12 +24,21 @@ const ICONS = [
     { name: 'FaMusic', icon: FaMusic },
 ];
 
-export default function AddProtocolModal({ isOpen, onClose, category }: AddProtocolModalProps) {
-    const { addProtocolActivity } = useBanffStore();
-    const [label, setLabel] = useState('');
-    const [description, setDescription] = useState('');
-    const [selectedIcon, setSelectedIcon] = useState('FaCoffee');
+export default function AddProtocolModal({ isOpen, onClose, category, initialData }: AddProtocolModalProps & { initialData?: ProtocolActivity }) {
+    const { addProtocolActivity, updateProtocolActivity } = useBanffStore();
+    const [label, setLabel] = useState(initialData?.label || '');
+    const [description, setDescription] = useState(initialData?.description || '');
+    const [selectedIcon, setSelectedIcon] = useState(initialData?.icon || 'FaCoffee');
     const [loading, setLoading] = useState(false);
+
+    // Reset state when modal opens/closes or initialData changes
+    useEffect(() => {
+        if (isOpen) {
+            setLabel(initialData?.label || '');
+            setDescription(initialData?.description || '');
+            setSelectedIcon(initialData?.icon || 'FaCoffee');
+        }
+    }, [isOpen, initialData]);
 
     if (!isOpen) return null;
 
@@ -41,7 +50,7 @@ export default function AddProtocolModal({ isOpen, onClose, category }: AddProto
             const { data: { user } } = await supabase.auth.getUser();
             const userId = user?.id || SINGLE_USER_ID;
 
-            const newActivity = {
+            const activityData = {
                 user_id: userId,
                 category,
                 label,
@@ -51,24 +60,46 @@ export default function AddProtocolModal({ isOpen, onClose, category }: AddProto
                 is_default: false
             };
 
-            const { data, error } = await supabase
-                .from('protocol_activities')
-                .insert(newActivity)
-                .select()
-                .single();
+            let data, error;
+
+            if (initialData) {
+                // Update existing
+                const result = await supabase
+                    .from('protocol_activities')
+                    .update(activityData)
+                    .eq('id', initialData.id)
+                    .select()
+                    .single();
+                data = result.data;
+                error = result.error;
+            } else {
+                // Insert new
+                const result = await supabase
+                    .from('protocol_activities')
+                    .insert(activityData)
+                    .select()
+                    .single();
+                data = result.data;
+                error = result.error;
+            }
 
             if (error) throw error;
 
             if (data) {
-                // @ts-ignore
-                addProtocolActivity(data as ProtocolActivity);
+                if (initialData) {
+                    // @ts-ignore
+                    updateProtocolActivity(data as ProtocolActivity);
+                } else {
+                    // @ts-ignore
+                    addProtocolActivity(data as ProtocolActivity);
+                }
                 onClose();
                 setLabel('');
                 setDescription('');
             }
         } catch (error) {
-            console.error("Failed to add activity:", error);
-            alert("Failed to add activity. Please try again.");
+            console.error("Failed to save activity:", error);
+            alert("Failed to save activity. Please try again.");
         } finally {
             setLoading(false);
         }
@@ -84,8 +115,8 @@ export default function AddProtocolModal({ isOpen, onClose, category }: AddProto
                     <FaTimes />
                 </button>
 
-                <h2 className="text-xl font-bold text-white mb-1">Add {category} Activity</h2>
-                <p className="text-sm text-zinc-500 mb-6">Create a new routine for your protocol.</p>
+                <h2 className="text-xl font-bold text-white mb-1">{initialData ? 'Edit' : 'Add'} {category} Activity</h2>
+                <p className="text-sm text-zinc-500 mb-6">{initialData ? 'Modify your routine details.' : 'Create a new routine for your protocol.'}</p>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
@@ -138,7 +169,7 @@ export default function AddProtocolModal({ isOpen, onClose, category }: AddProto
                         disabled={loading}
                         className="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-bold py-3 rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2 mt-4"
                     >
-                        {loading ? 'Adding...' : <><FaPlus /> Add Activity</>}
+                        {loading ? 'Saving...' : <>{initialData ? <FaPlus className="rotate-45" /> : <FaPlus />} {initialData ? 'Save Changes' : 'Add Activity'}</>}
                     </button>
                 </form>
             </div>
