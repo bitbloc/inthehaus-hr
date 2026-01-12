@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useBanffStore } from '@/store/useBanffStore';
 import { ProtocolActivity } from '@/types/banff';
+import { SINGLE_USER_ID } from '../constants';
 import { FaTimes, FaPlus, FaCoffee, FaClock, FaWalking, FaListUl, FaTv, FaBook, FaDumbbell, FaMusic } from 'react-icons/fa';
 
 interface AddProtocolModalProps {
@@ -36,35 +37,41 @@ export default function AddProtocolModal({ isOpen, onClose, category }: AddProto
         e.preventDefault();
         setLoading(true);
 
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            const userId = user?.id || SINGLE_USER_ID;
 
-        const newActivity = {
-            user_id: user.id,
-            category,
-            label,
-            description,
-            icon: selectedIcon,
-            weight: 1,
-            is_default: false
-        };
+            const newActivity = {
+                user_id: userId,
+                category,
+                label,
+                description,
+                icon: selectedIcon,
+                weight: 1,
+                is_default: false
+            };
 
-        const { data, error } = await supabase
-            .from('protocol_activities')
-            .insert(newActivity)
-            .select()
-            .single();
+            const { data, error } = await supabase
+                .from('protocol_activities')
+                .insert(newActivity)
+                .select()
+                .single();
 
-        if (data) {
-            // @ts-ignore
-            addProtocolActivity(data as ProtocolActivity);
-            onClose();
-            setLabel('');
-            setDescription('');
-        } else {
-            console.error(error);
+            if (error) throw error;
+
+            if (data) {
+                // @ts-ignore
+                addProtocolActivity(data as ProtocolActivity);
+                onClose();
+                setLabel('');
+                setDescription('');
+            }
+        } catch (error) {
+            console.error("Failed to add activity:", error);
+            alert("Failed to add activity. Please try again.");
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
 
     return (
@@ -115,8 +122,8 @@ export default function AddProtocolModal({ isOpen, onClose, category }: AddProto
                                         type="button"
                                         onClick={() => setSelectedIcon(item.name)}
                                         className={`p-3 rounded-xl border transition-all ${selectedIcon === item.name
-                                                ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400'
-                                                : 'bg-zinc-800/30 border-zinc-700 text-zinc-500'
+                                            ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400'
+                                            : 'bg-zinc-800/30 border-zinc-700 text-zinc-500'
                                             }`}
                                     >
                                         <Icon />
