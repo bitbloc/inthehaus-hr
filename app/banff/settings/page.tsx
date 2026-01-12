@@ -1,14 +1,43 @@
 'use client';
 
+import React, { useEffect } from 'react';
 import Link from 'next/link';
 import HabitForm from '../components/HabitForm';
 import LifestyleGrid from '../components/LifestyleGrid';
 import HabitManager from '../components/HabitManager';
 import ProfileCard from '../components/ProfileCard';
 import { useBanffStore } from '@/store/useBanffStore';
+import { supabase } from '@/lib/supabaseClient';
+import { SINGLE_USER_ID } from '../constants';
+import { subDays } from 'date-fns';
 
 export default function BanffSettingsPage() {
-    const { habits, totalLogs, lifestyles } = useBanffStore();
+    const { habits, totalLogs, lifestyles, setHabits, setLifestyles, setTotalLogs } = useBanffStore();
+
+    useEffect(() => {
+        const fetchData = async () => {
+            // 1. Fetch Habits
+            const { data: habitsData } = await supabase.from('habits').select('*').eq('is_archived', false);
+            if (habitsData) {
+                // @ts-ignore
+                setHabits(habitsData);
+            }
+
+            // 2. Fetch Lifestyles
+            const { data: lifestylesData } = await supabase.from('lifestyles').select('*');
+            if (lifestylesData) {
+                // @ts-ignore
+                useBanffStore.getState().setLifestyles(lifestylesData);
+            }
+
+            // 3. Fetch Logs (Total for XP)
+            const { count } = await supabase.from('habit_logs').select('*', { count: 'exact', head: true });
+            if (count !== null) setTotalLogs(count);
+        };
+
+        // Only fetch if empty (or always to ensure freshness? Always for settings)
+        fetchData();
+    }, [setHabits, setLifestyles, setTotalLogs]);
 
     // XP Logic Reused (Should ideally be in a hook/helper)
     const XP_PER_LOG = 10;
