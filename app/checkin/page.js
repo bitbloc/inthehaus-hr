@@ -307,6 +307,9 @@ export default function CheckIn() {
         </div>
 
         <div className="flex items-center gap-3">
+          <Link href="https://forms.gle/3LdW9zdjdTCpfpTe8" target="_blank" className="text-[10px] font-medium text-neutral-400 hover:text-neutral-800 transition-colors mr-1">
+            คำขอเบิกเงินล่วงหน้า
+          </Link>
           {profile ? (
             <div className="flex items-center gap-3">
               <div className="flex flex-col items-end">
