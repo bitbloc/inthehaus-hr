@@ -368,16 +368,7 @@ export default function CheckIn() {
         )}
       </AnimatePresence>
 
-      {/* 2.5 Weather Card */}
-      <AnimatePresence>
-        {userPosition && (
-          <WeatherCard
-            latitude={userPosition.lat}
-            longitude={userPosition.lon}
-            locationName={status.includes('Ready') ? 'In The Haus' : 'Remote'}
-          />
-        )}
-      </AnimatePresence>
+
 
       {/* 3. Hero Clock */}
       <div className="flex-1 flex flex-col items-center justify-center w-full z-10 -mt-10">
@@ -437,6 +428,16 @@ export default function CheckIn() {
 
       {/* 4. Recent Checkins (Glass Cards) */}
       <div className="w-full max-w-sm px-6 z-10 mb-8">
+        <AnimatePresence>
+          {userPosition && (
+            <WeatherCard
+              latitude={userPosition.lat}
+              longitude={userPosition.lon}
+              locationName={status.includes('Ready') ? 'In The Haus' : 'Remote'}
+            />
+          )}
+        </AnimatePresence>
+
         <h3 className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-4 pl-2">Recent Activity</h3>
         <div className="flex flex-col gap-2">
           <AnimatePresence>

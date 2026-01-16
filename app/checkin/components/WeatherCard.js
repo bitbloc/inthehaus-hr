@@ -53,7 +53,7 @@ export default function WeatherCard({ latitude, longitude, locationName = "Curre
         <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mt-6 mx-6 w-full max-w-sm z-10 mb-6"
+            className="w-full max-w-sm z-10 mb-6 px-6"
         >
             <div className="flex items-center justify-between px-5 py-3 bg-white/60 backdrop-blur-md rounded-2xl border border-white/60 shadow-sm relative overflow-hidden">
                 {/* Decorative background blob */}
