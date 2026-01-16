@@ -53,7 +53,7 @@ export default function WeatherCard({ latitude, longitude, locationName = "Curre
         <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mt-6 mx-6 w-full max-w-sm z-10"
+            className="mt-6 mx-6 w-full max-w-sm z-10 mb-6"
         >
             <div className="flex items-center justify-between px-5 py-3 bg-white/60 backdrop-blur-md rounded-2xl border border-white/60 shadow-sm relative overflow-hidden">
                 {/* Decorative background blob */}
@@ -72,7 +72,7 @@ export default function WeatherCard({ latitude, longitude, locationName = "Curre
                         <div className="flex justify-between items-start">
                             <div>
                                 <h4 className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest flex items-center gap-1">
-                                    📍 {locationName}
+                                    📍 {weather?.address || locationName}
                                 </h4>
                                 <div className="flex items-baseline gap-1">
                                     {loading ? (

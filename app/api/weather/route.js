@@ -27,12 +27,35 @@ export async function GET(request) {
             return NextResponse.json({ error: 'No weather data available' }, { status: 500 });
         }
 
+        let locationName = null;
+        try {
+            const geoRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=10`, {
+                headers: {
+                    'User-Agent': 'InTheHausHR/1.0 (internal tool)'
+                }
+            });
+            if (geoRes.ok) {
+                const geoData = await geoRes.json();
+                // Try to construct a readable location string: "District, Province" or "City, Country"
+                const addr = geoData.address;
+                const parts = [];
+                if (addr.city || addr.town || addr.village || addr.county) parts.push(addr.city || addr.town || addr.village || addr.county);
+                if (addr.state || addr.province) parts.push(addr.state || addr.province);
+                if (addr.country) parts.push(addr.country);
+
+                locationName = parts.length > 0 ? parts.slice(0, 2).join(', ') : null;
+            }
+        } catch (e) {
+            console.error("Geocode error", e);
+        }
+
         return NextResponse.json({
             temperature: current.temperature,
             conditionCode: current.weatherCode,
             humidity: current.humidity,
             windSpeed: current.windSpeed,
-            location: { lat, lon } // Echo back or reverse geocode if needed later
+            address: locationName,
+            location: { lat, lon }
         });
 
     } catch (error) {
