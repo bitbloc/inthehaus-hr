@@ -25,6 +25,8 @@ function cn(...inputs) {
   return twMerge(clsx(inputs));
 }
 
+import WeatherCard from "./components/WeatherCard";
+
 export default function CheckIn() {
   // --- State ---
   const [profile, setProfile] = useState(null);
@@ -34,6 +36,7 @@ export default function CheckIn() {
   const [lastAction, setLastAction] = useState(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [employeeData, setEmployeeData] = useState(null);
+  const [userPosition, setUserPosition] = useState(null); // { lat, lon }
 
   // Shift Context
   const [shiftContext, setShiftContext] = useState(null);
@@ -177,7 +180,10 @@ export default function CheckIn() {
   };
 
   const onGeoSuccess = (position) => {
-    const dist = getDistanceFromLatLonInKm(position.coords.latitude, position.coords.longitude, SHOP_LAT, SHOP_LONG);
+    const coords = { lat: position.coords.latitude, lon: position.coords.longitude };
+    setUserPosition(coords);
+
+    const dist = getDistanceFromLatLonInKm(coords.lat, coords.lon, SHOP_LAT, SHOP_LONG);
     if (dist <= ALLOWED_RADIUS_KM) setStatus("📍 Ready");
     else setStatus(`❌ Range (${dist.toFixed(3)}km)`);
   };
@@ -359,6 +365,17 @@ export default function CheckIn() {
               )}
             </div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 2.5 Weather Card */}
+      <AnimatePresence>
+        {userPosition && (
+          <WeatherCard
+            latitude={userPosition.lat}
+            longitude={userPosition.lon}
+            locationName={status.includes('Ready') ? 'In The Haus' : 'Remote'}
+          />
         )}
       </AnimatePresence>
 
