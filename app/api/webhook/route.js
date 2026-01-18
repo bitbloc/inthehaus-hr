@@ -34,22 +34,16 @@ export async function POST(request) {
           });
           handledLocally = true;
         } else if (text === 'hr_wrap' || text === 'summary') {
+          console.log("HR WRAP Command Triggered");
           // --- HR WRAP LOGIC ---
           const { supabase } = await import('../../../lib/supabaseClient');
-          const { format, startOfDay, endOfDay, differenceInMinutes, addHours } = await import('date-fns');
+          const { format, differenceInMinutes, addHours } = await import('date-fns');
 
-          // Get today's date range (Local Time handling is tricky on server, but let's assume UTC+7 or standard)
-          // Since server might be UTC, we want "Today in Thailand". 
-          // 1. Get current UTC time
-          const now = new Date();
-          // 2. Adjust to Thai time for "Day" determination? 
-          // Actually, let's just use server time broadly or check 'timestamp' range.
-          // Better: Get logs from last 24 hours or just "Today" based on +7 offset.
-          // Let's use simple UTC start/end for simplicity as Supabase stores in UTC.
-          // But we want "Today's shift".
-
+          // Get today's range based on server time (UTC)
+          // We'll trust Supabase 'gte' with a simple UTC midnight calculation.
           const START_OF_DAY_UTC = new Date();
-          START_OF_DAY_UTC.setHours(0, 0, 0, 0); // Server local time (usually UTC in Vercel)
+          START_OF_DAY_UTC.setHours(0, 0, 0, 0);
+          console.log("Querying logs since:", START_OF_DAY_UTC.toISOString());
 
           // Query Attendance
           const { data: logs, error } = await supabase
@@ -60,10 +54,12 @@ export async function POST(request) {
 
           if (error) {
             console.error("HR Wrap Data Error:", error);
-            await client.replyMessage(event.replyToken, { type: 'text', text: 'Error fetching data.' });
+            await client.replyMessage(event.replyToken, { type: 'text', text: 'Error fetching data: ' + error.message });
             handledLocally = true;
             continue;
           }
+
+          console.log(`Found ${logs.length} logs.`);
 
           // Process Data
           const summary = {};
@@ -77,38 +73,45 @@ export async function POST(request) {
             if (log.action_type === 'check_out') summary[name].out = new Date(log.timestamp);
           });
 
+          // Sort by Check-in time
+          const summaryList = Object.values(summary).sort((a, b) => {
+            const tA = a.in ? a.in.getTime() : 0;
+            const tB = b.in ? b.in.getTime() : 0;
+            return tA - tB;
+          });
+
           // Build Message
-          let msg = `สรุปการเข้างาน ${format(new Date(), 'dd/MM/yyyy')}\n`;
+          // Fallback if locale fails (e.g. node env issue): add 7 hours manually
+          const safeThaiTime = (date) => format(addHours(date, 7), 'HH:mm');
+
+          const todayStr = format(addHours(new Date(), 7), 'dd/MM/yyyy');
+
+          let msg = `สรุปการเข้างาน ${todayStr}\n`;
           let count = 0;
 
-          for (const name in summary) {
+          for (const s of summaryList) {
             count++;
-            const s = summary[name];
-            const inTime = s.in ? format(addHours(s.in, 7), 'HH:mm') : '-'; // Adjust UTC to Thai (+7) for display? 
-            // Note: date-fns 'format' uses local system time. If server is UTC, we add 7h manually for display or use timeZone.
-            // Let's assume input needs +7 adjustment if server is UTC.
-            // Safe bet: Display raw time + 7 hours if server is UTC. 
-            // Better: use `new Date(s.in).toLocaleTimeString('th-TH', { timeZone: 'Asia/Bangkok' })` but node might not have locale.
-            // Let's hardcode +7h for display safety since we know it's Thailand.
+            const inTime = s.in ? safeThaiTime(s.in) : '-';
+            const outTime = s.out ? safeThaiTime(s.out) : '-';
 
-            const outTime = s.out ? format(addHours(s.out, 7), 'HH:mm') : '-';
-
-            let duration = '';
+            let durationStr = '';
             if (s.in) {
-              const endT = s.out || new Date(); // If not out, calc valid duration so far? Or just show "Working"
+              const endT = s.out || new Date();
               const diff = differenceInMinutes(endT, s.in);
               const hrs = Math.floor(diff / 60);
               const mins = diff % 60;
-              duration = `(${hrs}ชม. ${mins}น.)`;
-              if (!s.out) duration += ' [Working]';
+              durationStr = `(${hrs}ชม. ${mins}น.)`;
+              if (!s.out) durationStr += ' [Working]';
             }
 
             msg += `\n👤 ${s.name} (${s.position})`;
             msg += `\n   เข้า: ${inTime} | ออก: ${outTime}`;
-            msg += `\n   รวม: ${duration}\n`;
+            msg += `\n   รวม: ${durationStr}\n`;
           }
 
           if (count === 0) msg += "\nยังไม่มีการลงเวลาวันนี้";
+
+          console.log("Replying with:", msg);
 
           await client.replyMessage(event.replyToken, {
             type: 'text',
