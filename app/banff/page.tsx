@@ -17,6 +17,7 @@ import HubermanFlow from './components/HubermanFlow';
 import XPBar from './components/XPBar';
 import VaultWidget from './components/VaultWidget';
 import LevelUpModal from './components/LevelUpModal';
+import InvestmentWidget from './components/InvestmentWidget';
 import { SINGLE_USER_ID } from './constants';
 
 export default function BanffPage() {
@@ -194,8 +195,9 @@ export default function BanffPage() {
             <XPBar currentXP={xpProgress} level={currentLevel} nextLevelXP={100} />
 
             {/* Vault Widget */}
-            <div className="pt-2">
+            <div className="pt-2 space-y-4">
                 <VaultWidget />
+                <InvestmentWidget />
             </div>
 
             {/* Date Display */}
