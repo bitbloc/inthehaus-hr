@@ -234,16 +234,48 @@ export default function AdminDashboard() {
     const handleDeleteEmployee = async (id) => {
         if (!confirm("⚠️ This will PERMANENTLY delete this staff and all their history.\n\nAre you sure you want to completely remove them from the system so they can register again?")) return;
 
-        const { error } = await supabase.from("employees").delete().eq("id", id);
+        try {
+            // 1. Delete Attendance Logs
+            const { error: err1 } = await supabase.from('attendance_logs').delete().eq('employee_id', id);
+            if (err1) throw new Error("Attendance Logs: " + err1.message);
 
-        if (!error) {
+            // 2. Delete Schedules
+            const { error: err2 } = await supabase.from('employee_schedules').delete().eq('employee_id', id);
+            if (err2) throw new Error("Schedules: " + err2.message);
+
+            // 3. Delete Leave Requests
+            const { error: err3 } = await supabase.from('leave_requests').delete().eq('employee_id', id);
+            if (err3) throw new Error("Leave Requests: " + err3.message);
+
+            // 4. Delete Roster Overrides
+            const { error: err4 } = await supabase.from('roster_overrides').delete().eq('employee_id', id);
+            if (err4) throw new Error("Roster Overrides: " + err4.message);
+
+            // 5. Delete Payroll Deductions
+            const { error: err5 } = await supabase.from('payroll_deductions').delete().eq('employee_id', id);
+            if (err5) throw new Error("Payroll Deductions: " + err5.message);
+
+            // 6. Delete Shift Swap Requests (Both as requester and peer)
+            const { error: err6a } = await supabase.from('shift_swap_requests').delete().eq('requester_id', id);
+            if (err6a) throw new Error("Swap Requests (Requester): " + err6a.message);
+
+            const { error: err6b } = await supabase.from('shift_swap_requests').delete().eq('target_peer_id', id);
+            if (err6b) throw new Error("Swap Requests (Peer): " + err6b.message);
+
+            // 7. Finally Delete Employee
+            const { error: errFinal } = await supabase.from("employees").delete().eq("id", id);
+            if (errFinal) throw new Error("Employee: " + errFinal.message);
+
             fetchEmployees();
             // Refresh pending list too
             supabase.from("employees").select("*").eq("is_active", false).order("created_at", { ascending: false })
                 .then(({ data }) => dispatch({ type: 'SET_DATA', payload: { pendingEmployees: data || [] } }));
-        } else {
+
+            alert("Staff deleted successfully!");
+
+        } catch (error) {
             console.error(error);
-            alert("Unable to delete: " + error.message + "\n\nIf they have worked shifts, you cannot delete them directly due to history records.");
+            alert("Delete Failed: " + error.message);
         }
     };
 
