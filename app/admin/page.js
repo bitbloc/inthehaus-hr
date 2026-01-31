@@ -232,8 +232,19 @@ export default function AdminDashboard() {
 
     // Employee Action
     const handleDeleteEmployee = async (id) => {
-        const { error } = await supabase.from("employees").update({ is_active: false }).eq("id", id);
-        if (!error) fetchEmployees(); else alert(error.message);
+        if (!confirm("⚠️ This will PERMANENTLY delete this staff and all their history.\n\nAre you sure you want to completely remove them from the system so they can register again?")) return;
+
+        const { error } = await supabase.from("employees").delete().eq("id", id);
+
+        if (!error) {
+            fetchEmployees();
+            // Refresh pending list too
+            supabase.from("employees").select("*").eq("is_active", false).order("created_at", { ascending: false })
+                .then(({ data }) => dispatch({ type: 'SET_DATA', payload: { pendingEmployees: data || [] } }));
+        } else {
+            console.error(error);
+            alert("Unable to delete: " + error.message + "\n\nIf they have worked shifts, you cannot delete them directly due to history records.");
+        }
     };
 
     // Deduction Action
