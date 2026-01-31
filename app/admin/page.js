@@ -288,6 +288,34 @@ export default function AdminDashboard() {
         fetchData('shifts', 'shifts');
     };
 
+    const handleSaveStaff = async (staffData) => {
+        try {
+            // Basic Validation
+            if (!staffData.name || !staffData.line_user_id) return alert("Name and LINE ID required");
+
+            // Prepare payload - ensure shift_rates is clean
+            const payload = { ...staffData };
+            delete payload.created_at; // Don't update this
+
+            // If we have an ID, it's an update. Upsert handles both if ID is present.
+            const { error } = await supabase.from('employees').upsert(payload);
+
+            if (error) throw error;
+
+            alert("Staff saved!");
+            setShowStaffModal(false);
+            setEditingStaff(null);
+            fetchEmployees();
+
+            // Refresh pending list
+            supabase.from("employees").select("*").eq("is_active", false).order("created_at", { ascending: false })
+                .then(({ data }) => dispatch({ type: 'SET_DATA', payload: { pendingEmployees: data || [] } }));
+
+        } catch (e) {
+            alert("Error: " + e.message);
+        }
+    };
+
     // Excel
     // Excel
     const handleExportExcel = () => {
@@ -749,7 +777,7 @@ export default function AdminDashboard() {
                             <table className="w-full text-sm text-left"><thead className="bg-slate-50 text-slate-400 font-bold text-xs uppercase"><tr><th className="p-4">Name</th><th className="p-4">Position</th><th className="p-4">Status</th><th className="p-4 text-right">Action</th></tr></thead>
                                 <tbody className="divide-y divide-slate-50">{data.employees.map(emp => (<tr key={emp.id} className="hover:bg-slate-50"><td className="p-4 font-bold text-slate-700">{emp.name}</td><td className="p-4 text-slate-500">{emp.position}</td><td className="p-4"><Badge color={emp.employment_status === 'Fulltime' ? 'emerald' : 'slate'}>{emp.employment_status || '-'}</Badge></td><td className="p-4 text-right flex justify-end gap-2"><button onClick={() => { setEditingStaff(emp); setShowStaffModal(true) }} className="text-blue-500 font-bold text-xs hover:bg-blue-50 px-2 py-1 rounded">Edit</button><LongPressButton onLongPress={() => handleDeleteEmployee(emp.id)} /></td></tr>))}</tbody></table>
                         </Card>
-                        <StaffModal isOpen={showStaffModal} onClose={() => setShowStaffModal(false)} onSave={() => { fetchEmployees(); supabase.from("employees").select("*").eq("is_active", false).order("created_at", { ascending: false }).then(({ data }) => dispatch({ type: 'SET_DATA', payload: { pendingEmployees: data || [] } })); }} initialData={editingStaff} isEditing={!!editingStaff} />
+                        <StaffModal isOpen={showStaffModal} onClose={() => setShowStaffModal(false)} onSave={handleSaveStaff} initialData={editingStaff} isEditing={!!editingStaff} />
                     </div>
                 )}
 
