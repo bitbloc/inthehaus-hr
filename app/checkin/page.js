@@ -165,7 +165,94 @@ export default function CheckIn() {
     }
   };
 
-  // ... (existing code for fetchMyShift) ...
+  const fetchMyShift = async (userId) => {
+    try {
+      const { data: emp } = await supabase.from('employees').select('id').eq('line_user_id', userId).single();
+      if (!emp) return;
+
+      const today = new Date();
+      const dateStr = format(today, 'yyyy-MM-dd');
+      const dayOfWeek = today.getDay(); // 0 is Sunday, which matches our schedule logic usually (or 1=Mon?)
+      // Let's assume 0=Sunday, 1=Monday. roster_weekly_schedules usually uses 0-6.
+
+      // 2. Check Overrides
+      const { data: override } = await supabase.from('roster_overrides')
+        .select('*')
+        .eq('employee_id', emp.id)
+        .eq('date', dateStr)
+        .maybeSingle();
+
+      if (override) {
+        if (override.is_off) {
+          setShiftContext(null);
+          return;
+        }
+
+        // Fetch shift name just in case
+        // const { data: shift } = await supabase.from('shifts').select('name').eq('id', override.shift_id).single();
+
+        setShiftContext({
+          start: override.custom_start_time,
+          end: override.custom_end_time,
+          getType: 'Override',
+          isLate: checkIsLate(override.custom_start_time)
+        });
+        return;
+      }
+
+      // 3. Check Weekly Schedule
+      const { data: weekly } = await supabase.from('roster_weekly_schedules')
+        .select('shift_id, is_off')
+        .eq('employee_id', emp.id)
+        .eq('day_of_week', dayOfWeek === 0 ? 6 : dayOfWeek - 1) // Adjust if DB uses 0=Mon. Standard JS 0=Sun. 
+        // NOTE: Usually projects stick to JS or SQL. Postgres ISODOW 1-7 (1=Mon). 
+        // Let's assume 0=Monday for now based on TeamSchedule `startOfWeek(today, { weekStartsOn: 1 })`.
+        // `weekDays` in TeamSchedule are 0..6 indices from Monday.
+        // So JS Day 1 (Mon) -> DB 0. JS Day 0 (Sun) -> DB 6.
+        .maybeSingle();
+
+      // Correction: TeamSchedule:
+      // const weekDays = Array.from({ length: 7 }).map((_, i) => addDays(startOfCurrentWeek, i));
+      // keys off map index.
+      // let's try direct map:
+      // If DB `day_of_week` is 0=Mon, 1=Tue...
+      // JS `getDay()`: 0=Sun, 1=Mon...
+      // MAPPING: (dayOfWeek + 6) % 7 
+      // Mon(1) -> 0. Sun(0) -> 6.
+
+      const dayIndex = (dayOfWeek + 6) % 7;
+
+      const { data: weeklySchedule } = await supabase.from('roster_weekly_schedules')
+        .select('shift_id, is_off')
+        .eq('employee_id', emp.id)
+        .eq('day_of_week', dayIndex)
+        .maybeSingle();
+
+      if (weeklySchedule && !weeklySchedule.is_off && weeklySchedule.shift_id) {
+        const { data: shift } = await supabase.from('shifts').select('*').eq('id', weeklySchedule.shift_id).single();
+        if (shift) {
+          setShiftContext({
+            start: shift.start_time,
+            end: shift.end_time,
+            getType: 'Template',
+            isLate: checkIsLate(shift.start_time)
+          });
+        }
+      } else {
+        setShiftContext(null);
+      }
+    } catch (e) {
+      console.error("Shift Fetch Error:", e);
+    }
+  };
+
+  const checkIsLate = (startTime) => {
+    const now = new Date();
+    const [h, m] = startTime.split(':').map(Number);
+    const shiftStart = new Date();
+    shiftStart.setHours(h, m, 0, 0);
+    return now > shiftStart;
+  };
 
   const handleStartCheckIn = () => {
     if (lastAction === 'register') {
@@ -183,7 +270,107 @@ export default function CheckIn() {
     setTimeout(() => fileInputRef.current?.click(), 300);
   };
 
-  // ... (existing code for onGeoSuccess, etc.) ...
+  const onGeoSuccess = (position) => {
+    const { latitude, longitude } = position.coords;
+    setUserPosition({ lat: latitude, lon: longitude });
+
+    const dist = getDistanceFromLatLonInKm(latitude, longitude, SHOP_LAT, SHOP_LONG);
+    if (dist <= ALLOWED_RADIUS_KM) {
+      if (!status.includes("Ready")) setStatus("Ready to Check In");
+    } else {
+      if (!devMode) setStatus(`Too far (${dist.toFixed(2)}km)`);
+    }
+  };
+
+  const onGeoError = (error) => {
+    console.error("Geo Error:", error);
+    // if(!devMode) setStatus("GPS Error");
+  };
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    try {
+      const resized = await resizeImage(file, 800);
+      const fileName = `${profile.userId}_${Date.now()}.jpg`;
+
+      const { error: uploadError } = await supabase.storage.from('attendance_photos').upload(fileName, resized);
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage.from('attendance_photos').getPublicUrl(fileName);
+
+      const action = lastAction === 'check_in' ? 'check_out' : 'check_in';
+
+      const { error: insertError } = await supabase.from('attendance_logs').insert({
+        employee_id: employeeData.id,
+        action_type: action,
+        timestamp: new Date().toISOString(),
+        photo_url: publicUrl,
+        location: { lat: userPosition?.lat, lon: userPosition?.lon }
+      });
+
+      if (insertError) throw insertError;
+
+      setShowCamera(false);
+      fetchRecents();
+      fetchUserStatus(profile.userId);
+
+      if (action === 'check_in') {
+        setShowMoodSelector(true);
+      } else {
+        alert("Checked Out!");
+      }
+    } catch (err) {
+      alert("Error: " + err.message);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleMoodSelect = async (mood) => {
+    try {
+      const { data: latestLog } = await supabase.from('attendance_logs')
+        .select('id')
+        .eq('employee_id', employeeData.id)
+        .order('timestamp', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (latestLog) {
+        await supabase.from('attendance_logs').update({ mood_status: mood }).eq('id', latestLog.id);
+        fetchRecents();
+      }
+    } catch (e) { console.error(e); }
+    setShowMoodSelector(false);
+  };
+
+  const handleDevLogin = () => {
+    // Toggle dev mode
+    const pwd = prompt("Dev Password");
+    if (pwd === "1234") {
+      setDevMode(!devMode);
+      setStatus("Ready (Dev)");
+      // alert("Dev Mode: " + (!devMode));
+    }
+  };
+
+  function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
+    var R = 6371;
+    var dLat = deg2rad(lat2 - lat1);
+    var dLon = deg2rad(lon2 - lon1);
+    var a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }
+
+  function deg2rad(deg) {
+    return deg * (Math.PI / 180);
+  }
 
   // Dynamic Button Colors and Logic
   const isLate = shiftContext?.isLate && lastAction !== 'check_in';
