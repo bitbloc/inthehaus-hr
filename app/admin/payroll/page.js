@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../../../lib/supabaseClient";
 import { format, startOfMonth, endOfMonth, differenceInMinutes, parse, isAfter } from "date-fns";
+import * as XLSX from "xlsx";
 import { motion } from "framer-motion";
 
 export default function PayrollPage() {
@@ -155,6 +156,54 @@ export default function PayrollPage() {
         }
     };
 
+    const handleExport = () => {
+        if (!reportData || reportData.length === 0) return;
+
+        // 1. Format Data for Excel
+        const exportData = reportData.map(row => ({
+            Date: format(new Date(row.date), "yyyy-MM-dd"),
+            Employee: row.name,
+            Position: row.shiftRates?.position || '-', // fallback if needed
+            Shift: row.shiftName,
+            "Check In": row.checkIn ? format(row.checkIn, "HH:mm") : "-",
+            "Check Out": row.checkOut ? format(row.checkOut, "HH:mm") : "-",
+            "Late (Mins)": row.lateMinutes || 0,
+            "OT (Hrs)": row.otHours || 0,
+            "Wage (THB)": row.wage || 0,
+            "OT Pay (THB)": row.otPay || 0,
+            "Total Pay (THB)": row.totalPay || 0,
+            Status: row.lateMinutes > 0 ? "Late" : "Normal"
+        }));
+
+        // 2. Create Workbook and Worksheet
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.json_to_sheet(exportData);
+
+        // Optional: Set column widths (approximate characters)
+        const wscols = [
+            { wch: 12 }, // Date
+            { wch: 20 }, // Employee
+            { wch: 15 }, // Position
+            { wch: 15 }, // Shift
+            { wch: 10 }, // In
+            { wch: 10 }, // Out
+            { wch: 10 }, // Late
+            { wch: 10 }, // OT
+            { wch: 12 }, // Wage
+            { wch: 12 }, // OT Pay
+            { wch: 15 }, // Total
+            { wch: 10 }, // Status
+        ];
+        ws['!cols'] = wscols;
+
+        // 3. Append Worksheet
+        XLSX.utils.book_append_sheet(wb, ws, "Payroll_Report");
+
+        // 4. Save File
+        const fileName = `Payroll_${startDate}_to_${endDate}.xlsx`;
+        XLSX.writeFile(wb, fileName);
+    };
+
     const formatTime = (date) => date ? format(date, "HH:mm") : "-";
 
     const totalPayout = reportData.reduce((sum, item) => sum + item.totalPay, 0);
@@ -182,6 +231,14 @@ export default function PayrollPage() {
                     >
                         {loading ? 'Calculating...' : 'Run Payroll'}
                     </button>
+                    {reportData.length > 0 && (
+                        <button
+                            onClick={handleExport}
+                            className="px-6 py-2 bg-emerald-600 text-white font-bold rounded-lg hover:bg-emerald-700 transition flex items-center gap-2"
+                        >
+                            <span>Download Excel</span>
+                        </button>
+                    )}
                 </div>
             </div>
 
