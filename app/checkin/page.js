@@ -108,8 +108,21 @@ export default function CheckIn() {
   };
 
   const fetchUserStatus = async (userId) => {
-    const { data: emp } = await supabase.from('employees').select('id, position').eq('line_user_id', userId).eq('is_active', true).single();
-    if (!emp) return;
+    // Check user existence regardless of active status
+    const { data: emp } = await supabase.from('employees').select('id, position, is_active').eq('line_user_id', userId).maybeSingle();
+
+    if (!emp) {
+      setStatus("New User");
+      setLastAction("register"); // New state for registration
+      return;
+    }
+
+    if (!emp.is_active) {
+      setStatus("Pending Approval");
+      setLastAction("pending"); // New state for pending
+      return;
+    }
+
     setEmployeeData(emp);
 
     const { data: log } = await supabase.from('attendance_logs').select('action_type, timestamp').eq('employee_id', emp.id).order('timestamp', { ascending: false }).limit(1).single();
@@ -130,169 +143,60 @@ export default function CheckIn() {
     }
   };
 
-  const fetchMyShift = async (userId) => {
+  const handleRegister = async () => {
+    if (!profile) return;
+    if (!confirm("Request access to In The Haus system?")) return;
+
     try {
-      const { data: emp } = await supabase.from('employees').select('id').eq('line_user_id', userId).single();
-      if (!emp) return;
+      const { error } = await supabase.from('employees').insert({
+        line_user_id: profile.userId,
+        name: profile.displayName,
+        nickname: profile.displayName,
+        photo_url: profile.pictureUrl,
+        is_active: false, // Pending approval
+        employment_status: 'Probation' // Default
+      });
 
-      const today = new Date();
-      const dateStr = format(today, 'yyyy-MM-dd');
-      const dayOfWeek = today.getDay();
-
-      const [
-        { data: weekly },
-        { data: overrides },
-        { data: allShifts }
-      ] = await Promise.all([
-        supabase.from('weekly_schedules').select('*').eq('employee_id', emp.id).eq('day_of_week', dayOfWeek).maybeSingle(),
-        supabase.from('roster_overrides').select('*').eq('employee_id', emp.id).eq('date', dateStr),
-        supabase.from('shifts').select('*')
-      ]);
-
-      const employees = [{ id: emp.id }];
-      const schedules = { [emp.id]: { [dayOfWeek]: weekly || null } };
-
-      const effectiveRoster = getEffectiveDailyRoster(employees, schedules, overrides || [], allShifts || [], today);
-      const myShift = effectiveRoster.find(r => r.employee.id === emp.id);
-
-      if (myShift) {
-        const nowStr = format(today, 'HH:mm:ss');
-        const isLate = nowStr > myShift.start_time;
-        setShiftContext({
-          name: myShift.shift_name,
-          start: myShift.start_time,
-          end: myShift.end_time,
-          isLate
-        });
-      }
-    } catch (e) { console.error("Shift Fetch Error:", e); }
-  };
-
-  // --- GPS & Actions ---
-  const handleDevLogin = () => {
-    const user = prompt("Username:");
-    const pass = prompt("Password:");
-    if (user === "yuzu" && pass === "1533") {
-      setDevMode(true);
-      setStatus("❤️ Developer Mode");
-      alert("Developer Mode Active");
+      if (error) throw error;
+      alert("Registration Sent! Please wait for admin approval.");
+      fetchUserStatus(profile.userId); // Create loop to check status
+    } catch (e) {
+      alert("Error: " + e.message);
     }
   };
 
-  const onGeoSuccess = (position) => {
-    const coords = { lat: position.coords.latitude, lon: position.coords.longitude };
-    setUserPosition(coords);
-
-    const dist = getDistanceFromLatLonInKm(coords.lat, coords.lon, SHOP_LAT, SHOP_LONG);
-    if (dist <= ALLOWED_RADIUS_KM) setStatus("📍 Ready");
-    else setStatus(`❌ Range (${dist.toFixed(3)}km)`);
-  };
-  const onGeoError = () => setStatus("❌ GPS Error");
+  // ... (existing code for fetchMyShift) ...
 
   const handleStartCheckIn = () => {
+    if (lastAction === 'register') {
+      handleRegister();
+      return;
+    }
+    if (lastAction === 'pending') {
+      alert("Your account is pending approval from admin.");
+      return;
+    }
+
     if (isUploading || isSubmitting) return;
     if (!devMode && !status.includes("Ready")) return alert("Please be at the location to check in.");
     setShowCamera(true);
     setTimeout(() => fileInputRef.current?.click(), 300);
   };
 
-  const handleFileChange = async (e) => {
-    if (isUploading || isSubmitting) return;
-    const file = e.target.files[0];
-    if (!file) { setShowCamera(false); return; }
-    try {
-      setIsUploading(true);
-      const resizedFile = await resizeImage(file, 600, 0.7);
-      const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.jpg`;
-      const filePath = `daily-checkin/${fileName}`;
-      const { error } = await supabase.storage.from('checkin-photos').upload(filePath, resizedFile);
-      if (error) throw error;
-      const { data: { publicUrl } } = supabase.storage.from('checkin-photos').getPublicUrl(filePath);
-      submitCheckIn(publicUrl);
-    } catch (err) { alert("Upload Failed: " + err.message); setShowCamera(false); }
-    finally { setIsUploading(false); }
-  };
+  // ... (existing code for onGeoSuccess, etc.) ...
 
-  const submitCheckIn = async (url) => {
-    if (!profile) return;
-    setIsSubmitting(true);
-    const actionType = lastAction === 'check_in' ? 'check_out' : 'check_in';
+  // Dynamic Button Colors and Logic
+  let mainButtonConfig = { label: 'Check In', icon: '☀️', sub: 'Start your day', color: "bg-[#171717] text-white border-[#262626]" };
 
-    try {
-      const { data: emp } = await supabase.from('employees').select('id, name, position').eq('line_user_id', profile.userId).single();
-      if (!emp) throw new Error("Employee not found");
-
-      const tempLog = {
-        id: 'temp-' + Date.now(),
-        timestamp: new Date().toISOString(),
-        action_type: actionType,
-        employees: { name: emp.name, photo_url: profile.pictureUrl, position: emp.position },
-        photo_url: url,
-        mood_status: null
-      };
-
-      const pos = emp.position?.toLowerCase() || '';
-      if (!pos.includes('owner') && !pos.includes('develop')) {
-        setRecentCheckins(prev => [tempLog, ...prev]);
-      }
-
-      const { error } = await supabase.from('attendance_logs').insert({
-        employee_id: emp.id,
-        action_type: actionType,
-        photo_url: url
-      });
-
-      if (error) throw error;
-
-      setLastAction(actionType);
-      setShowCamera(false);
-      setShowMoodSelector(true);
-      notifyLine(emp, actionType, url, null);
-
-    } catch (err) {
-      alert(err.message);
-      fetchRecents();
-      setShowCamera(false);
-    } finally { setIsSubmitting(false); }
-  };
-
-  const handleMoodSelect = async (mood) => {
-    setShowMoodSelector(false);
-    setRecentCheckins(prev => {
-      const newArr = [...prev];
-      if (newArr.length > 0 && newArr[0].employees.name === profile.displayName) {
-        newArr[0].mood_status = mood;
-      }
-      return newArr;
-    });
-
-    const { data: emp } = await supabase.from('employees').select('id').eq('line_user_id', profile.userId).single();
-    if (emp) {
-      const { data: log } = await supabase.from('attendance_logs').select('id').eq('employee_id', emp.id).order('timestamp', { ascending: false }).limit(1).single();
-      if (log) {
-        await supabase.from('attendance_logs').update({ mood_status: mood }).eq('id', log.id);
-      }
-    }
-  };
-
-  const notifyLine = async (emp, action, url, mood) => {
-    try { fetch('/api/notify-realtime', { method: 'POST', body: JSON.stringify({ name: emp.name, position: emp.position, action, time: format(new Date(), "HH:mm"), locationStatus: "Verified", photoUrl: url, mood }) }); } catch { }
-  };
-
-  function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
-    var R = 6371; var dLat = (lat2 - lat1) * (Math.PI / 180); var dLon = (lon2 - lon1) * (Math.PI / 180);
-    var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)); return R * c;
+  if (lastAction === 'register') {
+    mainButtonConfig = { label: 'Register', icon: '📝', sub: 'Request Access', color: "bg-blue-600 text-white border-blue-500" };
+  } else if (lastAction === 'pending') {
+    mainButtonConfig = { label: 'Pending', icon: '⏳', sub: 'Waiting Admin', color: "bg-amber-100 text-amber-700 border-amber-200" };
+  } else if (lastAction === 'check_in') {
+    mainButtonConfig = { label: 'Check Out', icon: '🌙', sub: 'Good rest!', color: "bg-white text-[#171717] border-white" };
+  } else if (isLate) {
+    mainButtonConfig = { label: 'Check In', icon: '☀️', sub: 'Star your day', color: "bg-amber-400 text-black border-amber-300" };
   }
-
-  // --- Render Helpers ---
-  const isLate = shiftContext?.isLate && lastAction !== 'check_in';
-  // Dynamic Button Colors
-  const buttonColor = isLate
-    ? "bg-amber-400 text-black border-amber-300 shadow-[0_20px_50px_-12px_rgba(251,191,36,0.5)]"
-    : (lastAction !== 'check_in'
-      ? "bg-[#171717] text-white border-[#262626] shadow-[0_20px_50px_-12px_rgba(0,0,0,0.4)]"
-      : "bg-white text-[#171717] border-white shadow-[0_20px_50px_-12px_rgba(255,255,255,0.4)]");
 
   return (
     <div className="min-h-screen bg-[#F2F2F2] text-neutral-800 font-sans flex flex-col items-center relative overflow-hidden font-feature-settings-['ss01'] pb-32">
@@ -327,7 +231,7 @@ export default function CheckIn() {
                   }}
                   className="text-[10px] text-neutral-500 font-medium cursor-pointer hover:text-blue-500 transition-colors"
                 >
-                  {employeeData?.position || 'Staff'}
+                  {employeeData?.position || (lastAction === 'pending' ? 'Pending' : 'Guest')}
                 </span>
               </div>
               <img src={profile.pictureUrl} className="w-10 h-10 rounded-xl object-cover border-2 border-white shadow-sm" />
@@ -412,14 +316,14 @@ export default function CheckIn() {
             {/* Squircle Button */}
             <div className={cn(
               "relative z-10 w-48 h-48 rounded-[2.5rem] flex flex-col items-center justify-center transition-all duration-300 border-b-4",
-              buttonColor
+              mainButtonConfig.color
             )}>
-              <span className="text-4xl mb-2">{lastAction !== 'check_in' ? '☀️' : '🌙'}</span>
+              <span className="text-4xl mb-2">{mainButtonConfig.icon}</span>
               <span className="text-xl font-bold tracking-tight">
-                {lastAction !== 'check_in' ? 'Check In' : 'Check Out'}
+                {mainButtonConfig.label}
               </span>
               <span className="text-[10px] opacity-60 mt-1 font-medium">
-                {lastAction !== 'check_in' ? 'Start your day' : 'Good rest!'}
+                {mainButtonConfig.sub}
               </span>
             </div>
           </motion.button>

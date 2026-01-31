@@ -14,7 +14,8 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
         base_salary: "", bank_account: "", bank_name: "",
         social_security_id: "", tax_id: "",
         shift_rates: { morning: 0, evening: 0, double: 0 },
-        emergency_contact: "", skills: [], education_history: []
+        emergency_contact: "", skills: [], education_history: [],
+        is_active: true
     });
 
     useEffect(() => {
@@ -31,7 +32,8 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
                 base_salary: "", bank_account: "", bank_name: "",
                 social_security_id: "", tax_id: "",
                 shift_rates: { morning: 0, evening: 0, double: 0 },
-                emergency_contact: "", skills: [], education_history: []
+                emergency_contact: "", skills: [], education_history: [],
+                is_active: true
             });
         }
     }, [initialData, isOpen]);
@@ -95,6 +97,17 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
                     <form id="staffForm" onSubmit={handleSubmit} className="space-y-6">
                         {activeTab === 'core' && (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-fade-in">
+                                <div className="md:col-span-2 bg-slate-100 p-4 rounded-xl flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className={`w-3 h-3 rounded-full ${formData.is_active ? 'bg-emerald-500' : 'bg-slate-400'}`}></div>
+                                        <span className="text-sm font-bold text-slate-700">Account Status</span>
+                                    </div>
+                                    <label className="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" checked={formData.is_active} onChange={e => setFormData({ ...formData, is_active: e.target.checked })} className="sr-only peer" />
+                                        <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                                        <span className="ml-3 text-xs font-bold text-slate-500">{formData.is_active ? 'ACTIVE' : 'INACTIVE'}</span>
+                                    </label>
+                                </div>
                                 <FormInput label="Full Name (TH)" name="name" value={formData.name} onChange={handleChange} required placeholder="นาย สมชาย ใจดี" />
                                 <FormInput label="Full Name (EN)" name="name_en" value={formData.name_en} onChange={handleChange} placeholder="Mr. Somchai Jaidee" />
                                 <FormInput label="Nickname" name="nickname" value={formData.nickname} onChange={handleChange} />
