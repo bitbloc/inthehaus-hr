@@ -288,13 +288,51 @@ export default function AdminDashboard() {
     };
 
     // Excel
+    // Excel
     const handleExportExcel = () => {
+        if (!payrollData || payrollData.length === 0) return alert("No data to export");
+
+        const exportRows = [];
+
+        payrollData.forEach(p => {
+            // Add Header Row for Employee (Optional, or just flatten)
+            // Flattening is better for data analysis.
+            p.dailyDetails.forEach(day => {
+                exportRows.push({
+                    "Date": day.date,
+                    "Employee": p.emp.name,
+                    "Position": p.emp.position || '-',
+                    "Shift": day.shift,
+                    "Time In": day.in,
+                    "Time Out": day.out,
+                    "Wage": day.wage || 0,
+                    "OT Pay": day.ot || 0,
+                    "OT Hrs": day.ot_hours || 0,
+                    "Status": day.status
+                });
+            });
+        });
+
         const wb = XLSX.utils.book_new();
-        const ws = XLSX.utils.json_to_sheet(payrollData.map(p => ({
-            Name: p.emp.name, WorkDays: p.workDays, Salary: p.totalSalary, OT_Pay: p.totalOTPay, Deduct: p.totalDeduct, Net: p.netSalary
-        })));
-        XLSX.utils.book_append_sheet(wb, ws, "Payroll");
-        XLSX.writeFile(wb, `Payroll_${selectedMonth}.xlsx`);
+        const ws = XLSX.utils.json_to_sheet(exportRows);
+
+        // Column Widths
+        const wscols = [
+            { wch: 12 }, // Date
+            { wch: 20 }, // Employee
+            { wch: 15 }, // Position
+            { wch: 15 }, // Shift
+            { wch: 10 }, // In
+            { wch: 10 }, // Out
+            { wch: 10 }, // Wage
+            { wch: 10 }, // OT Pay
+            { wch: 10 }, // OT Hrs
+            { wch: 15 }  // Status
+        ];
+        ws['!cols'] = wscols;
+
+        XLSX.utils.book_append_sheet(wb, ws, "Payroll_Detailed");
+        XLSX.writeFile(wb, `Payroll_Detailed_${selectedMonth}.xlsx`);
     };
 
     // --- Helpers ---
