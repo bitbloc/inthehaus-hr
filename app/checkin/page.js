@@ -186,6 +186,7 @@ export default function CheckIn() {
   // ... (existing code for onGeoSuccess, etc.) ...
 
   // Dynamic Button Colors and Logic
+  const isLate = shiftContext?.isLate && lastAction !== 'check_in';
   let mainButtonConfig = { label: 'Check In', icon: '☀️', sub: 'Start your day', color: "bg-[#171717] text-white border-[#262626]" };
 
   if (lastAction === 'register') {
