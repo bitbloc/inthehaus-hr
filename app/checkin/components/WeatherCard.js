@@ -1,5 +1,4 @@
-
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 
 // Weather Codes Mapping (Simplified for Tomorrow.io)
@@ -26,11 +25,24 @@ export default function WeatherCard({ latitude, longitude, locationName = "Curre
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
+    const lastCoords = useRef({ lat: 0, lon: 0 });
+
     useEffect(() => {
         if (!latitude || !longitude) return;
 
+        // Throttling: Check if moved significantly (approx ~1km or 0.01 deg)
+        // This prevents flickering on small GPS drifts
+        const distLat = Math.abs(latitude - lastCoords.current.lat);
+        const distLon = Math.abs(longitude - lastCoords.current.lon);
+
+        if (distLat < 0.01 && distLon < 0.01) return;
+
+        lastCoords.current = { lat: latitude, lon: longitude };
+
         const fetchWeather = async () => {
-            setLoading(true);
+            // Only show loading spinner on initial load, not during updates
+            if (!weather) setLoading(true);
+
             try {
                 const res = await fetch(`/api/weather?lat=${latitude}&lon=${longitude}`);
                 if (!res.ok) throw new Error('Failed to load weather');
