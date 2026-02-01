@@ -25,7 +25,7 @@ export default function CheckIn() {
   const [activeAnnouncement, setActiveAnnouncement] = useState(null);
   const [recentCheckins, setRecentCheckins] = useState([]);
   const [lastAction, setLastAction] = useState(null);
-  const [currentTime, setCurrentTime] = useState(new Date());
+  const [currentTime, setCurrentTime] = useState(null);
   const [employeeData, setEmployeeData] = useState(null);
   const [userPosition, setUserPosition] = useState(null); // { lat, lon }
 
@@ -49,6 +49,7 @@ export default function CheckIn() {
 
   // --- Init ---
   useEffect(() => {
+    setCurrentTime(new Date()); // Init on client
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     let watchId;
 
@@ -116,7 +117,7 @@ export default function CheckIn() {
 
     setEmployeeData(emp);
 
-    const { data: log } = await supabase.from('attendance_logs').select('action_type, timestamp').eq('employee_id', emp.id).order('timestamp', { ascending: false }).limit(1).single();
+    const { data: log } = await supabase.from('attendance_logs').select('action_type, timestamp').eq('employee_id', emp.id).order('timestamp', { ascending: false }).limit(1).maybeSingle();
 
     if (log) {
       const lastDate = new Date(log.timestamp);
@@ -158,7 +159,7 @@ export default function CheckIn() {
 
   const fetchMyShift = async (userId) => {
     try {
-      const { data: emp } = await supabase.from('employees').select('id').eq('line_user_id', userId).single();
+      const { data: emp } = await supabase.from('employees').select('id').eq('line_user_id', userId).maybeSingle();
       if (!emp) return;
 
       const today = new Date();
@@ -220,7 +221,7 @@ export default function CheckIn() {
         .maybeSingle();
 
       if (weeklySchedule && !weeklySchedule.is_off && weeklySchedule.shift_id) {
-        const { data: shift } = await supabase.from('shifts').select('*').eq('id', weeklySchedule.shift_id).single();
+        const { data: shift } = await supabase.from('shifts').select('*').eq('id', weeklySchedule.shift_id).maybeSingle();
         if (shift) {
           setShiftContext({
             start: shift.start_time,
