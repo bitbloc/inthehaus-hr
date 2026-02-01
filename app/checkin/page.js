@@ -287,10 +287,10 @@ export default function CheckIn() {
       const resized = await resizeImage(file, 800);
       const fileName = `${profile.userId}_${Date.now()}.jpg`;
 
-      const { error: uploadError } = await supabase.storage.from('attendance_photos').upload(fileName, resized);
+      const { error: uploadError } = await supabase.storage.from('checkin-photos').upload(fileName, resized);
       if (uploadError) throw uploadError;
 
-      const { data: { publicUrl } } = supabase.storage.from('attendance_photos').getPublicUrl(fileName);
+      const { data: { publicUrl } } = supabase.storage.from('checkin-photos').getPublicUrl(fileName);
 
       const action = lastAction === 'check_in' ? 'check_out' : 'check_in';
 
