@@ -484,6 +484,24 @@ export default function CheckIn() {
           </motion.div>
         </motion.div>
 
+        {/* Moved Announcement Card */}
+        <AnimatePresence>
+          {activeAnnouncement && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="mb-8 mx-6 w-full max-w-sm bg-white/80 backdrop-blur-md rounded-3xl p-5 shadow-lg border border-white/50 flex items-start gap-4 z-30 relative"
+            >
+              <div className={`mt-1.5 w-2 h-2 rounded-full ring-4 ${activeAnnouncement.priority > 1 ? 'bg-red-500 ring-red-100' : 'bg-primary ring-lime-100'}`}></div>
+              <div>
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5">Announcement</p>
+                <p className="text-sm font-medium text-neutral-800 leading-relaxed">{activeAnnouncement.message}</p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {!status.includes('Checking') && (
           <motion.button
             initial={{ scale: 0.9, opacity: 0 }}
@@ -552,23 +570,7 @@ export default function CheckIn() {
       {/* 5. Navigation Dock (The "Haus" Dock) */}
       <NavigationDock />
 
-      {/* 2. Announcement (Z-Index Fix) */}
-      <AnimatePresence>
-        {activeAnnouncement && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            className="mx-6 w-full max-w-sm bg-white/80 backdrop-blur-md rounded-3xl p-5 shadow-lg border border-white/50 flex items-start gap-4 z-30 relative"
-          >
-            <div className={`mt-1.5 w-2 h-2 rounded-full ring-4 ${activeAnnouncement.priority > 1 ? 'bg-red-500 ring-red-100' : 'bg-primary ring-lime-100'}`}></div>
-            <div>
-              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5">Announcement</p>
-              <p className="text-sm font-medium text-neutral-800 leading-relaxed">{activeAnnouncement.message}</p>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+
 
       {/* Camera & Mood (Modals) */}
       <AnimatePresence>
