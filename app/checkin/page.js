@@ -267,7 +267,7 @@ export default function CheckIn() {
     if (isUploading || isSubmitting) return;
     if (!devMode && !status.includes("Ready")) return alert("Please be at the location to check in.");
     setShowCamera(true);
-    setTimeout(() => fileInputRef.current?.click(), 300);
+    // Removed auto-click to fix mobile browser security blocking
   };
 
   const onGeoSuccess = (position) => {
@@ -510,6 +510,9 @@ export default function CheckIn() {
               <span className="text-xl font-bold tracking-tight">
                 {mainButtonConfig.label}
               </span>
+              <span className="text-xl font-bold tracking-tight">
+                {mainButtonConfig.label}
+              </span>
               <span className="text-[10px] opacity-60 mt-1 font-medium">
                 {mainButtonConfig.sub}
               </span>
@@ -590,10 +593,16 @@ export default function CheckIn() {
               <button onClick={() => setShowCamera(false)} className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm">✕</button>
             </div>
 
-            <div className="relative w-full max-w-sm aspect-square bg-white rounded-[2.5rem] border-4 border-white shadow-xl flex items-center justify-center overflow-hidden">
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              className="relative w-full max-w-sm aspect-square bg-white rounded-[2.5rem] border-4 border-white shadow-xl flex flex-col items-center justify-center overflow-hidden active:scale-95 transition-transform cursor-pointer"
+            >
               {isUploading
                 ? <div className="animate-spin w-12 h-12 border-4 border-neutral-100 border-t-neutral-800 rounded-full"></div>
-                : <span className="text-6xl opacity-10">📸</span>
+                : <>
+                  <span className="text-6xl mb-4">📸</span>
+                  <span className="text-xs font-bold text-neutral-400 uppercase tracking-widest">Tap to Take Photo</span>
+                </>
               }
             </div>
 

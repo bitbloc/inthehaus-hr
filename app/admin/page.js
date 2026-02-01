@@ -591,7 +591,7 @@ export default function AdminDashboard() {
                                                         <td className="px-6 py-4">
                                                             {log.photo_url ? (
                                                                 <a href={log.photo_url} target="_blank" rel="noopener noreferrer">
-                                                                    <img src={log.photo_url} alt="log" className="w-10 h-10 rounded-lg object-cover border border-slate-100 shadow-sm hover:scale-150 transition-transform" />
+                                                                    <img src={log.photo_url} alt="log" className="w-10 h-10 rounded-lg object-cover border border-slate-100 shadow-sm hover:scale-150 transition-transform" referrerPolicy="no-referrer" />
                                                                 </a>
                                                             ) : <span className="text-slate-300">-</span>}
                                                         </td>
@@ -790,7 +790,7 @@ export default function AdminDashboard() {
                                                 <tr key={emp.id} className="hover:bg-amber-50/50">
                                                     <td className="p-4 font-bold text-slate-700 flex items-center gap-3">
                                                         <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden">
-                                                            {emp.photo_url ? <img src={emp.photo_url} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-xs text-slate-500">{emp.name?.charAt(0)}</div>}
+                                                            {emp.photo_url ? <img src={emp.photo_url} className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : <div className="w-full h-full flex items-center justify-center text-xs text-slate-500">{emp.name?.charAt(0)}</div>}
 
                                                         </div>
                                                         <div>
