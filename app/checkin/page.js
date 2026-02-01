@@ -300,7 +300,7 @@ export default function CheckIn() {
         action_type: action,
         timestamp: new Date().toISOString(),
         photo_url: publicUrl,
-        location: { lat: userPosition?.lat, lon: userPosition?.lon }
+        location: userPosition ? `(${userPosition.lon},${userPosition.lat})` : null
       });
 
       if (insertError) throw insertError;
@@ -463,10 +463,10 @@ export default function CheckIn() {
         >
           {/* Dieter Rams Typography: Big, Tight, Clean */}
           <h2 className="text-[6rem] leading-none font-light tracking-tighter text-neutral-900">
-            {format(currentTime, "HH:mm")}
+            {currentTime ? format(currentTime, "HH:mm") : "--:--"}
           </h2>
           <p className="text-sm font-medium text-neutral-400 mt-2 tracking-widest uppercase">
-            {format(currentTime, "EEEE, dd MMMM")}
+            {currentTime ? format(currentTime, "EEEE, dd MMMM") : "Loading..."}
           </p>
 
           <motion.div
