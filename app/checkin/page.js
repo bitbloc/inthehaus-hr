@@ -9,17 +9,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import NavigationDock from "../_components/NavigationDock";
-import { getEffectiveDailyRoster } from "../../utils/roster_logic";
-
 // --- Icons (Simulated Lucide for cleaner look) ---
-const Icons = {
-  Calendar: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2" /><line x1="16" x2="16" y1="2" y2="6" /><line x1="8" x2="8" y1="2" y2="6" /><line x1="3" x2="21" y1="10" y2="10" /></svg>,
-  Wallet: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="14" x="2" y="5" rx="2" ry="2" /><line x1="2" x2="22" y1="10" y2="10" /></svg>,
-  Home: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></svg>,
-  Leave: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 2v4" /><path d="M8 2v4" /><path d="M3 10h18" /><path d="M12 22v-6" /><path d="M15 19l-3 3-3-3" /><rect x="3" y="4" width="18" height="18" rx="2" /></svg>, // Calendar with arrow down/check? Let's use Plane/File
-  Plane: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 22h20" /><path d="M13 6l-5 5 5 5" /><path d="M18 11l-10-10-5 5L13 16z" /></svg>, // Paper planeish
-  Swap: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3 4 7l4 4" /><path d="M4 7h16" /><path d="m16 21 4-4-4-4" /><path d="M20 17H4" /></svg>
-};
+// Removed unused Icons object
 
 function cn(...inputs) {
   return twMerge(clsx(inputs));
@@ -507,9 +498,6 @@ export default function CheckIn() {
               mainButtonConfig.color
             )}>
               <span className="text-4xl mb-2">{mainButtonConfig.icon}</span>
-              <span className="text-xl font-bold tracking-tight">
-                {mainButtonConfig.label}
-              </span>
               <span className="text-xl font-bold tracking-tight">
                 {mainButtonConfig.label}
               </span>
