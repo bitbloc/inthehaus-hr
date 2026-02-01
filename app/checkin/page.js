@@ -340,7 +340,7 @@ export default function CheckIn() {
   const handleDevLogin = () => {
     // Toggle dev mode
     const pwd = prompt("Dev Password");
-    if (pwd === "1234") {
+    if (pwd === "1533") {
       setDevMode(!devMode);
       setStatus("Ready (Dev)");
       // alert("Dev Mode: " + (!devMode));
@@ -392,7 +392,7 @@ export default function CheckIn() {
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-xl bg-neutral-900 flex items-center justify-center text-white font-bold text-xs shadow-lg">IH</div>
           <span className="text-sm font-semibold tracking-tight text-neutral-800">In the haus</span>
-          <button onClick={handleDevLogin} className="opacity-0 hover:opacity-100 transition-opacity text-xs">🛠️</button>
+          <button onClick={handleDevLogin} className="text-neutral-300 hover:text-neutral-900 transition-colors text-xs">🛠️</button>
         </div>
 
         <div className="flex items-center gap-3">
