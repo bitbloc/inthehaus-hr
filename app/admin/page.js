@@ -630,7 +630,7 @@ export default function AdminDashboard() {
                                                         <td className="px-6 py-4 whitespace-nowrap text-right">
                                                             <button
                                                                 onClick={(e) => { e.stopPropagation(); handleDeleteLog(log.id); }}
-                                                                className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all opacity-0 group-hover:opacity-100"
+                                                                className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all"
                                                                 title="Delete Log"
                                                             >
                                                                 <Icons.Trash size={14} />
