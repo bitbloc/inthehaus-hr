@@ -62,6 +62,7 @@ export default function AdminDashboard() {
     const [showDeductModal, setShowDeductModal] = useState(false);
     const [deductForm, setDeductForm] = useState({ empId: "", amount: "", isPercent: false, reason: "" });
     const [newAnnouncement, setNewAnnouncement] = useState("");
+    const [showAllLogs, setShowAllLogs] = useState(false);
 
     // Manual Entry State
     const [showManualModal, setShowManualModal] = useState(false);
@@ -212,6 +213,18 @@ export default function AdminDashboard() {
     };
 
     const handleNotify = async (api) => { if (confirm("Send?")) await fetch(api, { method: 'POST' }); };
+
+    const handleDeleteLog = async (logId) => {
+        if (!confirm("Are you sure you want to delete this activity log?")) return;
+
+        const { error } = await supabase.from('attendance_logs').delete().eq('id', logId);
+        if (error) {
+            alert("Error deleting log: " + error.message);
+        } else {
+            fetchLogs();
+            alert("Log deleted successfully");
+        }
+    };
 
     // Roster Action
     const handleUpdateSchedule = async (empId, day, shiftId, isOff) => {
@@ -565,29 +578,36 @@ export default function AdminDashboard() {
                                 </div>
                             )}
 
-                            <Card className="p-0 overflow-hidden">
-                                <div className="p-6 border-b border-slate-50 flex justify-between items-center">
+                            <Card className="p-0 overflow-hidden flex flex-col max-h-[600px]">
+                                <div className="p-6 border-b border-slate-50 flex justify-between items-center shrink-0 bg-white sticky top-0 z-20">
                                     <h3 className="font-bold text-slate-700">Real-time Activity</h3>
+                                    <button
+                                        onClick={() => setShowAllLogs(!showAllLogs)}
+                                        className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg hover:bg-slate-200 transition-colors"
+                                    >
+                                        {showAllLogs ? 'Show Less' : 'View All'}
+                                    </button>
                                 </div>
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-sm text-left">
-                                        <thead className="bg-slate-50/50 text-slate-400 uppercase text-[10px] font-bold tracking-wider">
+                                <div className="overflow-auto custom-scrollbar flex-1">
+                                    <table className="w-full text-sm text-left relative">
+                                        <thead className="bg-slate-50/95 backdrop-blur text-slate-400 uppercase text-[10px] font-bold tracking-wider sticky top-0 z-10 shadow-sm">
                                             <tr>
-                                                <th className="px-6 py-4">Date</th>
-                                                <th className="px-6 py-4">Time</th>
-                                                <th className="px-6 py-4">Photo</th>
-                                                <th className="px-6 py-4">Staff</th>
-                                                <th className="px-6 py-4">Action</th>
-                                                <th className="px-6 py-4">Status</th>
+                                                <th className="px-6 py-4 whitespace-nowrap">Date</th>
+                                                <th className="px-6 py-4 whitespace-nowrap">Time</th>
+                                                <th className="px-6 py-4 whitespace-nowrap">Photo</th>
+                                                <th className="px-6 py-4 whitespace-nowrap">Staff</th>
+                                                <th className="px-6 py-4 whitespace-nowrap">Action</th>
+                                                <th className="px-6 py-4 whitespace-nowrap">Status</th>
+                                                <th className="px-6 py-4 whitespace-nowrap w-10"></th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-50">
-                                            {data.logs.slice(0, 10).map(log => {
+                                            {(showAllLogs ? data.logs : data.logs.slice(0, 15)).map(log => {
                                                 const status = getShiftStatus(log);
                                                 return (
-                                                    <tr key={log.id} className="hover:bg-slate-50/50 transition-colors">
-                                                        <td className="px-6 py-4 font-mono text-slate-500 text-xs">{formatDate(log.timestamp)}</td>
-                                                        <td className="px-6 py-4 font-mono text-slate-500 text-xs">{formatTime(log.timestamp)}</td>
+                                                    <tr key={log.id} className="group hover:bg-slate-50/50 transition-colors">
+                                                        <td className="px-6 py-4 font-mono text-slate-500 text-xs whitespace-nowrap">{formatDate(log.timestamp)}</td>
+                                                        <td className="px-6 py-4 font-mono text-slate-500 text-xs whitespace-nowrap">{formatTime(log.timestamp)}</td>
                                                         <td className="px-6 py-4">
                                                             {log.photo_url ? (
                                                                 <a href={log.photo_url} target="_blank" rel="noopener noreferrer">
@@ -595,21 +615,42 @@ export default function AdminDashboard() {
                                                                 </a>
                                                             ) : <span className="text-slate-300">-</span>}
                                                         </td>
-                                                        <td className="px-6 py-4 font-bold text-slate-700 flex items-center gap-3">
-                                                            <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-xs text-slate-500 font-bold border border-slate-200">
+                                                        <td className="px-6 py-4 font-bold text-slate-700 flex items-center gap-3 whitespace-nowrap">
+                                                            <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-xs text-slate-500 font-bold border border-slate-200 shrink-0">
                                                                 {log.employees?.name?.charAt(0)}
                                                             </div>
                                                             {log.employees?.name}
                                                         </td>
-                                                        <td className="px-6 py-4">
+                                                        <td className="px-6 py-4 whitespace-nowrap">
                                                             <Badge color={log.action_type === 'check_in' ? 'blue' : log.action_type === 'absent' ? 'rose' : 'slate'}>
                                                                 {log.action_type === 'check_in' ? 'Check In' : log.action_type === 'check_out' ? 'Check Out' : 'Absent'}
                                                             </Badge>
                                                         </td>
-                                                        <td className="px-6 py-4"><Badge color={status.color}>{status.label}</Badge></td>
+                                                        <td className="px-6 py-4 whitespace-nowrap"><Badge color={status.color}>{status.label}</Badge></td>
+                                                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); handleDeleteLog(log.id); }}
+                                                                className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all opacity-0 group-hover:opacity-100"
+                                                                title="Delete Log"
+                                                            >
+                                                                <Icons.Trash size={14} />
+                                                            </button>
+                                                        </td>
                                                     </tr>
                                                 );
                                             })}
+                                            {!showAllLogs && data.logs.length > 15 && (
+                                                <tr>
+                                                    <td colSpan="6" className="px-6 py-4 text-center">
+                                                        <button
+                                                            onClick={() => setShowAllLogs(true)}
+                                                            className="text-xs font-bold text-slate-400 hover:text-slate-600 transition-colors"
+                                                        >
+                                                            Show {data.logs.length - 15} more...
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            )}
                                         </tbody>
                                     </table>
                                 </div>
