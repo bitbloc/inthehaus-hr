@@ -50,9 +50,21 @@ function dataReducer(state, action) {
 }
 
 export default function AdminDashboard() {
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+    const [loginUser, setLoginUser] = useState("");
+    const [loginPass, setLoginPass] = useState("");
     const [activeTab, setActiveTab] = useState("dashboard");
     const [selectedMonth, setSelectedMonth] = useState(format(new Date(), "yyyy-MM"));
     const [data, dispatch] = useReducer(dataReducer, initialState);
+
+    useEffect(() => {
+        if (sessionStorage.getItem("adminAuth") === "true") {
+            setIsAuthenticated(true);
+        }
+        setIsCheckingAuth(false);
+    }, []);
+
 
     // UI Local State
     const [showStaffModal, setShowStaffModal] = useState(false);
@@ -445,6 +457,57 @@ export default function AdminDashboard() {
                 .then(({ data }) => dispatch({ type: 'SET_DATA', payload: { pendingEmployees: data || [] } }));
         }
     }, [activeTab]);
+
+    const handleLogin = (e) => {
+        e.preventDefault();
+        if (loginUser === "inthehaus" && loginPass === "inthehaus1120100144907") {
+            sessionStorage.setItem("adminAuth", "true");
+            setIsAuthenticated(true);
+        } else {
+            alert("Invalid username or password");
+        }
+    };
+
+    if (isCheckingAuth) return null;
+
+    if (!isAuthenticated) {
+        return (
+            <div className="min-h-screen bg-[#F8F9FA] flex flex-col items-center justify-center p-4">
+                <Card className="w-full max-w-sm p-8 space-y-6 bg-white shadow-xl border border-slate-100 rounded-3xl">
+                    <div className="text-center space-y-2">
+                        <div className="w-16 h-16 bg-slate-900 rounded-2xl mx-auto flex items-center justify-center text-white text-2xl font-bold shadow-lg shadow-slate-200">H</div>
+                        <h1 className="text-2xl font-bold tracking-tight text-slate-800">Admin Login</h1>
+                        <p className="text-sm text-slate-500 font-medium">Please enter your credentials</p>
+                    </div>
+                    <form onSubmit={handleLogin} className="space-y-4">
+                        <div>
+                            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">Username</label>
+                            <input
+                                type="text"
+                                className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl mt-1 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-slate-300 transition-all"
+                                value={loginUser}
+                                onChange={e => setLoginUser(e.target.value)}
+                                required
+                            />
+                        </div>
+                        <div>
+                            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">Password</label>
+                            <input
+                                type="password"
+                                className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl mt-1 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-slate-300 transition-all"
+                                value={loginPass}
+                                onChange={e => setLoginPass(e.target.value)}
+                                required
+                            />
+                        </div>
+                        <button type="submit" className="w-full py-4 bg-slate-900 text-white rounded-xl font-bold shadow-lg shadow-slate-200 hover:bg-slate-800 transition-transform active:scale-95 mt-4">
+                            Access Dashboard
+                        </button>
+                    </form>
+                </Card>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-[#F8F9FA] text-slate-800 font-sans pb-20 selection:bg-slate-200">
