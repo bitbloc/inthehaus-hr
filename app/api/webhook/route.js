@@ -44,7 +44,7 @@ export async function POST(request) {
             text: replyText
           });
           handledLocally = true;
-        } else if (text === 'hr_wrap' || text === 'summary') {
+        } else if (text === 'hr_wrap' || text === 'hrwrap' || text === 'summary') {
           console.log("HR WRAP Command Triggered");
           // --- HR WRAP LOGIC ---
           const { supabase } = await import('../../../lib/supabaseClient');

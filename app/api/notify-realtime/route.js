@@ -44,8 +44,11 @@ export async function POST(request) {
     const cleanLocation = locationStatus?.replace('✅ ', '').replace('❌ ', '') || '-';
 
     // ✅ เตรียมส่วนแสดงรูปภาพ (Image Component)
-    // ใช้รูป Placeholder ถ้าไม่มีรูปจริง เพื่อไม่ให้ Layout พัง
-    const imageUrl = photoUrl || 'https://via.placeholder.com/150?text=No+Img';
+    // ใช้รูป Placeholder พื้นหลังสีสว่าง ถ้าไม่มีรูปจริง เพื่อไม่ให้ Layout พัง
+    const defaultPlaceholder = action === 'leave_request'
+      ? 'https://placehold.co/150x150/f59e0b/ffffff.png?text=Leave'
+      : 'https://placehold.co/150x150/f8f9fa/cccccc.png?text=No+Img';
+    const imageUrl = photoUrl || defaultPlaceholder;
 
     const message = {
       type: 'flex',
