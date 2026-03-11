@@ -171,6 +171,54 @@ export async function POST(request) {
             text: msg
           });
           handledLocally = true;
+        } else if (text.startsWith('ขอลา')) {
+          console.log("Recent Approved Leaves Command Triggered");
+          const { supabase } = await import('../../../lib/supabaseClient');
+          const { format, parseISO, addHours } = await import('date-fns');
+
+          // หาจำนวนในข้อความ เช่น 'ขอลา 2'
+          let limit = 2; // ค่าเริ่มต้น
+          const match = text.match(/\d+/);
+          if (match) {
+            const parsed = parseInt(match[0], 10);
+            if (!isNaN(parsed) && parsed > 0 && parsed <= 20) limit = parsed;
+          }
+
+          const { data: leaves, error } = await supabase
+            .from('leave_requests')
+            .select('*, employees(name, position)')
+            .eq('status', 'approved')
+            .order('created_at', { ascending: false }) // ล่าสุดขึ้นก่อน
+            .limit(limit);
+
+          if (error) {
+            await client.replyMessage(event.replyToken, { type: 'text', text: 'Error fetching data: ' + error.message });
+            handledLocally = true;
+            continue;
+          }
+
+          let msg = `✅ ประวัติอนุมัติลาล่าสุด (${leaves ? leaves.length : 0} รายการ)\n`;
+
+          if (leaves && leaves.length > 0) {
+            leaves.forEach(l => {
+              const typeText = l.leave_type === 'sick' ? 'ลาป่วย 😷' : l.leave_type === 'business' ? 'ลากิจ 💼' : 'พักร้อน 🏖️';
+              const dateStr = l.leave_date ? format(parseISO(l.leave_date), 'dd/MM/yyyy') : '-';
+
+              // วันที่ถูกอนุมัติ (ประมาณการจาก created_at หรือถ้ามี approved_at) เอาแค่วันที่ขอลาพอ
+              msg += `\n👤 ${l.employees?.name || 'Unknown'}`;
+              msg += `\n   วันที่ลา: ${dateStr}`;
+              msg += `\n   ประเภท: ${typeText}`;
+              msg += `\n   เหตุผล: ${l.reason || '-'}\n`;
+            });
+          } else {
+            msg += "\nยังไม่มีประวัติการอนุมัติการลา";
+          }
+
+          await client.replyMessage(event.replyToken, {
+            type: 'text',
+            text: msg
+          });
+          handledLocally = true;
         }
       }
     }
