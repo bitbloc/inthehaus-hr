@@ -323,8 +323,22 @@ export default function AdminDashboard() {
         if (!confirm(`Confirm ${newStatus}?`)) return;
         const { error } = await supabase.from('leave_requests').update({ status: newStatus }).eq('id', req.id);
         if (!error) {
-            // Notify (Optional)
-            try { await fetch('/api/notify-leave-status', { method: 'POST', body: JSON.stringify({ name: req.employees?.name, date: req.leave_date, type: req.leave_type, reason: req.reason, status: newStatus }), headers: { 'Content-Type': 'application/json' } }); } catch (e) { }
+            try {
+                const notifyRes = await fetch('/api/notify-leave-status', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        name: req.employees?.name,
+                        date: req.leave_date,
+                        type: req.leave_type,
+                        reason: req.reason,
+                        status: newStatus
+                    }),
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                if (!notifyRes.ok) {
+                    console.error("Failed to push notify line", await notifyRes.text());
+                }
+            } catch (e) { console.error("Line notify catch block:", e); }
             fetchData('leave_requests', 'leaveRequests');
         }
     };

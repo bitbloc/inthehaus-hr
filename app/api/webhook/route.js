@@ -151,24 +151,8 @@ export async function POST(request) {
       return NextResponse.json({ success: true, handler: 'local' });
     }
 
-    // 2. Forward to Supabase Function (if not handled locally)
-    const response = await fetch('https://lxfavbzmebqqsffgyyph.supabase.co/functions/v1/line-webhook', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-line-signature': signature || '',
-      },
-      body: JSON.stringify(body),
-    });
-
-    if (!response.ok) {
-      console.error(`Supabase function error: ${response.status} ${response.statusText}`);
-      // return success to LINE to avoid retries even if our backend failed
-      return NextResponse.json({ success: true, forwarded: false });
-    }
-
-    const data = await response.json();
-    return NextResponse.json(data);
+    // Return success to avoid LINE retries
+    return NextResponse.json({ success: true, forwardedToGas: true });
 
   } catch (error) {
     console.error("Webhook Proxy Error:", error);
