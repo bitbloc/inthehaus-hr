@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { Client } from '@line/bot-sdk';
 
 // ✅ Group ID ของร้าน
-const GROUP_ID = 'Cc2c65da5408563ef57ae61dee6ce3c1d';
+const GROUP_ID = 'C1210c7a0601b5a675060e312efe10bff';
 
 const client = new Client({
   channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN,
@@ -21,21 +21,21 @@ export async function POST(request) {
     let labelLocation = "พิกัด:";
 
     if (action === 'check_in') {
-        title = '🟢 ลงเวลาเข้างาน';
-        color = '#10b981'; // เขียว
+      title = '🟢 ลงเวลาเข้างาน';
+      color = '#10b981'; // เขียว
     } else if (action === 'check_out') {
-        title = '🔴 ลงเวลาออกงาน';
-        color = '#ef4444'; // แดง
+      title = '🔴 ลงเวลาออกงาน';
+      color = '#ef4444'; // แดง
     } else if (action === 'leave_request') {
-        title = '📝 แจ้งขอลาหยุด';
-        color = '#f59e0b'; // ส้ม
-        labelTime = "วันที่:";
-        labelStatus = "เหตุผล:";
-        labelLocation = "ประเภท:";
+      title = '📝 แจ้งขอลาหยุด';
+      color = '#f59e0b'; // ส้ม
+      labelTime = "วันที่:";
+      labelStatus = "เหตุผล:";
+      labelLocation = "ประเภท:";
     }
 
     const isLateOrEarly = statusDetail?.includes('สาย') || statusDetail?.includes('ออกก่อน');
-    const statusTextColor = isLateOrEarly ? '#f59e0b' : '#6b7280'; 
+    const statusTextColor = isLateOrEarly ? '#f59e0b' : '#6b7280';
 
     // Clean ข้อความพิกัด
     const cleanLocation = locationStatus?.replace('✅ ', '').replace('❌ ', '') || '-';
@@ -43,13 +43,13 @@ export async function POST(request) {
     // ✅ เตรียมส่วนแสดงรูปภาพ (Image Component)
     // ใช้รูป Placeholder ถ้าไม่มีรูปจริง เพื่อไม่ให้ Layout พัง
     const imageUrl = photoUrl || 'https://via.placeholder.com/150?text=No+Img';
-    
+
     const message = {
       type: 'flex',
       altText: `${name} ${title}`,
       contents: {
         type: 'bubble',
-        size: 'kilo', 
+        size: 'kilo',
         body: {
           type: 'box',
           layout: 'vertical',
@@ -64,7 +64,7 @@ export async function POST(request) {
               ]
             },
             { type: 'separator', margin: 'md' },
-            
+
             // 2. เนื้อหาหลัก (Layout แนวนอน: รูปซ้าย - ข้อความขวา)
             {
               type: 'box',
@@ -84,7 +84,7 @@ export async function POST(request) {
                   // Action: กดรูปเพื่อดูภาพเต็ม (เฉพาะถ้ามีรูปจริง)
                   ...(photoUrl && { action: { type: 'uri', uri: photoUrl } })
                 },
-                
+
                 // 📝 2.2 รายละเอียด (ขวามือ)
                 {
                   type: 'box',
@@ -93,36 +93,36 @@ export async function POST(request) {
                   contents: [
                     // ชื่อพนักงาน
                     { type: 'text', text: name, weight: 'bold', size: 'md', color: '#1f2937', wrap: true, margin: 'none' },
-                    
+
                     // รายละเอียดย่อย (เวลา, สถานะ, พิกัด)
                     {
-                        type: 'box',
-                        layout: 'vertical',
-                        margin: 'sm',
-                        spacing: 'xs',
-                        contents: [
-                            {
-                                type: 'box', layout: 'baseline', spacing: 'sm',
-                                contents: [
-                                    { type: 'text', text: labelTime, color: '#aaaaaa', size: 'xxs', flex: 2 },
-                                    { type: 'text', text: time, color: '#4b5563', size: 'xs', flex: 4, weight: 'bold' }
-                                ]
-                            },
-                            {
-                                type: 'box', layout: 'baseline', spacing: 'sm',
-                                contents: [
-                                    { type: 'text', text: labelStatus, color: '#aaaaaa', size: 'xxs', flex: 2 },
-                                    { type: 'text', text: statusDetail || '-', color: statusTextColor, size: 'xs', flex: 4, wrap: true }
-                                ]
-                            },
-                            {
-                                type: 'box', layout: 'baseline', spacing: 'sm',
-                                contents: [
-                                    { type: 'text', text: labelLocation, color: '#aaaaaa', size: 'xxs', flex: 2 },
-                                    { type: 'text', text: cleanLocation, color: '#9ca3af', size: 'xxs', flex: 4, wrap: true }
-                                ]
-                            }
-                        ]
+                      type: 'box',
+                      layout: 'vertical',
+                      margin: 'sm',
+                      spacing: 'xs',
+                      contents: [
+                        {
+                          type: 'box', layout: 'baseline', spacing: 'sm',
+                          contents: [
+                            { type: 'text', text: labelTime, color: '#aaaaaa', size: 'xxs', flex: 2 },
+                            { type: 'text', text: time, color: '#4b5563', size: 'xs', flex: 4, weight: 'bold' }
+                          ]
+                        },
+                        {
+                          type: 'box', layout: 'baseline', spacing: 'sm',
+                          contents: [
+                            { type: 'text', text: labelStatus, color: '#aaaaaa', size: 'xxs', flex: 2 },
+                            { type: 'text', text: statusDetail || '-', color: statusTextColor, size: 'xs', flex: 4, wrap: true }
+                          ]
+                        },
+                        {
+                          type: 'box', layout: 'baseline', spacing: 'sm',
+                          contents: [
+                            { type: 'text', text: labelLocation, color: '#aaaaaa', size: 'xxs', flex: 2 },
+                            { type: 'text', text: cleanLocation, color: '#9ca3af', size: 'xxs', flex: 4, wrap: true }
+                          ]
+                        }
+                      ]
                     }
                   ]
                 }
@@ -135,8 +135,8 @@ export async function POST(request) {
     };
 
     // ส่งเข้ากลุ่มโดยตรง
-    await client.pushMessage(GROUP_ID, [message]); 
-    
+    await client.pushMessage(GROUP_ID, [message]);
+
     return NextResponse.json({ success: true });
 
   } catch (error) {

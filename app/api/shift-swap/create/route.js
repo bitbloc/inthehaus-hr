@@ -55,7 +55,7 @@ export async function POST(req) {
                     channelSecret: process.env.CHANNEL_SECRET,
                 });
 
-                const GROUP_ID = process.env.LINE_GROUP_ID || 'Cc2c65da5408563ef57ae61dee6ce3c1d';
+                const GROUP_ID = process.env.LINE_GROUP_ID || 'C1210c7a0601b5a675060e312efe10bff';
 
                 const message = {
                     type: 'flex',

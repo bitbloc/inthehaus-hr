@@ -3,7 +3,7 @@ import { supabase } from '../../../lib/supabaseClient';
 import { Client } from '@line/bot-sdk';
 
 // ✅ ใส่ Group ID ของร้าน
-const GROUP_ID = 'Cc2c65da5408563ef57ae61dee6ce3c1d';
+const GROUP_ID = 'C1210c7a0601b5a675060e312efe10bff';
 
 const client = new Client({
   channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN,
@@ -13,7 +13,7 @@ const client = new Client({
 export async function POST(request) {
   try {
     const today = new Date();
-    today.setHours(0, 0, 0, 0); 
+    today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
@@ -67,11 +67,11 @@ export async function POST(request) {
             { type: 'separator', margin: 'lg' },
             { type: 'text', text: 'รายชื่อ:', margin: 'lg', weight: 'bold', size: 'sm' },
             ...names.map(item => ({
-                type: 'box', layout: 'vertical', margin: 'sm',
-                contents: [
-                    { type: 'text', text: item.text, size: 'xs', color: item.color, weight: item.color === '#ff5555' ? 'bold' : 'regular' },
-                    { type: 'text', text: item.sub, size: 'xxs', color: '#aaaaaa', margin: 'xs', offsetStart: '18px' }
-                ]
+              type: 'box', layout: 'vertical', margin: 'sm',
+              contents: [
+                { type: 'text', text: item.text, size: 'xs', color: item.color, weight: item.color === '#ff5555' ? 'bold' : 'regular' },
+                { type: 'text', text: item.sub, size: 'xxs', color: '#aaaaaa', margin: 'xs', offsetStart: '18px' }
+              ]
             }))
           ]
         }
@@ -79,11 +79,11 @@ export async function POST(request) {
     };
 
     if (total > 0) {
-        // ✅ เปลี่ยนจาก broadcast เป็น pushMessage ระบุกลุ่ม
-        await client.pushMessage(GROUP_ID, [message]);
-        return NextResponse.json({ success: true, message: "Report sent" });
+      // ✅ เปลี่ยนจาก broadcast เป็น pushMessage ระบุกลุ่ม
+      await client.pushMessage(GROUP_ID, [message]);
+      return NextResponse.json({ success: true, message: "Report sent" });
     } else {
-        return NextResponse.json({ success: true, message: "No data" });
+      return NextResponse.json({ success: true, message: "No data" });
     }
 
   } catch (error) {

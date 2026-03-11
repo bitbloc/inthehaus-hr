@@ -7,7 +7,7 @@ const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Shared Group ID (Consider moving to env or DB config in future)
-const GROUP_ID = 'Cc2c65da5408563ef57ae61dee6ce3c1d';
+const GROUP_ID = 'C1210c7a0601b5a675060e312efe10bff';
 
 const client = new Client({
     channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN,

@@ -3,7 +3,7 @@ import { supabase } from '../../../lib/supabaseClient';
 import { Client } from '@line/bot-sdk';
 
 // ✅ ใส่ Group ID ของร้าน
-const GROUP_ID = 'Cc2c65da5408563ef57ae61dee6ce3c1d';
+const GROUP_ID = 'C1210c7a0601b5a675060e312efe10bff';
 
 const client = new Client({
   channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN,
@@ -25,42 +25,42 @@ export async function POST(request) {
     daysTitle.forEach((_, index) => rosterByDay[index] = []);
 
     schedules.forEach(item => {
-        rosterByDay[item.day_of_week].push({
-            name: item.employees?.name,
-            shift: item.shifts?.name,
-            time: `${item.shifts?.start_time}-${item.shifts?.end_time}`
-        });
+      rosterByDay[item.day_of_week].push({
+        name: item.employees?.name,
+        shift: item.shifts?.name,
+        time: `${item.shifts?.start_time}-${item.shifts?.end_time}`
+      });
     });
 
     const contents = [];
     contents.push({ type: 'text', text: '📅 ตารางงานสัปดาห์นี้', weight: 'bold', size: 'xl', color: '#1DB446', align: 'center' });
     contents.push({ type: 'separator', margin: 'md' });
 
-    const dayOrder = [1, 2, 3, 4, 5, 6, 0]; 
+    const dayOrder = [1, 2, 3, 4, 5, 6, 0];
 
     dayOrder.forEach(dayIndex => {
-        const dayName = daysTitle[dayIndex];
-        const staffList = rosterByDay[dayIndex];
+      const dayName = daysTitle[dayIndex];
+      const staffList = rosterByDay[dayIndex];
 
-        if (staffList.length > 0) {
-            contents.push({
-                type: 'box', layout: 'horizontal', margin: 'lg',
-                contents: [
-                    { type: 'text', text: dayName, weight: 'bold', size: 'sm', color: '#333333', flex: 2 },
-                    { type: 'text', text: `${staffList.length} คน`, size: 'xs', color: '#aaaaaa', align: 'end', flex: 1 }
-                ]
-            });
-            staffList.forEach(staff => {
-                contents.push({
-                    type: 'box', layout: 'horizontal', margin: 'xs',
-                    contents: [
-                        { type: 'text', text: `• ${staff.name}`, size: 'xs', color: '#555555', flex: 3 },
-                        { type: 'text', text: `${staff.shift}`, size: 'xs', color: '#007bff', align: 'end', flex: 2 }
-                    ]
-                });
-            });
-            contents.push({ type: 'separator', margin: 'sm' });
-        }
+      if (staffList.length > 0) {
+        contents.push({
+          type: 'box', layout: 'horizontal', margin: 'lg',
+          contents: [
+            { type: 'text', text: dayName, weight: 'bold', size: 'sm', color: '#333333', flex: 2 },
+            { type: 'text', text: `${staffList.length} คน`, size: 'xs', color: '#aaaaaa', align: 'end', flex: 1 }
+          ]
+        });
+        staffList.forEach(staff => {
+          contents.push({
+            type: 'box', layout: 'horizontal', margin: 'xs',
+            contents: [
+              { type: 'text', text: `• ${staff.name}`, size: 'xs', color: '#555555', flex: 3 },
+              { type: 'text', text: `${staff.shift}`, size: 'xs', color: '#007bff', align: 'end', flex: 2 }
+            ]
+          });
+        });
+        contents.push({ type: 'separator', margin: 'sm' });
+      }
     });
 
     const message = {

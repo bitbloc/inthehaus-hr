@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { Client } from '@line/bot-sdk';
 
 // ✅ Group ID เดิมของร้าน
-const GROUP_ID = 'Cc2c65da5408563ef57ae61dee6ce3c1d';
+const GROUP_ID = 'C1210c7a0601b5a675060e312efe10bff';
 
 const client = new Client({
   channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN,
@@ -79,7 +79,7 @@ export async function POST(request) {
         },
         // Footer (ถ้าอนุมัติ ให้ดูดีหน่อย)
         styles: {
-            footer: { separator: true }
+          footer: { separator: true }
         }
       }
     };
