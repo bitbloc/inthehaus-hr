@@ -17,9 +17,20 @@ export async function POST(request) {
     const events = body.events || [];
     let handledLocally = false;
 
+    // Check if it's a test webhook from LINE developers console
+    if (events.length === 0 || (events.length > 0 && events[0].replyToken === '00000000000000000000000000000000')) {
+      return NextResponse.json({ success: true, message: 'Webhook verified' }, { status: 200 });
+    }
+
     // We only handle the first event for simplicity in this hybrid mode, 
     // or we can loop. Let's loop but only reply to matches.
     for (const event of events) {
+      if (event.source && event.source.type === 'group') {
+        console.log("====================================");
+        console.log("GROUP ID DETECTED:", event.source.groupId);
+        console.log("====================================");
+      }
+
       if (event.type === 'message' && event.message.type === 'text') {
         const text = event.message.text.trim().toLowerCase();
         if (text === 'อากาศ' || text === 'weather') {
@@ -122,11 +133,25 @@ export async function POST(request) {
       }
     }
 
+    // Always attempt to forward to Google Apps Script
+    try {
+      const gasResponse = await fetch('https://script.google.com/macros/s/AKfycbyJ5WFOFmjwVJWoIUer6dwxHdeSShDvUfSWU0NNfsIH8Ek9WguCAzJG9QSbK5g77MH6/exec', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+      console.log(`Forwarded to GAS, status: ${gasResponse.status}`);
+    } catch (gasError) {
+      console.error("Error forwarding to Google Apps Script:", gasError);
+    }
+
     if (handledLocally) {
       return NextResponse.json({ success: true, handler: 'local' });
     }
 
-    // 2. Forward to Supabase Function (if not handled)
+    // 2. Forward to Supabase Function (if not handled locally)
     const response = await fetch('https://lxfavbzmebqqsffgyyph.supabase.co/functions/v1/line-webhook', {
       method: 'POST',
       headers: {
