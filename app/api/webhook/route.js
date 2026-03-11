@@ -129,6 +129,48 @@ export async function POST(request) {
             text: msg
           });
           handledLocally = true;
+        } else if (text === 'ลางาน') {
+          console.log("Leave Request Command Triggered");
+          const { supabase } = await import('../../../lib/supabaseClient');
+          const { format, parseISO } = await import('date-fns');
+
+          const { data: leaves, error } = await supabase
+            .from('leave_requests')
+            .select('*, employees(name, position)')
+            .eq('status', 'pending')
+            .order('leave_date', { ascending: true });
+
+          if (error) {
+            await client.replyMessage(event.replyToken, { type: 'text', text: 'Error fetching data: ' + error.message });
+            handledLocally = true;
+            continue;
+          }
+
+          let count = 0;
+          let msg = `📋 รายการรออนุมัติลางาน\n`;
+
+          if (leaves && leaves.length > 0) {
+            leaves.forEach(l => {
+              count++;
+              const typeText = l.leave_type === 'sick' ? 'ลาป่วย 😷' : l.leave_type === 'business' ? 'ลากิจ 💼' : 'พักร้อน 🏖️';
+              // Format date DD/MM/YYYY
+              const dateStr = l.leave_date ? format(parseISO(l.leave_date), 'dd/MM/yyyy') : '-';
+
+              msg += `\n👤 ${l.employees?.name || 'Unknown'} (${l.employees?.position || '-'})`;
+              msg += `\n   วันที่: ${dateStr}`;
+              msg += `\n   ประเภท: ${typeText}`;
+              msg += `\n   เหตุผล: ${l.reason || '-'}\n`;
+            });
+            msg += `\n📌 รวมรออนุมัติ: ${count} รายการ`;
+          } else {
+            msg += "\n✅ ไม่มีรายการขอลาหยุดที่รออนุมัติ";
+          }
+
+          await client.replyMessage(event.replyToken, {
+            type: 'text',
+            text: msg
+          });
+          handledLocally = true;
         }
       }
     }

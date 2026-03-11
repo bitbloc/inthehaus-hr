@@ -78,8 +78,8 @@ export async function POST(request) {
               margin: 'md',
               spacing: 'md',
               contents: [
-                // 📸 2.1 รูปภาพ (Icon)
-                {
+                // 📸 2.1 รูปภาพ (Icon) - ซ่อนรูปภาพถ้าเป็นแจ้งขอลาหยุด
+                ...(action === 'leave_request' ? [] : [{
                   type: 'image',
                   url: imageUrl,
                   size: 'lg', // ขนาดรูปประมาณ 100px
@@ -89,7 +89,7 @@ export async function POST(request) {
                   flex: 3,
                   // Action: กดรูปเพื่อดูภาพเต็ม (เฉพาะถ้ามีรูปจริง)
                   ...(photoUrl && { action: { type: 'uri', uri: photoUrl } })
-                },
+                }]),
 
                 // 📝 2.2 รายละเอียด (ขวามือ)
                 {
