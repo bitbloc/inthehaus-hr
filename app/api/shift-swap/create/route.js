@@ -55,8 +55,11 @@ export async function POST(req) {
                     channelSecret: process.env.CHANNEL_SECRET,
                 });
 
-                const GROUP_ID = process.env.LINE_GROUP_ID || 'C1210c7a0601b5a675060e312efe10bff';
-
+                // ✅ Group IDs (กลุ่มหลัก และ กลุ่มแผนกอื่น)
+                const GROUP_IDS = [
+                    'C1210c7a0601b5a675060e312efe10bff',
+                    'C71db3c7339b11f43dc8f1ec34bf46f43'
+                ];
                 const message = {
                     type: 'flex',
                     altText: '🔄 มีคำขอเปลี่ยนกะใหม่ (Shift Swap)',
@@ -83,7 +86,9 @@ export async function POST(req) {
                     }
                 };
 
-                await client.pushMessage(GROUP_ID, [message]);
+                await Promise.all(
+                    GROUP_IDS.map(groupId => client.pushMessage(groupId, [message]))
+                );
             }
         } catch (notifyError) {
             console.error("Notification Error:", notifyError);

@@ -2,8 +2,11 @@ import { NextResponse } from 'next/server';
 import { supabase } from '../../../lib/supabaseClient';
 import { Client } from '@line/bot-sdk';
 
-// ✅ ใส่ Group ID ของร้าน
-const GROUP_ID = 'C1210c7a0601b5a675060e312efe10bff';
+// ✅ Group IDs (กลุ่มหลัก และ กลุ่มแผนกอื่น)
+const GROUP_IDS = [
+  'C1210c7a0601b5a675060e312efe10bff',
+  'C71db3c7339b11f43dc8f1ec34bf46f43'
+];
 
 const client = new Client({
   channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN,
@@ -80,7 +83,9 @@ export async function POST(request) {
 
     if (total > 0) {
       // ✅ เปลี่ยนจาก broadcast เป็น pushMessage ระบุกลุ่ม
-      await client.pushMessage(GROUP_ID, [message]);
+      await Promise.all(
+        GROUP_IDS.map(groupId => client.pushMessage(groupId, [message]))
+      );
       return NextResponse.json({ success: true, message: "Report sent" });
     } else {
       return NextResponse.json({ success: true, message: "No data" });

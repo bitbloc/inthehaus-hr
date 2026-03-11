@@ -2,7 +2,11 @@ import { NextResponse } from 'next/server';
 import { supabase } from '../../../../lib/supabaseClient';
 import { Client } from '@line/bot-sdk';
 
-const GROUP_ID = 'C1210c7a0601b5a675060e312efe10bff';
+// ✅ Group IDs (กลุ่มหลัก และ กลุ่มแผนกอื่น)
+const GROUP_IDS = [
+  'C1210c7a0601b5a675060e312efe10bff',
+  'C71db3c7339b11f43dc8f1ec34bf46f43'
+];
 const client = new Client({ channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN, channelSecret: process.env.CHANNEL_SECRET });
 export const dynamic = 'force-dynamic';
 
@@ -65,8 +69,14 @@ export async function GET(request) {
     }
 
     if (messages.length > 0) {
-      try { await client.pushMessage(GROUP_ID, messages.slice(0, 5)); return NextResponse.json({ success: true, count: messages.length, debug: debugLog }); }
-      catch (e) { return NextResponse.json({ success: false, warning: "LINE Fail", details: e.message, debug: debugLog }, { status: 200 }); }
+      try {
+        await Promise.all(
+          GROUP_IDS.map(groupId => client.pushMessage(groupId, messages.slice(0, 5)))
+        );
+        return NextResponse.json({ success: true, count: messages.length, debug: debugLog });
+      } catch (e) {
+        return NextResponse.json({ success: false, warning: "LINE Fail", details: e.message, debug: debugLog }, { status: 200 });
+      }
     }
     return NextResponse.json({ success: true, message: "No match", debug: debugLog });
   } catch (error) { return NextResponse.json({ error: error.message }, { status: 500 }); }

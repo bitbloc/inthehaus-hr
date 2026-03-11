@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
 import { Client } from '@line/bot-sdk';
 
-// ✅ Group ID เดิมของร้าน
-const GROUP_ID = 'C1210c7a0601b5a675060e312efe10bff';
+// ✅ Group IDs (กลุ่มหลัก และ กลุ่มแผนกอื่น)
+const GROUP_IDS = [
+  'C1210c7a0601b5a675060e312efe10bff',
+  'C71db3c7339b11f43dc8f1ec34bf46f43'
+];
 
 const client = new Client({
   channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN,
@@ -84,8 +87,10 @@ export async function POST(request) {
       }
     };
 
-    // ส่งเข้ากลุ่ม
-    await client.pushMessage(GROUP_ID, [message]);
+    // ส่งเข้าทุกกลุ่ม
+    await Promise.all(
+      GROUP_IDS.map(groupId => client.pushMessage(groupId, [message]))
+    );
 
     return NextResponse.json({ success: true });
 

@@ -134,17 +134,24 @@ export async function POST(request) {
     }
 
     // Always attempt to forward to Google Apps Script
-    try {
-      const gasResponse = await fetch('https://script.google.com/macros/s/AKfycbyJ5WFOFmjwVJWoIUer6dwxHdeSShDvUfSWU0NNfsIH8Ek9WguCAzJG9QSbK5g77MH6/exec', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-      });
-      console.log(`Forwarded to GAS, status: ${gasResponse.status}`);
-    } catch (gasError) {
-      console.error("Error forwarding to Google Apps Script:", gasError);
+    // Forward to Google Apps Script ONLY IF it comes from the original group
+    const isFromOriginalGroup = events.some(e => e.source?.groupId === 'C1210c7a0601b5a675060e312efe10bff');
+
+    if (isFromOriginalGroup) {
+      try {
+        const gasResponse = await fetch('https://script.google.com/macros/s/AKfycbyJ5WFOFmjwVJWoIUer6dwxHdeSShDvUfSWU0NNfsIH8Ek9WguCAzJG9QSbK5g77MH6/exec', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(body),
+        });
+        console.log(`Forwarded to GAS, status: ${gasResponse.status}`);
+      } catch (gasError) {
+        console.error("Error forwarding to Google Apps Script:", gasError);
+      }
+    } else {
+      console.log("Skipped GAS forwarding for non-primary group");
     }
 
     if (handledLocally) {
