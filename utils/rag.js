@@ -16,15 +16,24 @@ function getSupabase() {
 /**
  * Generate embedding for a text string
  */
-export async function getEmbedding(text) {
+export async function getEmbedding(text, taskType = 'RETRIEVAL_QUERY', title = null) {
     try {
         const instance = getGenAI();
         if (!instance) {
              console.error("Cannot get Gemini Instance (check API Key)");
              return null;
         }
+        
         const model = instance.getGenerativeModel({ model: "text-embedding-004" });
-        const result = await model.embedContent(text);
+        
+        // Optimized call based on latest documentation
+        const result = await model.embedContent({
+            content: { parts: [{ text }] },
+            taskType: taskType,
+            title: title || undefined,
+            outputDimensionality: 768
+        });
+        
         return result.embedding.values;
     } catch (error) {
         console.error("Full Embedding Error Details:", error);
@@ -37,7 +46,8 @@ export async function getEmbedding(text) {
  */
 export async function searchKnowledge(query, limit = 3) {
     try {
-        const embedding = await getEmbedding(query);
+        // Use RETRIEVAL_QUERY for searching
+        const embedding = await getEmbedding(query, 'RETRIEVAL_QUERY');
         if (!embedding) return [];
 
         const client = getSupabase();
@@ -64,7 +74,11 @@ export async function searchKnowledge(query, limit = 3) {
  */
 export async function addKnowledge(content, metadata = {}) {
     try {
-        const embedding = await getEmbedding(content);
+        // Use RETRIEVAL_DOCUMENT for storing knowledge
+        // If metadata has a title, use it to improve embedding quality
+        const title = metadata.title || null;
+        const embedding = await getEmbedding(content, 'RETRIEVAL_DOCUMENT', title);
+        
         if (!embedding) throw new Error("Could not generate embedding");
 
         const client = getSupabase();
