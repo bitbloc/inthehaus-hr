@@ -41,7 +41,10 @@ export async function getEmbedding(text, taskType = 'RETRIEVAL_QUERY', title = n
             try {
                 // Secondary Fallback: Try a different reliable model
                 const fallbackModel = instance.getGenerativeModel({ model: "gemini-embedding-001" });
-                result = await fallbackModel.embedContent(text);
+                result = await fallbackModel.embedContent({
+                    content: { parts: [{ text }] },
+                    outputDimensionality: 768
+                });
             } catch (fallbackError) {
                 throw new Error(`All embedding models failed. Last error: ${fallbackError.message}`);
             }
