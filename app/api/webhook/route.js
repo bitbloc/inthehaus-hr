@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { Client } from '@line/bot-sdk';
 import { getSchemaWeather, formatWeatherMessage } from '../../../utils/weather';
-import { getGeminiResponse } from '../../../utils/gemini';
+import { getGeminiResponse, classifyAndAnalyzeImage, getDailySummary, generateImage } from '../../../utils/gemini';
 import { getGoldPrice, getOilPrice, getElectricityPrice, getIngredientPrices } from '../../../utils/price';
-
+import { saveMessage, getChatHistory, getDailyContent, cleanupOldHistory } from '../../../utils/memory';
 
 const client = new Client({
   channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN,
@@ -13,252 +13,192 @@ const client = new Client({
 export async function POST(request) {
   try {
     const body = await request.json();
-    const signature = request.headers.get('x-line-signature');
-
-    // 1. Check for specific commands (Weather) to handle locally
-    // LINE Webhook can contain multiple events
     const events = body.events || [];
     let handledLocally = false;
 
-    // Check if it's a test webhook from LINE developers console
     if (events.length === 0 || (events.length > 0 && events[0].replyToken === '00000000000000000000000000000000')) {
       return NextResponse.json({ success: true, message: 'Webhook verified' }, { status: 200 });
     }
 
-    // We only handle the first event for simplicity in this hybrid mode, 
-    // or we can loop. Let's loop but only reply to matches.
+    // Run cleanup occasionally (simple heuristic: on every webhook call but could be more sophisticated)
+    cleanupOldHistory().catch(e => console.error("Cleanup Error:", e));
+
     for (const event of events) {
-      if (event.source && event.source.type === 'group') {
-        console.log("====================================");
-        console.log("GROUP ID DETECTED:", event.source.groupId);
-        console.log("====================================");
-      }
+      if (event.type === 'message') {
+        const groupId = event.source.groupId || event.source.userId;
+        const userId = event.source.userId;
 
-      if (event.type === 'message' && event.message.type === 'text') {
-        const text = event.message.text.trim().toLowerCase();
-        if (text === 'อากาศ' || text === 'weather') {
-          // Fetch Weather
-          const weatherData = await getSchemaWeather();
-          const replyText = formatWeatherMessage(weatherData);
-
-          // Reply
-          await client.replyMessage(event.replyToken, {
-            type: 'text',
-            text: replyText
-          });
-          handledLocally = true;
-        } else if (text === 'hr_wrap' || text === 'hrwrap' || text === 'summary') {
-          console.log("HR WRAP Command Triggered");
-          // --- HR WRAP LOGIC ---
-          const { supabase } = await import('../../../lib/supabaseClient');
-          const { format, differenceInMinutes, addHours } = await import('date-fns');
-
-          // Get today's range based on server time (UTC)
-          // We'll trust Supabase 'gte' with a simple UTC midnight calculation.
-          const START_OF_DAY_UTC = new Date();
-          START_OF_DAY_UTC.setHours(0, 0, 0, 0);
-          console.log("Querying logs since:", START_OF_DAY_UTC.toISOString());
-
-          // Query Attendance
-          const { data: logs, error } = await supabase
-            .from('attendance_logs')
-            .select('*, employees(name, position)')
-            .gte('timestamp', START_OF_DAY_UTC.toISOString())
-            .order('timestamp', { ascending: true });
-
-          if (error) {
-            console.error("HR Wrap Data Error:", error);
-            await client.replyMessage(event.replyToken, { type: 'text', text: 'Error fetching data: ' + error.message });
-            handledLocally = true;
-            continue;
-          }
-
-          console.log(`Found ${logs.length} logs.`);
-
-          // Process Data
-          const summary = {};
-          logs.forEach(log => {
-            const name = log.employees?.name || 'Unknown';
-            const position = log.employees?.position || '-';
-            if (!summary[name]) {
-              summary[name] = { name, position, in: null, out: null };
-            }
-            if (log.action_type === 'check_in') summary[name].in = new Date(log.timestamp);
-            if (log.action_type === 'check_out') summary[name].out = new Date(log.timestamp);
-          });
-
-          // Sort by Check-in time
-          const summaryList = Object.values(summary).sort((a, b) => {
-            const tA = a.in ? a.in.getTime() : 0;
-            const tB = b.in ? b.in.getTime() : 0;
-            return tA - tB;
-          });
-
-          // Build Message
-          // Fallback if locale fails (e.g. node env issue): add 7 hours manually
-          const safeThaiTime = (date) => format(addHours(date, 7), 'HH:mm');
-
-          const todayStr = format(addHours(new Date(), 7), 'dd/MM/yyyy');
-
-          let msg = `สรุปการเข้างาน ${todayStr}\n`;
-          let count = 0;
-
-          for (const s of summaryList) {
-            count++;
-            const inTime = s.in ? safeThaiTime(s.in) : '-';
-            const outTime = s.out ? safeThaiTime(s.out) : '-';
-
-            let durationStr = '';
-            if (s.in) {
-              const endT = s.out || new Date();
-              const diff = differenceInMinutes(endT, s.in);
-              const hrs = Math.floor(diff / 60);
-              const mins = diff % 60;
-              durationStr = `(${hrs}ชม. ${mins}น.)`;
-              if (!s.out) durationStr += ' [Working]';
-            }
-
-            msg += `\n👤 ${s.name} (${s.position})`;
-            msg += `\n   เข้า: ${inTime} | ออก: ${outTime}`;
-            msg += `\n   รวม: ${durationStr}\n`;
-          }
-
-          if (count === 0) msg += "\nยังไม่มีการลงเวลาวันนี้";
-
-          console.log("Replying with:", msg);
-
-          await client.replyMessage(event.replyToken, {
-            type: 'text',
-            text: msg
-          });
-          handledLocally = true;
-        } else if (text === 'ลางาน') {
-          console.log("Leave Request Command Triggered");
-          const { supabase } = await import('../../../lib/supabaseClient');
-          const { format, parseISO } = await import('date-fns');
-
-          const { data: leaves, error } = await supabase
-            .from('leave_requests')
-            .select('*, employees(name, position)')
-            .eq('status', 'pending')
-            .order('leave_date', { ascending: true });
-
-          if (error) {
-            await client.replyMessage(event.replyToken, { type: 'text', text: 'Error fetching data: ' + error.message });
-            handledLocally = true;
-            continue;
-          }
-
-          let count = 0;
-          let msg = `📋 รายการรออนุมัติลางาน\n`;
-
-          if (leaves && leaves.length > 0) {
-            leaves.forEach(l => {
-              count++;
-              const typeText = l.leave_type === 'sick' ? 'ลาป่วย 😷' : l.leave_type === 'business' ? 'ลากิจ 💼' : 'พักร้อน 🏖️';
-              // Format date DD/MM/YYYY
-              const dateStr = l.leave_date ? format(parseISO(l.leave_date), 'dd/MM/yyyy') : '-';
-
-              msg += `\n👤 ${l.employees?.name || 'Unknown'} (${l.employees?.position || '-'})`;
-              msg += `\n   วันที่: ${dateStr}`;
-              msg += `\n   ประเภท: ${typeText}`;
-              msg += `\n   เหตุผล: ${l.reason || '-'}\n`;
-            });
-            msg += `\n📌 รวมรออนุมัติ: ${count} รายการ`;
-          } else {
-            msg += "\n✅ ไม่มีรายการขอลาหยุดที่รออนุมัติ";
-          }
-
-          await client.replyMessage(event.replyToken, {
-            type: 'text',
-            text: msg
-          });
-          handledLocally = true;
-        } else if (text.startsWith('ขอลา')) {
-          console.log("Recent Approved Leaves Command Triggered");
-          const { supabase } = await import('../../../lib/supabaseClient');
-          const { format, parseISO, addHours } = await import('date-fns');
-
-          // หาจำนวนในข้อความ เช่น 'ขอลา 2'
-          let limit = 2; // ค่าเริ่มต้น
-          const match = text.match(/\d+/);
-          if (match) {
-            const parsed = parseInt(match[0], 10);
-            if (!isNaN(parsed) && parsed > 0 && parsed <= 20) limit = parsed;
-          }
-
-          const { data: leaves, error } = await supabase
-            .from('leave_requests')
-            .select('*, employees(name, position)')
-            .eq('status', 'approved')
-            .order('created_at', { ascending: false }) // ล่าสุดขึ้นก่อน
-            .limit(limit);
-
-          if (error) {
-            await client.replyMessage(event.replyToken, { type: 'text', text: 'Error fetching data: ' + error.message });
-            handledLocally = true;
-            continue;
-          }
-
-          let msg = `✅ ประวัติอนุมัติลาล่าสุด (${leaves ? leaves.length : 0} รายการ)\n`;
-
-          if (leaves && leaves.length > 0) {
-            leaves.forEach(l => {
-              const typeText = l.leave_type === 'sick' ? 'ลาป่วย 😷' : l.leave_type === 'business' ? 'ลากิจ 💼' : 'พักร้อน 🏖️';
-              const dateStr = l.leave_date ? format(parseISO(l.leave_date), 'dd/MM/yyyy') : '-';
-
-              // วันที่ถูกอนุมัติ (ประมาณการจาก created_at หรือถ้ามี approved_at) เอาแค่วันที่ขอลาพอ
-              msg += `\n👤 ${l.employees?.name || 'Unknown'}`;
-              msg += `\n   วันที่ลา: ${dateStr}`;
-              msg += `\n   ประเภท: ${typeText}`;
-              msg += `\n   เหตุผล: ${l.reason || '-'}\n`;
-            });
-          } else {
-            msg += "\nยังไม่มีประวัติการอนุมัติการลา";
-          }
-
-          await client.replyMessage(event.replyToken, {
-            type: 'text',
-            text: msg
-          });
-          handledLocally = true;
-        } else if (text.startsWith('yuzu')) {
-          console.log("Yuzu AI Assistant Triggered");
-          const query = event.message.text.slice(4).trim();
+        // Handle Text Messages
+        if (event.message.type === 'text') {
+          const rawText = event.message.text.trim();
+          const text = rawText.toLowerCase();
           
-          if (!query) {
-            await client.replyMessage(event.replyToken, {
-              type: 'text',
-              text: 'ยูซุยินดีให้บริการครับ พิมพ์ "yuzu" ตามด้วยสิ่งที่คุณอยากรู้ได้เลยครับ เช่น "yuzu ราคาทองวันนี้"'
-            });
-            handledLocally = true;
-            continue;
-          }
-
-          let context = "";
-          if (text.includes('ทอง')) context += await getGoldPrice() + "\n";
-          if (text.includes('น้ำมัน')) context += await getOilPrice() + "\n";
-          if (text.includes('ไฟ')) context += await getElectricityPrice() + "\n";
-          
-          // Enhanced ingredient detection
-          const ingredientKeywords = ['วัตถุดิบ', 'ราคาอาหาร', 'หมู', 'ไก่', 'เนื้อ', 'ปลา', 'ไข่', 'ผัก', 'ผลไม้', 'ข้าว'];
-          if (ingredientKeywords.some(kw => text.includes(kw))) {
-            context += await getIngredientPrices() + "\n";
-          }
-          if (text.includes('อากาศ')) {
+          if (text === 'อากาศ' || text === 'weather') {
             const weatherData = await getSchemaWeather();
-            context += formatWeatherMessage(weatherData) + "\n";
+            const replyText = formatWeatherMessage(weatherData);
+            await client.replyMessage(event.replyToken, { type: 'text', text: replyText });
+            handledLocally = true;
+          } else if (text === 'hr_wrap' || text === 'hrwrap' || text === 'summary') {
+            // ... (HR WRAP logic stays as is)
+            const { supabase } = await import('../../../lib/supabaseClient');
+            const { format, differenceInMinutes, addHours } = await import('date-fns');
+            const START_OF_DAY_UTC = new Date();
+            START_OF_DAY_UTC.setHours(0, 0, 0, 0);
+            const { data: logs, error } = await supabase
+              .from('attendance_logs')
+              .select('*, employees(name, position)')
+              .gte('timestamp', START_OF_DAY_UTC.toISOString())
+              .order('timestamp', { ascending: true });
+
+            if (error) {
+              await client.replyMessage(event.replyToken, { type: 'text', text: 'Error fetching data: ' + error.message });
+              handledLocally = true;
+              continue;
+            }
+
+            const summary = {};
+            logs.forEach(log => {
+              const name = log.employees?.name || 'Unknown';
+              const position = log.employees?.position || '-';
+              if (!summary[name]) summary[name] = { name, position, in: null, out: null };
+              if (log.action_type === 'check_in') summary[name].in = new Date(log.timestamp);
+              if (log.action_type === 'check_out') summary[name].out = new Date(log.timestamp);
+            });
+
+            const summaryList = Object.values(summary).sort((a, b) => (a.in?.getTime() || 0) - (b.in?.getTime() || 0));
+            const safeThaiTime = (date) => format(addHours(date, 7), 'HH:mm');
+            const todayStr = format(addHours(new Date(), 7), 'dd/MM/yyyy');
+            let msg = `สรุปการเข้างาน ${todayStr}\n`;
+            let count = 0;
+
+            for (const s of summaryList) {
+              count++;
+              const inTime = s.in ? safeThaiTime(s.in) : '-';
+              const outTime = s.out ? safeThaiTime(s.out) : '-';
+              let durationStr = '';
+              if (s.in) {
+                const diff = differenceInMinutes(s.out || new Date(), s.in);
+                durationStr = `(${Math.floor(diff / 60)}ชม. ${diff % 60}น.)`;
+                if (!s.out) durationStr += ' [Working]';
+              }
+              msg += `\n👤 ${s.name} (${s.position})\n   เข้า: ${inTime} | ออก: ${outTime}\n   รวม: ${durationStr}\n`;
+            }
+            if (count === 0) msg += "\nยังไม่มีการลงเวลาวันนี้";
+
+            await client.replyMessage(event.replyToken, { type: 'text', text: msg });
+            handledLocally = true;
+          } else if (text === 'ลางาน') {
+            const { supabase } = await import('../../../lib/supabaseClient');
+            const { format, parseISO } = await import('date-fns');
+            const { data: leaves, error } = await supabase
+              .from('leave_requests')
+              .select('*, employees(name, position)')
+              .eq('status', 'pending')
+              .order('leave_date', { ascending: true });
+
+            if (error) {
+              await client.replyMessage(event.replyToken, { type: 'text', text: 'Error fetching data: ' + error.message });
+              handledLocally = true;
+              continue;
+            }
+
+            let msg = `📋 รายการรออนุมัติลางาน\n`;
+            if (leaves?.length > 0) {
+              leaves.forEach(l => {
+                const dateStr = l.leave_date ? format(parseISO(l.leave_date), 'dd/MM/yyyy') : '-';
+                msg += `\n👤 ${l.employees?.name} (${l.employees?.position})\n   วันที่: ${dateStr}\n   ประเภท: ${l.leave_type}\n   เหตุผล: ${l.reason || '-'}\n`;
+              });
+              msg += `\n📌 รวมรออนุมัติ: ${leaves.length} รายการ`;
+            } else {
+              msg += "\n✅ ไม่มีรายการขอลาหยุดที่รออนุมัติ";
+            }
+            await client.replyMessage(event.replyToken, { type: 'text', text: msg });
+            handledLocally = true;
+          } else if (text.startsWith('yuzu')) {
+            const query = rawText.slice(4).trim();
+            if (!query) {
+              await client.replyMessage(event.replyToken, { type: 'text', text: 'ยูซุยินดีให้บริการครับ พิมพ์ "yuzu" ตามด้วยสิ่งที่คุณอยากรู้ได้เลยครับ' });
+              handledLocally = true;
+              continue;
+            }
+
+            // --- Specialized Yuzu Commands ---
+            
+            // 1. Image Generation
+            if (text.startsWith('yuzu วาดรูป') || text.startsWith('yuzu generate image')) {
+              const imagePrompt = query.replace('วาดรูป', '').trim();
+              const response = await generateImage(imagePrompt);
+              await client.replyMessage(event.replyToken, { type: 'text', text: response });
+              handledLocally = true;
+              continue;
+            }
+
+            // 2. Daily Summary
+            if (text === 'สรุปประจำวัน' || text === 'summary') {
+              console.log("Yuzu: Daily Summary Requested");
+              const content = await getDailyContent(groupId);
+              const summary = await getDailySummary(content);
+              await client.replyMessage(event.replyToken, { type: 'text', text: summary });
+              handledLocally = true;
+              continue;
+            }
+
+            // 3. Standard Yuzu Chat with Memory
+            const history = await getChatHistory(groupId);
+            
+            let context = "";
+            if (text.includes('ทอง')) context += await getGoldPrice() + "\n";
+            if (text.includes('น้ำมัน')) context += await getOilPrice() + "\n";
+            if (text.includes('ไฟ')) context += await getElectricityPrice() + "\n";
+            const ingredientKeywords = ['วัตถุดิบ', 'ราคาอาหาร', 'หมู', 'ไก่', 'เนื้อ', 'ปลา', 'ไข่', 'ผัก', 'ผลไม้', 'ข้าว'];
+            if (ingredientKeywords.some(kw => text.includes(kw))) context += await getIngredientPrices() + "\n";
+            if (text.includes('อากาศ')) context += formatWeatherMessage(await getSchemaWeather()) + "\n";
+
+            const response = await getGeminiResponse(query, context, history);
+
+            // Save Memory
+            await saveMessage(groupId, userId, 'user', query);
+            await saveMessage(groupId, null, 'model', response);
+
+            await client.replyMessage(event.replyToken, { type: 'text', text: response });
+            handledLocally = true;
+          } else {
+            // Save all messages for the daily summary (even non-yuzu ones)
+            await saveMessage(groupId, userId, 'user', rawText, 'text');
           }
+        } 
+        
+        // Handle Image Messages
+        else if (event.message.type === 'image') {
+          console.log("Yuzu Vision: Image Received");
+          try {
+            const stream = await client.getMessageContent(event.message.id);
+            const chunks = [];
+            for await (const chunk of stream) chunks.push(chunk);
+            const buffer = Buffer.concat(chunks);
+            const base64 = buffer.toString('base64');
 
-          const response = await getGeminiResponse(query, context);
+            const context = await getIngredientPrices();
 
-          await client.replyMessage(event.replyToken, {
-            type: 'text',
-            text: response
-          });
-          handledLocally = true;
+            // Refined Vision Logic
+            const result = await classifyAndAnalyzeImage(base64, "image/jpeg", context);
+
+            // Always save image description for summary (Retention 2 days handled in cleanup)
+            await saveMessage(groupId, userId, 'user', result.shortDescription, 'image_description');
+
+            // Only reply if it's food/ingredients
+            if (result.isFood) {
+              await client.replyMessage(event.replyToken, { type: 'text', text: result.analysis });
+              handledLocally = true;
+            } else {
+              console.log("Yuzu: Non-food image, staying silent but saved description.");
+              // Don't set handledLocally to true if we didn't reply, 
+              // so it can still forward to GAS if needed.
+            }
+          } catch (visionError) {
+            console.error("Vision Processing Error:", visionError);
+          }
         }
-
       }
     }
 
