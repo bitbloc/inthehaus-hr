@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { addKnowledge } from '../../../../utils/rag';
+import { addKnowledge } from '../../../../utils/rag.js';
 
 export async function POST(request) {
     try {

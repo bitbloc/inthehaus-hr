@@ -1,19 +1,21 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
-
-// For local testing compatibility
-if (typeof process !== 'undefined' && !process.env.GEMINI_API_KEY) {
-    try {
-        const dotenv = await import('dotenv');
-        dotenv.config({ path: '.env.local' });
-    } catch (e) {
-        // Dotenv might not be available in all envs, that's fine for production
-    }
-}
-
 import { saveMessage, getChatHistory } from './memory.js';
 import { searchKnowledge } from './rag.js';
 
-export const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+let genAIInstance = null;
+
+export function getGenAI() {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+        console.error("CRITICAL: GEMINI_API_KEY is missing from process.env");
+    }
+    if (!genAIInstance && apiKey) {
+        genAIInstance = new GoogleGenerativeAI(apiKey);
+    }
+    return genAIInstance;
+}
+
+// Keep export for backward compatibility but initialize safely
+export const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "dummy-key");
 
 
 /**
@@ -35,7 +37,10 @@ export async function getGeminiResponse(query, context = "", history = []) {
                 knowledgeResults.map(k => `- ${k.content}`).join('\n') + "\n";
         }
 
-        const model = genAI.getGenerativeModel({ 
+        const instance = getGenAI();
+        if (!instance) return "ขออภัยครับ เกิดข้อผิดพลาดในการเชื่อมต่อกับ AI (getGenAI failed)";
+
+        const model = instance.getGenerativeModel({ 
             model: "gemini-2.5-flash",
             systemInstruction: `คุณคือ "Yuzu" (ยูซุ) ผู้ช่วย AI อัจฉริยะประจำชุมชน "In The Haus"
             - หน้าที่: ตอบคำถามทั่วไป, เช็คราคาสินค้า (ทอง, น้ำมัน, ค่าไฟ, วัตถุดิบ), และสรุปบทสนทนา
@@ -79,7 +84,10 @@ export async function classifyAndAnalyzeImage(imageBase64, mimeType = "image/jpe
     if (!apiKey) return { isFood: false, analysis: "API Key missing", shortDescription: "" };
 
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+        const instance = getGenAI();
+        if (!instance) return { isFood: false, analysis: "AI Instance error", shortDescription: "" };
+        
+        const model = instance.getGenerativeModel({ model: "gemini-2.5-flash" });
         
         const systemPrompt = `คุณคือระบบวิเคราะห์รูปภาพของ Yuzu Bot
         1. ตรวจสอบว่ารูปนี้คือ "อาหาร/วัตถุดิบ" หรือ "แมว" หรือไม่
@@ -128,7 +136,10 @@ export async function getDailySummary(content) {
     if (!content) return "วันนี้ยังไม่มีการพูดคุยหรือรูปภาพที่บันทึกไว้ครับ";
 
     try {
-        const model = genAI.getGenerativeModel({ 
+        const instance = getGenAI();
+        if (!instance) return "AI Instance error";
+
+        const model = instance.getGenerativeModel({ 
             model: "gemini-2.5-flash",
             systemInstruction: `คุณคือ "Yuzu" (ยูซุ) ทำหน้าที่สรุปการสนทนาและเหตุการณ์ประจำวันในกลุ่ม LINE
             1. สรุปประเด็นสำคัญจากการพูดคุย

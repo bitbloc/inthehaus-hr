@@ -1,4 +1,4 @@
-import { genAI } from './gemini.js';
+import { getGenAI } from './gemini.js';
 import { createClient } from '@supabase/supabase-js';
 
 let supabase = null;
@@ -18,11 +18,16 @@ function getSupabase() {
  */
 export async function getEmbedding(text) {
     try {
-        const model = genAI.getGenerativeModel({ model: "text-embedding-004" });
+        const instance = getGenAI();
+        if (!instance) {
+             console.error("Cannot get Gemini Instance (check API Key)");
+             return null;
+        }
+        const model = instance.getGenerativeModel({ model: "text-embedding-004" });
         const result = await model.embedContent(text);
         return result.embedding.values;
     } catch (error) {
-        console.error("Embedding Error:", error);
+        console.error("Full Embedding Error Details:", error);
         return null;
     }
 }
