@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { Client } from '@line/bot-sdk';
 import { getSchemaWeather, formatWeatherMessage } from '../../../utils/weather';
+import { getGeminiResponse } from '../../../utils/gemini';
+import { getGoldPrice, getOilPrice, getElectricityPrice, getIngredientPrices } from '../../../utils/price';
+
 
 const client = new Client({
   channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN,
@@ -219,7 +222,43 @@ export async function POST(request) {
             text: msg
           });
           handledLocally = true;
+        } else if (text.startsWith('yuzu')) {
+          console.log("Yuzu AI Assistant Triggered");
+          const query = event.message.text.slice(4).trim();
+          
+          if (!query) {
+            await client.replyMessage(event.replyToken, {
+              type: 'text',
+              text: 'ยูซุยินดีให้บริการครับ พิมพ์ "yuzu" ตามด้วยสิ่งที่คุณอยากรู้ได้เลยครับ เช่น "yuzu ราคาทองวันนี้"'
+            });
+            handledLocally = true;
+            continue;
+          }
+
+          let context = "";
+          if (text.includes('ทอง')) context += await getGoldPrice() + "\n";
+          if (text.includes('น้ำมัน')) context += await getOilPrice() + "\n";
+          if (text.includes('ไฟ')) context += await getElectricityPrice() + "\n";
+          
+          // Enhanced ingredient detection
+          const ingredientKeywords = ['วัตถุดิบ', 'ราคาอาหาร', 'หมู', 'ไก่', 'เนื้อ', 'ปลา', 'ไข่', 'ผัก', 'ผลไม้', 'ข้าว'];
+          if (ingredientKeywords.some(kw => text.includes(kw))) {
+            context += await getIngredientPrices() + "\n";
+          }
+          if (text.includes('อากาศ')) {
+            const weatherData = await getSchemaWeather();
+            context += formatWeatherMessage(weatherData) + "\n";
+          }
+
+          const response = await getGeminiResponse(query, context);
+
+          await client.replyMessage(event.replyToken, {
+            type: 'text',
+            text: response
+          });
+          handledLocally = true;
         }
+
       }
     }
 
