@@ -14,6 +14,12 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 
 export async function getGeminiResponse(query, context = "") {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+        console.error("CRITICAL: GEMINI_API_KEY is missing from environment variables.");
+        return "ขออภัยครับ ยูซุหากุญแจ API ไม่เจอ (GEMINI_API_KEY) รบกวนตรวจสอบใน Vercel Settings นะครับ";
+    }
+
     try {
         const model = genAI.getGenerativeModel({ 
             model: "gemini-2.0-flash",
@@ -35,7 +41,11 @@ export async function getGeminiResponse(query, context = "") {
         const response = await result.response;
         return response.text();
     } catch (error) {
-        console.error("Gemini Error:", error);
-        return "ขออภัยครับ ยูซุเกิดข้อผิดพลาดในการประมวลผล ลองใหม่อีกครั้งนะครับ";
+        console.error("Gemini Technical Error:", error);
+        if (error.status === 429) {
+            return "ขออภัยครับ ตอนนี้โควต้าการใช้งาน Yuzu เต็มชั่วคราว (Rate Limit) รบกวนลองใหม่อีกครั้งในอีกสักครู่ครับ";
+        }
+        return `ขออภัยครับ ยูซุเกิดข้อผิดพลาดในการประมวลผล (${error.message || 'unknown error'}) ลองใหม่อีกครั้งนะครับ`;
     }
 }
+
