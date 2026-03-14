@@ -1,22 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { saveMessage, getChatHistory } from './memory.js';
 import { searchKnowledge } from './rag.js';
-
-let genAIInstance = null;
-
-export function getGenAI() {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-        console.error("CRITICAL: GEMINI_API_KEY is missing from process.env");
-    }
-    if (!genAIInstance && apiKey) {
-        genAIInstance = new GoogleGenerativeAI(apiKey);
-    }
-    return genAIInstance;
-}
-
-// Keep export for backward compatibility but initialize safely
-export const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "dummy-key");
+import { getGenAI, genAI } from './gemini-client.js';
 
 
 /**

@@ -1,4 +1,4 @@
-import { getGenAI } from './gemini.js';
+import { getGenAI } from './gemini-client.js';
 import { createClient } from '@supabase/supabase-js';
 
 let supabase = null;
@@ -26,13 +26,20 @@ export async function getEmbedding(text, taskType = 'RETRIEVAL_QUERY', title = n
         
         const model = instance.getGenerativeModel({ model: "text-embedding-004" });
         
-        // Optimized call based on latest documentation
-        const result = await model.embedContent({
-            content: { parts: [{ text }] },
-            taskType: taskType,
-            title: title || undefined,
-            outputDimensionality: 768
-        });
+        let result;
+        try {
+            // Priority: Optimized call based on latest documentation
+            result = await model.embedContent({
+                content: { parts: [{ text }] },
+                taskType: taskType,
+                title: title || undefined,
+                outputDimensionality: 768
+            });
+        } catch (optimizeError) {
+            console.warn("Optimized embedding failed, falling back to simple call:", optimizeError.message);
+            // Fallback: Simple text-based call
+            result = await model.embedContent(text);
+        }
         
         return result.embedding.values;
     } catch (error) {
