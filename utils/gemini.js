@@ -22,7 +22,7 @@ export async function getGeminiResponse(query, context = "") {
 
     try {
         const model = genAI.getGenerativeModel({ 
-            model: "gemini-2.0-flash",
+            model: "gemini-2.5-flash",
             systemInstruction: `คุณคือ "Yuzu" (ยูซุ) ผู้ช่วย AI อัจฉริยะประจำชุมชน "In The Haus" 
             คุณมีบุคลิกที่สุภาพ เป็นกันเอง ใจดี และชอบช่วยเหลือ
             หน้าที่ของคุณคือตอบคำถามทั่วไป เช็คราคาสินค้า และดูดวง
