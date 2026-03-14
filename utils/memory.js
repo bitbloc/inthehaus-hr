@@ -82,7 +82,11 @@ export async function getDailyContent(groupId) {
         
         return data.map(item => {
             const time = new Date(item.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
-            const prefix = item.message_type === 'image_description' ? '[ภาพ]: ' : (item.role === 'user' ? '👤: ' : '🤖: ');
+            let prefix = '🤖: ';
+            if (item.message_type === 'image_description') prefix = '[ภาพ]: ';
+            else if (item.message_type === 'mood_booster') prefix = '💖 [คำชม]: ';
+            else if (item.role === 'user') prefix = '👤: ';
+            
             return `${time} ${prefix}${item.content}`;
         }).join('\n');
     } catch (err) {

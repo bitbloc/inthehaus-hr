@@ -157,8 +157,12 @@ export async function POST(request) {
             const response = await getGeminiResponse(query, context, history);
 
             // Save Memory
-            await saveMessage(groupId, userId, 'user', query);
-            await saveMessage(groupId, null, 'model', response);
+            // If it's a praise/compliment command, tag it as mood_booster
+            const isMoodBooster = ['ชม', 'ขอบคุณ', 'ขอบใจ', 'ดีมาก', 'เก่ง'].some(kw => query.includes(kw));
+            const messageType = isMoodBooster ? 'mood_booster' : 'text';
+            
+            await saveMessage(groupId, userId, 'user', query, messageType);
+            await saveMessage(groupId, null, 'model', response, 'text');
 
             await client.replyMessage(event.replyToken, { type: 'text', text: response });
             handledLocally = true;
@@ -186,14 +190,12 @@ export async function POST(request) {
             // Always save image description for summary (Retention 2 days handled in cleanup)
             await saveMessage(groupId, userId, 'user', result.shortDescription, 'image_description');
 
-            // Only reply if it's food/ingredients
-            if (result.isFood) {
+            // Only reply if it's food/ingredients OR a cat
+            if (result.isFood || result.isCat) {
               await client.replyMessage(event.replyToken, { type: 'text', text: result.analysis });
               handledLocally = true;
             } else {
-              console.log("Yuzu: Non-food image, staying silent but saved description.");
-              // Don't set handledLocally to true if we didn't reply, 
-              // so it can still forward to GAS if needed.
+              console.log("Yuzu: Non-critical image, staying silent but saved description.");
             }
           } catch (visionError) {
             console.error("Vision Processing Error:", visionError);

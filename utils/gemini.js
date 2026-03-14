@@ -82,9 +82,10 @@ export async function classifyAndAnalyzeImage(imageBase64, mimeType = "image/jpe
         const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
         
         const systemPrompt = `คุณคือระบบวิเคราะห์รูปภาพของ Yuzu Bot
-        1. ตรวจสอบว่ารูปนี้คือ "อาหาร" หรือ "วัตถุดิบประกอบอาหาร" หรือไม่
-        2. หากใช่ ให้ตอบ JSON ในรูปแบบ: {"isFood": true, "menuName": "ชื่อเมนู", "costAnalysis": "รายละเอียดต้นทุนอ้างอิง Makro", "shortDescription": "คำอธิบายรูปสั้นๆ"}
-        3. หากไม่ใช่ ให้ตอบ JSON ในรูปแบบ: {"isFood": false, "shortDescription": "บรรยายสั้นๆ ว่าในรูปคืออะไร"}
+        1. ตรวจสอบว่ารูปนี้คือ "อาหาร/วัตถุดิบ" หรือ "แมว" หรือไม่
+        2. หากเป็นอาหาร: ให้ตอบ JSON {"isFood": true, "menuName": "ชื่อเมนู", "costAnalysis": "รายละเอียดต้นทุนอ้างอิง Makro", "shortDescription": "คำอธิบายรูปสั้นๆ"}
+        3. หากเป็นแมว: ให้ตอบ JSON {"isCat": true, "catFeelings": "ความรู้สึกของแมวในรูป (พากย์เป็นเสียงแมวที่น่ารักและกวนๆ)", "shortDescription": "คำอธิบายแมว"}
+        4. หากไม่ใช่ทั้งคู่: ให้ตอบ JSON {"isFood": false, "isCat": false, "shortDescription": "บรรยายสั้นๆ ว่าในรูปคืออะไร"}
         
         ห้ามตอบอย่างอื่นนอกจาก JSON`;
 
@@ -102,10 +103,13 @@ export async function classifyAndAnalyzeImage(imageBase64, mimeType = "image/jpe
         try {
             const data = JSON.parse(textResponse);
             if (data.isFood) {
-                const analysis = `นี่คือ ${data.menuName} ครับ!\n\nต้นทุนวัตถุดิบประมาณนี้ครับ (อ้างอิง Makro):\n${data.costAnalysis}\n\n${context ? '\nContext ราคาเพิ่มเติม:\n' + context : ''}`;
+                const analysis = `นี่คือ ${data.menuName} ครับ!\n\nต้นทุนวัตถุดิบประมาณนี้ครับ (อ้างอิง Makro):\n${data.costAnalysis}`;
                 return { isFood: true, analysis, shortDescription: data.shortDescription };
+            } else if (data.isCat) {
+                const analysis = `🐱 ${data.catFeelings}`;
+                return { isCat: true, analysis, shortDescription: data.shortDescription };
             } else {
-                return { isFood: false, analysis: "", shortDescription: data.shortDescription };
+                return { isFood: false, isCat: false, analysis: "", shortDescription: data.shortDescription };
             }
         } catch (parseError) {
             console.error("JSON Parse Error in Vision:", textResponse);
@@ -129,10 +133,11 @@ export async function getDailySummary(content) {
             systemInstruction: `คุณคือ "Yuzu" (ยูซุ) ทำหน้าที่สรุปการสนทนาและเหตุการณ์ประจำวันในกลุ่ม LINE
             1. สรุปประเด็นสำคัญจากการพูดคุย
             2. สรุปว่ามีใครส่งรูปอะไรมาบ้าง (จากคำบรรยายภาพที่ระบุไว้ในวงเล็บ [ภาพ])
-            3. เขียนสรุปให้น่ารัก เป็นกันเอง และสุภาพ แยกเป็นหัวข้อที่อ่านง่าย`
+            3. **พิเศษ**: ค้นหาข้อความที่เป็น [คำชม] (Mood Booster) แล้วสรุปแยกออกมาเป็นหัวข้อ "💖 เรื่องราวดีๆ ประจำวัน" เพื่อเชิดชูคนทำดี
+            4. เขียนสรุปให้น่ารัก เป็นกันเอง และสุภาพ แยกเป็นหัวข้อที่อ่านง่าย`
         });
 
-        const prompt = `ช่วยสรุปเหตุการณ์ในวันนี้จาก Log ด้านล่างนี้ให้หน่อยครับ:\n\n${content}`;
+        const prompt = `ช่วยสรุปเหตุการณ์ในวันนี้จาก Log ด้านล่างนี้ให้หน่อยครับ และอย่าลืมเน้นเรื่องราวดีๆ (Mood Booster) ด้วยนะ:\n\n${content}`;
 
         const result = await model.generateContent(prompt);
         const response = await result.response;
