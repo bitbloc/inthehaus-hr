@@ -76,12 +76,15 @@ export async function classifyAndAnalyzeImage(imageBase64, mimeType = "image/jpe
         const model = instance.getGenerativeModel({ model: "gemini-2.5-flash" });
         
         const systemPrompt = `คุณคือระบบวิเคราะห์รูปภาพของ Yuzu Bot
-        1. ตรวจสอบว่ารูปนี้คือ "อาหาร/วัตถุดิบ" หรือ "แมว" หรือไม่
-        2. หากเป็นอาหาร: ให้ตอบ JSON {"isFood": true, "menuName": "ชื่อเมนู", "costAnalysis": "รายละเอียดต้นทุนอ้างอิง Makro", "shortDescription": "คำอธิบายรูปสั้นๆ"}
-        3. หากเป็นแมว: ให้ตอบ JSON {"isCat": true, "catFeelings": "ความรู้สึกของแมวในรูป (พากย์เป็นเสียงแมวที่น่ารักและกวนๆ)", "shortDescription": "คำอธิบายแมว"}
-        4. หากไม่ใช่ทั้งคู่: ให้ตอบ JSON {"isFood": false, "isCat": false, "shortDescription": "บรรยายสั้นๆ ว่าในรูปคืออะไร"}
+        1. ตรวจสอบว่ารูปนี้คือ "รูปถ่ายอาหาร/วัตถุดิบจริงๆ" หรือ "รูปถ่ายแมวจริงๆ" หรือไม่
+        2. หากเป็นรูปถ่ายอาหาร: ให้ตอบ JSON {"isFood": true, "menuName": "ชื่อเมนู", "costAnalysis": "รายละเอียดต้นทุนอ้างอิง Makro", "shortDescription": "คำอธิบายรูปสั้นๆ", "shouldReply": true}
+        3. หากเป็นรูปถ่ายแมว: ให้ตอบ JSON {"isCat": true, "catFeelings": "ความรู้สึกของแมวในรูป (พากย์เป็นเสียงแมวที่น่ารักและกวนๆ)", "shortDescription": "คำอธิบายแมว", "shouldReply": true}
+        4. หากเป็นรูปที่มีแต่ตัวหนังสือ (เช่น ไวท์บอร์ด, เอกสาร, เมนูอาหารที่เป็นกระดาษ) หรือรูปธรรมดาอื่นๆ: 
+           ให้ตอบ JSON {"isFood": false, "isCat": false, "shouldReply": false, "shortDescription": "บรรยายสั้นๆ ว่าในรูปคืออะไร"}
         
-        ห้ามตอบอย่างอื่นนอกจาก JSON`;
+        **กฎสำคัญ**: 
+        - ถ้าเป็นรูปไวท์บอร์ดหรือข้อความเกี่ยวกับอาหาร ให้ถือว่า isFood: false และ shouldReply: false
+        - ตอบเป็น JSON เท่านั้น ห้ามมีข้อความอื่น`;
 
         const imagePart = {
             inlineData: {
@@ -96,18 +99,18 @@ export async function classifyAndAnalyzeImage(imageBase64, mimeType = "image/jpe
         
         try {
             const data = JSON.parse(textResponse);
-            if (data.isFood) {
+            if (data.shouldReply && data.isFood) {
                 const analysis = `นี่คือ ${data.menuName} ค่ะ!\n\nต้นทุนวัตถุดิบประมาณนี้ค่ะ (อ้างอิง Makro):\n${data.costAnalysis}`;
-                return { isFood: true, analysis, shortDescription: data.shortDescription };
-            } else if (data.isCat) {
+                return { isFood: true, analysis, shortDescription: data.shortDescription, shouldReply: true };
+            } else if (data.shouldReply && data.isCat) {
                 const analysis = `🐱 ${data.catFeelings}`;
-                return { isCat: true, analysis, shortDescription: data.shortDescription };
+                return { isCat: true, analysis, shortDescription: data.shortDescription, shouldReply: true };
             } else {
-                return { isFood: false, isCat: false, analysis: "", shortDescription: data.shortDescription };
+                return { isFood: false, isCat: false, analysis: "", shortDescription: data.shortDescription, shouldReply: false };
             }
         } catch (parseError) {
             console.error("JSON Parse Error in Vision:", textResponse);
-            return { isFood: false, analysis: "", shortDescription: "รูปภาพทั่วไป" };
+            return { isFood: false, analysis: "", shortDescription: "รูปภาพทั่วไป", shouldReply: false };
         }
     } catch (error) {
         console.error("Gemini Vision Error:", error);

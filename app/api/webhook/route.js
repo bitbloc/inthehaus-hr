@@ -190,8 +190,8 @@ export async function POST(request) {
             // Always save image description for summary (Retention 2 days handled in cleanup)
             await saveMessage(groupId, userId, 'user', result.shortDescription, 'image_description');
 
-            // Only reply if it's food/ingredients OR a cat
-            if (result.isFood || result.isCat) {
+            // Only reply if the AI determined this is a clear photo of food or a cat
+            if (result.shouldReply) {
               await client.replyMessage(event.replyToken, { type: 'text', text: result.analysis });
               handledLocally = true;
             } else {
