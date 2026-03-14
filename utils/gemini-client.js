@@ -8,7 +8,7 @@ let genAIInstance = null;
 export function getGenAI() {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-        console.error("CRITICAL: GEMINI_API_KEY is missing from process.env");
+        console.error("CRITICAL: GEMINI_API_KEY environment variable is missing.");
         return null;
     }
     if (!genAIInstance) {
