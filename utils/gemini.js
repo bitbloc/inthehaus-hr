@@ -142,3 +142,12 @@ export async function getDailySummary(content) {
         return "ขออภัยครับ ยูซุไม่สามารถสรุปข้อมูลของวันนี้ได้ในขณะนี้";
     }
 }
+
+/**
+ * Placeholder for Image Generation (Phase 4 Future)
+ */
+export async function generateImage(prompt) {
+    console.log("Image generation requested for:", prompt);
+    // Future integration with Imagen 3
+    return { success: false, message: "ฟีเจอร์วาดรูปกำลังอยู่ในการพัฒนาครับ!" };
+}
