@@ -20,11 +20,10 @@ export async function getEmbedding(text, taskType = 'RETRIEVAL_QUERY', title = n
     try {
         const instance = getGenAI();
         if (!instance) {
-             console.error("Cannot get Gemini Instance (check API Key)");
-             return null;
+             return { error: "GEMINI_API_KEY environment variable is missing" };
         }
         
-        const model = instance.getGenerativeModel({ model: "text-embedding-004" });
+        const model = instance.getGenerativeModel({ model: "models/text-embedding-004" });
         
         let result;
         try {
@@ -40,11 +39,15 @@ export async function getEmbedding(text, taskType = 'RETRIEVAL_QUERY', title = n
             // Fallback: Simple text-based call
             result = await model.embedContent(text);
         }
+
+        if (!result || !result.embedding || !result.embedding.values) {
+            throw new Error("Gemini returned an empty embedding response");
+        }
         
-        return result.embedding.values;
+        return { values: result.embedding.values };
     } catch (error) {
         console.error("Full Embedding Error Details:", error);
-        return null;
+        return { error: error.message || "Unknown embedding error" };
     }
 }
 
@@ -54,12 +57,12 @@ export async function getEmbedding(text, taskType = 'RETRIEVAL_QUERY', title = n
 export async function searchKnowledge(query, limit = 3) {
     try {
         // Use RETRIEVAL_QUERY for searching
-        const embedding = await getEmbedding(query, 'RETRIEVAL_QUERY');
-        if (!embedding) return [];
+        const result = await getEmbedding(query, 'RETRIEVAL_QUERY');
+        if (result.error || !result.values) return [];
 
         const client = getSupabase();
         const { data, error } = await client.rpc('match_yuzu_knowledge', {
-            query_embedding: embedding,
+            query_embedding: result.values,
             match_threshold: 0.5,
             match_count: limit
         });
@@ -84,9 +87,11 @@ export async function addKnowledge(content, metadata = {}) {
         // Use RETRIEVAL_DOCUMENT for storing knowledge
         // If metadata has a title, use it to improve embedding quality
         const title = metadata.title || null;
-        const embedding = await getEmbedding(content, 'RETRIEVAL_DOCUMENT', title);
+        const result = await getEmbedding(content, 'RETRIEVAL_DOCUMENT', title);
         
-        if (!embedding) throw new Error("Could not generate embedding");
+        if (result.error || !result.values) {
+            throw new Error(result.error || "Could not generate embedding");
+        }
 
         const client = getSupabase();
         const { error } = await client
@@ -94,7 +99,7 @@ export async function addKnowledge(content, metadata = {}) {
             .insert({
                 content,
                 metadata,
-                embedding
+                embedding: result.values
             });
 
         if (error) throw error;
