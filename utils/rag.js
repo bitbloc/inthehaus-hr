@@ -23,7 +23,8 @@ export async function getEmbedding(text, taskType = 'RETRIEVAL_QUERY', title = n
              return { error: "GEMINI_API_KEY environment variable is missing" };
         }
         
-        const model = instance.getGenerativeModel({ model: "models/text-embedding-004" });
+        const modelName = "text-embedding-004";
+        const model = instance.getGenerativeModel({ model: modelName });
         
         let result;
         try {
@@ -35,9 +36,15 @@ export async function getEmbedding(text, taskType = 'RETRIEVAL_QUERY', title = n
                 outputDimensionality: 768
             });
         } catch (optimizeError) {
-            console.warn("Optimized embedding failed, falling back to simple call:", optimizeError.message);
-            // Fallback: Simple text-based call
-            result = await model.embedContent(text);
+            console.warn(`Embedding with ${modelName} failed, trying fallback:`, optimizeError.message);
+            
+            try {
+                // Secondary Fallback: Try a different reliable model
+                const fallbackModel = instance.getGenerativeModel({ model: "gemini-embedding-001" });
+                result = await fallbackModel.embedContent(text);
+            } catch (fallbackError) {
+                throw new Error(`All embedding models failed. Last error: ${fallbackError.message}`);
+            }
         }
 
         if (!result || !result.embedding || !result.embedding.values) {
