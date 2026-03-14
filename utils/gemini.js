@@ -1,3 +1,4 @@
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { saveMessage, getChatHistory } from './memory.js';
 import { searchKnowledge } from './rag.js';
 
