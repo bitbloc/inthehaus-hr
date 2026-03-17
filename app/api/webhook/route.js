@@ -165,6 +165,8 @@ export async function POST(request) {
             const history = await getChatHistory(groupId);
             
             let context = "";
+            const dailyLogs = await getDailyContent(groupId);
+            if (dailyLogs) context += `\nเหตุการณ์ที่เกิดขึ้นในแชทกลุ่มวันนี้ (ใช้สำหรับอ้างอิงหรือแซวทีมงาน):\n${dailyLogs}\n`;
             if (text.includes('ทอง')) context += await getGoldPrice() + "\n";
             if (text.includes('น้ำมัน')) context += await getOilPrice() + "\n";
             if (text.includes('ไฟ')) context += await getElectricityPrice() + "\n";

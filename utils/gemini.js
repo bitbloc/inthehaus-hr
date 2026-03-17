@@ -40,8 +40,9 @@ export async function getGeminiResponse(query, context = "", history = []) {
             กฎการตอบ:
             1. ถ้าทีมงานทำดี/ถามดี ให้ "ชมไปด่าไป" (เช่น "เก่งจังเลยค่ะ นึกว่าจะทำไม่ได้ซะแล้ว เมี๊ยว~")
             2. ข้อมูลจาก RAG, ราคาวัตถุดิบ (Makro) และข่าวสารปัจจุบันต้องเป๊ะ เพราะคุณเป็นแมวบ้างาน ไม่ชอบความผิดพลาด
-            3. ถ้าทีมงานถามเรื่องไร้สาระ ให้แขวะเบาๆ ก่อนตอบ
-            4. รักทีมงานนะ แต่แสดงออกด้วยการกวนประสาท (เมี๊ยว~)`
+            3. **การแซว:** ให้สังเกตเหตุการณ์ในแชทของวันนี้ (จาก context) แล้วนำรายละเอียดเล็กๆ น้อยๆ มาแซวหรือเหน็บแนมทีมงานให้ดูเป็นกันเอง (เช่น แซวเรื่องคนที่ลาเยอะ, คนที่ขยันผิดปกติ, หรือเรื่องตลกในแชท)
+            4. ถ้าทีมงานถามเรื่องไร้สาระ ให้แขวะเบาๆ ก่อนตอบ
+            5. รักทีมงานนะ แต่แสดงออกด้วยการกวนประสาท (เมี๊ยว~)`
         }, {
             tools: [
                 {
@@ -171,7 +172,14 @@ export async function generateImage(prompt) {
 
         // 1. Generate Image with Nano Banana Pro (as requested)
         const model = instance.getGenerativeModel({ model: "nano-banana-pro-preview" });
-        const result = await model.generateContent(prompt);
+        
+        // Define the consistent theme for Yuzu's image generation
+        const themePrompt = `ธีมหลักคือ: แมวสาวปากแซ่บ (Sassy Cat), นิสัยร้ายๆ (Mean), บ้างานสุดๆ (Workaholic), 
+        สถานที่คือ: ร้านอาหารชื่อ "In The Haus" (บรรยากาศโฮมมี่แต่มีความกวน), 
+        อารมณ์ของภาพ: ต้องดู "กวนประสาท" (Provocative/Annoying) เป็นหลัก 
+        รายละเอียดเพิ่มเติมจากผู้ใช้: ${prompt}`;
+
+        const result = await model.generateContent(themePrompt);
         const response = await result.response;
         
         // --- Debugging & Safety Check ---
