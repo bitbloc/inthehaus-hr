@@ -14,6 +14,7 @@ import { TabButton } from "./_components/ui/TabButton";
 import { Icons } from "./_components/ui/HausIcon";
 import { LongPressButton } from "./_components/ui/LongPressButton";
 import StaffModal from "./StaffModal";
+import YuzuKnowledgeManager from "./_components/YuzuKnowledgeManager";
 
 // --- Reducer for Cleaner State ---
 const initialState = {
@@ -554,6 +555,7 @@ export default function AdminDashboard() {
                             { id: 'applications', label: 'Hiring', icon: Icons.Job },
                             { id: 'announcements', label: 'News', icon: Icons.Alert },
                             { id: 'history', label: 'History', icon: Icons.File },
+                            { id: 'yuzu', label: 'Yuzu AI', icon: Icons.Yuzu },
                             { id: 'settings', label: 'Settings', icon: Icons.Settings },
                         ].map(tab => (
                             <TabButton key={tab.id} active={activeTab === tab.id} onClick={() => setActiveTab(tab.id)} label={tab.label} icon={tab.icon} />
@@ -1020,6 +1022,11 @@ export default function AdminDashboard() {
                             </div>
                         </Card>
                     </div>
+                )}
+                
+                {/* --- YUZU AI --- */}
+                {activeTab === 'yuzu' && (
+                    <YuzuKnowledgeManager />
                 )}
 
                 {/* --- SHIFT SWAP & REQUESTS --- */}
