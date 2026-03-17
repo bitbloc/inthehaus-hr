@@ -23,7 +23,7 @@ export async function getEmbedding(text, taskType = 'RETRIEVAL_QUERY', title = n
              return { error: "GEMINI_API_KEY environment variable is missing" };
         }
         
-        const modelName = "text-embedding-004";
+        const modelName = "gemini-embedding-2-preview";
         const model = instance.getGenerativeModel({ model: modelName });
         
         let result;
