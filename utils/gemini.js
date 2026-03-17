@@ -169,8 +169,8 @@ export async function generateImage(prompt) {
         const instance = getGenAI();
         if (!instance) throw new Error("AI Instance error");
 
-        // 1. Generate Image with Imagen 4 (The latest in the list)
-        const model = instance.getGenerativeModel({ model: "imagen-4.0-generate-001" });
+        // 1. Generate Image with Nano Banana Pro (as requested)
+        const model = instance.getGenerativeModel({ model: "nano-banana-pro-preview" });
         const result = await model.generateContent(prompt);
         const response = await result.response;
         
