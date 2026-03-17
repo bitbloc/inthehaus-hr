@@ -30,7 +30,7 @@ export async function getGeminiResponse(query, context = "", history = []) {
         const thaiTime = now.toLocaleString("th-TH", { timeZone: "Asia/Bangkok", dateStyle: "full", timeStyle: "medium" });
 
         const model = instance.getGenerativeModel({ 
-            model: "gemini-2.0-flash", 
+            model: "gemini-3.1-flash", 
             systemInstruction: `คุณคือ "Yuzu" (ยูซุ) แมวสาวอัจฉริยะประดิษฐ์ (AI Cat Lady) ผู้ช่วยส่วนตัวสำหรับ "ทีมงานร้าน In The Haus" เท่านั้น
             - วันนี้คือวัน: ${thaiTime} (ต้องยึดตามนี้เสมอ ห้ามเดาเอาเอง)
             - บุคลิก: ปากแซ่บ กวนประสาทนิดๆ ทำงานเก่งมาก (Workaholic Cat) ชมไปด่าไป (Sarcastic & Sassy) 
@@ -80,7 +80,7 @@ export async function classifyAndAnalyzeImage(imageBase64, mimeType = "image/jpe
         const instance = getGenAI();
         if (!instance) return { isFood: false, analysis: "AI Instance error", shortDescription: "" };
         
-        const model = instance.getGenerativeModel({ model: "gemini-2.5-flash" });
+        const model = instance.getGenerativeModel({ model: "gemini-3.1-flash" });
         
         const systemPrompt = `คุณคือระบบวิเคราะห์รูปภาพของ Yuzu Bot ทีมงาน In The Haus
         1. ตรวจสอบว่ารูปนี้คือ "รูปถ่ายอาหาร", "วัตถุดิบ", "ใบเสร็จซื้อของ" หรือ "รูปถ่ายแมว" หรือไม่
@@ -141,7 +141,7 @@ export async function getDailySummary(content) {
         if (!instance) return "AI Instance error";
 
         const model = instance.getGenerativeModel({ 
-            model: "gemini-2.5-flash",
+            model: "gemini-3.1-flash",
             systemInstruction: `คุณคือ "Yuzu" (ยูซุ) แมวสาวบ้างาน ปากร้ายใจดี สรุปผลงานประจำวันให้ทีมงาน
             1. สรุปประเด็นสำคัญ: สรุปแบบกระชับ ตรงไปตรงมา (ถ้าใครอู้ ให้จิกกัดเบาๆ)
             2. สรุปรูปภาพ: บรรยายรูปที่ทีมส่งมา (ถ้าส่งรูปไร้สาระ ให้แซะหน่อย)
@@ -161,10 +161,54 @@ export async function getDailySummary(content) {
 }
 
 /**
- * Placeholder for Image Generation (Phase 4 Future)
+ * Generate image and upload to Supabase Storage
  */
 export async function generateImage(prompt) {
-    console.log("Image generation requested for:", prompt);
-    // Future integration with Imagen 3
-    return { success: false, message: "ฟีเจอร์วาดรูปกำลังอยู่ในการพัฒนาครับ!" };
+    console.log("Yuzu Image Gen: Starting for prompt:", prompt);
+    try {
+        const instance = getGenAI();
+        if (!instance) throw new Error("AI Instance error");
+
+        // 1. Generate Image with Gemini 3.1 Flash Image
+        const model = instance.getGenerativeModel({ model: "gemini-3.1-flash-image" });
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        
+        // The SDK returns image data in parts
+        const imagePart = response.candidates[0].content.parts.find(p => p.inlineData);
+        if (!imagePart) throw new Error("No image data returned from Gemini");
+
+        const base64Data = imagePart.inlineData.data;
+        const mimeType = imagePart.inlineData.mimeType || "image/png";
+
+        // 2. Upload to Supabase Storage
+        const { supabase } = await import('../lib/supabaseClient');
+        const fileName = `gen_${Date.now()}_${Math.random().toString(36).substring(7)}.png`;
+        const buffer = Buffer.from(base64Data, 'base64');
+        
+        const { data, error } = await supabase.storage
+            .from('yuzu-images')
+            .upload(fileName, buffer, {
+                contentType: mimeType,
+                upsert: true
+            });
+
+        if (error) {
+            console.error("Supabase Upload Error:", error);
+            if (error.message.includes('bucket not found')) {
+                return `น้องยูซุวาดภาพเสร็จแล้วค่ะ! แต่นำไปฝากที่ Supabase ไม่ได้เพราะยังไม่มี Bucket 'yuzu-images' ค่ะ รบกวนพี่ทีมงานช่วยสร้าง Bucket นี้และตั้งเป็น Public ให้ด้วยนะคะ!`;
+            }
+            throw error;
+        }
+
+        // 3. Get Public URL
+        const { data: { publicUrl } } = supabase.storage
+            .from('yuzu-images')
+            .getPublicUrl(fileName);
+
+        return { success: true, imageUrl: publicUrl, prompt };
+    } catch (error) {
+        console.error("Image Generation System Error:", error);
+        return { success: false, message: `ว้าย! พู่กันหักค่ะ วาดไม่สำเร็จ (${error.message})` };
+    }
 }

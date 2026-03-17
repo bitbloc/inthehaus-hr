@@ -127,8 +127,26 @@ export async function POST(request) {
             // 1. Image Generation
             if (text.startsWith('yuzu วาดรูป') || text.startsWith('yuzu generate image')) {
               const imagePrompt = query.replace('วาดรูป', '').trim();
-              const response = await generateImage(imagePrompt);
-              await client.replyMessage(event.replyToken, { type: 'text', text: response });
+              const result = await generateImage(imagePrompt);
+
+              if (result.success && result.imageUrl) {
+                // Send as Image Message
+                await client.replyMessage(event.replyToken, [
+                  { 
+                    type: 'text', 
+                    text: `วาดเสร็จแล้วค๊าาา! นี่คือภาพ "${result.prompt}" สไตล์น้องยูซุนะคะ เมี๊ยว~` 
+                  },
+                  {
+                    type: 'image',
+                    originalContentUrl: result.imageUrl,
+                    previewImageUrl: result.imageUrl
+                  }
+                ]);
+              } else {
+                // Send error or text response
+                const errorMsg = typeof result === 'string' ? result : (result.message || "วาดไม่สำเร็จค่ะ");
+                await client.replyMessage(event.replyToken, { type: 'text', text: errorMsg });
+              }
               handledLocally = true;
               continue;
             }
