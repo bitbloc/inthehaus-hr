@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '../../../../lib/supabaseClient';
 import { Client } from '@line/bot-sdk';
+import { cleanupOldHistory, cleanupOldImages } from '../../../../utils/memory';
 
 // ✅ Group IDs (กลุ่มหลัก และ กลุ่มแผนกอื่น)
 const GROUP_IDS = [
@@ -12,6 +13,10 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request) {
   try {
+    // 🧹 Run cleanup tasks occasionally (every 5 mins is fine as they handle internal logic)
+    cleanupOldHistory().catch(e => console.error("History Cleanup Error:", e));
+    cleanupOldImages().catch(e => console.error("Image Cleanup Error:", e));
+
     const now = new Date();
     const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
     const thaiTime = new Date(utc + (3600000 * 7));
