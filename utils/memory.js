@@ -1,6 +1,13 @@
-import { supabase } from '../lib/supabaseClient';
+
+let supabase = null;
 
 function getSupabase() {
+    if (!supabase) {
+        supabase = createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL,
+            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+        );
+    }
     return supabase;
 }
 
@@ -105,47 +112,5 @@ export async function cleanupOldHistory() {
         if (error) console.error("Cleanup Error:", error);
     } catch (err) {
         console.error("Memory Utility Error (cleanup):", err);
-    }
-}
-
-/**
- * Cleanup images older than 15 days from Supabase Storage
- */
-export async function cleanupOldImages() {
-    try {
-        const client = getSupabase();
-        const bucketName = 'yuzu-images';
-        
-        // 1. List files in the bucket
-        const { data: files, error: listError } = await client.storage
-            .from(bucketName)
-            .list();
-
-        if (listError) {
-            console.error("Storage List Error:", listError);
-            return;
-        }
-
-        if (!files || files.length === 0) return;
-
-        // 2. Identify files older than 15 days
-        const fifteenDaysAgo = new Date();
-        fifteenDaysAgo.setDate(fifteenDaysAgo.getDate() - 15);
-
-        const filesToDelete = files
-            .filter(file => new Date(file.created_at) < fifteenDaysAgo)
-            .map(file => file.name);
-
-        if (filesToDelete.length === 0) return;
-
-        // 3. Delete files
-        console.log(`Cleanup: Deleting ${filesToDelete.length} old images from ${bucketName}`);
-        const { error: deleteError } = await client.storage
-            .from(bucketName)
-            .remove(filesToDelete);
-
-        if (deleteError) console.error("Storage Delete Error:", deleteError);
-    } catch (err) {
-        console.error("Memory Utility Error (image cleanup):", err);
     }
 }

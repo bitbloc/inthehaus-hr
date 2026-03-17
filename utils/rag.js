@@ -1,7 +1,15 @@
 import { getGenAI } from './gemini-client.js';
-import { supabase } from '../lib/supabaseClient';
+import { createClient } from '@supabase/supabase-js';
+
+let supabase = null;
 
 function getSupabase() {
+    if (!supabase) {
+        supabase = createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL,
+            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+        );
+    }
     return supabase;
 }
 
@@ -15,7 +23,7 @@ export async function getEmbedding(text, taskType = 'RETRIEVAL_QUERY', title = n
              return { error: "GEMINI_API_KEY environment variable is missing" };
         }
         
-        const modelName = "gemini-embedding-2-preview";
+        const modelName = "text-embedding-004";
         const model = instance.getGenerativeModel({ model: modelName });
         
         let result;
