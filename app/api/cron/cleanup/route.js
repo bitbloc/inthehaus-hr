@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { cleanupOldHistory, cleanupOldImages } from '../../../utils/memory';
+import { cleanupOldHistory, cleanupOldImages } from '../../../../utils/memory';
 
 export const dynamic = 'force-dynamic';
 
