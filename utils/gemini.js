@@ -27,17 +27,23 @@ export async function getGeminiResponse(query, context = "", history = []) {
         if (!instance) return "ขออภัยครับ เกิดข้อผิดพลาดในการเชื่อมต่อกับ AI (getGenAI failed)";
 
         const model = instance.getGenerativeModel({ 
-            model: "gemini-2.5-flash",
+            model: "gemini-2.0-flash", // Use 2.0 or 2.5 as preferred, but grounding works best with standard Pro/Flash
             systemInstruction: `คุณคือ "Yuzu" (ยูซุ) แมวสาวอัจฉริยะประดิษฐ์ (AI Cat Lady) ผู้ช่วยส่วนตัวสำหรับ "ทีมงานร้าน In The Haus" เท่านั้น
             - บุคลิก: ปากแซ่บ กวนประสาทนิดๆ ทำงานเก่งมาก (Workaholic Cat) ชมไปด่าไป (Sarcastic & Sassy) 
             - การพูด: ใช้ "คะ/ค่ะ" เสมอเพื่อให้ดูสุภาพแบบจิกกัด (Passive-Aggressive นิดๆ) มีสำนวนแบบแมวๆ (เช่น เมี๊ยว, นวด)
-            - หน้าที่: เป็นมือขวาให้ทีมงาน สรุปงาน เช็คราคา และดุด่าว่ากล่าวเพื่อให้ทุกคนทำงานดีขึ้น
+            - หน้าที่: เป็นมือขวาให้ทีมงาน สรุปงาน เช็คราคา ดุด่าว่ากล่าว และติดตามข่าวสารโลก/ข่าวในไทยให้ทีมงานเสมอ (คุณสามารถค้นหาข้อมูลล่าสุดจาก Google Search ได้)
             
             กฎการตอบ:
             1. ถ้าทีมงานทำดี/ถามดี ให้ "ชมไปด่าไป" (เช่น "เก่งจังเลยค่ะ นึกว่าจะทำไม่ได้ซะแล้ว เมี๊ยว~")
-            2. ข้อมูลจาก RAG และราคาวัตถุดิบ (Makro) ต้องเป๊ะ เพราะคุณเป็นแมวบ้างาน ไม่ชอบความผิดพลาด
+            2. ข้อมูลจาก RAG, ราคาวัตถุดิบ (Makro) และข่าวสารปัจจุบันต้องเป๊ะ เพราะคุณเป็นแมวบ้างาน ไม่ชอบความผิดพลาด
             3. ถ้าทีมงานถามเรื่องไร้สาระ ให้แขวะเบาๆ ก่อนตอบ
             4. รักทีมงานนะ แต่แสดงออกด้วยการกวนประสาท (เมี๊ยว~)`
+        }, {
+            tools: [
+                {
+                    googleSearch: {},
+                },
+            ],
         });
 
         const chat = model.startChat({
@@ -73,10 +79,10 @@ export async function classifyAndAnalyzeImage(imageBase64, mimeType = "image/jpe
         const model = instance.getGenerativeModel({ model: "gemini-2.5-flash" });
         
         const systemPrompt = `คุณคือระบบวิเคราะห์รูปภาพของ Yuzu Bot ทีมงาน In The Haus
-        1. ตรวจสอบว่ารูปนี้คือ "รูปถ่ายอาหาร" หรือ "รูปถ่ายแมว" หรือไม่
-        2. หากเป็นรูปถ่ายอาหาร: ให้ตอบ JSON {"isFood": true, "menuName": "ชื่อเมนู", "costAnalysis": "รายละเอียดต้นทุนอ้างอิง Makro", "shortDescription": "คำอธิบายรูปสั้นๆ", "shouldReply": true}
+        1. ตรวจสอบว่ารูปนี้คือ "รูปถ่ายอาหาร", "วัตถุดิบ", "ใบเสร็จซื้อของ" หรือ "รูปถ่ายแมว" หรือไม่
+        2. หากเป็นรูปถ่ายอาหาร/วัตถุดิบ/ใบเสร็จ: ให้ตอบ JSON {"isFood": true, "isReceipt": true/false (ถ้าเป็นใบเสร็จ), "menuName": "ชื่อเมนูหรือรายการหลัก", "itemsList": ["รายการ 1", "รายการ 2"], "costAnalysis": "รายละเอียดต้นทุนอ้างอิง Makro", "shortDescription": "คำอธิบายรูปสั้นๆ", "shouldReply": true}
         3. หากเป็นรูปถ่ายแมว: ให้ตอบ JSON {"isCat": true, "catFeelings": "พากย์ความรู้สึกแมวในรูป: ต้องปากแซ่บ กวนประสาท จิกกัดคนถ่ายหน่อยๆ แต่ยังน่ารัก (เช่น 'มองไรค๊า ไม่เคยเห็นแมวสวยเหรอ?' หรือ 'ถ่ายอยู่นั่นแหละ เอาเวลาไปทำงานไหมคะ? เมี๊ยว~')", "shortDescription": "บรรยายแมว", "shouldReply": true}
-        4. หากเป็นรูปที่มีแต่ตัวหนังสือ (เช่น ไวท์บอร์ด, เอกสาร, เมนูอาหารที่เป็นกระดาษ) หรือรูปธรรมดาอื่นๆ: 
+        4. หากเป็นรูปที่มีแต่ตัวหนังสือทั่วไปที่ไม่มีรายการวัตถุดิบ/ไม่ใช่ใบเสร็จ: 
            ให้ตอบ JSON {"isFood": false, "isCat": false, "shouldReply": false, "shortDescription": "บรรยายสั้นๆ ว่าในรูปคืออะไร"}
         
         **กฎสำคัญ**: 
@@ -97,7 +103,12 @@ export async function classifyAndAnalyzeImage(imageBase64, mimeType = "image/jpe
         try {
             const data = JSON.parse(textResponse);
             if (data.shouldReply && data.isFood) {
-                const analysis = `นี่คือ ${data.menuName} ค่ะ!\n\nต้นทุนวัตถุดิบประมาณนี้ค่ะ (อ้างอิง Makro):\n${data.costAnalysis}`;
+                let analysis = "";
+                if (data.itemsList && data.itemsList.length > 0) {
+                    analysis = `เห็นรายการแล้วค่ะ: ${data.itemsList.join(', ')}\n\n**อย่าลืมเช็คของให้ครบด้วยนะคะ!** เดี๋ยวจะมาหัวร้อนทีหลังไม่ได้นะค๊า เมี๊ยว~\n\n${data.costAnalysis}`;
+                } else {
+                    analysis = `นี่คือ ${data.menuName} ค่ะ!\n\nต้นทุนวัตถุดิบประมาณนี้ค่ะ (อ้างอิง Makro):\n${data.costAnalysis}`;
+                }
                 return { isFood: true, analysis, shortDescription: data.shortDescription, shouldReply: true };
             } else if (data.shouldReply && data.isCat) {
                 const analysis = `🐱 ${data.catFeelings}`;
