@@ -1,15 +1,7 @@
 import { getGenAI } from './gemini-client.js';
-import { createClient } from '@supabase/supabase-js';
-
-let supabase = null;
+import { supabase } from '../lib/supabaseClient';
 
 function getSupabase() {
-    if (!supabase) {
-        supabase = createClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL,
-            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-        );
-    }
     return supabase;
 }
 
