@@ -3,7 +3,7 @@ import { Client } from '@line/bot-sdk';
 import { getSchemaWeather, formatWeatherMessage } from '../../../utils/weather';
 import { getGeminiResponse, classifyAndAnalyzeImage, getDailySummary, generateImage } from '../../../utils/gemini';
 import { getGoldPrice, getOilPrice, getElectricityPrice, getIngredientPrices } from '../../../utils/price';
-import { saveMessage, getChatHistory, getDailyContent, cleanupOldHistory } from '../../../utils/memory';
+import { saveMessage, getChatHistory, getDailyContent, cleanupOldHistory, getEmployeeHistory } from '../../../utils/memory';
 
 const client = new Client({
   channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN,
@@ -161,8 +161,20 @@ export async function POST(request) {
               continue;
             }
 
+            // 2.5 Employee Performance Report (Special Command for Owner)
+            if (text.includes('รายงานพนักงาน') || text.includes('ประเมินผล')) {
+              console.log("Yuzu: Employee Report Requested");
+              const dailyLogs = await getDailyContent(groupId);
+              // For now, we use dailyLogs as context, but Gemini is instructed to look for performance
+              const reportPrompt = `ช่วยสรุปรายงานพฤติกรรมและการทำงานของพนักงานจากข้อมูลที่มีหน่อยค่ะ โดยเน้นวิเคราะห์จุดแข็ง จุดอ่อน และสิ่งที่ควรปรับปรุงของแต่ละคน:\n\n${dailyLogs}`;
+              const report = await getGeminiResponse(reportPrompt, "คุณกำลังทำรายงานประเมินผลพนักงานให้เจ้าของร้าน โปรดวิเคราะห์อย่างละเอียดและเป็นกลาง (แต่ยังคงสไตล์ยูซุ)");
+              await client.replyMessage(event.replyToken, { type: 'text', text: report });
+              handledLocally = true;
+              continue;
+            }
+
             // 3. Standard Yuzu Chat with Memory
-            const history = await getChatHistory(groupId);
+            const history = await getChatHistory(groupId, 100);
             
             let context = "";
             const dailyLogs = await getDailyContent(groupId);

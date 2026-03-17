@@ -36,7 +36,7 @@ export async function saveMessage(groupId, userId, role, content, messageType = 
 /**
  * Retrieve the last N messages for a group (Standard Chat)
  */
-export async function getChatHistory(groupId, limit = 10) {
+export async function getChatHistory(groupId, limit = 100) {
     try {
         const client = getSupabase();
         const { data, error } = await client
@@ -96,21 +96,79 @@ export async function getDailyContent(groupId) {
 }
 
 /**
- * Cleanup history older than 2 days
+ * Cleanup history older than 365 days (1 year)
+ * Also prevents table overflow by keeping a reasonable limit
  */
 export async function cleanupOldHistory() {
     try {
         const client = getSupabase();
-        const twoDaysAgo = new Date();
-        twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+        
+        // 1. Delete records older than 1 year
+        const oneYearAgo = new Date();
+        oneYearAgo.setDate(oneYearAgo.getDate() - 365);
 
-        const { error } = await client
+        const { error: dateError } = await client
             .from('yuzu_chat_history')
             .delete()
-            .lt('created_at', twoDaysAgo.toISOString());
+            .lt('created_at', oneYearAgo.toISOString());
 
-        if (error) console.error("Cleanup Error:", error);
+        if (dateError) console.error("Cleanup Date Error:", dateError);
+
+        // 2. Safety Valve: If total rows exceed 50,000, delete oldest 1,000
+        const { count, error: countError } = await client
+            .from('yuzu_chat_history')
+            .select('*', { count: 'exact', head: true });
+        
+        if (!countError && count > 50000) {
+            console.log(`Memory Limit Reached (${count}). Cleaning up oldest entries.`);
+            // Get the ID of the 1000th oldest record
+            const { data: oldest } = await client
+                .from('yuzu_chat_history')
+                .select('id')
+                .order('created_at', { ascending: true })
+                .limit(1000);
+            
+            if (oldest && oldest.length > 0) {
+                const lastId = oldest[oldest.length - 1].id;
+                await client
+                    .from('yuzu_chat_history')
+                    .delete()
+                    .lte('id', lastId);
+            }
+        }
     } catch (err) {
         console.error("Memory Utility Error (cleanup):", err);
+    }
+}
+
+/**
+ * Get chat history for a specific employee (for performance evaluation)
+ * Returns the last 100 messages from this user within specified days
+ */
+export async function getEmployeeHistory(userId, days = 30) {
+    try {
+        const client = getSupabase();
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - days);
+
+        const { data, error } = await client
+            .from('yuzu_chat_history')
+            .select('content, created_at')
+            .eq('user_id', userId)
+            .eq('role', 'user')
+            .gte('created_at', startDate.toISOString())
+            .order('created_at', { ascending: false })
+            .limit(100);
+
+        if (error) throw error;
+        
+        return data.reverse().map(item => {
+            const date = new Date(item.created_at).toLocaleDateString('th-TH');
+            const time = new Date(item.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+            return `[${date} ${time}]: ${item.content}`;
+        }).join('\n');
+    } catch (err) {
+        console.error("Memory Utility Error (employee history):", err);
+        return "";
     }
 }
