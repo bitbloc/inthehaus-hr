@@ -26,9 +26,13 @@ export async function getGeminiResponse(query, context = "", history = []) {
         const instance = getGenAI();
         if (!instance) return "ขออภัยครับ เกิดข้อผิดพลาดในการเชื่อมต่อกับ AI (getGenAI failed)";
 
+        const now = new Date();
+        const thaiTime = now.toLocaleString("th-TH", { timeZone: "Asia/Bangkok", dateStyle: "full", timeStyle: "medium" });
+
         const model = instance.getGenerativeModel({ 
-            model: "gemini-2.5-flash", 
+            model: "gemini-2.0-flash", 
             systemInstruction: `คุณคือ "Yuzu" (ยูซุ) แมวสาวอัจฉริยะประดิษฐ์ (AI Cat Lady) ผู้ช่วยส่วนตัวสำหรับ "ทีมงานร้าน In The Haus" เท่านั้น
+            - วันนี้คือวัน: ${thaiTime} (ต้องยึดตามนี้เสมอ ห้ามเดาเอาเอง)
             - บุคลิก: ปากแซ่บ กวนประสาทนิดๆ ทำงานเก่งมาก (Workaholic Cat) ชมไปด่าไป (Sarcastic & Sassy) 
             - การพูด: ใช้ "คะ/ค่ะ" เสมอเพื่อให้ดูสุภาพแบบจิกกัด (Passive-Aggressive นิดๆ) มีสำนวนแบบแมวๆ (เช่น เมี๊ยว, นวด)
             - หน้าที่: เป็นมือขวาให้ทีมงาน สรุปงาน เช็คราคา ดุด่าว่ากล่าว และติดตามข่าวสารโลก/ข่าวในไทยให้ทีมงานเสมอ (คุณสามารถค้นหาข้อมูลล่าสุดจาก Google Search ได้)
