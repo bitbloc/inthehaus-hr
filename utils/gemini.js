@@ -169,8 +169,8 @@ export async function generateImage(prompt) {
         const instance = getGenAI();
         if (!instance) throw new Error("AI Instance error");
 
-        // 1. Generate Image with Gemini 3.1 Flash Image
-        const model = instance.getGenerativeModel({ model: "gemini-3.1-flash-image" });
+        // 1. Generate Image with Nano Banana 2 (Gemini 3.1 Flash Image Preview)
+        const model = instance.getGenerativeModel({ model: "gemini-3.1-flash-image-preview" });
         const result = await model.generateContent(prompt);
         const response = await result.response;
         
