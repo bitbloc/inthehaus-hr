@@ -174,9 +174,30 @@ export async function generateImage(prompt) {
         const result = await model.generateContent(prompt);
         const response = await result.response;
         
+        // --- Debugging & Safety Check ---
+        const candidate = response.candidates && response.candidates[0];
+        if (!candidate) throw new Error("No candidates returned from Gemini");
+
+        if (candidate.finishReason === 'SAFETY') {
+            return `ว้าย! น้องยูซุวาดรูปนี้ให้ไม่ได้ค่ะ เพราะติดตัวกรองความปลอดภัย (Safety Filter) รบกวนลองปรับเปลี่ยนคำสั่งใหม่นะคะ!`;
+        }
+
+        if (candidate.finishReason !== 'STOP' && candidate.finishReason !== undefined) {
+             return `น้องยูซุวาดไม่สำเร็จค่ะ (Finish Reason: ${candidate.finishReason}) รบกวนลองใหม่อีกทีนะคะ!`;
+        }
+
         // The SDK returns image data in parts
-        const imagePart = response.candidates[0].content.parts.find(p => p.inlineData);
-        if (!imagePart) throw new Error("No image data returned from Gemini");
+        const parts = candidate.content.parts;
+        const imagePart = parts.find(p => p.inlineData);
+        
+        if (!imagePart) {
+            // Check if there's text instead (sometimes it returns text explaining why it can't draw)
+            const textPart = parts.find(p => p.text);
+            if (textPart) {
+                return `น้องยูซุวาดรูปให้ไม่ได้ค่ะ แต่เค้าบอกมาว่า: "${textPart.text}" (ลองสั่งแบบเน้นบรรยากาศดูนะคะ อย่าระบุข้อความเยอะเกินไปค่ะ)`;
+            }
+            throw new Error("No image data found in response parts");
+        }
 
         const base64Data = imagePart.inlineData.data;
         const mimeType = imagePart.inlineData.mimeType || "image/png";
