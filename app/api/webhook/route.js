@@ -167,7 +167,7 @@ export async function POST(request) {
               const dailyLogs = await getDailyContent(groupId);
               // For now, we use dailyLogs as context, but Gemini is instructed to look for performance
               const reportPrompt = `ช่วยสรุปรายงานพฤติกรรมและการทำงานของพนักงานจากข้อมูลที่มีหน่อยค่ะ โดยเน้นวิเคราะห์จุดแข็ง จุดอ่อน และสิ่งที่ควรปรับปรุงของแต่ละคน:\n\n${dailyLogs}`;
-              const report = await getGeminiResponse(reportPrompt, "คุณกำลังทำรายงานประเมินผลพนักงานให้เจ้าของร้าน โปรดวิเคราะห์อย่างละเอียดและเป็นกลาง (แต่ยังคงสไตล์ยูซุ)");
+              const report = await getGeminiResponse(reportPrompt, "คุณกำลังทำรายงานประเมินผลพนักงานให้เจ้าของร้าน โปรดวิเคราะห์อย่างละเอียดและเป็นกลาง (แต่ยังคงสไตล์ยูซุ)", [], userId);
               await client.replyMessage(event.replyToken, { type: 'text', text: report });
               handledLocally = true;
               continue;
@@ -186,7 +186,7 @@ export async function POST(request) {
             if (ingredientKeywords.some(kw => text.includes(kw))) context += await getIngredientPrices() + "\n";
             if (text.includes('อากาศ')) context += formatWeatherMessage(await getSchemaWeather()) + "\n";
 
-            const response = await getGeminiResponse(query, context, history);
+            const response = await getGeminiResponse(query, context, history, userId);
 
             // Save Memory
             // If it's a praise/compliment command, tag it as mood_booster

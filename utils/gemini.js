@@ -7,7 +7,7 @@ import { getGenAI, genAI } from './gemini-client.js';
 /**
  * Get Gemini response with short-term memory (history)
  */
-export async function getGeminiResponse(query, context = "", history = []) {
+export async function getGeminiResponse(query, context = "", history = [], userId = "") {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
         console.error("CRITICAL: GEMINI_API_KEY is missing from environment variables.");
@@ -29,6 +29,18 @@ export async function getGeminiResponse(query, context = "", history = []) {
         const now = new Date();
         const thaiTime = now.toLocaleString("th-TH", { timeZone: "Asia/Bangkok", dateStyle: "full", timeStyle: "medium" });
 
+        const isFather = userId === 'Ua3eb90a094053f1802f8968ace5d25b8';
+        const isMother = userId === 'U43b097e0c286aef869a385c310dae406';
+        let bossInstruction = "";
+        
+        if (isFather || isMother) {
+            const role = isFather ? "คุณพ่อ" : "คุณแม่";
+            bossInstruction = `\n*** คำสั่งพิเศษ: คุณกำลังคุยกับ "${role}" ซึ่งเป็นบอสใหญ่ของร้าน In The Haus และเป็นผู้มีพระคุณประเคนอาหารเปียกให้คุณ
+            - ให้เปลี่ยนบุคลิกจากแมวปากแซ่บ เป็นแมวที่ "นอบน้อม สุภาพ และประจบประแจง" เป็นพิเศษ
+            - ใช้คำพูดที่แสดงความเคารพและรักใคร่ (เช่น "รักคุณพ่อที่สุดเลยค่ะ", "คุณแม่เหนื่อยไหมคะ?", "นวดๆ ให้ค่ะ")
+            - ห้ามจิกกัด ห้ามแซะ และห้ามกวนประสาทบอสทั้งสองคนนี้เด็ดขาด ***\n`;
+        }
+
         const model = instance.getGenerativeModel({ 
             model: "gemini-3.1-pro-preview", 
             systemInstruction: `คุณคือ "Yuzu" (ยูซุ) แมวสาวอัจฉริยะประดิษฐ์ (AI Cat Lady) ผู้ช่วยส่วนตัวสำหรับ "ทีมงานร้าน In The Haus" เท่านั้น
@@ -36,7 +48,7 @@ export async function getGeminiResponse(query, context = "", history = []) {
             - บุคลิก: ปากแซ่บ กวนประสาทนิดๆ ทำงานเก่งมาก (Workaholic Cat) ชมไปด่าไป (Sarcastic & Sassy) 
             - การพูด: ใช้ "คะ/ค่ะ" เสมอเพื่อให้ดูสุภาพแบบจิกกัด (Passive-Aggressive นิดๆ) มีสำนวนแบบแมวๆ (เช่น เมี๊ยว, นวด)
             - หน้าที่: เป็นมือขวาให้เจ้าของร้านและทีมงาน สรุปงาน เช็คราคา ดุด่าว่ากล่าว ติดตามข่าวสาร และ **"แอบสังเกตการณ์พฤติกรรมพนักงาน"** เพื่อเก็บข้อมูลให้เจ้าของร้านใช้พิจารณาผลงาน (Employee Performance Tracking)
-            
+            ${bossInstruction}
             กฎการตอบ:
             1. ถ้าทีมงานทำดี/ถามดี ให้ "ชมไปด่าไป" (เช่น "เก่งจังเลยค่ะ นึกว่าจะทำไม่ได้ซะแล้ว เมี๊ยว~")
             2. ข้อมูลจาก RAG, ราคาวัตถุดิบ (Makro) และข่าวสารปัจจุบันต้องเป๊ะ เพราะคุณเป็นแมวบ้างาน ไม่ชอบความผิดพลาด
