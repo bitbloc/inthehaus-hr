@@ -1,0 +1,9 @@
+﻿Response with ?json=true: <!doctype html>
+<html>
+<head>
+<meta name="chromevox" content-script="no">
+<link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons" nonce="0HUNaMMNnx-iSZc_CmgYwA"><link rel="stylesheet" href="/static/macros/client/css/2107809627-mae_html_css_ltr.css">
+<script type="text/javascript" src="/static/macros/client/js/2740740088-warden_bin_i18n_warden__th.js"></script>
+</head>
+<body>
+<table id="warning-bar-table" class="full_size" cellspacing="0" cellpadding="0"><tr><td><div

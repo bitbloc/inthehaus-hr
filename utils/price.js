@@ -20,24 +20,35 @@ export async function getGoldPrice() {
 
 export async function getOilPrice() {
     try {
-        const response = await fetch('https://api.chnwt.dev/thai-oil-api/latest');
-        if (!response.ok) throw new Error('Oil API error');
-        const data = await response.json();
+        // 1. Fetch Standard PTT Prices
+        const priceRes = await fetch('https://api.chnwt.dev/thai-oil-api/latest');
+        let priceMsg = "";
+        if (priceRes.ok) {
+            const priceData = await priceRes.json();
+            if (priceData.status === 'success') {
+                const ptt = priceData.response.stations.ptt;
+                priceMsg = `⛽ [ราคากลาง PTT] - ${priceData.response.date}\n` +
+                           `- Gasoline 95: ${ptt.gasoline_95?.price || 'N/A'}\n` +
+                           `- Gasohol 95: ${ptt.gasohol_95?.price || 'N/A'}\n` +
+                           `- Gasohol 91: ${ptt.gasohol_91?.price || 'N/A'}\n` +
+                           `- Diesel: ${ptt.diesel_b7?.price || ptt.diesel?.price || 'N/A'}\n`;
+            }
+        }
+
+        // 2. Dashboard Status Summary (Latest Check: 19 March Evening)
+        const dashboardUrl = 'https://script.google.com/macros/s/AKfycbxrg8k2_8y7t7F8nfmdRSY8rcB4n6IjA8ej72HMbENI8gv74x8x-rw5TFqeNRWtTjAL/exec';
         
-        if (data.status !== 'success') throw new Error('Oil API status error');
+        let dashMsg = `\n📊 [สถานการณ์น้ำมันนครพนม รายชนิด]\n`;
+        dashMsg += `⛽ **ดีเซล:** ปกติ 10 แห่ง (แนะนำ: PTT ท่าควาย, PTT ธาตุพนม, บ้านแพงบริการ)\n`;
+        dashMsg += `⛽ **91:** ปกติ 17 แห่ง (แนะนำ: PTT ท่าควาย, PTT บายพาส, PTT ธาตุพนม)\n`;
+        dashMsg += `⛽ **95:** ปกติ 16 แห่ง (แนะนำ: PTT ท่าควาย, PTT บายพาส, PTT ธาตุพนม)\n`;
+        dashMsg += `⛽ **E20:** ปกติ 10 แห่ง (แนะนำ: PTT ธาตุพนม, PTT ศรีสงคราม, PTT นาหว้า)\n`;
+        dashMsg += `\n📍 ค้นหาปั๊ม/เช็คเรียลไทม์ที่นี่: ${dashboardUrl}`;
 
-        const ptt = data.response.stations.ptt;
-        let msg = `⛽ ราคาน้ำมัน (PTT) - ${data.response.date}\n`;
-        msg += `\nGasoline 95: ${ptt.gasoline_95?.price || 'N/A'} บาท/ลิตร`;
-        msg += `\nGasohol 95: ${ptt.gasohol_95?.price || 'N/A'} บาท/ลิตร`;
-        msg += `\nGasohol 91: ${ptt.gasohol_91?.price || 'N/A'} บาท/ลิตร`;
-        msg += `\nGasohol E20: ${ptt.gasohol_e20?.price || 'N/A'} บาท/ลิตร`;
-        msg += `\nDiesel: ${ptt.diesel_b7?.price || ptt.diesel?.price || 'N/A'} บาท/ลิตร`;
-
-        return msg;
+        return priceMsg + dashMsg;
     } catch (error) {
-        console.error('Error fetching oil price:', error);
-        return 'ไม่สามารถดึงราคาน้ำมันได้ในขณะนี้';
+        console.error('Error fetching oil data:', error);
+        return 'ไม่สามารถดึงข้อมูลน้ำมันได้ค่ะ เช็คที่เว็บนี้นะคะ: https://script.google.com/macros/s/AKfycbxrg8k2_8y7t7F8nfmdRSY8rcB4n6IjA8ej72HMbENI8gv74x8x-rw5TFqeNRWtTjAL/exec';
     }
 }
 

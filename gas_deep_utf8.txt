@@ -1,0 +1,6 @@
+﻿Status: 200
+Length: 15889
+Contains "เธเธเธ•เธด": true
+Contains "เธซเธกเธ”": true
+Contains "เธ—เนเธฒเธเธงเธฒเธข": false
+Contains "เธเนเธญเธเธ•เธฐเธงเธฑเธ": false
