@@ -124,6 +124,22 @@ export async function POST(request) {
 
             // --- Specialized Yuzu Commands ---
             
+            // 0. Diagnostic Command
+            if (text === 'yuzu who am i' || text === 'yuzu ใครคือฉัน') {
+              const isFather = userId === 'Ua3eb90a094053f1802f8968ace5d25b8';
+              const isMother = userId === 'U43b097e0c286aef869a385c310dae406';
+              let identity = "ทีมงานทั่วไปค่ะ";
+              if (isFather) identity = "คุณพ่อ (บอสใหญ่) ค่ะ! 🙏";
+              if (isMother) identity = "คุณแม่ (บอสใหญ่) ค่ะ! 🙏";
+              
+              await client.replyMessage(event.replyToken, { 
+                type: 'text', 
+                text: `คุณคือ: ${identity}\nUser ID: ${userId || 'ไม่พบ ID ค่ะ'}\n(ข้อมูลนี้ใช้เพื่อตรวจสอบสถานะบอสเท่านั้นนะคะ เมี๊ยว~)` 
+              });
+              handledLocally = true;
+              continue;
+            }
+            
             // 1. Image Generation
             if (text.startsWith('yuzu วาดรูป') || text.startsWith('yuzu generate image')) {
               const imagePrompt = query.replace('วาดรูป', '').trim();
