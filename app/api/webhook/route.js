@@ -243,10 +243,30 @@ export async function POST(request) {
               await client.replyMessage(event.replyToken, { type: 'text', text: result.analysis });
               handledLocally = true;
             } else {
-              console.log("Yuzu: Non-critical image, staying silent but saved description.");
             }
           } catch (visionError) {
             console.error("Vision Processing Error:", visionError);
+          }
+        }
+        
+        // Handle Location Messages
+        else if (event.message.type === 'location') {
+          console.log("Yuzu Location: Received");
+          const { latitude, longitude, address } = event.message;
+          const query = `ฉันอยู่ที่นี่: ${address || 'ตำแหน่งปัจจุบัน'} (${latitude}, ${longitude}) ช่วยหาปั๊มน้ำมันที่ใกล้ที่สุดและน้ำมันยังไม่หมดจาก Dashboard หรือข้อมูลล่าสุดให้หน่อยค่ะ`;
+          
+          try {
+            const context = `[Location] Lat: ${latitude}, Lng: ${longitude}, Address: ${address}\n[Home] Shop "In The Haus" is at (17.381465, 104.785587)\n[Source] https://script.google.com/macros/s/AKfycbxrg8k2_8y7t7F8nfmdRSY8rcB4n6IjA8ej72HMbENI8gv74x8x-rw5TFqeNRWtTjAL/exec`;
+            
+            const response = await getGeminiResponse(query, context, [], userId);
+            
+            await saveMessage(groupId, userId, 'user', `[Location Message] ${address || 'Coordinates'}`, 'location');
+            await saveMessage(groupId, null, 'model', response, 'text');
+            
+            await client.replyMessage(event.replyToken, { type: 'text', text: response });
+            handledLocally = true;
+          } catch (locationError) {
+            console.error("Location Processing Error:", locationError);
           }
         }
       }
