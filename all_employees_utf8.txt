@@ -1,2 +1,0 @@
-﻿[dotenv@17.3.1] injecting env (9) from .env.local -- tip: โ๏ธ  suppress all logs with { quiet: true }
-null

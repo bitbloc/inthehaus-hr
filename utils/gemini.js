@@ -39,9 +39,9 @@ export async function getGeminiResponse(query, context = "", history = [], userI
             - ห้ามจิกกัด ห้ามแซะ และห้ามกวนประสาทบอสทั้งสองคนนี้เด็ดขาด ***\n`;
         }
 
-        // Using gemini-1.5-pro (Standard Pro Model)
+        // Using gemini-3.1-pro-preview (Latest Stable for this project)
         const model = instance.getGenerativeModel({ 
-            model: "gemini-1.5-pro",
+            model: "gemini-3.1-pro-preview",
             tools: [{ googleSearch: {} }],
             systemInstruction: `คุณคือ "Yuzu" (ยูซุ) แมวสาวอัจฉริยะประดิษฐ์ (AI Cat Lady) ผู้ช่วยส่วนตัวสำหรับ "ทีมงานร้าน In The Haus" เท่านั้น
             - วันนี้คือวัน: ${thaiTime} (ต้องยึดตามนี้เสมอ ห้ามเดาเอาเอง)
@@ -93,7 +93,7 @@ export async function classifyAndAnalyzeImage(imageBase64, mimeType = "image/jpe
         const instance = getGenAI();
         if (!instance) return { isFood: false, analysis: "AI Instance error", shortDescription: "" };
         
-        const model = instance.getGenerativeModel({ model: "gemini-1.5-pro" });
+        const model = instance.getGenerativeModel({ model: "gemini-3.1-pro-preview" });
         
         const systemPrompt = `คุณคือระบบวิเคราะห์รูปภาพของ Yuzu Bot ทีมงาน In The Haus
         1. ตรวจสอบว่ารูปนี้คือ "รูปถ่ายอาหาร", "วัตถุดิบ", "ใบเสร็จซื้อของ" หรือ "รูปถ่ายแมว" หรือไม่
@@ -130,7 +130,7 @@ export async function getDailySummary(content) {
     try {
         const instance = getGenAI();
         const model = instance.getGenerativeModel({ 
-            model: "gemini-1.5-pro",
+            model: "gemini-3.1-pro-preview",
             systemInstruction: `คุณคือ "Yuzu" (ยูซุ) แมวสาวสรุปผลงานประจำวันให้ทีมงาน In The Haus สรุปทั้งข่าวสารนครพนมและพฤติกรรมทีมงานแบบปากแซ่บ` 
         });
 
@@ -149,15 +149,45 @@ export async function getDailySummary(content) {
 export async function generateImage(prompt) {
     try {
         const instance = getGenAI();
-        // Imagen 3 or similar under the hood if available, but we must use valid model name.
-        // gemini-1.5-pro cannot generate images directly yet in this SDK.
-        // We'll use the 'imagen-3.0-generate-001' or similar if target project supports it.
-        // However, for stability, we will use 'gemini-1.5-pro' and assume text if image fails.
-        // Actually, if user wants image gen, we should use 'gemini-1.5-pro' only if it supports it.
-        // Let's use 'gemini-1.5-pro' for now.
-        const model = instance.getGenerativeModel({ model: "gemini-1.5-pro" });
-        return { success: false, message: "ระบบสร้างรูปภาพกำลังปรับปรุงชั่วคราวค่ะ เมี๊ยว~" };
+        if (!instance) throw new Error("AI Instance error");
+        const model = instance.getGenerativeModel({ model: "nano-banana-pro-preview" });
+        
+        const themePrompt = `ธีมหลักคือ: แมวสาวปากแซ่บ (Sassy Cat), นิสัยร้ายๆ (Mean), บ้างานสุดๆ (Workaholic), 
+        สถานที่คือ: ร้านอาหารชื่อ "In The Haus" (บรรยากาศโฮมมี่แต่มีความกวน), 
+        อารมณ์ของภาพ: ต้องดู "กวนประสาท" (Provocative/Annoying) เป็นหลัก 
+        รายละเอียดเพิ่มเติมจากผู้ใช้: ${prompt}`;
+
+        const result = await model.generateContent(themePrompt);
+        const response = await result.response;
+        
+        const candidate = response.candidates && response.candidates[0];
+        if (!candidate) throw new Error("No candidates returned from Gemini");
+
+        const parts = candidate.content.parts;
+        const imagePart = parts.find(p => p.inlineData);
+        
+        if (!imagePart) {
+            const textPart = parts.find(p => p.text);
+            if (textPart) return textPart.text;
+            throw new Error("No image data found");
+        }
+
+        const base64Data = imagePart.inlineData.data;
+        const mimeType = imagePart.inlineData.mimeType || "image/png";
+
+        // Upload to Supabase
+        const { supabase } = await import('../lib/supabaseClient');
+        const fileName = `gen_${Date.now()}.png`;
+        const { data, error } = await supabase.storage
+            .from('yuzu-images')
+            .upload(fileName, Buffer.from(base64Data, 'base64'), { contentType: mimeType });
+
+        if (error) throw error;
+        const { data: { publicUrl } } = supabase.storage.from('yuzu-images').getPublicUrl(fileName);
+
+        return { success: true, imageUrl: publicUrl, prompt };
     } catch (error) {
-        return { success: false, message: "error" };
+        console.error("Image gen error:", error);
+        return { success: false, message: "วาดไม่สำเร็จค่ะ" };
     }
 }

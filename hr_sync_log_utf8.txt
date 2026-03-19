@@ -1,5 +1,0 @@
-﻿[dotenv@17.3.1] injecting env (9) from .env.local -- tip: โก๏ธ secrets for agents: https://dotenvx.com/as2
-Checking UID: U77e56cb573085ba79d37b496c6abdb63
-
-Active Employees with UIDs:
-null
