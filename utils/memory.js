@@ -83,11 +83,10 @@ export async function getDailyContent(groupId) {
         if (logsError) throw logsError;
         if (!logs || logs.length === 0) return "";
 
-        // Fetch active employees for mapping
+        // Fetch all employees for mapping (including owners/inactive for history tracking)
         const { data: employees } = await client
             .from('employees')
-            .select('line_user_id, name, nickname')
-            .eq('is_active', true);
+            .select('line_user_id, name, nickname');
         
         const nameMap = {};
         if (employees) {

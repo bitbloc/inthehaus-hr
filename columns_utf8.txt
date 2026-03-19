@@ -1,0 +1,2 @@
+﻿[dotenv@17.3.1] injecting env (9) from .env.local -- tip: ๐” prevent building .env in docker: https://dotenvx.com/prebuild
+โ… Employee Table Keys: id, line_user_id, name, position, shift_start, created_at, shift_id, is_active, name_en, nickname, phone, email, address, id_card, employment_status, job_level, start_date, probation_date, base_salary, bank_account, bank_name, social_security_id, tax_id, education_history, skills, emergency_contact, shift_rates, photo_url

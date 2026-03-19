@@ -1,0 +1,10 @@
+﻿[dotenv@17.3.1] injecting env (9) from .env.local -- tip: ๐” prevent committing .env to code: https://dotenvx.com/precommit
+Final Employee Report (Sync Check):
+==================================
+- Add (Add) [Probation] | Pos: Bar & Floor | Active: true | UID: U7133fffa83cabd740013121da55dd8f3
+- Mam โฅ (N/A) [N/A] | Pos: Owner | Active: false | UID: U43b097e0c286aef869a385c310dae406
+- เนเธเธชเน€เธเธญเธฃเน (N/A) [Fulltime] | Pos: Bar & Floor | Active: true | UID: U4719e215298d2451d48b401d44f035fc
+- เธเธฒเธข (PT) (N/A) [N/A] | Pos: Part Time | Active: false | UID: U3a64f782c918bf3a531bd34625be145d
+- เธเธตเนเธเธธเนเธข (N/A) [Fulltime] | Pos: Cooking | Active: true | UID: U5ec550267ecf7d50e7536be0df2c1f49
+- เธฃเธดเธชเธฒ (N/A) [Contract] | Pos: Bar & Floor | Active: true | UID: U293e5a299f969b87a7fef220f41c4d8a
+- เธค. (เธค.) [Probation] | Pos: Owner | Active: true | UID: Ua3eb90a094053f1802f8968ace5d25b8
