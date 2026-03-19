@@ -3,7 +3,7 @@ import { Client } from '@line/bot-sdk';
 import { getSchemaWeather, formatWeatherMessage } from '../../../utils/weather';
 import { getGeminiResponse, classifyAndAnalyzeImage, getDailySummary, generateImage } from '../../../utils/gemini';
 import { getGoldPrice, getOilPrice, getElectricityPrice, getIngredientPrices } from '../../../utils/price';
-import { saveMessage, getChatHistory, getDailyContent, cleanupOldHistory, getEmployeeHistory } from '../../../utils/memory';
+import { saveMessage, getChatHistory, getDailyContent, cleanupOldHistory, getEmployeeHistory, getEmployeeByLineId } from '../../../utils/memory';
 import { getAccurateNews } from '../../../utils/news';
 
 const client = new Client({
@@ -194,6 +194,16 @@ export async function POST(request) {
             const history = await getChatHistory(groupId, 100);
             
             let context = "";
+            
+            // Real-time Employee Sync (HR Accuracy)
+            const employee = await getEmployeeByLineId(userId);
+            if (employee) {
+              context += `คุณกำลังคุยกับ: ${employee.nickname || employee.name} (${employee.position})\n`;
+              context += `สถานะพนักงาน: ${employee.employment_status || 'Fulltime'}\n`;
+            } else {
+              context += `(ไม่พบข้อมูลพนักงานในระบบสำหรับ LINE ID นี้: ${userId})\n`;
+            }
+
             const dailyLogs = await getDailyContent(groupId);
             if (dailyLogs) context += `\nเหตุการณ์ที่เกิดขึ้นในแชทกลุ่มวันนี้ (ใช้สำหรับอ้างอิงหรือแซวทีมงาน):\n${dailyLogs}\n`;
             if (text.includes('ทอง')) context += await getGoldPrice() + "\n";

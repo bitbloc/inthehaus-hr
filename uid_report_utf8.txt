@@ -1,0 +1,34 @@
+﻿[dotenv@17.3.1] injecting env (9) from .env.local -- tip: ๐ค– agentic secret storage: https://dotenvx.com/as2
+Active Employee UID Mapping:
+[
+  {
+    "name": "เธเธตเนเธเธธเนเธข",
+    "nickname": null,
+    "position": "Cooking",
+    "line_user_id": "U5ec550267ecf7d50e7536be0df2c1f49"
+  },
+  {
+    "name": "เธฃเธดเธชเธฒ",
+    "nickname": null,
+    "position": "Bar & Floor",
+    "line_user_id": "U293e5a299f969b87a7fef220f41c4d8a"
+  },
+  {
+    "name": "เนเธเธชเน€เธเธญเธฃเน",
+    "nickname": null,
+    "position": "Bar & Floor",
+    "line_user_id": "U4719e215298d2451d48b401d44f035fc"
+  },
+  {
+    "name": "เธค.",
+    "nickname": "เธค.",
+    "position": "Owner",
+    "line_user_id": "Ua3eb90a094053f1802f8968ace5d25b8"
+  },
+  {
+    "name": "Add",
+    "nickname": "Add",
+    "position": "Bar & Floor",
+    "line_user_id": "U7133fffa83cabd740013121da55dd8f3"
+  }
+]

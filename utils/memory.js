@@ -64,6 +64,7 @@ export async function getChatHistory(groupId, limit = 100) {
 
 /**
  * Get all content for a specific group for today (for Summarization)
+ * Now resolves LINE UIDs to real names for HR accuracy
  */
 export async function getDailyContent(groupId) {
     try {
@@ -71,21 +72,39 @@ export async function getDailyContent(groupId) {
         const startOfDay = new Date();
         startOfDay.setHours(0, 0, 0, 0);
 
-        const { data, error } = await client
+        // Fetch logs
+        const { data: logs, error: logsError } = await client
             .from('yuzu_chat_history')
-            .select('role, content, message_type, created_at')
+            .select('user_id, role, content, message_type, created_at')
             .eq('group_id', groupId)
             .gte('created_at', startOfDay.toISOString())
             .order('created_at', { ascending: true });
 
-        if (error) throw error;
+        if (logsError) throw logsError;
+        if (!logs || logs.length === 0) return "";
+
+        // Fetch active employees for mapping
+        const { data: employees } = await client
+            .from('employees')
+            .select('line_user_id, name, nickname')
+            .eq('is_active', true);
         
-        return data.map(item => {
+        const nameMap = {};
+        if (employees) {
+            employees.forEach(emp => {
+                nameMap[emp.line_user_id] = emp.nickname || emp.name;
+            });
+        }
+        
+        return logs.map(item => {
             const time = new Date(item.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
             let prefix = '🤖: ';
             if (item.message_type === 'image_description') prefix = '[ภาพ]: ';
             else if (item.message_type === 'mood_booster') prefix = '💖 [คำชม]: ';
-            else if (item.role === 'user') prefix = '👤: ';
+            else if (item.role === 'user') {
+                const name = nameMap[item.user_id] || '(บุคคลนิรนาม/UID ผิด)';
+                prefix = `👤 ${name}: `;
+            }
             
             return `${time} ${prefix}${item.content}`;
         }).join('\n');
@@ -170,5 +189,30 @@ export async function getEmployeeHistory(userId, days = 30) {
     } catch (err) {
         console.error("Memory Utility Error (employee history):", err);
         return "";
+    }
+}
+/**
+ * Get employee details by LINE User ID (Sync with HR data)
+ */
+export async function getEmployeeByLineId(lineUserId) {
+    if (!lineUserId) return null;
+    try {
+        const client = getSupabase();
+        const { data, error } = await client
+            .from('employees')
+            .select('name, nickname, position, employment_status')
+            .eq('line_user_id', lineUserId)
+            .eq('is_active', true)
+            .maybeSingle();
+
+        if (error) {
+            console.error("Error fetching employee by LINE ID:", error);
+            return null;
+        }
+
+        return data;
+    } catch (err) {
+        console.error("Memory Utility Error (fetch employee):", err);
+        return null;
     }
 }
