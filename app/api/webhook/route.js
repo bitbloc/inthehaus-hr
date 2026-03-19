@@ -4,6 +4,7 @@ import { getSchemaWeather, formatWeatherMessage } from '../../../utils/weather';
 import { getGeminiResponse, classifyAndAnalyzeImage, getDailySummary, generateImage } from '../../../utils/gemini';
 import { getGoldPrice, getOilPrice, getElectricityPrice, getIngredientPrices } from '../../../utils/price';
 import { saveMessage, getChatHistory, getDailyContent, cleanupOldHistory, getEmployeeHistory } from '../../../utils/memory';
+import { getAccurateNews } from '../../../utils/news';
 
 const client = new Client({
   channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN,
@@ -201,6 +202,13 @@ export async function POST(request) {
             const ingredientKeywords = ['วัตถุดิบ', 'ราคาอาหาร', 'หมู', 'ไก่', 'เนื้อ', 'ปลา', 'ไข่', 'ผัก', 'ผลไม้', 'ข้าว'];
             if (ingredientKeywords.some(kw => text.includes(kw))) context += await getIngredientPrices() + "\n";
             if (text.includes('อากาศ')) context += formatWeatherMessage(await getSchemaWeather()) + "\n";
+            
+            // NEW: Injected Latest News Context for accurate real-time reporting
+            const newsKeywords = ['ข่าว', 'อัปเดต', 'สรุป', 'ส่อง', 'ติดตาม', 'สถานการณ์'];
+            if (newsKeywords.some(kw => text.includes(kw))) {
+              console.log("Yuzu: Injecting Latest News Context");
+              context += await getAccurateNews() + "\n";
+            }
 
             const response = await getGeminiResponse(query, context, history, userId);
 
