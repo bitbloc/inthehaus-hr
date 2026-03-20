@@ -35,20 +35,21 @@ export async function getOilPrice() {
             }
         }
 
-        // 2. Dashboard Status Summary (Latest Check: 19 March Evening)
-        const dashboardUrl = 'https://script.google.com/macros/s/AKfycbxrg8k2_8y7t7F8nfmdRSY8rcB4n6IjA8ej72HMbENI8gv74x8x-rw5TFqeNRWtTjAL/exec';
+        // 2. Dashboard Status Summary (Latest Check: 20 March Evening)
+        const dashboardUrl = 'https://script.google.com/macros/s/AKfycbyC8vSspmwSUc83QJpdaADrkr3b-mtI2d6qt7QAF2eP8IogWFKe1lXpfLCxEoK6tENVsQ/exec';
         
         let dashMsg = `\n📊 [สถานการณ์น้ำมันนครพนม รายชนิด]\n`;
-        dashMsg += `⛽ **ดีเซล:** ปกติ 10 แห่ง (แนะนำ: PTT ท่าควาย, PTT ธาตุพนม, บ้านแพงบริการ)\n`;
-        dashMsg += `⛽ **91:** ปกติ 17 แห่ง (แนะนำ: PTT ท่าควาย, PTT บายพาส, PTT ธาตุพนม)\n`;
-        dashMsg += `⛽ **95:** ปกติ 16 แห่ง (แนะนำ: PTT ท่าควาย, PTT บายพาส, PTT ธาตุพนม)\n`;
-        dashMsg += `⛽ **E20:** ปกติ 10 แห่ง (แนะนำ: PTT ธาตุพนม, PTT ศรีสงคราม, PTT นาหว้า)\n`;
+        dashMsg += `⛽ **ดีเซล:** ปกติ 12 แห่ง (แนะนำ: PTT นาทราย, PTT บ้านผึ้ง, นครอะไหล่ปิโตรเลียม)\n`;
+        dashMsg += `⛽ **91:** ปกติ 17 แห่ง (แนะนำ: PTT นครพนมปิโตรเลียม สาขา 1, PTT ดอนแดง)\n`;
+        dashMsg += `⛽ **95:** ปกติ 16 แห่ง (แนะนำ: PTT นครพนมปิโตรเลียม สาขา 1, PTT ดอนแดง)\n`;
+        dashMsg += `⛽ **E20:** ปกติ 14 แห่ง (แนะนำ: PTT นาทราย, PTT บ้านผึ้ง)\n`;
+        dashMsg += `⚠️ *หมายเหตุ: ปั๊ม ปตท. ท้ายเมือง (หจก.พนมบริการ) ของหมดนะคะ*\n`;
         dashMsg += `\n📍 ค้นหาปั๊ม/เช็คเรียลไทม์ที่นี่: ${dashboardUrl}`;
 
         return priceMsg + dashMsg;
     } catch (error) {
         console.error('Error fetching oil data:', error);
-        return 'ไม่สามารถดึงข้อมูลน้ำมันได้ค่ะ เช็คที่เว็บนี้นะคะ: https://script.google.com/macros/s/AKfycbxrg8k2_8y7t7F8nfmdRSY8rcB4n6IjA8ej72HMbENI8gv74x8x-rw5TFqeNRWtTjAL/exec';
+        return 'ไม่สามารถดึงข้อมูลน้ำมันได้ค่ะ เช็คที่เว็บนี้นะคะ: https://script.google.com/macros/s/AKfycbyC8vSspmwSUc83QJpdaADrkr3b-mtI2d6qt7QAF2eP8IogWFKe1lXpfLCxEoK6tENVsQ/exec';
     }
 }
 

@@ -62,7 +62,7 @@ export async function getGeminiResponse(query, context = "", history = [], userI
                - **ข่าวประเทศไทย:** ส่องหน้าเว็บ [THE STANDARD Latest News] โดยตรง
                - **หมวดหมู่ข่าวเพิ่มเติม:** ในประเทศ, ต่างประเทศ, เศรษฐกิจ, และด่วนล่าสุด (Latest)
                - **กฎการสรุปข่าว:** เมื่อมีคนขอ "ข่าวล่าสุด" ให้เข้าเว็บที่เกี่ยวข้องด้านบน สรุปมาหมวดละ 3-5 ข่าว โดย "แบ่งตามหมวดหมู่" และ "รวบรัด" ที่สุด
-               - **สถานการณ์น้ำมันนครพนม:** [Dashboard น้ำมัน](https://script.google.com/macros/s/AKfycbxrg8k2_8y7t7F8nfmdRSY8rcB4n6IjA8ej72HMbENI8gv74x8x-rw5TFqeNRWtTjAL/exec) (เช็คข้อมูลหน้าเว็บ Dashboard เป็นหลัก)
+               - **สถานการณ์น้ำมันนครพนม:** [Dashboard น้ำมัน](https://script.google.com/macros/s/AKfycbyC8vSspmwSUc83QJpdaADrkr3b-mtI2d6qt7QAF2eP8IogWFKe1lXpfLCxEoK6tENVsQ/exec) (เช็คข้อมูลหน้าเว็บ Dashboard เป็นหลัก)
              6. **การหาพิกัดและนำทาง (Navigation & Fuel Finder):**
                 - พิกัดร้าน "In The Haus" คือ 17.390083, 104.792944
                 - กฎการสร้างลิงก์: ห้ามใช้ลิงก์ search ให้ใช้ลิงก์ Google Maps Directions (นำทาง) เสมอ
