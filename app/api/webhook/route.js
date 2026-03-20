@@ -128,7 +128,7 @@ export async function POST(request) {
             // 0. Diagnostic Command
             if (text === 'yuzu who am i' || text === 'yuzu ใครคือฉัน') {
               const isFather = userId === 'U77e56cb573085ba79d37b496c6abdb63';
-              const isMother = userId === 'U43b097e0c286aef869a385c310dae406';
+              const isMother = userId === 'U8c53c87647799f798f208250be71ae1b';
               let identity = "ทีมงานทั่วไปค่ะ";
               if (isFather) identity = "คุณพ่อ (บอสใหญ่) ค่ะ! 🙏";
               if (isMother) identity = "คุณแม่ (บอสใหญ่) ค่ะ! 🙏";

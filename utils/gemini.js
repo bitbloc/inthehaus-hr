@@ -28,7 +28,7 @@ export async function getGeminiResponse(query, context = "", history = [], userI
         const thaiTime = now.toLocaleString("th-TH", { timeZone: "Asia/Bangkok", dateStyle: "full", timeStyle: "medium" });
 
         const isFather = userId === 'U77e56cb573085ba79d37b496c6abdb63';
-        const isMother = userId === 'U43b097e0c286aef869a385c310dae406';
+        const isMother = userId === 'U8c53c87647799f798f208250be71ae1b';
         let bossInstruction = "";
         
         if (isFather || isMother) {
