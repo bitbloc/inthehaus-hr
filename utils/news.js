@@ -65,7 +65,7 @@ export async function getAccurateNews(categories = ['nakhon-phanom', 'latest', '
         results.forEach(res => {
             let catName = "";
             switch(res.category) {
-                case 'nakhon-phanom': catName = 'นครพนม (ไทยรัฐ)'; break;
+                case 'nakhon-phanom': catName = 'นครพนม (Facebook/ไทยรัฐ)'; break;
                 case 'latest': catName = 'ด่วนล่าสุด (THE STANDARD)'; break;
                 case 'thailand': catName = 'ในประเทศ (THE STANDARD)'; break;
                 case 'world': catName = 'ต่างประเทศ (THE STANDARD)'; break;
@@ -78,7 +78,11 @@ export async function getAccurateNews(categories = ['nakhon-phanom', 'latest', '
                     context += `${i + 1}. ${h}\n`;
                 });
             } else {
-                context += "- (ไม่พบข่าวล่าสุดในหน้าเว็บนี้)\n";
+                if (res.category === 'nakhon-phanom') {
+                    context += "- (สแกนข่าวหน้าเว็บไม่พบคะ โปรดส่องกลุ่ม [นครพนม Nakhonphanom Talk of the Town] หรือเพจ [สวท.นครพนม] แทนนะคะ)\n";
+                } else {
+                    context += "- (ไม่พบข่าวล่าสุดในหน้าเว็บนี้)\n";
+                }
             }
         });
 
