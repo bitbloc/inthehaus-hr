@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS public.slip_transactions (
 ALTER TABLE public.slip_transactions ENABLE ROW LEVEL SECURITY;
 
 -- Allow all access for anon and authenticated (matching the project's permission pattern)
+DROP POLICY IF EXISTS "Admins can manage slip_transactions" ON public.slip_transactions;
 DROP POLICY IF EXISTS "Enable all access" ON public.slip_transactions;
 CREATE POLICY "Enable all access" 
 ON public.slip_transactions 

@@ -330,7 +330,18 @@ export async function POST(request) {
             // Handle Slips
             if (result.isSlip) {
               const { supabase } = await import('../../../lib/supabaseClient');
-              const fileName = `slip_${Date.now()}_${userId}.jpg`;
+              
+              // Resolve the user_id for the database (mapping line_bot_id to line_user_id)
+              let mappedDbUserId = userId;
+              const allEmployees = await getAllEmployeesData();
+              if (allEmployees) {
+                const emp = allEmployees.find(e => e.line_bot_id === userId || e.line_user_id === userId);
+                if (emp && emp.line_user_id) {
+                   mappedDbUserId = emp.line_user_id;
+                }
+              }
+
+              const fileName = `slip_${Date.now()}_${mappedDbUserId}.jpg`;
               const { data: uploadData, error: uploadError } = await supabase.storage
                 .from('yuzu-slips')
                 .upload(fileName, buffer, { contentType: 'image/jpeg' });
@@ -353,7 +364,7 @@ export async function POST(request) {
 
               const { error: insertError } = await supabase.from('slip_transactions').insert({
                 group_id: groupId,
-                user_id: userId,
+                user_id: mappedDbUserId,
                 amount: parsedAmount,
                 slip_url: slipUrl
               });
