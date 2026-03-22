@@ -27,9 +27,11 @@ export async function getGeminiResponse(query, context = "", history = [], userI
         const now = new Date();
         const thaiTime = now.toLocaleString("th-TH", { timeZone: "Asia/Bangkok", dateStyle: "full", timeStyle: "medium" });
 
-        // Fetch Dynamic Config for Bosses
+        // Fetch Dynamic Config for Bosses and Roles
         const { getYuzuConfigs } = await import('./memory.js');
-        const { father_uid, mother_uid } = await getYuzuConfigs();
+        const configs = await getYuzuConfigs(); // Now returns an object with all keys
+        const father_uid = configs.father_uid;
+        const mother_uid = configs.mother_uid;
 
         const isFather = userId === father_uid;
         const isMother = userId === mother_uid;
@@ -47,21 +49,19 @@ export async function getGeminiResponse(query, context = "", history = [], userI
             const employee = await getEmployeeByLineId(userId);
             const position = employee?.position || "ทีมงาน";
             
+            // Map position to role instruction keys
+            let roleInstruction = "";
             if (position.includes("Bar") || position.includes("Floor")) {
+                roleInstruction = configs['role_instruction_Bar&Floor'];
+            } else if (position.includes("Kitchen") || position.includes("ครัว") || position.includes("Cooking")) {
+                roleInstruction = configs['role_instruction_Kitchen'];
+            } else if (position.includes("Admin") || position.includes("จัดการ") || position.includes("Owner")) {
+                roleInstruction = configs['role_instruction_Admin'];
+            }
+
+            if (roleInstruction) {
                 specializedInstruction = `\n*** คำแนะนำเพิ่มเติม (ตำแหน่ง ${position}): 
-                - เน้นเรื่องความสะอาดของร้าน การบริการลูกค้า และเครื่องดื่มที่สมบูรณ์แบบ
-                - แซวเรื่องการเช็ดโต๊ะหรือการเช็คสต็อกเครื่องดื่มบ้าง
-                - กระตุ้นให้กระตือรือร้นในการดูแลลูกค้าที่ "Floor" และความเป๊ะที่ "Bar" ***\n`;
-            } else if (position.includes("Kitchen") || position.includes("ครัว")) {
-                specializedInstruction = `\n*** คำแนะนำเพิ่มเติม (ตำแหน่ง ${position}): 
-                - เน้นเรื่องรสชาติอาหาร ความเร็วในการออกตั๋ว และความสะอาดในครัว
-                - แซวเรื่องการเตรียมวัตถุดิบหรือการล้างจาน
-                - ย้ำเตือนเรื่องการคัดเลือกวัตถุดิบ (อ้างอิงราคา Makro ถ้าจำเป็น) ***\n`;
-            } else if (position.includes("Admin") || position.includes("จัดการ")) {
-                specializedInstruction = `\n*** คำแนะนำเพิ่มเติม (ตำแหน่ง ${position}): 
-                - คุยเรื่องตัวเลข ยอดขาย และรายงานสรุป
-                - เน้นเรื่องความถูกต้องของสลิปและการเช็คอินพนักงาน
-                - ทำตัวเหมือนเป็นบัดดี้ที่ช่วยเรื่องเอกสาร (แต่ยังกวนประสาทตามสไตล์ยูซุ) ***\n`;
+                - ${roleInstruction} ***\n`;
             }
         }
 

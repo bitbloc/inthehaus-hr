@@ -104,56 +104,58 @@ export default function YuzuKnowledgeAdmin() {
         if (error) {
             alert('Error updating employee: ' + error.message);
         } else {
-            setEmployees(prev => prev.map(emp => emp.id === id ? { ...emp, [field]: value } : emp));
+            setMessage('อัปเดตข้อมูลพนักงานเรียบร้อย');
+            setTimeout(() => setMessage(''), 3000);
         }
     }
 
     return (
-        <div className="p-8 max-w-5xl mx-auto min-h-screen bg-gray-50">
-            <header className="mb-10 text-center">
-                 <h1 className="text-4xl font-extrabold mb-2 flex justify-center items-center gap-3 text-orange-600">
+        <div className="py-12 px-4 md:px-8 max-w-6xl mx-auto min-h-screen bg-transparent">
+            <header className="mb-12 text-center pt-4">
+                 <h1 className="text-4xl md:text-5xl font-extrabold mb-3 flex justify-center items-center gap-3 text-orange-600 tracking-tight">
                     🍊 Yuzu AI Management
                 </h1>
-                <p className="text-gray-500">จัดการความรู้, สิทธิ์บอส และฐานข้อมูลพนักงานน้องยูซุ</p>
+                <p className="text-gray-500 font-medium">จัดการความรู้, สิทธิ์บอส และบุคลิกรายตำแหน่งของน้องยูซุ</p>
             </header>
 
             {/* Tabs */}
-            <div className="flex gap-2 mb-8 bg-white p-1 rounded-xl shadow-sm border border-orange-100">
+            <div className="flex flex-wrap gap-2 mb-10 bg-white/80 backdrop-blur-md p-1.5 rounded-2xl shadow-sm border border-orange-100 sticky top-4 z-50">
                 {[
                     { id: 'knowledge', label: '📖 ความรู้ (RAG)', icon: '📚' },
-                    { id: 'config', label: '⚙️ ตั้งค่าบอส (UID)', icon: '👑' },
+                    { id: 'config', label: '⚙️ ตั้งค่าระบบ (Config)', icon: '🛠️' },
                     { id: 'employees', label: '👥 พนักงาน & ตำแหน่ง', icon: '👤' }
                 ].map(tab => (
                     <button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
-                        className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
+                        className={`flex-1 min-w-[150px] py-3.5 px-6 rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${
                             activeTab === tab.id 
-                            ? 'bg-orange-500 text-white shadow-md' 
-                            : 'text-gray-600 hover:bg-orange-50 hover:text-orange-600'
+                            ? 'bg-orange-500 text-white shadow-lg shadow-orange-200 scale-[1.02]' 
+                            : 'text-gray-500 hover:bg-orange-50 hover:text-orange-600'
                         }`}
                     >
-                        <span>{tab.icon}</span>
+                        <span className="text-xl">{tab.icon}</span>
                         {tab.label}
                     </button>
                 ))}
             </div>
             
             {message && (
-                <div className="mb-6 p-4 bg-orange-100 border border-orange-200 text-orange-700 rounded-lg animate-pulse text-center font-medium">
-                    {message}
+                <div className="fixed bottom-8 right-8 z-50 p-4 bg-orange-600 text-white rounded-2xl shadow-2xl animate-bounce border-2 border-orange-400 font-bold">
+                    ✨ {message}
                 </div>
             )}
 
             {/* TAB: KNOWLEDGE */}
             {activeTab === 'knowledge' && (
-                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <div className="bg-white p-6 rounded-2xl shadow-xl border border-orange-50 mb-8">
-                        <h2 className="text-xl font-bold mb-4 text-gray-800 flex items-center gap-2">
-                             ✏️ เพิ่มความรู้ใหม่ให้น้องยูซุ
+                <div className="animate-in fade-in slide-in-from-bottom-6 duration-700">
+                    <div className="bg-white p-8 rounded-3xl shadow-xl border border-orange-50 mb-10">
+                        <h2 className="text-2xl font-black mb-6 text-gray-800 flex items-center gap-3">
+                             <span className="p-2 bg-orange-100 rounded-lg text-orange-600">✏️</span>
+                             เพิ่มความรู้ใหม่ให้น้องยูซุ
                         </h2>
                         <textarea 
-                            className="w-full p-4 border-2 border-gray-100 rounded-xl h-40 mb-4 focus:ring-4 focus:ring-orange-200 focus:border-orange-500 outline-none transition-all resize-none"
+                            className="w-full p-6 border-2 border-gray-100 rounded-2xl h-48 mb-6 focus:ring-8 focus:ring-orange-100 focus:border-orange-500 outline-none transition-all resize-none text-lg leading-relaxed"
                             placeholder="ใส่เนื้อความรู้ที่นี่ (เช่น กฎระเบียบบริษัท, เมนูอาหาร, ข้อมูลเฉพาะเจาะจง)..."
                             value={newContent}
                             onChange={(e) => setNewContent(e.target.value)}
@@ -162,35 +164,38 @@ export default function YuzuKnowledgeAdmin() {
                             <button 
                                 onClick={handleAddKnowledge}
                                 disabled={loading || !newContent}
-                                className="bg-orange-500 text-white px-8 py-3 rounded-xl hover:bg-orange-600 disabled:opacity-50 transition-all font-bold shadow-lg shadow-orange-200 transform hover:-translate-y-0.5 active:translate-y-0"
+                                className="bg-orange-500 text-white px-10 py-4 rounded-2xl hover:bg-orange-600 disabled:opacity-50 transition-all font-black text-lg shadow-xl shadow-orange-200 transform hover:-translate-y-1 active:translate-y-0"
                             >
                                 {loading ? '⌛ กำลังบันทึก...' : '🚀 บันทึกลงฐานความรู้'}
                             </button>
                         </div>
                     </div>
 
-                    <div className="space-y-4">
-                        <h2 className="text-xl font-bold text-gray-800">📋 รายการความรู้ในระบบ ({knowledge.length})</h2>
-                        {knowledge.length === 0 && !loading && <p className="text-gray-400 italic">ยังไม่มีข้อมูลความรู้ในระบบ</p>}
+                    <div className="space-y-6">
+                        <h2 className="text-2xl font-black text-gray-800 flex items-center gap-3">
+                             <span className="p-2 bg-gray-100 rounded-lg text-gray-600">📋</span>
+                             รายการความรู้ ({knowledge.length})
+                        </h2>
+                        {knowledge.length === 0 && !loading && <p className="text-gray-400 italic bg-white p-10 rounded-3xl text-center border-2 border-dashed">ยังไม่มีข้อมูลความรู้ในระบบ</p>}
                         {knowledge.map((k) => (
-                            <div key={k.id} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex justify-between items-start group hover:border-orange-200 transition-all hover:shadow-md">
-                                <div className="flex-1 pr-6">
-                                    <p className="text-gray-800 whitespace-pre-wrap leading-relaxed">{k.content}</p>
-                                    <div className="flex items-center gap-3 mt-3">
-                                        <span className="text-[10px] uppercase tracking-wider font-bold text-gray-300 bg-gray-50 px-2 py-1 rounded">
-                                            ID: {k.id.toString().slice(0, 8)}
+                            <div key={k.id} className="bg-white p-6 md:p-8 rounded-3xl border border-gray-100 shadow-sm flex justify-between items-start group hover:border-orange-300 transition-all hover:shadow-xl">
+                                <div className="flex-1 pr-10">
+                                    <p className="text-gray-700 whitespace-pre-wrap leading-loose text-lg font-medium">{k.content}</p>
+                                    <div className="flex items-center gap-4 mt-6">
+                                        <span className="text-[11px] uppercase tracking-widest font-black text-gray-400 bg-gray-50 px-3 py-1.5 rounded-full border border-gray-100">
+                                            DOC-ID: {k.id.toString().slice(0, 8)}
                                         </span>
-                                        <span className="text-xs text-gray-400 italic">
-                                            สร้างเมื่อ: {new Date(k.created_at).toLocaleString('th-TH')}
+                                        <span className="text-xs text-gray-400 font-medium">
+                                            📅 {new Date(k.created_at).toLocaleString('th-TH')}
                                         </span>
                                     </div>
                                 </div>
                                 <button 
                                     onClick={() => handleDeleteKnowledge(k.id)}
-                                    className="text-gray-300 hover:text-red-500 p-2 rounded-lg hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100"
+                                    className="text-gray-200 hover:text-red-500 p-3 rounded-2xl hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100 flex-shrink-0"
                                     title="ลบความรู้นี้"
                                 >
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" viewBox="0 0 20 20" fill="currentColor">
                                         <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
                                     </svg>
                                 </button>
@@ -202,57 +207,76 @@ export default function YuzuKnowledgeAdmin() {
 
             {/* TAB: CONFIG */}
             {activeTab === 'config' && (
-                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <div className="bg-white p-8 rounded-2xl shadow-xl border border-orange-50 max-w-2xl mx-auto">
-                        <h2 className="text-2xl font-bold mb-6 text-gray-800 flex items-center gap-2">
-                             👑 ตั้งค่าบอสสูงสุด (UID)
-                        </h2>
-                        <p className="text-gray-500 mb-8 text-sm bg-orange-50 p-4 rounded-xl border border-orange-100">
-                            กำหนด LINE User ID ของบอส เพื่อให้น้องยูซุเปลี่ยนบุคลิกเป็น "แมวประจบ" เมื่อคุยกับบุคคลเหล่านี้
-                        </p>
-                        
-                        <div className="space-y-6">
-                            <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-2">UID คุณพ่อ (Father)</label>
-                                <div className="flex gap-2">
-                                    <input 
-                                        type="text"
-                                        className="flex-1 p-3 bg-gray-50 border-2 border-gray-100 rounded-xl focus:ring-4 focus:ring-orange-100 outline-none font-mono text-sm"
-                                        value={config.father_uid}
-                                        onChange={(e) => setConfig({...config, father_uid: e.target.value})}
-                                        placeholder="เช่น U77e56cb..."
-                                    />
-                                    <button 
-                                        onClick={() => handleUpdateConfig('father_uid', config.father_uid)}
-                                        className="bg-gray-800 text-white px-5 rounded-xl hover:bg-black transition-all font-medium"
-                                    >
-                                        Update
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-2">UID คุณแม่ (Mother)</label>
-                                <div className="flex gap-2">
-                                    <input 
-                                        type="text"
-                                        className="flex-1 p-3 bg-gray-50 border-2 border-gray-100 rounded-xl focus:ring-4 focus:ring-orange-100 outline-none font-mono text-sm"
-                                        value={config.mother_uid}
-                                        onChange={(e) => setConfig({...config, mother_uid: e.target.value})}
-                                        placeholder="เช่น U8c53c87..."
-                                    />
-                                    <button 
-                                        onClick={() => handleUpdateConfig('mother_uid', config.mother_uid)}
-                                        className="bg-gray-800 text-white px-5 rounded-xl hover:bg-black transition-all font-medium"
-                                    >
-                                        Update
-                                    </button>
-                                </div>
+                <div className="animate-in fade-in slide-in-from-bottom-6 duration-700">
+                    <div className="grid gap-8">
+                        {/* Boss Config */}
+                        <div className="bg-white p-8 md:p-12 rounded-3xl shadow-xl border border-orange-50">
+                            <h2 className="text-3xl font-black mb-8 text-gray-800 flex items-center gap-3">
+                                <span className="p-2 bg-orange-100 rounded-xl text-orange-600">👑</span>
+                                ตั้งค่าบอสสูงสุด (Boss UIDs)
+                            </h2>
+                            <div className="grid md:grid-cols-2 gap-10">
+                                {[
+                                    { id: 'father_uid', label: 'คุณพ่อ (Father)', icon: '👔' },
+                                    { id: 'mother_uid', label: 'คุณแม่ (Mother)', icon: '💃' }
+                                ].map(boss => (
+                                    <div key={boss.id} className="space-y-3">
+                                        <label className="flex items-center gap-2 text-sm font-black text-gray-600 uppercase tracking-widest">
+                                            <span>{boss.icon}</span> {boss.label}
+                                        </label>
+                                        <div className="flex gap-3">
+                                            <input 
+                                                type="text"
+                                                className="flex-1 p-4 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:ring-8 focus:ring-orange-50 focus:border-orange-500 outline-none font-mono text-sm shadow-inner transition-all"
+                                                value={config[boss.id] || ''}
+                                                onChange={(e) => setConfig({...config, [boss.id]: e.target.value})}
+                                                placeholder="U77e56cb..."
+                                            />
+                                            <button 
+                                                onClick={() => handleUpdateConfig(boss.id, config[boss.id])}
+                                                className="bg-gray-900 text-white px-6 rounded-2xl hover:bg-black transition-all font-bold text-sm shadow-lg active:scale-95"
+                                            >
+                                                บันทึก
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
                         </div>
 
-                        <div className="mt-10 pt-6 border-t border-gray-100 italic text-xs text-gray-400 text-center">
-                            * การเปลี่ยน UID มีผลทันทีในการสนทนาถัดไปผ่าน Webhook
+                        {/* Role Interaction Config */}
+                        <div className="bg-white p-8 md:p-12 rounded-3xl shadow-xl border border-orange-50">
+                            <h2 className="text-3xl font-black mb-4 text-gray-800 flex items-center gap-3">
+                                <span className="p-2 bg-purple-100 rounded-xl text-purple-600">🎭</span>
+                                ปรับแต่งบุคลิกรายตำแหน่ง (Role-based AI)
+                            </h2>
+                            <p className="text-gray-400 mb-10 text-sm font-medium">
+                                กำหนด "คำสั่งพิเศษ" ให้น้องยูซุคุยกับพนักงานแต่ละแผนกด้วยสไตล์ที่แตกต่างกัน (ปรับแต่ง Instruction แยกตาม Role)
+                            </p>
+
+                            <div className="grid gap-8">
+                                {[
+                                    { key: 'role_instruction_Bar&Floor', label: 'Bar & Floor (หน้าร้าน)', positions: ['Bar&Floor', 'Bar & Floor'] },
+                                    { key: 'role_instruction_Kitchen', label: 'Kitchen (ในครัว)', positions: ['Cooking', 'Kitchen'] },
+                                    { key: 'role_instruction_Admin', label: 'Admin (จัดการระบบ)', positions: ['Owner', 'Admin'] }
+                                ].map(role => (
+                                    <div key={role.key} className="p-6 rounded-2xl bg-gray-50 border border-gray-200">
+                                        <label className="block text-lg font-black text-gray-700 mb-4 flex items-center gap-2">
+                                            📌 สำหรับตำแหน่ง: <span className="text-purple-600">{role.label}</span>
+                                        </label>
+                                        <textarea
+                                            className="w-full p-5 bg-white border-2 border-gray-100 rounded-2xl h-32 focus:ring-8 focus:ring-purple-50 focus:border-purple-400 outline-none transition-all resize-none text-base leading-relaxed text-gray-600"
+                                            placeholder={`ใส่คำแนะนำพิเศษสำหรับกลุ่ม ${role.label}...`}
+                                            value={config[role.key] || ''}
+                                            onChange={(e) => setConfig({...config, [role.key]: e.target.value})}
+                                            onBlur={(e) => handleUpdateConfig(role.key, e.target.value)}
+                                        />
+                                        <p className="mt-3 text-[11px] text-gray-400 italic">
+                                            * น้องยูซุจะใช้คำสั่งนี้เมื่อ LINE ID นั้นมีตำแหน่งตรงกับกลุ่ม: {role.positions.join(', ')}
+                                        </p>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -260,33 +284,35 @@ export default function YuzuKnowledgeAdmin() {
 
             {/* TAB: EMPLOYEES */}
             {activeTab === 'employees' && (
-                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <div className="bg-white rounded-2xl shadow-xl border border-orange-50 overflow-hidden">
-                        <div className="p-6 bg-white border-b border-gray-50 flex justify-between items-center">
-                            <h2 className="text-xl font-bold text-gray-800">👥 จัดการพนักงาน ({employees.length})</h2>
-                            <p className="text-xs text-gray-400">แก้ไขตำแหน่งและ Bot UID เพื่อให้ AI จำชื่อได้</p>
+                <div className="animate-in fade-in slide-in-from-bottom-6 duration-700">
+                    <div className="bg-white rounded-[32px] shadow-2xl border border-orange-50 overflow-hidden">
+                        <div className="p-10 bg-white border-b border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4">
+                            <div>
+                                <h2 className="text-3xl font-black text-gray-800">👥 รายชื่อทีมงาน ({employees.length})</h2>
+                                <p className="text-sm text-gray-400 font-medium mt-1">อัปเดต Bot UID และตำแหน่งงานเพื่อให้ AI จำแม่นขึ้น</p>
+                            </div>
                         </div>
                         <div className="overflow-x-auto">
                             <table className="w-full text-left">
-                                <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-widest font-bold">
+                                <thead className="bg-gray-50/50 text-gray-400 text-[11px] uppercase tracking-[0.2em] font-black">
                                     <tr>
-                                        <th className="px-6 py-4">ชื่อ / ชื่อเล่น</th>
-                                        <th className="px-6 py-4">ตำแหน่ง</th>
-                                        <th className="px-6 py-4">Yuzu Bot UID (Bot ID)</th>
-                                        <th className="px-6 py-4 text-center">ข้อมูลระบบ</th>
+                                        <th className="px-10 py-6">พนักงาน</th>
+                                        <th className="px-10 py-6">ตำแหน่ง</th>
+                                        <th className="px-10 py-6">Yuzu Bot UID (Chat ID)</th>
+                                        <th className="px-10 py-6 text-center">สถานะ</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-50">
                                     {employees.map(emp => (
-                                        <tr key={emp.id} className="hover:bg-orange-50/30 transition-all group">
-                                            <td className="px-6 py-4">
-                                                <div className="font-bold text-gray-800">{emp.nickname || emp.name}</div>
-                                                <div className="text-[10px] text-gray-400">{emp.name}</div>
+                                        <tr key={emp.id} className="hover:bg-orange-50/20 transition-all group">
+                                            <td className="px-10 py-8">
+                                                <div className="font-black text-gray-800 text-lg">{emp.nickname || emp.name}</div>
+                                                <div className="text-xs text-gray-400 mt-0.5">{emp.name}</div>
                                             </td>
-                                            <td className="px-6 py-4">
+                                            <td className="px-10 py-8">
                                                 <input 
                                                     type="text"
-                                                    className="w-full bg-transparent border-b border-transparent focus:border-orange-300 outline-none p-1 text-sm text-gray-600 focus:bg-white rounded"
+                                                    className="w-full bg-orange-50/0 border-b-2 border-transparent focus:border-orange-400 focus:bg-white outline-none p-2 text-base font-bold text-gray-600 rounded-lg transition-all"
                                                     value={emp.position || ''}
                                                     onChange={(e) => {
                                                         const val = e.target.value;
@@ -295,12 +321,12 @@ export default function YuzuKnowledgeAdmin() {
                                                     onBlur={(e) => handleUpdateEmployee(emp.id, 'position', e.target.value)}
                                                 />
                                             </td>
-                                            <td className="px-6 py-4">
+                                            <td className="px-10 py-8">
                                                 <input 
                                                     type="text"
-                                                    className="w-full bg-transparent border-b border-transparent focus:border-orange-300 outline-none p-1 font-mono text-[10px] text-gray-500 focus:bg-white rounded"
+                                                    className="w-full bg-gray-50/0 border-b-2 border-transparent focus:border-orange-400 focus:bg-white outline-none p-2 font-mono text-xs text-gray-400 focus:text-orange-600 rounded-lg transition-all"
                                                     value={emp.line_bot_id || ''}
-                                                    placeholder="ใส่ UID จากแชทบอท..."
+                                                    placeholder="U..."
                                                     onChange={(e) => {
                                                         const val = e.target.value;
                                                         setEmployees(prev => prev.map(item => item.id === emp.id ? {...item, line_bot_id: val} : item));
@@ -308,25 +334,16 @@ export default function YuzuKnowledgeAdmin() {
                                                     onBlur={(e) => handleUpdateEmployee(emp.id, 'line_bot_id', e.target.value)}
                                                 />
                                             </td>
-                                            <td className="px-6 py-4 text-center">
-                                                <span className={`inline-block w-2 h-2 rounded-full ${emp.line_bot_id ? 'bg-green-400' : 'bg-gray-200'}`} title={emp.line_bot_id ? 'UID Connected' : 'Missing UID'}></span>
-                                                <div className="text-[9px] text-gray-300 mt-1">Check-in: {emp.line_user_id ? 'Yes' : 'No'}</div>
+                                            <td className="px-10 py-8 text-center">
+                                                <div className="flex flex-col items-center gap-2">
+                                                    <span className={`inline-block w-3 h-3 rounded-full shadow-sm ${emp.line_bot_id ? 'bg-green-500 animate-pulse' : 'bg-gray-200'}`}></span>
+                                                    <span className="text-[10px] font-black text-gray-300 uppercase">{emp.line_bot_id ? 'Connected' : 'Offline'}</span>
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}
                                 </tbody>
                             </table>
-                        </div>
-                    </div>
-                    <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-100 flex items-start gap-3">
-                        <div className="text-blue-500 text-xl font-bold">ℹ️</div>
-                        <div className="text-xs text-blue-700 leading-relaxed">
-                            <p className="font-bold mb-1">คำแนะนำ:</p>
-                            <ul className="list-disc ml-4 space-y-1">
-                                <li><strong>Bot UID:</strong> คือ User ID ที่ได้เมื่อพิมพ์ "yuzu who am i" ในแชทพนักงาน</li>
-                                <li><strong>ตำแหน่ง:</strong> น้องยูซุจะใช้ตำแหน่งนี้ในบทสนทนา (เช่น ถ้าตำแหน่งคือ 'Bar&Floor' AI จะคุยเน้นเรื่องเครื่องดื่มและบริการ)</li>
-                                <li>AI จะจำพนักงานที่ "เปิดใช้งาน (Is Active)" อยู่เท่านั้น</li>
-                            </ul>
                         </div>
                     </div>
                 </div>
