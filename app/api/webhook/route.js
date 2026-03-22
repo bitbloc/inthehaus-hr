@@ -242,14 +242,24 @@ export async function POST(request) {
               } else {
                  replyText += `✅ จำนวนสลิป: ${count} รายการ\n`;
                  replyText += `💰 ยอดรวมทั้งหมด: ${total.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท\n\n`;
-                 replyText += `(พิมพ์ "yuzu export slips" เพื่อดาวน์โหลด Excel ค่ะ)`;
+                 replyText += `⏰ รายละเอียดเวลาโอน:\n`;
+                 
+                 // Sort slips by timestamp early to late
+                 const sortedSlips = [...slips].sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
+                 
+                 sortedSlips.forEach((s) => {
+                     const timeStr = format(addHours(new Date(s.timestamp), 7), 'HH:mm');
+                     replyText += `- เวลา ${timeStr} น. : ${Number(s.amount).toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท\n`;
+                 });
+                 
+                 replyText += `\n(พิมพ์ "yuzu export slips" เพื่อดาวน์โหลด Excel ค่ะ)`;
               }
 
               // Image generation condition
               const wantsImage = (text.includes('ภาพ') || text.includes('รูป')) && !text.includes('ไม่ต้อง') && !text.includes('ไม่เอา');
               
-              if ((count > 0 && !isLatest && !text.includes('ไม่ต้อง') && !text.includes('ไม่เอา')) || wantsImage) {
-                const prompt = `ภาพพื้นหลังสวยงามพรีเมียม แนวร้านอาหาร In The Haus มีข้อความ สรุปยอดโอน ${dateTitle} ยอด ${total.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท สีสันสดใส`;
+              if (wantsImage && count > 0 && !isLatest) {
+                const prompt = `ภาพกราฟิกข้อความ ไม่มีรูปแมวเด็ดขาด ให้ออกแบบสวยงามพรีเมียมตัวอักษร 3D "สรุปยอดโอน ${dateTitle} ยอด ${total.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท" แสดงผลตารางเวลาโอนเงินย่อยๆ ร่วมด้วย สีสันสดใส ชัดเจน`;
                 const genResult = await generateImage(prompt);
                 
                 if (genResult.success && genResult.imageUrl) {
