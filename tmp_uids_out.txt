@@ -1,0 +1,38 @@
+﻿[dotenv@17.3.1] injecting env (9) from .env.local -- tip: ๐ก๏ธ auth for agents: https://vestauth.com
+--- EMPLOYEES TABLE (Yuzu Uses This) ---
+[
+  {
+    id: 2,
+    name: 'Mam โฅ',
+    line_user_id: 'U8c53c87647799f798f208250be71ae1b',
+    is_active: true
+  },
+  {
+    id: 3,
+    name: 'เนเธเธชเน€เธเธญเธฃเน',
+    line_user_id: 'U4719e215298d2451d48b401d44f035fc',
+    is_active: true
+  },
+  {
+    id: 4,
+    name: 'เธฃเธดเธชเธฒ',
+    line_user_id: 'U293e5a299f969b87a7fef220f41c4d8a',
+    is_active: true
+  },
+  {
+    id: 5,
+    name: 'เธเธตเนเธเธธเนเธข',
+    line_user_id: 'U5ec550267ecf7d50e7536be0df2c1f49',
+    is_active: true
+  },
+  {
+    id: 8,
+    name: 'เธเธฒเธข (PT)',
+    line_user_id: 'U3a64f782c918bf3a531bd34625be145d',
+    is_active: false
+  }
+]
+
+--- LINE_USERS / CHECK-IN TABLE (Might exist?) ---
+
+Trying to fetch an employee who can check in but Yuzu doesn't know:

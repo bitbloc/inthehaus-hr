@@ -86,12 +86,14 @@ export async function getDailyContent(groupId) {
         // Fetch all employees for mapping (including owners/inactive for history tracking)
         const { data: employees } = await client
             .from('employees')
-            .select('line_user_id, name, nickname');
+            .select('line_user_id, line_bot_id, name, nickname');
         
         const nameMap = {};
         if (employees) {
             employees.forEach(emp => {
-                nameMap[emp.line_user_id] = emp.nickname || emp.name;
+                // Prioritize Bot ID, fallback to Check-in ID for chat mapping
+                const uid = emp.line_bot_id || emp.line_user_id;
+                if (uid) nameMap[uid] = emp.nickname || emp.name;
             });
         }
         
@@ -191,16 +193,18 @@ export async function getEmployeeHistory(userId, days = 30) {
     }
 }
 /**
- * Get employee details by LINE User ID (Sync with HR data)
+ * Get employee details by LINE Bot ID (Sync with HR data)
  */
 export async function getEmployeeByLineId(lineUserId) {
     if (!lineUserId) return null;
     try {
         const client = getSupabase();
+        
+        // Match by line_bot_id (Yuzu's UID) or line_user_id as fallback
         const { data, error } = await client
             .from('employees')
-            .select('name, nickname, position, employment_status')
-            .eq('line_user_id', lineUserId)
+            .select('name, nickname, position, employment_status, line_bot_id, line_user_id')
+            .or(`line_bot_id.eq.${lineUserId},line_user_id.eq.${lineUserId}`)
             .eq('is_active', true)
             .maybeSingle();
 
@@ -224,7 +228,7 @@ export async function getAllEmployeesData() {
         const client = getSupabase();
         const { data, error } = await client
             .from('employees')
-            .select('line_user_id, name, nickname, position, is_active')
+            .select('line_user_id, line_bot_id, name, nickname, position, is_active')
             .eq('is_active', true);
 
         if (error) {

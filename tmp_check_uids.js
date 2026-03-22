@@ -1,30 +1,19 @@
-
+require('dotenv').config({ path: '.env.local' });
 const { createClient } = require('@supabase/supabase-js');
-const dotenv = require('dotenv');
-dotenv.config({ path: '.env.local' });
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 
-if (!supabaseUrl || !supabaseKey) {
-  console.error("Missing Supabase credentials in .env.local");
-  process.exit(1);
+async function checkDatabases() {
+  console.log("--- EMPLOYEES TABLE (Yuzu Uses This) ---");
+  const { data: employees, error: err1 } = await supabase.from('employees').select('id, name, line_user_id, is_active').order('id', { ascending: true }).limit(5);
+  if (err1) console.error(err1);
+  console.log(employees);
+
+  console.log("\n--- LINE_USERS / CHECK-IN TABLE (Might exist?) ---");
+  // Let's list tables in Supabase to see if there's another table for check-in
+  
+  console.log("\nTrying to fetch an employee who can check in but Yuzu doesn't know:");
+  // Let's search by name if possible, or just look at the schema.
 }
 
-const supabase = createClient(supabaseUrl, supabaseKey);
-
-async function checkEmployees() {
-  const { data, error } = await supabase
-    .from('employees')
-    .select('name, nickname, position, line_user_id')
-    .eq('is_active', true);
-
-  if (error) {
-    console.error("Error fetching employees:", error);
-  } else {
-    console.log("Active Employee UID Mapping:");
-    console.log(JSON.stringify(data, null, 2));
-  }
-}
-
-checkEmployees();
+checkDatabases();

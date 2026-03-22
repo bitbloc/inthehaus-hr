@@ -178,6 +178,66 @@ export async function POST(request) {
               continue;
             }
 
+            // 2.1 Slip Summary & Export
+            if (text === 'สรุปยอดโอน' || text === 'สรุปยอดโอนวันนี้' || text === 'yuzu สรุปยอดโอน') {
+              console.log("Yuzu: Slip Summary Requested");
+              const { supabase } = await import('../../../lib/supabaseClient');
+              const { format, addHours } = await import('date-fns');
+              
+              const START_OF_DAY_UTC = new Date();
+              START_OF_DAY_UTC.setHours(0, 0, 0, 0);
+              const dateStr = format(addHours(new Date(), 7), 'yyyy-MM-dd');
+              
+              // We'll filter by 'date' column for exact Thai Date match
+              const { data: slips, error } = await supabase
+                .from('slip_transactions')
+                .select('amount, user_id')
+                .eq('date', dateStr)
+                .eq('is_deleted', false);
+
+              if (error) {
+                await client.replyMessage(event.replyToken, { type: 'text', text: 'เมี๊ยว~ เกิดข้อผิดพลาดในการดึงยอดโอนค่ะ' });
+                handledLocally = true;
+                continue;
+              }
+
+              let total = 0;
+              let count = slips.length;
+              slips.forEach(s => total += Number(s.amount));
+              
+              const todayStr = format(addHours(new Date(), 7), 'dd/MM/yyyy');
+              let replyText = `📊 สรุปยอดโอนประจำวันที่ ${todayStr}\n\n`;
+              replyText += `✅ จำนวนสลิป: ${count} รายการ\n`;
+              replyText += `💰 ยอดรวมทั้งหมด: ${total.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท\n\n`;
+              replyText += `(พิมพ์ "yuzu export slips" เพื่อดาวน์โหลด Excel ค่ะ)`;
+
+              if (count > 0) {
+                const prompt = `ภาพพื้นหลังสวยงามพรีเมียม แนวร้านอาหาร In The Haus มีข้อความ สรุปยอดโอน วันที่ ${todayStr} ยอด ${total.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท สีสันสดใส`;
+                const genResult = await generateImage(prompt);
+                
+                if (genResult.success && genResult.imageUrl) {
+                   await client.replyMessage(event.replyToken, [
+                     { type: 'text', text: replyText },
+                     { type: 'image', originalContentUrl: genResult.imageUrl, previewImageUrl: genResult.imageUrl }
+                   ]);
+                } else {
+                   await client.replyMessage(event.replyToken, { type: 'text', text: replyText });
+                }
+              } else {
+                await client.replyMessage(event.replyToken, { type: 'text', text: replyText });
+              }
+              handledLocally = true;
+              continue;
+            }
+
+            if (text === 'yuzu export slips' || text === 'export slips') {
+               const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://inthehaus-hr.vercel.app';
+               const rawUrl = `${baseUrl}/api/export-slips`;
+               await client.replyMessage(event.replyToken, { type: 'text', text: `📥 ดาวน์โหลดไฟล์สรุปยอดโอน (CSV) ได้ที่ลิงก์นี้เลยค่ะ เมี๊ยว~\n${rawUrl}` });
+               handledLocally = true;
+               continue;
+            }
+
             // 2.5 Employee Performance Report (Special Command for Owner)
             if (text.includes('รายงานพนักงาน') || text.includes('ประเมินผล')) {
               console.log("Yuzu: Employee Report Requested");
@@ -267,8 +327,47 @@ export async function POST(request) {
             // Always save image description for summary (Retention 2 days handled in cleanup)
             await saveMessage(groupId, userId, 'user', result.shortDescription, 'image_description');
 
+            // Handle Slips
+            if (result.isSlip) {
+              const { supabase } = await import('../../../lib/supabaseClient');
+              const fileName = `slip_${Date.now()}_${userId}.jpg`;
+              const { data: uploadData, error: uploadError } = await supabase.storage
+                .from('yuzu-slips')
+                .upload(fileName, buffer, { contentType: 'image/jpeg' });
+
+              let slipUrl = null;
+              if (!uploadError) {
+                const { data: { publicUrl } } = supabase.storage.from('yuzu-slips').getPublicUrl(fileName);
+                slipUrl = publicUrl;
+              } else {
+                console.error("Slip Upload Error:", uploadError);
+              }
+
+              // Parse amount safely
+              let parsedAmount = 0;
+              if (typeof result.amount === 'number') {
+                parsedAmount = result.amount;
+              } else if (typeof result.amount === 'string') {
+                parsedAmount = parseFloat(result.amount.replace(/,/g, ''));
+              }
+
+              const { error: insertError } = await supabase.from('slip_transactions').insert({
+                group_id: groupId,
+                user_id: userId,
+                amount: parsedAmount,
+                slip_url: slipUrl
+              });
+
+              if (insertError) {
+                 console.error("Slip Insert Error:", insertError);
+                 await client.replyMessage(event.replyToken, { type: 'text', text: "เมี๊ยว~ ระบบขัดข้อง บันทึกสลิปไม่สำเร็จค่ะ" });
+              } else {
+                 await client.replyMessage(event.replyToken, { type: 'text', text: `บันทึกยอดโอน ${parsedAmount} บาท เรียบร้อยค่ะ เมี๊ยว~ 💸` });
+              }
+              handledLocally = true;
+            } 
             // Only reply if the AI determined this is a clear photo of food or a cat
-            if (result.shouldReply) {
+            else if (result.shouldReply) {
               await client.replyMessage(event.replyToken, { type: 'text', text: result.analysis });
               handledLocally = true;
             } else {

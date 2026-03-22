@@ -7,7 +7,7 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
     const [activeTab, setActiveTab] = useState("core");
     const [formData, setFormData] = useState({
         name: "", name_en: "", nickname: "",
-        phone: "", email: "", line_user_id: "",
+        phone: "", email: "", line_user_id: "", line_bot_id: "",
         address: "", id_card: "",
         employment_status: "Probation", position: "", job_level: "",
         start_date: "", probation_date: "",
@@ -25,7 +25,7 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
             // Reset if adding new
             setFormData({
                 name: "", name_en: "", nickname: "",
-                phone: "", email: "", line_user_id: "",
+                phone: "", email: "", line_user_id: "", line_bot_id: "",
                 address: "", id_card: "",
                 employment_status: "Probation", position: "", job_level: "",
                 start_date: "", probation_date: "",
@@ -111,7 +111,9 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
                                 <FormInput label="Full Name (TH)" name="name" value={formData.name} onChange={handleChange} required placeholder="นาย สมชาย ใจดี" />
                                 <FormInput label="Full Name (EN)" name="name_en" value={formData.name_en} onChange={handleChange} placeholder="Mr. Somchai Jaidee" />
                                 <FormInput label="Nickname" name="nickname" value={formData.nickname} onChange={handleChange} />
-                                <FormInput label="Line User ID" name="line_user_id" value={formData.line_user_id} onChange={handleChange} required placeholder="U1234..." mono />
+                                <FormInput label="LINE Check-in ID (LIFF)" name="line_user_id" value={formData.line_user_id || ''} onChange={handleChange} placeholder="U1234..." mono />
+                                <FormInput label="LINE Bot ID (Yuzu)" name="line_bot_id" value={formData.line_bot_id || ''} onChange={handleChange} placeholder="U5678..." mono />
+
                                 <FormInput label="Phone Number" name="phone" value={formData.phone} onChange={handleChange} type="tel" />
                                 <FormInput label="Email" name="email" value={formData.email} onChange={handleChange} type="email" />
                                 <FormInput label="ID Card Number" name="id_card" value={formData.id_card} onChange={handleChange} placeholder="1-xxxx-xxxxx-xx-x" mono />

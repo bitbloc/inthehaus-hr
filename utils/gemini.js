@@ -97,10 +97,11 @@ export async function classifyAndAnalyzeImage(imageBase64, mimeType = "image/jpe
         const model = instance.getGenerativeModel({ model: "gemini-3.1-pro-preview" });
         
         const systemPrompt = `คุณคือระบบวิเคราะห์รูปภาพของ Yuzu Bot ทีมงาน In The Haus
-        1. ตรวจสอบว่ารูปนี้คือ "รูปถ่ายอาหาร", "วัตถุดิบ", "ใบเสร็จซื้อของ" หรือ "รูปถ่ายแมว" หรือไม่
-        2. หากเป็นรูปถ่ายอาหาร/วัตถุดิบ/ใบเสร็จ: ให้ตอบ JSON {"isFood": true, "isReceipt": true/false (ถ้าเป็นใบเสร็จ), "menuName": "ชื่อเมนูหรือรายการหลัก", "itemsList": ["รายการ 1", "รายการ 2"], "costAnalysis": "รายละเอียดต้นทุนอ้างอิง Makro", "shortDescription": "คำอธิบายรูปสั้นๆ", "shouldReply": true}
-        3. หากเป็นรูปถ่ายแมว: ให้ตอบ JSON {"isCat": true, "catFeelings": "พากย์ความรู้สึกแมวในรูป: ต้องปากแซ่บ กวนประสาท จิกกัดคนถ่ายหน่อยๆ แต่ยังน่ารัก", "shortDescription": "บรรยายแมว", "shouldReply": true}
-        4. อื่นๆ: {"isFood": false, "shouldReply": false}
+        1. ตรวจสอบว่ารูปนี้คือ "รูปถ่ายสลิปโอนเงินธนาคาร", "รูปถ่ายอาหาร", "วัตถุดิบ", "ใบเสร็จซื้อของ" หรือ "รูปถ่ายแมว" หรือไม่
+        2. หากเป็น สลิปโอนเงินธนาคาร (Bank Transfer Slip): ให้ตอบ JSON {"isSlip": true, "amount": ตัวเลขยอดเงินที่โอน(ห้ามใส่คอมม่า), "shortDescription": "สลิปโอนเงิน", "shouldReply": true}
+        3. หากเป็นรูปถ่ายอาหาร/วัตถุดิบ/ใบเสร็จ: ให้ตอบ JSON {"isFood": true, "isReceipt": true/false (ถ้าเป็นใบเสร็จ), "menuName": "ชื่อเมนูหรือรายการหลัก", "itemsList": ["รายการ 1", "รายการ 2"], "costAnalysis": "รายละเอียดต้นทุนอ้างอิง Makro", "shortDescription": "คำอธิบายรูปสั้นๆ", "shouldReply": true}
+        4. หากเป็นรูปถ่ายแมว: ให้ตอบ JSON {"isCat": true, "catFeelings": "พากย์ความรู้สึกแมวในรูป: ต้องปากแซ่บ กวนประสาท จิกกัดคนถ่ายหน่อยๆ แต่ยังน่ารัก", "shortDescription": "บรรยายแมว", "shouldReply": true}
+        5. อื่นๆ: {"isFood": false, "shouldReply": false}
         ตอบเป็น JSON เท่านั้น`;
 
         const imagePart = {
@@ -111,12 +112,14 @@ export async function classifyAndAnalyzeImage(imageBase64, mimeType = "image/jpe
         const textResponse = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
         const data = JSON.parse(textResponse);
         
-        if (data.shouldReply && data.isFood) {
+        if (data.shouldReply && data.isSlip) {
+            return { isSlip: true, amount: data.amount, shortDescription: data.shortDescription, shouldReply: true };
+        } else if (data.shouldReply && data.isFood) {
             return { isFood: true, analysis: data.costAnalysis, shortDescription: data.shortDescription, shouldReply: true };
         } else if (data.shouldReply && data.isCat) {
             return { isCat: true, analysis: `🐱 ${data.catFeelings}`, shortDescription: data.shortDescription, shouldReply: true };
         }
-        return { isFood: false, shouldReply: false };
+        return { isFood: false, isCat: false, isSlip: false, shouldReply: false };
     } catch (error) {
         console.error("Gemini Vision Error:", error);
         return { isFood: false, analysis: "", shortDescription: "error" };
