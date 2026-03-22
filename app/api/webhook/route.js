@@ -395,27 +395,30 @@ export async function POST(request) {
             // Handle Slips
             if (result.isSlip) {
               const { supabase } = await import('../../../lib/supabaseClient');
-              
               // Resolve the user_id for the database (mapping line_bot_id to line_user_id)
               let mappedDbUserId = userId;
               let senderName = "บุคคลภายนอก (ไม่มีในระบบ)";
               let isAuthorized = false;
 
-              const allEmployees = await getAllEmployeesData();
-              if (allEmployees) {
-                const emp = allEmployees.find(e => e.line_bot_id === userId || e.line_user_id === userId);
-                if (emp) {
-                   if (emp.line_user_id) {
-                     mappedDbUserId = emp.line_user_id;
-                   }
-                   if (emp.nickname || emp.name) {
-                     senderName = emp.nickname || emp.name;
-                   }
-                   const position = emp.position ? emp.position.toLowerCase().replace(/\s/g, '') : '';
-                   if (position.includes('bar&floor') || position.includes('owner')) {
-                      isAuthorized = true;
-                   }
-                }
+              // Direct DB query to prevent Next.js caching issues
+              const { data: emp, error: empErr } = await supabase
+                 .from('employees')
+                 .select('line_user_id, line_bot_id, name, nickname, position')
+                 .eq('is_active', true)
+                 .or(`line_bot_id.eq.${userId},line_user_id.eq.${userId}`)
+                 .maybeSingle();
+
+              if (emp) {
+                 if (emp.line_user_id) {
+                   mappedDbUserId = emp.line_user_id;
+                 }
+                 if (emp.nickname || emp.name) {
+                   senderName = emp.nickname || emp.name;
+                 }
+                 const position = emp.position ? emp.position.toLowerCase().replace(/\s/g, '') : '';
+                 if (position.includes('bar&floor') || position.includes('owner')) {
+                    isAuthorized = true;
+                 }
               }
 
               if (!isAuthorized) {

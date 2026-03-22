@@ -1,0 +1,50 @@
+[
+  {
+    "line_user_id": "Ua3eb90a094053f1802f8968ace5d25b8",
+    "line_bot_id": "U77e56cb573085ba79d37b496c6abdb63",
+    "name": "ฤ.",
+    "nickname": "ฤ.",
+    "position": "Owner",
+    "is_active": true
+  },
+  {
+    "line_user_id": "U293e5a299f969b87a7fef220f41c4d8a",
+    "line_bot_id": "Ua62b57e86ad7ddc6d28411eeeee62f89",
+    "name": "ริสา",
+    "nickname": null,
+    "position": "Bar&Floor",
+    "is_active": true
+  },
+  {
+    "line_user_id": "U5ec550267ecf7d50e7536be0df2c1f49",
+    "line_bot_id": "U5ec550267ecf7d50e7536be0df2c1f49",
+    "name": "พี่ปุ้ย",
+    "nickname": null,
+    "position": "Cooking",
+    "is_active": true
+  },
+  {
+    "line_user_id": "U8c53c87647799f798f208250be71ae1b",
+    "line_bot_id": "U8c53c87647799f798f208250be71ae1b",
+    "name": "Mam ♥",
+    "nickname": null,
+    "position": "Owner",
+    "is_active": true
+  },
+  {
+    "line_user_id": "U4719e215298d2451d48b401d44f035fc",
+    "line_bot_id": "U5982dc3642092f71f02c0a55c2d4a2fd",
+    "name": "แคสเปอร์",
+    "nickname": null,
+    "position": "Bar & Floor",
+    "is_active": true
+  },
+  {
+    "line_user_id": "U7133fffa83cabd740013121da55dd8f3",
+    "line_bot_id": "Ucfeceafe08fabcd85e516d55ca0302a5",
+    "name": "Add",
+    "nickname": "Add",
+    "position": "Bar&Floor",
+    "is_active": true
+  }
+]
