@@ -2,8 +2,34 @@
  * News Fetcher Utility for THE STANDARD
  */
 
-export async function getAccurateNews(categories = ['nakhon-phanom', 'nakhon-phanom-matichon', 'nakhon-phanom-pptv', 'latest', 'thailand', 'world', 'business']) {
+export async function getAccurateNews(categories = ['nakhon-phanom', 'nakhon-phanom-matichon', 'nakhon-phanom-pptv', 'nakhon-phanom-fb', 'latest', 'thailand', 'world', 'business']) {
     console.log("Yuzu News Fetcher: Starting for categories:", categories);
+    
+    const now = new Date();
+    const ThaiMonths = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+
+    function isWithinLast7Days(dateObj) {
+        if (!dateObj || isNaN(dateObj.getTime())) return false;
+        const diffInMs = now.getTime() - dateObj.getTime();
+        const diffInDays = diffInMs / (1000 * 60 * 60 * 24);
+        return diffInDays >= 0 && diffInDays <= 7;
+    }
+
+    function parseThaiDate(thaiStr) {
+        // Example: "17 ต.ค. 2568,17:23น."
+        try {
+            const match = thaiStr.match(/(\d+)\s+([^\s,]+)\s+(\d+),(\d+):(\d+)น/);
+            if (match) {
+                const day = parseInt(match[1]);
+                const monthIdx = ThaiMonths.indexOf(match[2]);
+                const year = parseInt(match[3]) - 543; // BE to AD
+                const hour = parseInt(match[4]);
+                const minute = parseInt(match[5]);
+                return new Date(year, monthIdx, day, hour, minute);
+            }
+        } catch (e) {}
+        return null;
+    }
     
     // Use a real-looking User-Agent to avoid WAF blocks
     const headers = {
@@ -21,6 +47,13 @@ export async function getAccurateNews(categories = ['nakhon-phanom', 'nakhon-pha
                 url = `https://www.matichon.co.th/tag/%E0%B8%99%E0%B8%84%E0%B8%A3%E0%B8%9E%E0%B8%99%E0%B8%A1/feed?t=${Date.now()}`;
             } else if (cat === 'nakhon-phanom-pptv') {
                 url = `https://www.pptvhd36.com/tags/%E0%B8%99%E0%B8%84%E0%B8%A3%E0%B8%9E%E0%B8%99%E0%B8%A1?t=${Date.now()}`;
+            } else if (cat === 'nakhon-phanom-fb') {
+                // Return static info/links for these pages as they are hard to scrape without API
+                return { category: cat, headlines: [
+                    "สวท.นครพนม (Facebook Page): https://www.facebook.com/profile.php?id=100064315526807",
+                    "นครพนม Happy Nakhonphanom: https://www.facebook.com/happynakhonphanom",
+                    "Bird Agavone -นครพนม-: https://www.facebook.com/birdagavone1"
+                ] };
             } else if (cat === 'latest') {
                 url = `https://thestandard.co/latest/?t=${Date.now()}`;
             } else {
@@ -39,29 +72,31 @@ export async function getAccurateNews(categories = ['nakhon-phanom', 'nakhon-pha
                     if (matchNext) {
                         try {
                             const data = JSON.parse(matchNext[1]);
-                            function findTitles(obj) {
+                            function findArticles(obj) {
                                 let results = [];
                                 if (typeof obj === 'object' && obj !== null) {
+                                    if (obj.title && obj.publishTime) {
+                                        results.push({ title: obj.title, date: new Date(obj.publishTime) });
+                                    }
                                     for (let k in obj) {
-                                        if (k === 'title' && typeof obj[k] === 'string' && obj[k].length > 20) {
-                                            results.push(obj[k]);
-                                        }
-                                        results = results.concat(findTitles(obj[k]));
+                                        results = results.concat(findArticles(obj[k]));
                                     }
                                 } else if (Array.isArray(obj)) {
                                     for (let v of obj) {
-                                        results = results.concat(findTitles(v));
+                                        results = results.concat(findArticles(v));
                                     }
                                 }
                                 return results;
                             }
-                            const allFound = findTitles(data.props?.initialState || data);
+                            const allFound = findArticles(data.props?.initialState || data);
                             const noiseTexts = ["บทความและข่าว", "ไทยรัฐออนไลน์", "รวมข่าว", "รูปภาพ", "คลังภาพ", "วิดีโอ", "ติดต่อโฆษณา", "การเมือง", "กีฬา", "บันเทิง", "สังคม", "เศรษฐกิจ", "ต่างประเทศ", "ไลฟ์สไตล์", "ดวง", "หวย", "ยานยนต์", "เทคโนโลยี", "คลิป", "ดูคลิปทั้งหมด"];
-                            const uniqueItems = [...new Set(allFound)];
-                            for (const titleText of uniqueItems) {
+                            
+                            for (const art of allFound) {
                                 if (titles.length >= 5) break;
-                                if (!noiseTexts.some(n => titleText.includes(n))) {
-                                    titles.push(titleText.replace(/&quot;/g, '"').trim());
+                                if (art.title.length > 20 && !noiseTexts.some(n => art.title.includes(n))) {
+                                    if (isWithinLast7Days(art.date)) {
+                                        titles.push(art.title.replace(/&quot;/g, '"').trim());
+                                    }
                                 }
                             }
                         } catch(e) { console.error("JSON Parse Error:", e); }
@@ -90,12 +125,17 @@ export async function getAccurateNews(categories = ['nakhon-phanom', 'nakhon-pha
                     }
                 } else if (url.includes('pptvhd36.com')) {
                     // Extract from PPTV
-                    const regex = /<h[234][^>]*>(.*?)<\/h[234]>/gs;
-                    let match;
-                    while ((match = regex.exec(html)) !== null && titles.length < 5) {
-                        let titleText = (match[1] || match[2] || match[0]).replace(/<[^>]*>?/gm, '').replace(/\s+/g, ' ').replace(/&quot;/g, '"').replace(/&#8211;/g, '-').trim();
-                        if (titleText.length > 20 && !titles.includes(titleText) && !titleText.includes('ข่าวที่เกี่ยวข้องกับ')) {
-                            titles.push(titleText);
+                    const blocks = html.split(/<div class="list-item"|<article|<li class="item"/);
+                    for (const block of blocks) {
+                        if (titles.length >= 5) break;
+                        const titleMatch = block.match(/<h[234][^>]*>(.*?)<\/h[234]>/s);
+                        const dateMatch = block.match(/datetime="([^"]+)"/);
+                        if (titleMatch && dateMatch) {
+                            const titleText = titleMatch[1].replace(/<[^>]*>?/gm, '').replace(/\s+/g, ' ').replace(/&quot;/g, '"').trim();
+                            const storyDate = parseThaiDate(dateMatch[1]);
+                            if (titleText.length > 20 && isWithinLast7Days(storyDate) && !titleText.includes('ข่าวที่เกี่ยวข้องกับ')) {
+                                titles.push(titleText);
+                            }
                         }
                     }
                 } else {
@@ -138,6 +178,7 @@ export async function getAccurateNews(categories = ['nakhon-phanom', 'nakhon-pha
                 case 'nakhon-phanom': catName = 'นครพนม (ไทยรัฐออนไลน์)'; break;
                 case 'nakhon-phanom-matichon': catName = 'นครพนม (มติชนออนไลน์)'; break;
                 case 'nakhon-phanom-pptv': catName = 'นครพนม (PPTVHD36)'; break;
+                case 'nakhon-phanom-fb': catName = 'นครพนม (Facebook Pages แนะนำ)'; break;
                 case 'latest': catName = 'ด่วนล่าสุด (THE STANDARD)'; break;
                 case 'thailand': catName = 'ในประเทศ (THE STANDARD)'; break;
                 case 'world': catName = 'ต่างประเทศ (THE STANDARD)'; break;

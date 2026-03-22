@@ -398,12 +398,30 @@ export async function POST(request) {
               
               // Resolve the user_id for the database (mapping line_bot_id to line_user_id)
               let mappedDbUserId = userId;
+              let senderName = "บุคคลภายนอก (ไม่มีในระบบ)";
+              let isAuthorized = false;
+
               const allEmployees = await getAllEmployeesData();
               if (allEmployees) {
                 const emp = allEmployees.find(e => e.line_bot_id === userId || e.line_user_id === userId);
-                if (emp && emp.line_user_id) {
-                   mappedDbUserId = emp.line_user_id;
+                if (emp) {
+                   if (emp.line_user_id) {
+                     mappedDbUserId = emp.line_user_id;
+                   }
+                   if (emp.nickname || emp.name) {
+                     senderName = emp.nickname || emp.name;
+                   }
+                   const position = emp.position ? emp.position.toLowerCase().replace(/\s/g, '') : '';
+                   if (position.includes('bar&floor') || position.includes('owner')) {
+                      isAuthorized = true;
+                   }
                 }
+              }
+
+              if (!isAuthorized) {
+                 await client.replyMessage(event.replyToken, { type: 'text', text: `เมี๊ยว~ คุณ ${senderName} ไม่มีสิทธิ์บันทึกสลิปนะคะ (รับเฉพาะตำแหน่ง Bar&Floor และ Owner ค่ะ)\n[UID: ${userId}] 😾` });
+                 handledLocally = true;
+                 continue;
               }
 
               const fileName = `slip_${Date.now()}_${mappedDbUserId}.jpg`;
@@ -444,13 +462,6 @@ export async function POST(request) {
                      await client.replyMessage(event.replyToken, { type: 'text', text: `เมี๊ยว~ บันทึกสลิปไม่สำเร็จค่ะ (Error: ${insertError.message || insertError.code || 'Unknown DB Error'})` });
                  }
               } else {
-                 let senderName = "บุคคลภายนอก (ไม่มีในระบบ)";
-                 if (allEmployees) {
-                    const empNameData = allEmployees.find(e => e.line_bot_id === userId || e.line_user_id === userId);
-                    if (empNameData && empNameData.name) {
-                        senderName = empNameData.nickname || empNameData.name;
-                    }
-                 }
                  await client.replyMessage(event.replyToken, { type: 'text', text: `บันทึกยอดโอน ${parsedAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท เรียบร้อยค่ะ เมี๊ยว~ 💸\nผู้ส่งสลิป: ${senderName}` });
               }
               handledLocally = true;
