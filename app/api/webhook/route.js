@@ -245,10 +245,10 @@ export async function POST(request) {
                  replyText += `(พิมพ์ "yuzu export slips" เพื่อดาวน์โหลด Excel ค่ะ)`;
               }
 
-              // Image generation condition (if they explicitly asked for image OR it's a daily summary with > 0 items)
-              const wantsImage = text.includes('ภาพ') || text.includes('รูป');
+              // Image generation condition
+              const wantsImage = (text.includes('ภาพ') || text.includes('รูป')) && !text.includes('ไม่ต้อง') && !text.includes('ไม่เอา');
               
-              if ((count > 0 && !isLatest) || wantsImage) {
+              if ((count > 0 && !isLatest && !text.includes('ไม่ต้อง') && !text.includes('ไม่เอา')) || wantsImage) {
                 const prompt = `ภาพพื้นหลังสวยงามพรีเมียม แนวร้านอาหาร In The Haus มีข้อความ สรุปยอดโอน ${dateTitle} ยอด ${total.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท สีสันสดใส`;
                 const genResult = await generateImage(prompt);
                 
