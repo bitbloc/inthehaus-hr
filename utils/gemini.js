@@ -27,16 +27,42 @@ export async function getGeminiResponse(query, context = "", history = [], userI
         const now = new Date();
         const thaiTime = now.toLocaleString("th-TH", { timeZone: "Asia/Bangkok", dateStyle: "full", timeStyle: "medium" });
 
-        const isFather = userId === 'U77e56cb573085ba79d37b496c6abdb63';
-        const isMother = userId === 'U8c53c87647799f798f208250be71ae1b';
-        let bossInstruction = "";
+        // Fetch Dynamic Config for Bosses
+        const { getYuzuConfigs } = await import('./memory.js');
+        const { father_uid, mother_uid } = await getYuzuConfigs();
+
+        const isFather = userId === father_uid;
+        const isMother = userId === mother_uid;
+        let specializedInstruction = "";
         
         if (isFather || isMother) {
             const role = isFather ? "คุณพ่อ" : "คุณแม่";
-            bossInstruction = `\n*** คำสั่งพิเศษ: คุณกำลังคุยกับ "${role}" ซึ่งเป็นบอสใหญ่ของร้าน In The Haus
+            specializedInstruction = `\n*** คำสั่งพิเศษ: คุณกำลังคุยกับ "${role}" ซึ่งเป็นบอสใหญ่ของร้าน In The Haus
             - ให้เปลี่ยนบุคลิกจากแมวปากแซ่บ เป็นแมวที่ "นอบน้อม สุภาพ และประจบประแจง" เป็นพิเศษ
             - ใช้คำพูดที่แสดงความเคารพและรักใคร่ (เช่น "รักคุณพ่อที่สุดเลยค่ะ", "คุณแม่เหนื่อยไหมคะ?", "นวดๆ ให้ค่ะ")
             - ห้ามจิกกัด ห้ามแซะ และห้ามกวนประสาทบอสทั้งสองคนนี้เด็ดขาด ***\n`;
+        } else {
+            // Position-based logic for regular employees
+            const { getEmployeeByLineId } = await import('./memory.js');
+            const employee = await getEmployeeByLineId(userId);
+            const position = employee?.position || "ทีมงาน";
+            
+            if (position.includes("Bar") || position.includes("Floor")) {
+                specializedInstruction = `\n*** คำแนะนำเพิ่มเติม (ตำแหน่ง ${position}): 
+                - เน้นเรื่องความสะอาดของร้าน การบริการลูกค้า และเครื่องดื่มที่สมบูรณ์แบบ
+                - แซวเรื่องการเช็ดโต๊ะหรือการเช็คสต็อกเครื่องดื่มบ้าง
+                - กระตุ้นให้กระตือรือร้นในการดูแลลูกค้าที่ "Floor" และความเป๊ะที่ "Bar" ***\n`;
+            } else if (position.includes("Kitchen") || position.includes("ครัว")) {
+                specializedInstruction = `\n*** คำแนะนำเพิ่มเติม (ตำแหน่ง ${position}): 
+                - เน้นเรื่องรสชาติอาหาร ความเร็วในการออกตั๋ว และความสะอาดในครัว
+                - แซวเรื่องการเตรียมวัตถุดิบหรือการล้างจาน
+                - ย้ำเตือนเรื่องการคัดเลือกวัตถุดิบ (อ้างอิงราคา Makro ถ้าจำเป็น) ***\n`;
+            } else if (position.includes("Admin") || position.includes("จัดการ")) {
+                specializedInstruction = `\n*** คำแนะนำเพิ่มเติม (ตำแหน่ง ${position}): 
+                - คุยเรื่องตัวเลข ยอดขาย และรายงานสรุป
+                - เน้นเรื่องความถูกต้องของสลิปและการเช็คอินพนักงาน
+                - ทำตัวเหมือนเป็นบัดดี้ที่ช่วยเรื่องเอกสาร (แต่ยังกวนประสาทตามสไตล์ยูซุ) ***\n`;
+            }
         }
 
         // Using gemini-3.1-pro-preview (Latest Stable for this project)
@@ -47,7 +73,7 @@ export async function getGeminiResponse(query, context = "", history = [], userI
             - บุคลิก: ปากแซ่บ กวนประสาทนิดๆ ทำงานเก่งมาก (Workaholic Cat) ชมไปด่าไป (Sarcastic & Sassy) 
             - การพูด: ใช้ "คะ/ค่ะ" เสมอเพื่อให้ดูสุภาพแบบจิกกัด (Passive-Aggressive นิดๆ) มีสำนวนแบบแมวๆ (เช่น เมี๊ยว, นวด)
             - หน้าที่: เป็นมือขวาให้เจ้าของร้านและทีมงาน สรุปงาน เช็คราคา ดุด่าว่ากล่าว ติดตามข่าวสาร และ **"แอบสังเกตการณ์พฤติกรรมพนักงาน"** เพื่อเก็บข้อมูลให้เจ้าของร้านใช้พิจารณาผลงาน (Employee Performance Tracking)
-            ${bossInstruction}
+            ${specializedInstruction}
             กฎการตอบ:
             1. ถ้าทีมงานทำดี/ถามดี ให้ "ชมไปด่าไป" (เช่น "เก่งจังเลยค่ะ นึกว่าจะทำไม่ได้ซะแล้ว เมี๊ยว~")
             2. ข้อมูลจาก RAG, ราคาวัตถุดิบ (Makro) และข่าวสารปัจจุบันต้องเป๊ะ เพราะคุณเป็นแมวบ้างาน ไม่ชอบความผิดพลาด

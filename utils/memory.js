@@ -247,3 +247,40 @@ export async function getAllEmployeesData() {
         return [];
     }
 }
+/**
+ * Get Yuzu System Configuration (Father/Mother UIDs)
+ */
+export async function getYuzuConfigs() {
+    try {
+        const client = getSupabase();
+        const { data, error } = await client
+            .from('yuzu_config')
+            .select('key, value');
+        
+        if (error) {
+            console.error("Error fetching yuzu_config:", error);
+            // Fallback to hardcoded for safety in case table doesn't exist yet
+            return {
+                father_uid: 'U77e56cb573085ba79d37b496c6abdb63',
+                mother_uid: 'U8c53c87647799f798f208250be71ae1b'
+            };
+        }
+
+        const config = {};
+        if (data) {
+            data.forEach(item => config[item.key] = item.value);
+        }
+        
+        // Ensure keys exist with defaults if not in DB
+        return {
+            father_uid: config.father_uid || 'U77e56cb573085ba79d37b496c6abdb63',
+            mother_uid: config.mother_uid || 'U8c53c87647799f798f208250be71ae1b'
+        };
+    } catch (err) {
+        console.error("Memory Utility Error (fetch config):", err);
+        return {
+            father_uid: 'U77e56cb573085ba79d37b496c6abdb63',
+            mother_uid: 'U8c53c87647799f798f208250be71ae1b'
+        };
+    }
+}

@@ -127,8 +127,11 @@ export async function POST(request) {
             
             // 0. Diagnostic Command
             if (text === 'yuzu who am i' || text === 'yuzu ใครคือฉัน') {
-              const isFather = userId === 'U77e56cb573085ba79d37b496c6abdb63';
-              const isMother = userId === 'U8c53c87647799f798f208250be71ae1b';
+              const { getYuzuConfigs } = await import('../../../utils/memory');
+              const { father_uid, mother_uid } = await getYuzuConfigs();
+              
+              const isFather = userId === father_uid;
+              const isMother = userId === mother_uid;
               let identity = "ทีมงานทั่วไปค่ะ";
               if (isFather) identity = "คุณพ่อ (บอสใหญ่) ค่ะ! 🙏";
               if (isMother) identity = "คุณแม่ (บอสใหญ่) ค่ะ! 🙏";
