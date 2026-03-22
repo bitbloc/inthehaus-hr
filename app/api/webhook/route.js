@@ -179,21 +179,48 @@ export async function POST(request) {
             }
 
             // 2.1 Slip Summary & Export
-            if (text === 'สรุปยอดโอน' || text === 'สรุปยอดโอนวันนี้' || text === 'yuzu สรุปยอดโอน') {
+            const isSlipSummary = text.includes('สรุปยอดโอน') || text.includes('ยอดโอนล่าสุด');
+            if (isSlipSummary) {
               console.log("Yuzu: Slip Summary Requested");
               const { supabase } = await import('../../../lib/supabaseClient');
-              const { format, addHours } = await import('date-fns');
+              const { format, addHours, subDays } = await import('date-fns');
               
-              const START_OF_DAY_UTC = new Date();
-              START_OF_DAY_UTC.setHours(0, 0, 0, 0);
-              const dateStr = format(addHours(new Date(), 7), 'yyyy-MM-dd');
+              let targetDateStr = null;
+              let isLatest = false;
+              let dateTitle = "วันนี้";
               
-              // We'll filter by 'date' column for exact Thai Date match
-              const { data: slips, error } = await supabase
-                .from('slip_transactions')
-                .select('amount, user_id')
-                .eq('date', dateStr)
-                .eq('is_deleted', false);
+              const bkkNow = addHours(new Date(), 7);
+
+              if (text.includes('เมื่อวาน')) {
+                  targetDateStr = format(subDays(bkkNow, 1), 'yyyy-MM-dd');
+                  dateTitle = "เมื่อวานนี้";
+              } else if (text.includes('ล่าสุด')) {
+                  isLatest = true;
+                  dateTitle = "ล่าสุด";
+              } else {
+                  // Try to find DD/MM/YYYY or DD-MM-YYYY
+                  const dateRegex = /(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/;
+                  const match = text.match(dateRegex);
+                  if (match) {
+                      let [_, d, m, y] = match;
+                      if (y.length === 4 && parseInt(y) > 2500) y = (parseInt(y) - 543).toString(); // Convert Buddhist year to AD
+                      targetDateStr = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+                      dateTitle = `วันที่ ${d}/${m}/${y}`;
+                  } else {
+                      // Default to today
+                      targetDateStr = format(bkkNow, 'yyyy-MM-dd');
+                  }
+              }
+              
+              let dbQuery = supabase.from('slip_transactions').select('amount, user_id, timestamp').eq('is_deleted', false);
+              
+              if (isLatest) {
+                  dbQuery = dbQuery.order('timestamp', { ascending: false }).limit(1);
+              } else {
+                  dbQuery = dbQuery.eq('date', targetDateStr);
+              }
+
+              const { data: slips, error } = await dbQuery;
 
               if (error) {
                 await client.replyMessage(event.replyToken, { type: 'text', text: 'เมี๊ยว~ เกิดข้อผิดพลาดในการดึงยอดโอนค่ะ' });
@@ -205,14 +232,24 @@ export async function POST(request) {
               let count = slips.length;
               slips.forEach(s => total += Number(s.amount));
               
-              const todayStr = format(addHours(new Date(), 7), 'dd/MM/yyyy');
-              let replyText = `📊 สรุปยอดโอนประจำวันที่ ${todayStr}\n\n`;
-              replyText += `✅ จำนวนสลิป: ${count} รายการ\n`;
-              replyText += `💰 ยอดรวมทั้งหมด: ${total.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท\n\n`;
-              replyText += `(พิมพ์ "yuzu export slips" เพื่อดาวน์โหลด Excel ค่ะ)`;
+              let replyText = `📊 สรุปยอดโอน ${dateTitle}\n\n`;
+              if (isLatest) {
+                 if (count > 0) {
+                     replyText = `💸 ยอดโอนล่าสุด:\n\nจำนวนเงิน: ${Number(slips[0].amount).toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท\nเวลา: ${format(addHours(new Date(slips[0].timestamp), 7), 'HH:mm:ss น.')}`;
+                 } else {
+                     replyText = `เมี๊ยว~ ยังไม่มียอดโอนเลยค่ะ`;
+                 }
+              } else {
+                 replyText += `✅ จำนวนสลิป: ${count} รายการ\n`;
+                 replyText += `💰 ยอดรวมทั้งหมด: ${total.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท\n\n`;
+                 replyText += `(พิมพ์ "yuzu export slips" เพื่อดาวน์โหลด Excel ค่ะ)`;
+              }
 
-              if (count > 0) {
-                const prompt = `ภาพพื้นหลังสวยงามพรีเมียม แนวร้านอาหาร In The Haus มีข้อความ สรุปยอดโอน วันที่ ${todayStr} ยอด ${total.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท สีสันสดใส`;
+              // Image generation condition (if they explicitly asked for image OR it's a daily summary with > 0 items)
+              const wantsImage = text.includes('ภาพ') || text.includes('รูป');
+              
+              if ((count > 0 && !isLatest) || wantsImage) {
+                const prompt = `ภาพพื้นหลังสวยงามพรีเมียม แนวร้านอาหาร In The Haus มีข้อความ สรุปยอดโอน ${dateTitle} ยอด ${total.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท สีสันสดใส`;
                 const genResult = await generateImage(prompt);
                 
                 if (genResult.success && genResult.imageUrl) {
@@ -375,7 +412,14 @@ export async function POST(request) {
                  console.error("Slip Insert Error:", insertError);
                  await client.replyMessage(event.replyToken, { type: 'text', text: `เมี๊ยว~ บันทึกสลิปไม่สำเร็จค่ะ (Error: ${insertError.message || insertError.code || 'Unknown DB Error'})` });
               } else {
-                 await client.replyMessage(event.replyToken, { type: 'text', text: `บันทึกยอดโอน ${parsedAmount} บาท เรียบร้อยค่ะ เมี๊ยว~ 💸` });
+                 let senderName = "บุคคลภายนอก (ไม่มีในระบบ)";
+                 if (allEmployees) {
+                    const empNameData = allEmployees.find(e => e.line_bot_id === userId || e.line_user_id === userId);
+                    if (empNameData && empNameData.name) {
+                        senderName = empNameData.nickname || empNameData.name;
+                    }
+                 }
+                 await client.replyMessage(event.replyToken, { type: 'text', text: `บันทึกยอดโอน ${parsedAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท เรียบร้อยค่ะ เมี๊ยว~ 💸\nผู้ส่งสลิป: ${senderName}` });
               }
               handledLocally = true;
             } 
