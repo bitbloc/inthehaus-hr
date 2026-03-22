@@ -279,8 +279,8 @@ export async function POST(request) {
 
             if (text === 'yuzu export slips' || text === 'export slips') {
                const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://inthehaus-hr.vercel.app';
-               const rawUrl = `${baseUrl}/api/export-slips`;
-               await client.replyMessage(event.replyToken, { type: 'text', text: `📥 ดาวน์โหลดไฟล์สรุปยอดโอน (CSV) ได้ที่ลิงก์นี้เลยค่ะ เมี๊ยว~\n${rawUrl}` });
+               const rawUrl = `${baseUrl}/admin/yuzu/slips/report`;
+               await client.replyMessage(event.replyToken, { type: 'text', text: `📥 ดาวน์โหลดรายงานสรุปยอดโอนแบบ PDF สวยๆ ได้ที่ลิงก์นี้เลยค่ะ เมี๊ยว~\n${rawUrl}` });
                handledLocally = true;
                continue;
             }
@@ -428,12 +428,18 @@ export async function POST(request) {
                 group_id: groupId,
                 user_id: mappedDbUserId,
                 amount: parsedAmount,
-                slip_url: slipUrl
+                slip_url: slipUrl,
+                transaction_ref: result.transactionRef || undefined,
+                sender_name: result.senderName || undefined
               });
 
               if (insertError) {
                  console.error("Slip Insert Error:", insertError);
-                 await client.replyMessage(event.replyToken, { type: 'text', text: `เมี๊ยว~ บันทึกสลิปไม่สำเร็จค่ะ (Error: ${insertError.message || insertError.code || 'Unknown DB Error'})` });
+                 if (insertError.code === '23505') {
+                     await client.replyMessage(event.replyToken, { type: 'text', text: `เมี๊ยว~ สลิปใบนี้ (อ้างอิง: ${result.transactionRef || 'ไม่ทราบ'}) ถูกบันทึกเข้าระบบไปแล้วนะคะ ห้ามส่งซ้ำและห้ามโกงค่ะ! 😾` });
+                 } else {
+                     await client.replyMessage(event.replyToken, { type: 'text', text: `เมี๊ยว~ บันทึกสลิปไม่สำเร็จค่ะ (Error: ${insertError.message || insertError.code || 'Unknown DB Error'})` });
+                 }
               } else {
                  let senderName = "บุคคลภายนอก (ไม่มีในระบบ)";
                  if (allEmployees) {
