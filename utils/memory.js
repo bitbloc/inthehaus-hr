@@ -215,3 +215,25 @@ export async function getEmployeeByLineId(lineUserId) {
         return null;
     }
 }
+
+/**
+ * Get all active employees (for mapping UIDs in chat context)
+ */
+export async function getAllEmployeesData() {
+    try {
+        const client = getSupabase();
+        const { data, error } = await client
+            .from('employees')
+            .select('line_user_id, name, nickname, position, is_active')
+            .eq('is_active', true);
+
+        if (error) {
+            console.error("Error fetching all employees:", error);
+            return [];
+        }
+        return data || [];
+    } catch (err) {
+        console.error("Memory Utility Error (fetch all employees):", err);
+        return [];
+    }
+}

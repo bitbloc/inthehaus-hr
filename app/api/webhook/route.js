@@ -3,7 +3,7 @@ import { Client } from '@line/bot-sdk';
 import { getSchemaWeather, formatWeatherMessage } from '../../../utils/weather';
 import { getGeminiResponse, classifyAndAnalyzeImage, getDailySummary, generateImage } from '../../../utils/gemini';
 import { getGoldPrice, getOilPrice, getElectricityPrice, getIngredientPrices } from '../../../utils/price';
-import { saveMessage, getChatHistory, getDailyContent, cleanupOldHistory, getEmployeeHistory, getEmployeeByLineId } from '../../../utils/memory';
+import { saveMessage, getChatHistory, getDailyContent, cleanupOldHistory, getEmployeeHistory, getEmployeeByLineId, getAllEmployeesData } from '../../../utils/memory';
 import { getAccurateNews } from '../../../utils/news';
 
 const client = new Client({
@@ -202,6 +202,17 @@ export async function POST(request) {
               context += `สถานะพนักงาน: ${employee.employment_status || 'Fulltime'}\n`;
             } else {
               context += `(ไม่พบข้อมูลพนักงานในระบบสำหรับ LINE ID นี้: ${userId})\n`;
+            }
+
+            // Provide all UIDs mapping so Yuzu knows who is who if asked
+            const allEmployees = await getAllEmployeesData();
+            if (allEmployees && allEmployees.length > 0) {
+              context += `\nรายชื่อพนักงานทั้งหมดในระบบตอนนี้ (ทำ mapping UID -> ชื่อ ให้ตรวจสอบ):\n`;
+              allEmployees.forEach(emp => {
+                const empName = emp.nickname || emp.name;
+                context += `- UID: ${emp.line_user_id} | ชื่อ: ${empName} | ตำแหน่ง: ${emp.position}\n`;
+              });
+              context += `(จบรายชื่อพนักงาน)\n`;
             }
 
             const dailyLogs = await getDailyContent(groupId);
