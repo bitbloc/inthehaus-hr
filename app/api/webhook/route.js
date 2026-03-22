@@ -270,7 +270,9 @@ export async function POST(request) {
               context += `\nรายชื่อพนักงานทั้งหมดในระบบตอนนี้ (ทำ mapping UID -> ชื่อ ให้ตรวจสอบ):\n`;
               allEmployees.forEach(emp => {
                 const empName = emp.nickname || emp.name;
-                context += `- UID: ${emp.line_user_id} | ชื่อ: ${empName} | ตำแหน่ง: ${emp.position}\n`;
+                const uid1 = emp.line_user_id || 'ไม่มี';
+                const uid2 = emp.line_bot_id || 'ไม่มี';
+                context += `- Bot UID: ${uid2} | LIFF UID: ${uid1} | ชื่อ: ${empName} | ตำแหน่ง: ${emp.position}\n`;
               });
               context += `(จบรายชื่อพนักงาน)\n`;
             }
@@ -371,7 +373,7 @@ export async function POST(request) {
 
               if (insertError) {
                  console.error("Slip Insert Error:", insertError);
-                 await client.replyMessage(event.replyToken, { type: 'text', text: "เมี๊ยว~ ระบบขัดข้อง บันทึกสลิปไม่สำเร็จค่ะ" });
+                 await client.replyMessage(event.replyToken, { type: 'text', text: `เมี๊ยว~ บันทึกสลิปไม่สำเร็จค่ะ (Error: ${insertError.message || insertError.code || 'Unknown DB Error'})` });
               } else {
                  await client.replyMessage(event.replyToken, { type: 'text', text: `บันทึกยอดโอน ${parsedAmount} บาท เรียบร้อยค่ะ เมี๊ยว~ 💸` });
               }
