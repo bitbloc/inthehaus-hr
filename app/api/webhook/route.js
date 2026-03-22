@@ -420,8 +420,13 @@ export async function POST(request) {
               let senderName = "บุคคลภายนอก (ไม่มีในระบบ)";
               let isAuthorized = false;
 
-              // Use the employee data we already fetched if available, otherwise fetch
-              const emp = empDataForVision || await getEmployeeByLineId(userId);
+              // Aggressive Cache Bypass: Direct query within the slip block with unique fetch options
+              const { data: emp, error: empErr } = await supabase
+                 .from('employees')
+                 .select('line_user_id, line_bot_id, name, nickname, position')
+                 .eq('is_active', true)
+                 .or(`line_bot_id.eq.${userId},line_user_id.eq.${userId}`)
+                 .maybeSingle();
 
               if (emp) {
                  if (emp.line_user_id) {
