@@ -279,9 +279,22 @@ export async function POST(request) {
             if (text.includes('รายงานพนักงาน') || text.includes('ประเมินผล')) {
               console.log("Yuzu: Employee Report Requested");
               const dailyLogs = await getDailyContent(groupId);
+              const allEmployees = await getAllEmployeesData();
+              
+              let contextContent = `\nรายชื่อพนักงานทั้งหมดในระบบตอนนี้ (ทำ mapping UID -> ชื่อ ให้ตรวจสอบ):\n`;
+              if (allEmployees && allEmployees.length > 0) {
+                 allEmployees.forEach(emp => {
+                   const empName = emp.nickname || emp.name;
+                   const uid1 = emp.line_user_id || 'ไม่มี';
+                   const uid2 = emp.line_bot_id || 'ไม่มี';
+                   contextContent += `- Bot UID: ${uid2} | LIFF UID: ${uid1} | ชื่อ: ${empName} | ตำแหน่ง: ${emp.position}\n`;
+                 });
+                 contextContent += `(จบรายชื่อพนักงาน)\n\n`;
+              }
+              
               // For now, we use dailyLogs as context, but Gemini is instructed to look for performance
-              const reportPrompt = `ช่วยสรุปรายงานพฤติกรรมและการทำงานของพนักงานจากข้อมูลที่มีหน่อยค่ะ โดยเน้นวิเคราะห์จุดแข็ง จุดอ่อน และสิ่งที่ควรปรับปรุงของแต่ละคน:\n\n${dailyLogs}`;
-              const report = await getGeminiResponse(reportPrompt, "คุณกำลังทำรายงานประเมินผลพนักงานให้เจ้าของร้าน โปรดวิเคราะห์อย่างละเอียดและเป็นกลาง (แต่ยังคงสไตล์ยูซุ)", [], userId);
+              const reportPrompt = `ช่วยสรุปรายงานพฤติกรรมและการทำงานของพนักงานจากข้อมูลที่มีหน่อยค่ะ ยึดตามรายชื่อพนักงานที่มีในระบบต่อไปนี้:\n${contextContent}\nและนี่คือประวัติการแชท/ทำงานของวันนี้:\n${dailyLogs || "(วันนี้ยังไม่มีประวัติการแชทให้วิเคราะห์)"}\n\nโปรดเน้นวิเคราะห์แต่ละคนตามรายชื่อที่มี และรายงานความพร้อมให้เจ้านายฟัง (ถ้าประวัติแชทว่างก็บอกสถานะของรายชื่อบุคคลไปก่อน)`;
+              const report = await getGeminiResponse(reportPrompt, "คุณกำลังทำรายงานประเมินผลพนักงานให้เจ้าของร้าน โปรดวิเคราะห์อย่างละเอียดและเป็นกลาง (แต่ยังคงสไตล์ยูซุปากแซ่บ)", [], userId);
               await client.replyMessage(event.replyToken, { type: 'text', text: report });
               handledLocally = true;
               continue;
