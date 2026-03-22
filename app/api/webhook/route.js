@@ -3,7 +3,7 @@ import { Client } from '@line/bot-sdk';
 import { getSchemaWeather, formatWeatherMessage } from '../../../utils/weather';
 import { getGeminiResponse, classifyAndAnalyzeImage, getDailySummary, generateImage } from '../../../utils/gemini';
 import { getGoldPrice, getOilPrice, getElectricityPrice, getIngredientPrices } from '../../../utils/price';
-import { saveMessage, getChatHistory, getDailyContent, cleanupOldHistory, getEmployeeHistory, getEmployeeByLineId, getAllEmployeesData } from '../../../utils/memory';
+import { saveMessage, getChatHistory, getDailyContent, cleanupOldHistory, getEmployeeHistory, getEmployeeByLineId, getAllEmployeesData, getYuzuConfigs } from '../../../utils/memory';
 import { getAccurateNews } from '../../../utils/news';
 
 const client = new Client({
@@ -384,10 +384,30 @@ export async function POST(request) {
             const buffer = Buffer.concat(chunks);
             const base64 = buffer.toString('base64');
 
+            const configs = await getYuzuConfigs();
+            const { father_uid, mother_uid } = configs;
+            const isBoss = userId === father_uid || userId === mother_uid;
+
+            let positionInstruction = "";
+            let empDataForVision = null;
+
+            if (!isBoss) {
+              empDataForVision = await getEmployeeByLineId(userId);
+              const position = empDataForVision?.position || "ทีมงาน";
+              
+              if (position.includes("Bar") || position.includes("Floor")) {
+                positionInstruction = configs['role_instruction_Bar&Floor'];
+              } else if (position.includes("Kitchen") || position.includes("ครัว") || position.includes("Cooking")) {
+                positionInstruction = configs['role_instruction_Kitchen'];
+              } else if (position.includes("Admin") || position.includes("จัดการ") || position.includes("Owner")) {
+                positionInstruction = configs['role_instruction_Admin'];
+              }
+            }
+
             const context = await getIngredientPrices();
 
-            // Refined Vision Logic
-            const result = await classifyAndAnalyzeImage(base64, "image/jpeg", context);
+            // Refined Vision Logic with Role Context
+            const result = await classifyAndAnalyzeImage(base64, "image/jpeg", context, isBoss, positionInstruction);
 
             // Always save image description for summary (Retention 2 days handled in cleanup)
             await saveMessage(groupId, userId, 'user', result.shortDescription, 'image_description');
@@ -400,13 +420,8 @@ export async function POST(request) {
               let senderName = "บุคคลภายนอก (ไม่มีในระบบ)";
               let isAuthorized = false;
 
-              // Direct DB query to prevent Next.js caching issues
-              const { data: emp, error: empErr } = await supabase
-                 .from('employees')
-                 .select('line_user_id, line_bot_id, name, nickname, position')
-                 .eq('is_active', true)
-                 .or(`line_bot_id.eq.${userId},line_user_id.eq.${userId}`)
-                 .maybeSingle();
+              // Use the employee data we already fetched if available, otherwise fetch
+              const emp = empDataForVision || await getEmployeeByLineId(userId);
 
               if (emp) {
                  if (emp.line_user_id) {

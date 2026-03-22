@@ -114,18 +114,22 @@ export async function getGeminiResponse(query, context = "", history = [], userI
 /**
  * Handle Vision requests (Classify and Analyze)
  */
-export async function classifyAndAnalyzeImage(imageBase64, mimeType = "image/jpeg", context = "") {
+export async function classifyAndAnalyzeImage(imageBase64, mimeType = "image/jpeg", context = "", isBoss = false, positionInstruction = "") {
     try {
         const instance = getGenAI();
         if (!instance) return { isFood: false, analysis: "AI Instance error", shortDescription: "" };
         
         const model = instance.getGenerativeModel({ model: "gemini-3.1-pro-preview" });
         
+        const catInstruction = isBoss 
+            ? "พากย์ความรู้สึกแมวในรูป: ต้องนอบน้อม สุภาพ ประจบประแจง เหมือนแมวที่รักและเคารพเจ้าของมากที่สุดในโลก (เช่น รักคุณพ่อที่สุด, คุณแม่สวยจังเลยค่ะ, นวดๆ ให้ค่ะบอส)"
+            : `พากย์ความรู้สึกแมวในรูป: ต้องปากแซ่บ กวนประสาท จิกกัดคนถ่ายตามหน้าที่ความรับผิดชอบของเขา: ${positionInstruction || 'จิกกัดทั่วไปแบบแมวปากร้าย'}`;
+
         const systemPrompt = `คุณคือระบบวิเคราะห์รูปภาพของ Yuzu Bot ทีมงาน In The Haus
         1. ตรวจสอบว่ารูปนี้คือ "รูปถ่ายสลิปโอนเงินธนาคาร", "รูปถ่ายอาหาร", "วัตถุดิบ", "ใบเสร็จซื้อของ" หรือ "รูปถ่ายแมว" หรือไม่
         2. หากเป็น สลิปโอนเงินธนาคาร (Bank Transfer Slip): ให้ตอบ JSON {"isSlip": true, "amount": ตัวเลขยอดเงินที่โอน(ห้ามใส่คอมม่า), "transactionRef": "เลขอ้างอิงรายการ หรือ รหัสอ้างอิง บนสลิป (สำคัญมาก ห้ามพลาด)", "senderName": "ชื่อผู้โอน", "shortDescription": "สลิปโอนเงิน", "shouldReply": true}
         3. หากเป็นรูปถ่ายอาหาร/วัตถุดิบ/ใบเสร็จ: ให้ตอบ JSON {"isFood": true, "isReceipt": true/false (ถ้าเป็นใบเสร็จ), "menuName": "ชื่อเมนูหรือรายการหลัก", "itemsList": ["รายการ 1", "รายการ 2"], "costAnalysis": "รายละเอียดต้นทุนอ้างอิง Makro", "shortDescription": "คำอธิบายรูปสั้นๆ", "shouldReply": true}
-        4. หากเป็นรูปถ่ายแมว: ให้ตอบ JSON {"isCat": true, "catFeelings": "พากย์ความรู้สึกแมวในรูป: ต้องปากแซ่บ กวนประสาท จิกกัดคนถ่ายหน่อยๆ แต่ยังน่ารัก", "shortDescription": "บรรยายแมว", "shouldReply": true}
+        4. หากเป็นรูปถ่ายแมว: ให้ตอบ JSON {"isCat": true, "catFeelings": "${catInstruction}", "shortDescription": "บรรยายแมว", "shouldReply": true}
         5. อื่นๆ: {"isFood": false, "shouldReply": false}
         ตอบเป็น JSON เท่านั้น`;
 
