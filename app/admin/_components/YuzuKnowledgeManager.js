@@ -19,7 +19,7 @@ export default function YuzuKnowledgeManager() {
     const [searchTerm, setSearchTerm] = useState('');
     
     // Date filter for slips
-    const [selectedDate, setSelectedDate] = useState(format(addHours(new Date(), 7), 'yyyy-MM-dd'));
+    const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
 
     useEffect(() => {
         fetchData();
