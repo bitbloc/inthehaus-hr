@@ -17,8 +17,8 @@ function SlipPDFReportContent() {
 
     useEffect(() => {
         const fetchData = async () => {
-            // Fetch employees for mapping
-            const { data: empData } = await supabase.from('employees').select('id, name, nickname');
+            // Fetch employees for mapping (include both IDs)
+            const { data: empData } = await supabase.from('employees').select('id, name, nickname, line_bot_id, line_user_id');
             if (empData) setEmployees(empData);
 
             // Fetch slips for specific date
@@ -43,7 +43,11 @@ function SlipPDFReportContent() {
             (slip.user_id && e.line_bot_id && e.line_bot_id.toLowerCase() === String(slip.user_id).toLowerCase()) ||
             (slip.user_id && e.line_user_id && e.line_user_id.toLowerCase() === String(slip.user_id).toLowerCase())
         );
-        const staffName = emp ? (emp.nickname || emp.name) : (slip.user_id ? `Staff ID: ${slip.user_id}` : "ไม่ระบุพนักงาน");
+        
+        // Truncate long IDs for cleaner PDF
+        const formatId = (id) => id ? (id.length > 8 ? `${id.substring(0, 4)}...${id.substring(id.length - 4)}` : id) : "";
+        
+        const staffName = emp ? (emp.nickname || emp.name) : (slip.user_id ? `Staff: ${formatId(slip.user_id)}` : "ไม่ระบุพนักงาน");
         const sender = slip.sender_name || "ไม่ทราบชื่อผู้โอน";
         return { staffName, sender };
     };
@@ -65,14 +69,14 @@ function SlipPDFReportContent() {
             </div>
 
             {/* Hero Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-16">
                 <div className="border-l-8 border-black pl-6 py-2">
                     <p className="text-[10px] font-bold tracking-[0.4em] uppercase opacity-40 mb-2">Total Net Transfer</p>
-                    <p className="text-7xl font-black tracking-tighter">฿{totalAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</p>
+                    <p className="text-5xl font-black tracking-tighter">฿{totalAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</p>
                 </div>
                 <div className="border-l-8 border-black pl-6 py-2">
                     <p className="text-[10px] font-bold tracking-[0.4em] uppercase opacity-40 mb-2">Total Transactions</p>
-                    <p className="text-7xl font-black tracking-tighter">{slips.length}</p>
+                    <p className="text-5xl font-black tracking-tighter">{slips.length}</p>
                 </div>
             </div>
 
@@ -82,8 +86,8 @@ function SlipPDFReportContent() {
                     <div className="col-span-1">Time</div>
                     <div className="col-span-3">Sender (Customer)</div>
                     <div className="col-span-2">Staff (Uploader)</div>
-                    <div className="col-span-2">Bank</div>
-                    <div className="col-span-2">Ref</div>
+                    <div className="col-span-1">Bank</div>
+                    <div className="col-span-3">Ref Code</div>
                     <div className="col-span-2 text-right">Amount</div>
                 </div>
 
@@ -97,16 +101,16 @@ function SlipPDFReportContent() {
                             <div className="col-span-3">
                                 <p className="text-sm font-black tracking-tight">{sender}</p>
                             </div>
-                            <div className="col-span-2">
-                                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{staffName}</p>
+                             <div className="col-span-2">
+                                <p className="text-[9px] font-bold uppercase tracking-tight text-slate-500 whitespace-nowrap overflow-hidden text-ellipsis">{staffName}</p>
                             </div>
-                            <div className="col-span-2">
-                                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{slip.bank_name || "-"}</p>
+                            <div className="col-span-1">
+                                <p className="text-[9px] font-bold uppercase tracking-tight text-slate-400">{slip.bank_name || "-"}</p>
                             </div>
-                            <div className="col-span-2 font-mono text-[10px] text-slate-300 break-all">
+                            <div className="col-span-3 font-mono text-[8px] text-slate-300 break-all leading-tight">
                                 {slip.transaction_ref || "-"}
                             </div>
-                            <div className="col-span-2 text-right text-lg font-black tracking-tighter">
+                            <div className="col-span-2 text-right text-base font-black tracking-tight">
                                 {Number(slip.amount).toLocaleString('th-TH', { minimumFractionDigits: 2 })}
                             </div>
                         </div>
