@@ -30,14 +30,20 @@ export async function POST(request) {
           const isYuzuMentioned = /yuzu|ยูซุ/i.test(query);
           
           if (isYuzuMentioned) {
-            const history = await getChatHistory(groupId, 10);
-            const response = await getGeminiResponse(query, "", history, userId);
+            try {
+              const history = await getChatHistory(groupId, 10);
+              const response = await getGeminiResponse(query, "", history, userId);
 
-            await saveMessage(groupId, userId, 'user', query, 'text');
-            await saveMessage(groupId, null, 'model', response, 'text');
+              await saveMessage(groupId, userId, 'user', query, 'text');
+              await saveMessage(groupId, null, 'model', response, 'text');
 
-            await client.replyMessage(event.replyToken, { type: 'text', text: response });
-            handledLocally = true;
+              await client.replyMessage(event.replyToken, { type: 'text', text: response });
+              handledLocally = true;
+            } catch (textError) {
+              console.error("Text Processing Error:", textError);
+              await client.replyMessage(event.replyToken, { type: 'text', text: `เมี๊ยว~ ยูซุประมวลผลข้อความไม่สำเร็จค่ะ (${textError.message}) 😿` });
+              handledLocally = true;
+            }
           } else {
             await saveMessage(groupId, userId, 'user', rawText, 'text');
           }
