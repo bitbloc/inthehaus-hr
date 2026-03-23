@@ -1,50 +1,72 @@
-"use client";
-
 import { useState, useEffect } from "react";
 import { supabase } from "../../../lib/supabaseClient";
 import { Card } from "./ui/Card";
 import { Badge } from "./ui/Badge";
 import { Icons } from "./ui/HausIcon";
+import { format, addHours } from "date-fns";
 
 export default function YuzuKnowledgeManager() {
-    const [activeTab, setActiveTab] = useState('knowledge'); // 'knowledge', 'config', 'employees'
+    const [activeTab, setActiveTab] = useState('knowledge'); // 'knowledge', 'config', 'employees', 'slips'
     const [knowledge, setKnowledge] = useState([]);
     const [employees, setEmployees] = useState([]);
+    const [slips, setSlips] = useState([]);
     const [config, setConfig] = useState({ father_uid: '', mother_uid: '' });
     
     const [newContent, setNewContent] = useState('');
     const [loading, setLoading] = useState(false);
+    const [slipLoading, setSlipLoading] = useState(false);
     const [message, setMessage] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
+    
+    // Date filter for slips
+    const [selectedDate, setSelectedDate] = useState(format(addHours(new Date(), 7), 'yyyy-MM-dd'));
 
     useEffect(() => {
         fetchData();
-    }, [activeTab]);
+    }, [activeTab, selectedDate]);
 
     async function fetchData() {
-        setLoading(true);
         if (activeTab === 'knowledge') {
+            setLoading(true);
             const { data, error } = await supabase
                 .from('yuzu_knowledge')
                 .select('*')
                 .order('created_at', { ascending: false });
             if (!error) setKnowledge(data);
+            setLoading(false);
         } else if (activeTab === 'config') {
+            setLoading(true);
             const { data, error } = await supabase.from('yuzu_config').select('*');
             if (!error && data) {
                 const cfg = {};
                 data.forEach(item => cfg[item.key] = item.value);
                 setConfig(prev => ({ ...prev, ...cfg }));
             }
+            setLoading(false);
         } else if (activeTab === 'employees') {
+            setLoading(true);
             const { data, error } = await supabase
                 .from('employees')
                 .select('id, name, nickname, position, line_bot_id, line_user_id, is_active')
                 .eq('is_active', true)
                 .order('name', { ascending: true });
             if (!error) setEmployees(data);
+            setLoading(false);
+        } else if (activeTab === 'slips') {
+            setSlipLoading(true);
+            // DIRECT QUERY WITH GMT+7 DATE FILTER
+            const { data, error } = await supabase
+                .from('slip_transactions')
+                .select('id, amount, slip_url, timestamp, is_deleted, sender_name, employees(name, nickname)')
+                .eq('is_deleted', false)
+                .eq('date', selectedDate)
+                .order('timestamp', { ascending: false });
+            
+            if (!error && data) {
+                setSlips(data);
+            }
+            setSlipLoading(false);
         }
-        setLoading(false);
     }
 
     async function handleAddKnowledge() {
@@ -75,6 +97,15 @@ export default function YuzuKnowledgeManager() {
     async function handleDeleteKnowledge(id) {
         if (!confirm('ยืนยันการลบความรู้นี้?')) return;
         const { error } = await supabase.from('yuzu_knowledge').delete().eq('id', id);
+        if (!error) fetchData();
+    }
+
+    async function handleDeleteSlip(id) {
+        if (!confirm('ยืนยันการลบรายการสลิปนี้?')) return;
+        const { error } = await supabase
+            .from('slip_transactions')
+            .update({ is_deleted: true })
+            .eq('id', id);
         if (!error) fetchData();
     }
 
@@ -117,20 +148,21 @@ export default function YuzuKnowledgeManager() {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
                 <div>
                     <h2 className="text-2xl font-bold text-slate-800">Yuzu AI Management</h2>
-                    <p className="text-slate-500 text-sm">จัดการฐานความรู้ สิทธิ์บอส และบุคลิกรายตำแหน่ง</p>
+                    <p className="text-slate-500 text-sm">จัดการฐานความรู้ สิทธิ์บอส และยอดโอนเงิน</p>
                 </div>
                 
                 {/* Internal Tabs */}
-                <div className="bg-slate-100 p-1 rounded-xl flex gap-1 self-start">
+                <div className="bg-slate-100 p-1 rounded-xl flex gap-1 self-start overflow-x-auto no-scrollbar">
                     {[
                         { id: 'knowledge', label: 'Knowledge', icon: Icons.File },
                         { id: 'config', label: 'System Config', icon: Icons.Settings },
-                        { id: 'employees', label: 'Staff Roles', icon: Icons.Staff }
+                        { id: 'employees', label: 'Staff Roles', icon: Icons.Staff },
+                        { id: 'slips', label: 'Transfer Slips', icon: Icons.Money }
                     ].map(tab => (
                         <button
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id)}
-                            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
+                            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
                                 activeTab === tab.id 
                                 ? 'bg-white text-orange-600 shadow-sm' 
                                 : 'text-slate-500 hover:text-slate-700'
@@ -146,7 +178,7 @@ export default function YuzuKnowledgeManager() {
             {/* TAB: KNOWLEDGE */}
             {activeTab === 'knowledge' && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <Card className="lg:col-span-1 space-y-4 h-fit sticky top-24">
+                    <Card className="lg:col-span-1 space-y-4 h-fit lg:sticky lg:top-24">
                         <h3 className="font-bold text-slate-700 flex items-center gap-2">
                             <Icons.Yuzu size={18} className="text-orange-500" />
                             Add New Fact
@@ -347,6 +379,95 @@ export default function YuzuKnowledgeManager() {
                 </div>
             )}
 
+            {/* TAB: SLIPS */}
+            {activeTab === 'slips' && (
+                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        <div className="flex items-center gap-4 bg-white p-2 px-4 rounded-2xl shadow-sm border border-slate-100 w-fit">
+                            <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">เลือกวันที่:</span>
+                            <input 
+                                type="date" 
+                                value={selectedDate}
+                                onChange={(e) => setSelectedDate(e.target.value)}
+                                className="bg-transparent font-bold text-slate-800 outline-none text-sm cursor-pointer"
+                            />
+                        </div>
+                        
+                        <a 
+                            href={`/admin/yuzu/slips/report?date=${selectedDate}`} 
+                            target="_blank"
+                            className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold text-[10px] tracking-[0.2em] uppercase shadow-xl hover:bg-black transition-all flex items-center gap-2"
+                        >
+                            <Icons.File size={14} /> PDF REPORT
+                        </a>
+                    </div>
+
+                    <Card className="p-0 overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm text-left">
+                                <thead className="bg-slate-50 text-slate-400 font-bold text-[10px] uppercase tracking-wider">
+                                    <tr>
+                                        <th className="px-6 py-4">Time</th>
+                                        <th className="px-6 py-4">Sender</th>
+                                        <th className="px-6 py-4">Amount (THB)</th>
+                                        <th className="px-6 py-4">Proof</th>
+                                        <th className="px-6 py-4 text-center">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-50">
+                                    {slipLoading ? (
+                                        <tr>
+                                            <td colSpan="5" className="p-12 text-center text-slate-400 italic">กำลังดึงข้อมูลสลิป...</td>
+                                        </tr>
+                                    ) : slips.length === 0 ? (
+                                        <tr>
+                                            <td colSpan="5" className="p-20 text-center">
+                                                <p className="text-slate-300 font-bold uppercase tracking-widest mb-1">No Transactions</p>
+                                                <p className="text-slate-400 text-[10px]">ไม่พบข้อมูลสลิปในวันที่เลือก</p>
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        slips.map((slip) => (
+                                            <tr key={slip.id} className="hover:bg-slate-50 transition-colors group">
+                                                <td className="px-6 py-4">
+                                                    <div className="font-bold text-slate-700">{format(new Date(slip.timestamp), 'HH:mm:ss')}</div>
+                                                    <div className="text-[10px] text-slate-400 uppercase font-mono">{format(new Date(slip.timestamp), 'dd MMM yyyy')}</div>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="font-medium text-slate-600">
+                                                        {slip.employees?.nickname || slip.employees?.name || slip.sender_name || 'External'}
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span className="text-lg font-black tracking-tight text-slate-900">
+                                                        {Number(slip.amount).toLocaleString('th-TH', {minimumFractionDigits: 2})}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    {slip.slip_url ? (
+                                                        <a href={slip.slip_url} target="_blank" rel="noreferrer" className="text-[10px] font-bold uppercase tracking-widest py-2 px-4 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-900 hover:text-white transition-all">
+                                                            View Slip
+                                                        </a>
+                                                    ) : <span className="text-slate-300">-</span>}
+                                                </td>
+                                                <td className="px-6 py-4 text-center">
+                                                    <button 
+                                                        onClick={() => handleDeleteSlip(slip.id)}
+                                                        className="p-2 text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 rounded-full hover:bg-rose-50 transition-all"
+                                                    >
+                                                        <Icons.Trash size={14} />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </Card>
+                </div>
+            )}
+
             {message && !loading && (
                  <div className="fixed bottom-8 right-8 z-[100] bg-slate-900 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-right-10 duration-300">
                     <span className="w-2 h-2 rounded-full bg-orange-500 animate-ping" />
@@ -366,3 +487,14 @@ if (!Icons.Plus) {
         </svg>
     );
 }
+
+// Minimal Money icon for the slips
+if (!Icons.Money) {
+    Icons.Money = ({ size }) => (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="12" y1="1" x2="12" y2="23"></line>
+            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+        </svg>
+    );
+}
+
