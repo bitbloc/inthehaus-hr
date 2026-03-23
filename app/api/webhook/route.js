@@ -327,17 +327,18 @@ export async function POST(request) {
               context += `(ไม่พบข้อมูลพนักงานในระบบสำหรับ LINE ID นี้: ${userId})\n`;
             }
 
-            // Provide all UIDs mapping so Yuzu knows who is who if asked
             const allEmployees = await getAllEmployeesData();
             if (allEmployees && allEmployees.length > 0) {
-              context += `\nรายชื่อพนักงานทั้งหมดในระบบตอนนี้ (ทำ mapping UID -> ชื่อ ให้ตรวจสอบ):\n`;
+              context += `\n[ฐานข้อมูลพนักงานร้าน In The Haus ณ ปัจจุบัน - คุณต้องจำและใช้ชื่อจริง/ชื่อเล่นเหล่านี้เท่านั้น]:\n`;
               allEmployees.forEach(emp => {
-                const empName = emp.nickname || emp.name;
-                const uid1 = emp.line_user_id || 'ไม่มี';
-                const uid2 = emp.line_bot_id || 'ไม่มี';
-                context += `- Bot UID: ${uid2} | LIFF UID: ${uid1} | ชื่อ: ${empName} | ตำแหน่ง: ${emp.position}\n`;
+                const displayName = emp.nickname || emp.name;
+                const altName = emp.nickname ? emp.name : '';
+                const position = emp.position || '-';
+                const lineId = emp.line_bot_id || emp.line_user_id || 'ไม่มี';
+                
+                context += `- พนักงาน: ${displayName}${altName ? ` (ชื่อจริง: ${altName})` : ''} | ตำแหน่ง: ${position} | LINE UID: ${lineId}\n`;
               });
-              context += `(จบรายชื่อพนักงาน)\n`;
+              context += `[จบรายงานพนักงาน]\n`;
             }
 
             const dailyLogs = await getDailyContent(groupId);
