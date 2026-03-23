@@ -5,12 +5,12 @@ import { saveMessage, getChatHistory, getYuzuConfigs, getEmployeeByLineId } from
 import { getIngredientPrices } from '../../../utils/price';
 import { format, addHours } from 'date-fns';
 
-const client = new Client({
-  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
-  channelSecret: process.env.LINE_CHANNEL_SECRET,
-});
-
 export async function POST(request) {
+  const client = new Client({
+    channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
+    channelSecret: process.env.LINE_CHANNEL_SECRET,
+  });
+
   try {
     const body = await request.json();
     const events = body.events;
