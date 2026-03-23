@@ -1,7 +1,8 @@
 import { Client } from '@line/bot-sdk';
 import { NextResponse } from 'next/server';
 import { getGeminiResponse, classifyAndAnalyzeImage } from '../../../utils/gemini';
-import { saveMessage, getChatHistory, getYuzuConfigs, getEmployeeByLineId, getIngredientPrices } from '../../../utils/memory';
+import { saveMessage, getChatHistory, getYuzuConfigs, getEmployeeByLineId } from '../../../utils/memory';
+import { getIngredientPrices } from '../../../utils/price';
 import { format, addHours } from 'date-fns';
 
 const client = new Client({
