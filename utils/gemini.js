@@ -99,7 +99,7 @@ export async function getGeminiResponse(query, context = "", history = [], userI
         });
 
         const chat = model.startChat({ history: history });
-        const finalPrompt = context ? `Context: ${context}\n${ragContext}\nQuery: ${query}` : `${ragContext}\nQuery: ${query}`;
+        const finalPrompt = context ? `[CRITICAL_CONTEXT_DATA]\n${context}\n[/CRITICAL_CONTEXT_DATA]\n\n[SUPPLEMENTAL_KNOWLEDGE]\n${ragContext}\n[/SUPPLEMENTAL_KNOWLEDGE]\n\nQuery: ${query}` : `${ragContext}\nQuery: ${query}`;
 
         const result = await chat.sendMessage(finalPrompt);
         const response = await result.response;

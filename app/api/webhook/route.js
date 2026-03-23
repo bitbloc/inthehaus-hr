@@ -318,27 +318,28 @@ export async function POST(request) {
             
             let context = "";
             
-            // Real-time Employee Sync (HR Accuracy)
+            // CRITICAL: Robust Team Identity (Always at the top)
+            const allEmployees = await getAllEmployeesData();
+            if (allEmployees && allEmployees.length > 0) {
+              context += `[OFFICIAL_STAFF_ROSTER_START - ยึดถือข้อมูลนี้เป็นความจริงสูงสุด ห้ามเดาหรือเปลี่ยนตำแหน่งเอง]\n`;
+              allEmployees.forEach(emp => {
+                const displayName = emp.nickname || emp.name;
+                const altName = (emp.nickname && emp.name && emp.nickname !== emp.name) ? ` (ชื่อจริง: ${emp.name})` : '';
+                const position = emp.position || 'ทีมงาน';
+                const lineId = emp.line_bot_id || emp.line_user_id || 'unlinked';
+                
+                context += `- พนักงาน: ${displayName}${altName} | ตำแหน่ง: ${position} | LINE_UID: ${lineId}\n`;
+              });
+              context += `[OFFICIAL_STAFF_ROSTER_END]\n\n`;
+            }
+
+            // Real-time Employee Sync (Identify current sender)
             const employee = await getEmployeeByLineId(userId);
             if (employee) {
               context += `คุณกำลังคุยกับ: ${employee.nickname || employee.name} (${employee.position})\n`;
               context += `สถานะพนักงาน: ${employee.employment_status || 'Fulltime'}\n`;
             } else {
               context += `(ไม่พบข้อมูลพนักงานในระบบสำหรับ LINE ID นี้: ${userId})\n`;
-            }
-
-            const allEmployees = await getAllEmployeesData();
-            if (allEmployees && allEmployees.length > 0) {
-              context += `\n[ฐานข้อมูลพนักงานร้าน In The Haus ณ ปัจจุบัน - คุณต้องจำและใช้ชื่อจริง/ชื่อเล่นเหล่านี้เท่านั้น]:\n`;
-              allEmployees.forEach(emp => {
-                const displayName = emp.nickname || emp.name;
-                const altName = emp.nickname ? emp.name : '';
-                const position = emp.position || '-';
-                const lineId = emp.line_bot_id || emp.line_user_id || 'ไม่มี';
-                
-                context += `- พนักงาน: ${displayName}${altName ? ` (ชื่อจริง: ${altName})` : ''} | ตำแหน่ง: ${position} | LINE UID: ${lineId}\n`;
-              });
-              context += `[จบรายงานพนักงาน]\n`;
             }
 
             const dailyLogs = await getDailyContent(groupId);
