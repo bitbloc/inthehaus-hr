@@ -26,11 +26,12 @@ export async function POST(request) {
           const rawText = event.message.text;
           const query = rawText.trim();
 
-          // Quick Check for Yuzu mention
-          if (query.toLowerCase().includes('yuzu') || query.includes('ยูซุ')) {
-            const context = ""; // Full context can be added if needed
+          // Robust Check for Yuzu mention (case-insensitive)
+          const isYuzuMentioned = /yuzu|ยูซุ/i.test(query);
+          
+          if (isYuzuMentioned) {
             const history = await getChatHistory(groupId, 10);
-            const response = await getGeminiResponse(query, context, history, userId);
+            const response = await getGeminiResponse(query, "", history, userId);
 
             await saveMessage(groupId, userId, 'user', query, 'text');
             await saveMessage(groupId, null, 'model', response, 'text');
@@ -120,11 +121,18 @@ export async function POST(request) {
                 }
               }
               handledLocally = true;
-            } else if (result.shouldReply) {
-              await client.replyMessage(event.replyToken, { type: 'text', text: result.analysis });
+            } else if (result.shouldReply || result.analysis) {
+              await client.replyMessage(event.replyToken, { type: 'text', text: result.analysis || result.shortDescription });
               handledLocally = true;
             }
-          } catch (e) { console.error("Vision Error:", e); }
+          } catch (e) { 
+            console.error("Vision Error:", e);
+            // Fallback for image processing errors to prevent non-responsiveness
+            if (!handledLocally) {
+              await client.replyMessage(event.replyToken, { type: 'text', text: "เมี๊ยว~ ยูซุประมวลผลรูปภาพไม่สำเร็จค่ะ ลองส่งใหม่อีกครั้งนะคะ! 😿" });
+              handledLocally = true;
+            }
+          }
         }
         
         // Handle Location Messages
