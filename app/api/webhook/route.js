@@ -468,18 +468,17 @@ export async function POST(request) {
                 parsedAmount = parseFloat(result.amount.replace(/,/g, ''));
               }
 
-              // Get GMT+7 Date
-              const { addHours, format } = await import('date-fns');
-              const dateStr = format(addHours(new Date(), 7), 'yyyy-MM-dd');
+              // Get current date in 'YYYY-MM-DD' format
+              const today = new Date();
+              const dateStr = today.toISOString().split('T')[0];
 
               const { error: insertError } = await supabase.from('slip_transactions').insert({
                 group_id: groupId,
-                user_id: emp.id,
+                user_id: mappedDbUserId,
                 amount: parsedAmount,
                 slip_url: slipUrl,
                 transaction_ref: result.transactionRef || null,
                 sender_name: result.senderName || null,
-                bank_name: result.bankName || null,
                 date: dateStr
               });
 

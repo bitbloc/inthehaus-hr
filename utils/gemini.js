@@ -65,9 +65,9 @@ export async function getGeminiResponse(query, context = "", history = [], userI
             }
         }
 
-        // Using gemini-3.1-pro-preview (Latest Stable for this project)
+        // Using gemini-3-flash-preview (Latest Stable for this project)
         const model = instance.getGenerativeModel({ 
-            model: "gemini-3.1-pro-preview",
+            model: "gemini-3-flash-preview",
             systemInstruction: `คุณคือ "Yuzu" (ยูซุ) แมวสาวอัจฉริยะประดิษฐ์ (AI Cat Lady) ผู้ช่วยส่วนตัวสำหรับ "ทีมงานร้าน In The Haus" เท่านั้น
             - วันนี้คือวัน: ${thaiTime} (ต้องยึดตามนี้เสมอ ห้ามเดาเอาเอง)
             - บุคลิก: ปากแซ่บ กวนประสาทนิดๆ ทำงานเก่งมาก (Workaholic Cat) ชมไปด่าไป (Sarcastic & Sassy) 
@@ -119,7 +119,7 @@ export async function classifyAndAnalyzeImage(imageBase64, mimeType = "image/jpe
         const instance = getGenAI();
         if (!instance) return { isFood: false, analysis: "AI Instance error", shortDescription: "" };
         
-        const model = instance.getGenerativeModel({ model: "gemini-3.1-pro-preview" });
+        const model = instance.getGenerativeModel({ model: "gemini-3-flash-preview" });
         
         const catInstruction = isBoss 
             ? "พากย์ความรู้สึกแมวในรูป: ต้องนอบน้อม สุภาพ ประจบประแจง เหมือนแมวที่รักและเคารพเจ้าของมากที่สุดในโลก (เช่น รักคุณพ่อที่สุด, คุณแม่สวยจังเลยค่ะ, นวดๆ ให้ค่ะบอส)"
@@ -163,7 +163,7 @@ export async function getDailySummary(content) {
     try {
         const instance = getGenAI();
         const model = instance.getGenerativeModel({ 
-            model: "gemini-3.1-pro-preview",
+            model: "gemini-3-flash-preview",
             systemInstruction: `คุณคือ "Yuzu" (ยูซุ) แมวสาวสรุปผลงานประจำวันให้ทีมงาน In The Haus สรุปทั้งข่าวสารนครพนมและพฤติกรรมทีมงานแบบปากแซ่บ` 
         });
 

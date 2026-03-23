@@ -67,7 +67,7 @@ export default function YuzuKnowledgeManager() {
             // DIRECT QUERY WITHOUT JOIN TO AVOID 400 ERROR
             const { data, error } = await supabase
                 .from('slip_transactions')
-                .select('id, amount, slip_url, timestamp, is_deleted, sender_name, user_id, bank_name')
+                .select('id, amount, slip_url, timestamp, is_deleted, sender_name, user_id')
                 .eq('is_deleted', false)
                 .eq('date', selectedDate)
                 .order('timestamp', { ascending: false });
@@ -428,9 +428,7 @@ export default function YuzuKnowledgeManager() {
                                 <thead className="bg-slate-50 text-slate-400 font-bold text-[10px] uppercase tracking-wider">
                                     <tr>
                                         <th className="px-6 py-4">Time</th>
-                                        <th className="px-6 py-4">Staff (Uploader)</th>
-                                        <th className="px-6 py-4">Customer (Sender)</th>
-                                        <th className="px-6 py-4">Bank</th>
+                                        <th className="px-6 py-4">Sender</th>
                                         <th className="px-6 py-4">Amount (THB)</th>
                                         <th className="px-6 py-4">Proof</th>
                                         <th className="px-6 py-4 text-center">Action</th>
@@ -439,11 +437,11 @@ export default function YuzuKnowledgeManager() {
                                 <tbody className="divide-y divide-slate-50">
                                     {slipLoading ? (
                                         <tr>
-                                            <td colSpan="7" className="p-12 text-center text-slate-400 italic">กำลังดึงข้อมูลสลิป...</td>
+                                            <td colSpan="5" className="p-12 text-center text-slate-400 italic">กำลังดึงข้อมูลสลิป...</td>
                                         </tr>
                                     ) : slips.length === 0 ? (
                                         <tr>
-                                            <td colSpan="7" className="p-20 text-center">
+                                            <td colSpan="5" className="p-20 text-center">
                                                 <p className="text-slate-300 font-bold uppercase tracking-widest mb-1">No Transactions</p>
                                                 <p className="text-slate-400 text-[10px]">ไม่พบข้อมูลสลิปในวันที่เลือก</p>
                                             </td>
@@ -457,17 +455,7 @@ export default function YuzuKnowledgeManager() {
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <div className="font-medium text-slate-600">
-                                                        {employees.find(e => e.id === slip.user_id)?.nickname || "-"}
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="font-medium text-slate-600">
-                                                        {slip.sender_name || "External"}
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                                                        {slip.bank_name || "-"}
+                                                        {getEmployeeName(slip.user_id, slip.sender_name)}
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-4">
