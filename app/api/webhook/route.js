@@ -468,13 +468,18 @@ export async function POST(request) {
                 parsedAmount = parseFloat(result.amount.replace(/,/g, ''));
               }
 
+              // Get current date in 'YYYY-MM-DD' format
+              const today = new Date();
+              const dateStr = today.toISOString().split('T')[0];
+
               const { error: insertError } = await supabase.from('slip_transactions').insert({
                 group_id: groupId,
                 user_id: mappedDbUserId,
                 amount: parsedAmount,
                 slip_url: slipUrl,
-                transaction_ref: result.transactionRef || undefined,
-                sender_name: result.senderName || undefined
+                transaction_ref: result.transactionRef || null,
+                sender_name: result.senderName || null,
+                date: dateStr
               });
 
               if (insertError) {
