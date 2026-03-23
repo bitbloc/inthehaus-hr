@@ -17,15 +17,25 @@ export default function SlipPDFReport() {
     const [loading, setLoading] = useState(true);
     const [downloading, setDownloading] = useState(false);
     const reportRef = useRef(null);
-    const todayStr = format(addHours(new Date(), 7), 'yyyy-MM-dd');
-    const displayDate = format(addHours(new Date(), 7), 'dd MMMM yyyy', { locale: th });
+    
+    // Get date from query param or use today
+    const [todayStr, setTodayStr] = useState(format(addHours(new Date(), 7), 'yyyy-MM-dd'));
+    const [displayDate, setDisplayDate] = useState('');
 
     useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const dateParam = params.get('date');
+        const activeDate = dateParam || format(addHours(new Date(), 7), 'yyyy-MM-dd');
+        
+        setTodayStr(activeDate);
+        setDisplayDate(format(new Date(activeDate), 'dd MMMM yyyy', { locale: th }));
+
         const fetchSlips = async () => {
+            setLoading(true);
             const { data, error } = await supabase
                 .from('slip_transactions')
                 .select('amount, user_id, timestamp, slip_url, transaction_ref, sender_name')
-                .eq('date', todayStr)
+                .eq('date', activeDate)
                 .eq('is_deleted', false)
                 .order('timestamp', { ascending: true });
 
@@ -35,7 +45,7 @@ export default function SlipPDFReport() {
             setLoading(false);
         };
         fetchSlips();
-    }, [todayStr]);
+    }, []);
 
     const handleDownloadPDF = async () => {
         if (!reportRef.current) return;
