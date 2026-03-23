@@ -3,16 +3,20 @@ let supabase = null;
 
 function getSupabase() {
     if (!supabase) {
-        supabase = createClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL,
-            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-            {
-                auth: { persistSession: false },
-                global: {
-                    fetch: (...args) => fetch(args[0], { ...args[1], cache: 'no-store' })
-                }
+        const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const key = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+        
+        if (!url || !key) {
+            console.error("CRITICAL: Supabase credentials missing (URL or KEY)");
+            return null;
+        }
+
+        supabase = createClient(url, key, {
+            auth: { persistSession: false },
+            global: {
+                fetch: (...args) => fetch(args[0], { ...args[1], cache: 'no-store' })
             }
-        );
+        });
     }
     return supabase;
 }
@@ -231,6 +235,7 @@ export async function getEmployeeByLineId(lineUserId) {
 export async function getAllEmployeesData() {
     try {
         const client = getSupabase();
+        if (!client) return [];
         const { data, error } = await client
             .from('employees')
             .select('line_user_id, line_bot_id, name, nickname, position, is_active')
@@ -252,29 +257,28 @@ export async function getAllEmployeesData() {
 export async function getYuzuConfigs() {
     try {
         const client = getSupabase();
+        if (!client) throw new Error("No client");
+
         const { data, error } = await client
             .from('yuzu_config')
             .select('key, value');
         
+        const config = {
+            father_uid: 'U77e56cb573085ba79d37b496c6abdb63',
+            mother_uid: 'U8c53c87647799f798f208250be71ae1b'
+        };
+
         if (error) {
             console.error("Error fetching yuzu_config:", error);
-            // Fallback to hardcoded for safety in case table doesn't exist yet
-            return {
-                father_uid: 'U77e56cb573085ba79d37b496c6abdb63',
-                mother_uid: 'U8c53c87647799f798f208250be71ae1b'
-            };
+            // Return defaults if error
+            return config;
         }
 
-        const config = {};
         if (data) {
             data.forEach(item => config[item.key] = item.value);
         }
         
-        // Ensure keys exist with defaults if not in DB
-        return {
-            father_uid: config.father_uid || 'U77e56cb573085ba79d37b496c6abdb63',
-            mother_uid: config.mother_uid || 'U8c53c87647799f798f208250be71ae1b'
-        };
+        return config;
     } catch (err) {
         console.error("Memory Utility Error (fetch config):", err);
         return {
