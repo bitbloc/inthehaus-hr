@@ -262,7 +262,7 @@ export async function POST(request) {
               const wantsImage = (text.includes('ภาพ') || text.includes('รูป')) && !text.includes('ไม่ต้อง') && !text.includes('ไม่เอา');
               
               if (wantsImage && count > 0 && !isLatest) {
-                const prompt = `ภาพกราฟิกข้อความ ไม่มีรูปแมวเด็ดขาด ให้ออกแบบสวยงามพรีเมียมตัวอักษร 3D "สรุปยอดโอน ${dateTitle} ยอด ${total.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท" แสดงผลตารางเวลาโอนเงินย่อยๆ ร่วมด้วย สีสันสดใส ชัดเจน`;
+                const prompt = `Premium minimalist graphic design summary for "In The Haus" restaurant. White background, bold black typography, high contrast. Large numbers for "สรุปยอดโอนรวม ${total.toLocaleString('th-TH', {minimumFractionDigits: 0})} บาท". Simple clean list of transaction times. Stylized brand name "In The Haus" in script or elegant font. No cats, no 3D, no colorful backgrounds. Professional report aesthetic.`;
                 const genResult = await generateImage(prompt);
                 
                 if (genResult.success && genResult.imageUrl) {

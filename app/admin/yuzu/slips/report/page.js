@@ -66,120 +66,105 @@ export default function SlipPDFReport() {
     };
 
     const totalAmount = slips.reduce((sum, s) => sum + Number(s.amount), 0);
+    const logoUrl = "https://uozcalculatecumdzmcjr.supabase.co/storage/v1/object/public/yuzu-assets/inthehaus-logo.png"; // Placeholder for the provided logo
 
     return (
-        <div className="min-h-screen bg-gray-100 p-4 md:p-8 font-sans text-gray-800">
-            <div className="max-w-4xl mx-auto flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+        <div className="min-h-screen bg-[#f9f9f9] p-4 md:p-12 font-sans text-black">
+            <div className="max-w-4xl mx-auto flex justify-between items-center mb-10">
                 <button 
                     onClick={() => window.history.back()}
-                    className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
+                    className="text-sm font-medium hover:underline flex items-center gap-1"
                 >
-                    <ArrowLeft size={20} /> กลับไปหน้าก่อนหน้า
+                    <ArrowLeft size={16} /> กลับ
                 </button>
-                <button 
-                    onClick={handleDownloadPDF}
-                    disabled={loading || downloading}
-                    className="flex items-center gap-2 bg-[#ff7b00] hover:bg-[#e66f00] text-white px-6 py-3 rounded-xl font-medium shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    {downloading ? (
-                        <>กำลังประมวลผล PDF...</>
-                    ) : (
-                        <><Download size={20} /> ดาวน์โหลด PDF</>
-                    )}
-                </button>
+                <div className="flex gap-4">
+                    <button 
+                        onClick={handleDownloadPDF}
+                        disabled={loading || downloading}
+                        className="bg-black text-white px-6 py-2 rounded-full font-bold text-sm flex items-center gap-2 hover:bg-gray-800 transition-all disabled:opacity-50"
+                    >
+                        {downloading ? "กำลังประมวลผล..." : <><Download size={18} /> DOWNLOAD PDF</>}
+                    </button>
+                </div>
             </div>
 
-            {/* A4 Document Container */}
-            <div className="max-w-[210mm] mx-auto bg-white shadow-2xl overflow-hidden">
-                {/* PDF Content Area */}
-                <div ref={reportRef} className="p-12 min-h-[297mm] bg-white relative">
+            {/* A4 Document Container - Refined for "Our Year" Mood */}
+            <div className="max-w-[210mm] mx-auto bg-white shadow-sm border border-gray-100 overflow-hidden">
+                <div ref={reportRef} className="p-16 min-h-[297mm] bg-white relative flex flex-col">
                     
-                    {/* Header */}
-                    <div className="border-b-4 border-[#ff7b00] pb-8 mb-8 flex justify-between items-end">
-                        <div>
-                            <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight">รายงานสรุปยอดโอน</h1>
-                            <p className="text-xl text-gray-500 mt-2 font-medium">In The Haus</p>
+                    {/* Brand Header */}
+                    <div className="flex justify-between items-start mb-20">
+                        <div className="w-48">
+                            <img src={logoUrl} alt="In The Haus" className="w-full object-contain" />
                         </div>
                         <div className="text-right">
-                            <p className="text-lg font-semibold text-gray-800">วันที่: {displayDate}</p>
-                            <p className="text-gray-500 mt-1">เวลาอัปเดตบรรทัดล่าสุด: {format(addHours(new Date(), 7), 'HH:mm น.')}</p>
+                            <h2 className="text-3xl font-serif italic text-gray-800">Our Day</h2>
+                            <p className="text-sm text-gray-400 mt-1 uppercase tracking-widest">{displayDate}</p>
                         </div>
                     </div>
 
-                    {/* Summary Cards */}
-                    <div className="grid grid-cols-2 gap-6 mb-10">
-                        <div className="bg-orange-50 p-6 rounded-2xl border border-orange-100">
-                            <div className="flex items-center gap-3 text-orange-600 mb-2">
-                                <FileText size={24} />
-                                <h3 className="font-semibold text-lg">จำนวนรายการโอน</h3>
+                    {/* Minimalist Narrative / Hero Stats */}
+                    <div className="mb-20">
+                        <p className="text-sm text-gray-500 max-w-lg mb-12 leading-relaxed">
+                            รายงานสรุปยอดโอนรวมประจำวันของร้าน In The Haus ข้อมูลชุดนี้ครอบคลุมการทำรายการโอนเงินทั้งหมดที่ผ่านการตรวจสอบโดยระบบ Yuzu AI และพนักงานทีม Bar & Floor เพื่อความโปร่งใสและแม่นยำในการปิดยอดประจำวัน
+                        </p>
+
+                        <div className="space-y-12">
+                            <div className="border-b border-gray-100 pb-8 flex justify-between items-end">
+                                <h3 className="text-8xl font-black tracking-tighter">
+                                    {slips.length < 10 ? `0${slips.length}` : slips.length}
+                                </h3>
+                                <p className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-2">Total Transactions</p>
                             </div>
-                            <p className="text-4xl font-bold text-gray-900">{slips.length} <span className="text-xl text-gray-500 font-normal">รายการ</span></p>
-                        </div>
-                        <div className="bg-emerald-50 p-6 rounded-2xl border border-emerald-100">
-                            <div className="flex items-center gap-3 text-emerald-600 mb-2">
-                                <CheckCircle size={24} />
-                                <h3 className="font-semibold text-lg">ยอดรวมสุทธิ</h3>
+
+                            <div className="border-b border-gray-100 pb-8 flex justify-between items-end">
+                                <h3 className="text-7xl font-black tracking-tighter">
+                                    +{totalAmount.toLocaleString('th-TH', {minimumFractionDigits: 0})}
+                                </h3>
+                                <p className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-2">Net Transfer Amount (THB)</p>
                             </div>
-                            <p className="text-4xl font-bold text-emerald-600">{totalAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})} <span className="text-xl text-gray-500 font-normal">บาท</span></p>
                         </div>
                     </div>
 
-                    {/* Table */}
-                    {loading ? (
-                        <p className="text-center text-gray-500 py-10">กำลังโหลดข้อมูล...</p>
-                    ) : slips.length === 0 ? (
-                        <div className="text-center py-20 bg-gray-50 rounded-2xl border border-dashed border-gray-300">
-                            <p className="text-gray-500 text-lg">ไม่พบข้อมูลการโอนเงินของวันนี้</p>
-                        </div>
-                    ) : (
-                        <div className="overflow-hidden rounded-xl border border-gray-200">
-                            <table className="w-full text-left border-collapse">
-                                <thead>
-                                    <tr className="bg-gray-100 text-gray-700">
-                                        <th className="py-4 px-6 font-semibold border-b">ลำดับ</th>
-                                        <th className="py-4 px-6 font-semibold border-b">เวลาที่โอน</th>
-                                        <th className="py-4 px-6 font-semibold border-b">ผู้ทำรายการ</th>
-                                        <th className="py-4 px-6 font-semibold border-b">เลขอ้างอิง (Ref)</th>
-                                        <th className="py-4 px-6 font-semibold border-b text-right">จำนวนเงิน (บาท)</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {slips.map((slip, idx) => (
-                                        <tr key={idx} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                                            <td className="py-4 px-6 text-gray-500">{idx + 1}</td>
-                                            <td className="py-4 px-6 font-medium text-gray-800">
-                                                {format(addHours(new Date(slip.timestamp), 7), 'HH:mm')}
-                                            </td>
-                                            <td className="py-4 px-6 text-gray-600">{slip.sender_name || '-'}</td>
-                                            <td className="py-4 px-6 text-gray-500 text-sm font-mono">{slip.transaction_ref || '-'}</td>
-                                            <td className="py-4 px-6 text-right font-semibold text-gray-900">
-                                                {Number(slip.amount).toLocaleString('th-TH', {minimumFractionDigits: 2})}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                    {/* Total Row */}
-                                    <tr className="bg-orange-50">
-                                        <td colSpan="4" className="py-5 px-6 text-right font-bold text-gray-900">ยอดรวมทั้งหมด</td>
-                                        <td className="py-5 px-6 text-right font-bold text-orange-600 text-lg border-t border-orange-200">
-                                            {totalAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})}
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
+                    {/* Clean List Instead of Heavy Table */}
+                    <div className="flex-grow">
+                        <h4 className="text-xs font-bold uppercase tracking-[0.2em] text-gray-300 mb-8">Transaction Timeline</h4>
+                        
+                        {loading ? (
+                            <p className="text-gray-400 italic">กำลังดึงข้อมูลจากระบบ...</p>
+                        ) : slips.length === 0 ? (
+                            <p className="text-gray-400 italic">ไม่มีข้อมูลการโอนเงินในวันนี้</p>
+                        ) : (
+                            <div className="space-y-6">
+                                {slips.map((slip, idx) => (
+                                    <div key={idx} className="flex justify-between items-start group">
+                                        <div className="flex gap-8">
+                                            <span className="text-gray-300 font-mono text-sm">{format(addHours(new Date(slip.timestamp), 7), 'HH:mm')}</span>
+                                            <div>
+                                                <p className="font-bold text-sm uppercase tracking-tight">{slip.sender_name || 'Staff'}</p>
+                                                <p className="text-[10px] text-gray-400 font-mono mt-1">{slip.transaction_ref || 'External Receipt'}</p>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-lg font-black tracking-tight">{Number(slip.amount).toLocaleString('th-TH', {minimumFractionDigits: 2})}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
 
-                    {/* Footer */}
-                    <div className="absolute bottom-12 left-12 right-12 text-center text-gray-400 text-sm border-t border-gray-200 pt-6">
-                        <p>เอกสารสรุปยอดโอนสร้างโดยระบบอัตโนมัติ (Yuzu AI Assistant) - ร้าน In The Haus</p>
+                    {/* Subtle Footer */}
+                    <div className="mt-20 pt-8 border-t border-gray-50 flex justify-between items-center text-[10px] text-gray-300 uppercase tracking-widest font-bold">
+                        <div>Verified by Yuzu AI Assistant</div>
+                        <div>Page 01 / 01</div>
                     </div>
                 </div>
             </div>
             
-            {/* Download Hint for Mobile */}
-            <p className="text-center text-gray-500 mt-8 text-sm md:hidden">
-                กรุณากดปุ่ม "ดาวน์โหลด PDF" ด้านบนเพื่อจัดเก็บเป็นไฟล์
-            </p>
+            <div className="text-center mt-12 py-8 bg-black text-white/20 text-[10px] uppercase tracking-[0.5em] font-bold">
+                In The Haus &bull; Restaurant OS &bull; 2026
+            </div>
         </div>
     );
 }
