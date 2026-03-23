@@ -334,3 +334,34 @@ export async function getYuzuConfigs() {
         };
     }
 }
+/**
+ * Check if a user is an Owner/Boss (Robust Dual-UID Check)
+ */
+export async function checkIsBoss(userId) {
+    if (!userId) return false;
+    try {
+        const configs = await getYuzuConfigs();
+        const { father_uid, mother_uid } = configs;
+        
+        // 1. Check against config UIDs (Direct match from Yuzu Config)
+        if (userId === father_uid || userId === mother_uid) return true;
+        
+        // 2. Check employees table for Owner position (Dual-UID Match)
+        const client = getSupabase();
+        const { data: emp } = await client
+            .from('employees')
+            .select('position')
+            .or(`line_bot_id.ilike.${userId},line_user_id.ilike.${userId}`)
+            .eq('is_active', true)
+            .maybeSingle();
+        
+        if (emp && (emp.position === 'Owner' || emp.position === 'CEO' || emp.position === 'Manager' || emp.position === 'แอดมิน')) {
+            return true;
+        }
+        
+        return false;
+    } catch (err) {
+        console.error("Error in checkIsBoss:", err);
+        return false;
+    }
+}

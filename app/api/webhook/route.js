@@ -3,7 +3,7 @@ import { Client } from '@line/bot-sdk';
 import { getSchemaWeather, formatWeatherMessage } from '../../../utils/weather';
 import { getGeminiResponse, classifyAndAnalyzeImage, getDailySummary, generateImage } from '../../../utils/gemini';
 import { getGoldPrice, getOilPrice, getElectricityPrice, getIngredientPrices } from '../../../utils/price';
-import { saveMessage, getChatHistory, getDailyContent, cleanupOldHistory, getEmployeeHistory, getEmployeeByLineId, getAllEmployeesData, getYuzuConfigs } from '../../../utils/memory';
+import { saveMessage, getChatHistory, getDailyContent, cleanupOldHistory, getEmployeeHistory, getEmployeeByLineId, getAllEmployeesData, getYuzuConfigs, checkIsBoss } from '../../../utils/memory';
 import { getAccurateNews } from '../../../utils/news';
 
 const client = new Client({
@@ -335,7 +335,12 @@ export async function POST(request) {
 
             // Real-time Employee Sync (Identify current sender)
             const employee = await getEmployeeByLineId(userId);
-            if (employee) {
+            const isBoss = await checkIsBoss(userId);
+            
+            if (isBoss) {
+              context += `คุณกำลังคุยกับ: เจ้านาย (${employee?.nickname || employee?.name || 'Owner'})\n`;
+              context += `สถานะ: เจ้าของร้าน (Owner)\n`;
+            } else if (employee) {
               context += `คุณกำลังคุยกับ: ${employee.nickname || employee.name} (${employee.position})\n`;
               context += `สถานะพนักงาน: ${employee.employment_status || 'Fulltime'}\n`;
             } else {
@@ -402,8 +407,7 @@ export async function POST(request) {
             const base64 = buffer.toString('base64');
 
             const configs = await getYuzuConfigs();
-            const { father_uid, mother_uid } = configs;
-            const isBoss = userId === father_uid || userId === mother_uid;
+            const isBoss = await checkIsBoss(userId);
 
             let positionInstruction = "";
             let empDataForVision = null;
