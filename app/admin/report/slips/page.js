@@ -21,10 +21,10 @@ function SlipPDFReportContent() {
             const { data: empData } = await supabase.from('employees').select('id, name, nickname');
             if (empData) setEmployees(empData);
 
-            // Fetch slips for specific date - removed bank_name to fix 400 error
+            // Fetch slips for specific date
             const { data, error } = await supabase
                 .from('slip_transactions')
-                .select('id, amount, timestamp, sender_name, user_id, transaction_ref')
+                .select('id, amount, timestamp, sender_name, user_id, transaction_ref, bank_name')
                 .eq('is_deleted', false)
                 .eq('date', reportDate)
                 .order('timestamp', { ascending: true });
