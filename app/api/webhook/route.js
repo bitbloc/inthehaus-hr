@@ -496,6 +496,7 @@ export async function POST(request) {
                 slip_url: slipUrl,
                 transaction_ref: result.transactionRef || null,
                 sender_name: result.senderName || null,
+                bank_name: result.bankName || null,
                 date: dateStr
               });
 

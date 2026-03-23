@@ -127,10 +127,12 @@ export async function classifyAndAnalyzeImage(imageBase64, mimeType = "image/jpe
 
         const systemPrompt = `คุณคือระบบวิเคราะห์รูปภาพของ Yuzu Bot ทีมงาน In The Haus
         1. ตรวจสอบว่ารูปนี้คือ "รูปถ่ายสลิปโอนเงินธนาคาร", "รูปถ่ายอาหาร", "วัตถุดิบ", "ใบเสร็จซื้อของ" หรือ "รูปถ่ายแมว" หรือไม่
-        2. หากเป็น สลิปโอนเงินธนาคาร (Bank Transfer Slip): ให้ตอบ JSON {"isSlip": true, "amount": ตัวเลขยอดเงินที่โอน(ห้ามใส่คอมม่า), "transactionRef": "เลขอ้างอิงรายการ หรือ รหัสอ้างอิง บนสลิป (สำคัญมาก ห้ามพลาด)", "senderName": "ชื่อผู้โอน", "bankName": "ชื่อธนาคารที่โอน (เช่น กสิกรไทย, ไทยพาณิชย์, กรุงเทพ, กรุงไทย, ฯลฯ)", "shortDescription": "สลิปโอนเงิน", "shouldReply": true}
-        3. หากเป็นรูปถ่ายอาหาร/วัตถุดิบ/ใบเสร็จ: ให้ตอบ JSON {"isFood": true, "isReceipt": true/false (ถ้าเป็นใบเสร็จ), "menuName": "ชื่อเมนูหรือรายการหลัก", "itemsList": ["รายการ 1", "รายการ 2"], "costAnalysis": "รายละเอียดต้นทุนอ้างอิง Makro", "shortDescription": "คำอธิบายรูปสั้นๆ", "shouldReply": true}
+        2. หากเป็น สลิปโอนเงินธนาคาร (Bank Transfer Slip): 
+           - วิเคราะห์ "สีประจำธนาคาร" และ "โลโก้" เพื่อระบุธนาคาร (กสิกร=เขียว, ไทยพาณิชย์=ม่วง, กรุงเทพ=น้ำเงินเข้ม, กรุงไทย=ฟ้าสว่าง, กรุงศรี=เหลือง/ทอง, ออมสิน=ชมพู, TTB=น้ำเงินส้ม)
+           - บังคับตอบ JSON: {"isSlip": true, "amount": ตัวเลขยอดเงิน, "transactionRef": "รหัสอ้างอิง", "senderName": "ชื่อผู้โอน", "bankName": "ชื่อธนาคารภาษาไทยเท่านั้น", "shortDescription": "สลิปธนาคาร...", "shouldReply": true}
+        3. หากเป็นรูปถ่ายอาหาร/วัตถุดิบ/ใบเสร็จ: ให้ตอบ JSON {"isFood": true, "isReceipt": true/false, "menuName": "ชื่อรายการ", "itemsList": ["รายการ"], "costAnalysis": "รายละเอียดต้นทุน", "shortDescription": "คำอธิบาย", "shouldReply": true}
         4. หากเป็นรูปถ่ายแมว: ให้ตอบ JSON {"isCat": true, "catFeelings": "${catInstruction}", "shortDescription": "บรรยายแมว", "shouldReply": true}
-        5. อื่นๆ: {"isFood": false, "shouldReply": false}
+        5. อื่นๆ: {"shouldReply": false}
         ตอบเป็น JSON เท่านั้น`;
 
         const imagePart = {
