@@ -277,6 +277,22 @@ export async function getYuzuConfigs() {
         if (data) {
             data.forEach(item => config[item.key] = item.value);
         }
+
+        // Fetch staff roster to inject into system prompt
+        const { data: employees } = await client
+            .from('employees')
+            .select('name, nickname, position')
+            .eq('is_active', true);
+        
+        if (employees) {
+            let rosterStr = "\n[OFFICIAL_STAFF_ROSTER]:\n";
+            employees.forEach(emp => {
+                const displayName = emp.nickname || emp.name;
+                const altName = (emp.nickname && emp.name && emp.nickname !== emp.name) ? ` (${emp.name})` : '';
+                rosterStr += `- ${displayName}${altName} | ตำแหน่ง: ${emp.position || 'ทีมงาน'}\n`;
+            });
+            config.staff_roster = rosterStr;
+        }
         
         return config;
     } catch (err) {
