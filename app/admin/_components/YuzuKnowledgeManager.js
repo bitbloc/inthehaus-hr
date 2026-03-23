@@ -54,20 +54,40 @@ export default function YuzuKnowledgeManager() {
             setLoading(false);
         } else if (activeTab === 'slips') {
             setSlipLoading(true);
-            // DIRECT QUERY WITH GMT+7 DATE FILTER
+            
+            // Fetch employees if not already loaded to support mapping
+            if (employees.length === 0) {
+                const { data: empData } = await supabase
+                    .from('employees')
+                    .select('id, name, nickname')
+                    .eq('is_active', true);
+                if (empData) setEmployees(empData);
+            }
+
+            // DIRECT QUERY WITHOUT JOIN TO AVOID 400 ERROR
             const { data, error } = await supabase
                 .from('slip_transactions')
-                .select('id, amount, slip_url, timestamp, is_deleted, sender_name, employees(name, nickname)')
+                .select('id, amount, slip_url, timestamp, is_deleted, sender_name, user_id')
                 .eq('is_deleted', false)
                 .eq('date', selectedDate)
                 .order('timestamp', { ascending: false });
             
             if (!error && data) {
                 setSlips(data);
+            } else if (error) {
+                console.error("Slip fetch error:", error);
+                setMessage('Error: ' + error.message);
             }
             setSlipLoading(false);
         }
     }
+
+    // Helper to get employee name from ID
+    const getEmployeeName = (userId, senderName) => {
+        const emp = employees.find(e => e.id === userId);
+        if (emp) return emp.nickname || emp.name;
+        return senderName || 'External';
+    };
 
     async function handleAddKnowledge() {
         if (!newContent) return;
@@ -435,7 +455,7 @@ export default function YuzuKnowledgeManager() {
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <div className="font-medium text-slate-600">
-                                                        {slip.employees?.nickname || slip.employees?.name || slip.sender_name || 'External'}
+                                                        {getEmployeeName(slip.user_id, slip.sender_name)}
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-4">
