@@ -84,9 +84,10 @@ export default function YuzuKnowledgeManager() {
 
     // Helper to get employee name from ID
     const getEmployeeName = (userId, senderName) => {
-        const emp = employees.find(e => e.id === userId);
+        if (!userId) return senderName || 'External';
+        const emp = employees.find(e => String(e.id) === String(userId));
         if (emp) return emp.nickname || emp.name;
-        return senderName || 'External';
+        return senderName || `Staff (ID: ${userId})`;
     };
 
     async function handleAddKnowledge() {

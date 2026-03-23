@@ -38,8 +38,8 @@ function SlipPDFReportContent() {
     const totalAmount = slips.reduce((sum, slip) => sum + Number(slip.amount), 0);
 
     const getSenderDisplay = (slip) => {
-        const emp = employees.find(e => e.id === slip.user_id);
-        const staffName = emp ? (emp.nickname || emp.name) : "ไม่ระบุพนักงาน";
+        const emp = employees.find(e => String(e.id) === String(slip.user_id));
+        const staffName = emp ? (emp.nickname || emp.name) : (slip.user_id ? `Staff ID: ${slip.user_id}` : "ไม่ระบุพนักงาน");
         const sender = slip.sender_name || "ไม่ทราบชื่อผู้โอน";
         return { staffName, sender };
     };
