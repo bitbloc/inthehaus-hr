@@ -358,17 +358,32 @@ export async function POST(request) {
               context += await getAccurateNews() + "\n";
             }
 
-            const response = await getGeminiResponse(query, context, history, userId);
+            let response = await getGeminiResponse(query, context, history, userId);
+            
+            // Proactive Learning: Extract and Save
+            let cleanedResponse = response;
+            if (response.includes('[YUZU_LEARNING]')) {
+              try {
+                const parts = response.split('[YUZU_LEARNING]');
+                cleanedResponse = parts[0].trim();
+                const learningJson = parts[1].trim();
+                const factData = JSON.parse(learningJson);
+                await saveLearnedFact(groupId, factData);
+                console.log("Yuzu Learned a New Fact:", factData.fact);
+              } catch (e) {
+                console.error("Error parsing Yuzu Learning block:", e);
+              }
+            }
 
-            // Save Memory
-            // If it's a praise/compliment command, tag it as mood_booster
+            // Save Memory (use original response to keep system tags in history if desired, 
+            // or cleanedResponse for cleaner memory. Let's use cleanedResponse for history.)
             const isMoodBooster = ['ชม', 'ขอบคุณ', 'ขอบใจ', 'ดีมาก', 'เก่ง'].some(kw => query.includes(kw));
             const messageType = isMoodBooster ? 'mood_booster' : 'text';
             
             await saveMessage(groupId, userId, 'user', query, messageType);
-            await saveMessage(groupId, null, 'model', response, 'text');
+            await saveMessage(groupId, null, 'model', cleanedResponse, 'text');
 
-            await client.replyMessage(event.replyToken, { type: 'text', text: response });
+            await client.replyMessage(event.replyToken, { type: 'text', text: cleanedResponse });
             handledLocally = true;
           } else {
             // Save all messages for the daily summary (even non-yuzu ones)

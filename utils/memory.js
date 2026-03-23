@@ -44,6 +44,37 @@ export async function saveMessage(groupId, userId, role, content, messageType = 
 }
 
 /**
+ * Save AI Learned Fact (Pending Review)
+ */
+export async function saveLearnedFact(groupId, factData) {
+    try {
+        const client = getSupabase();
+        if (!client) return;
+
+        const { fact, keywords, category, isProblem } = factData;
+        
+        const { error } = await client
+            .from('yuzu_knowledge')
+            .insert({
+                content: fact,
+                metadata: {
+                    status: 'pending',
+                    source: 'chat_learning',
+                    group_id: groupId,
+                    keywords: keywords || [],
+                    category: category || 'GENERAL',
+                    is_problem: isProblem || false,
+                    learned_at: new Date().toISOString()
+                }
+            });
+
+        if (error) console.error("Error saving learned fact:", error);
+    } catch (err) {
+        console.error("Memory Utility Error (save learned fact):", err);
+    }
+}
+
+/**
  * Retrieve the last N messages for a group (Standard Chat)
  */
 export async function getChatHistory(groupId, limit = 100) {

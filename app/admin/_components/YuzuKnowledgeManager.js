@@ -6,8 +6,9 @@ import { Icons } from "./ui/HausIcon";
 import { format, addHours } from "date-fns";
 
 export default function YuzuKnowledgeManager() {
-    const [activeTab, setActiveTab] = useState('knowledge'); // 'knowledge', 'config', 'employees', 'slips'
+    const [activeTab, setActiveTab] = useState('knowledge'); // 'knowledge', 'insights', 'config', 'employees', 'slips'
     const [knowledge, setKnowledge] = useState([]);
+    const [insights, setInsights] = useState([]);
     const [employees, setEmployees] = useState([]);
     const [slips, setSlips] = useState([]);
     const [config, setConfig] = useState({ father_uid: '', mother_uid: '' });
@@ -33,6 +34,15 @@ export default function YuzuKnowledgeManager() {
                 .select('*')
                 .order('created_at', { ascending: false });
             if (!error) setKnowledge(data);
+            setLoading(false);
+        } else if (activeTab === 'insights') {
+            setLoading(true);
+            const { data, error } = await supabase
+                .from('yuzu_knowledge')
+                .select('*')
+                .filter('metadata->>status', 'eq', 'pending')
+                .order('created_at', { ascending: false });
+            if (!error) setInsights(data);
             setLoading(false);
         } else if (activeTab === 'config') {
             setLoading(true);
@@ -125,6 +135,31 @@ export default function YuzuKnowledgeManager() {
         if (!error) fetchData();
     }
 
+    async function handleVerifyInsight(id) {
+        const { error } = await supabase
+            .from('yuzu_knowledge')
+            .update({ 
+                metadata: { status: 'verified', verified_at: new Date().toISOString() } 
+            })
+            .eq('id', id);
+        
+        if (!error) {
+            setMessage('บันทึกความรู้เข้าคลังหลักเรียบร้อย ✨');
+            fetchData();
+        }
+    }
+
+    async function handleUpdateInsightKeywords(id, keywords) {
+        const insight = insights.find(i => i.id === id);
+        if (!insight) return;
+        const newMetadata = { ...insight.metadata, keywords: keywords.split(',').map(k => k.trim()) };
+        const { error } = await supabase
+            .from('yuzu_knowledge')
+            .update({ metadata: newMetadata })
+            .eq('id', id);
+        if (!error) fetchData();
+    }
+
     async function handleDeleteSlip(id) {
         if (!confirm('ยืนยันการลบรายการสลิปนี้?')) return;
         const { error } = await supabase
@@ -180,6 +215,7 @@ export default function YuzuKnowledgeManager() {
                 <div className="bg-slate-100 p-1 rounded-xl flex gap-1 self-start overflow-x-auto no-scrollbar">
                     {[
                         { id: 'knowledge', label: 'Knowledge', icon: Icons.File },
+                        { id: 'insights', label: 'AI Insights', icon: Icons.Yuzu },
                         { id: 'config', label: 'System Config', icon: Icons.Settings },
                         { id: 'employees', label: 'Staff Roles', icon: Icons.Staff },
                         { id: 'slips', label: 'Transfer Slips', icon: Icons.Money }
@@ -263,6 +299,99 @@ export default function YuzuKnowledgeManager() {
                             </div>
                         </Card>
                         <p className="text-center text-[10px] text-slate-400 uppercase font-bold tracking-widest">Total {filteredKnowledge.length} entries</p>
+                    </div>
+                </div>
+            )}
+
+            {/* TAB: INSIGHTS */}
+            {activeTab === 'insights' && (
+                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                        {/* Summary Stats */}
+                        <Card className="bg-purple-50 border-purple-100 flex flex-col items-center justify-center p-6 text-center">
+                            <Icons.Yuzu size={32} className="text-purple-600 mb-2" />
+                            <h4 className="text-xl font-black text-purple-900">{insights.length}</h4>
+                            <p className="text-[10px] font-bold text-purple-400 uppercase tracking-widest">New AI Insights</p>
+                        </Card>
+                        
+                        {/* Flowchart Hint */}
+                        <Card className="lg:col-span-3 bg-slate-900 text-white overflow-hidden relative group">
+                            <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform">
+                                <Icons.Yuzu size={120} />
+                            </div>
+                            <div className="relative z-10 p-6 space-y-2">
+                                <Badge color="purple" className="mb-2">KNOWLEDGE FLOW</Badge>
+                                <h3 className="text-lg font-bold">แผนผังการเรียนรู้ของยูซุ</h3>
+                                <p className="text-slate-400 text-sm max-w-md">ระบบจะเชื่อมโยงปัญหาและวิธีแก้ที่พบในแชทออกมาเป็น Flowchart ให้คุณพ่อเห็นภาพรวมครับ</p>
+                                
+                                {/* Simple Visual Flowchart (CSS based) */}
+                                <div className="mt-6 flex items-center gap-4 text-[10px] font-bold uppercase tracking-tighter overflow-x-auto no-scrollbar py-2">
+                                    <div className="px-3 py-2 bg-rose-500 rounded-lg whitespace-nowrap">Problem Found</div>
+                                    <div className="text-slate-600">→</div>
+                                    <div className="px-3 py-2 bg-indigo-500 rounded-lg whitespace-nowrap">AI Extraction</div>
+                                    <div className="text-slate-600">→</div>
+                                    <div className="px-3 py-2 bg-emerald-500 rounded-lg whitespace-nowrap">Boss Approval</div>
+                                    <div className="text-slate-600">→</div>
+                                    <div className="px-3 py-2 bg-amber-500 rounded-lg whitespace-nowrap">New Knowledge!</div>
+                                </div>
+                            </div>
+                        </Card>
+                    </div>
+
+                    <div className="space-y-4">
+                        <h3 className="font-bold text-slate-800 flex items-center gap-2 px-1">
+                            <Icons.Alert size={18} className="text-purple-500" />
+                            สิ่งที่ยูซุแอบจำมาจากแชท (ต้องยืนยัน)
+                        </h3>
+                        
+                        {insights.length === 0 ? (
+                            <Card className="py-20 text-center">
+                                <p className="text-slate-300 font-bold uppercase tracking-widest">No New Insights yet</p>
+                                <p className="text-slate-400 text-xs">ยูซุยังไม่พบความรู้อันไหนที่น่าสนใจในแชทวันนี้เลยค่ะเมี๊ยว~</p>
+                            </Card>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {insights.map(item => (
+                                    <Card key={item.id} className="group hover:border-purple-200 transition-all border-l-4 border-l-purple-500 p-6 space-y-4">
+                                        <div className="flex justify-between items-start">
+                                            <Badge color={item.metadata?.is_problem ? "rose" : "purple"}>
+                                                {item.metadata?.category || 'GENERAL'}
+                                            </Badge>
+                                            <span className="text-[10px] font-bold text-slate-400">{new Date(item.created_at).toLocaleTimeString('th-TH')}</span>
+                                        </div>
+                                        
+                                        <p className="text-sm font-medium text-slate-700 leading-relaxed">
+                                            {item.content}
+                                        </p>
+                                        
+                                        <div className="space-y-2">
+                                            <label className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest block">Keywords (แก้ไขโดยใช้ลูกน้ำคั่น)</label>
+                                            <input 
+                                                type="text" 
+                                                defaultValue={(item.metadata?.keywords || []).join(', ')}
+                                                onBlur={(e) => handleUpdateInsightKeywords(item.id, e.target.value)}
+                                                className="w-full text-xs font-bold text-indigo-600 bg-slate-50 p-2 rounded-lg outline-none focus:ring-1 focus:ring-purple-200"
+                                            />
+                                        </div>
+                                        
+                                        <div className="flex gap-2 pt-2">
+                                            <button 
+                                                onClick={() => handleVerifyInsight(item.id)}
+                                                className="flex-1 bg-emerald-500 text-white py-2 rounded-xl text-xs font-bold hover:bg-emerald-600 transition-all shadow-sm"
+                                            >
+                                                Approve & Save
+                                            </button>
+                                            <button 
+                                                onClick={() => handleDeleteKnowledge(item.id)}
+                                                className="px-4 bg-slate-100 text-slate-400 py-2 rounded-xl text-xs font-bold hover:bg-rose-50 hover:text-rose-500 transition-all"
+                                            >
+                                                Delete
+                                            </button>
+                                        </div>
+                                    </Card>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
@@ -531,6 +660,17 @@ if (!Icons.Money) {
         <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <line x1="12" y1="1" x2="12" y2="23"></line>
             <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+        </svg>
+    );
+}
+
+// Minimal Alert icon
+if (!Icons.Alert) {
+    Icons.Alert = ({ size, className }) => (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
         </svg>
     );
 }
