@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { supabase } from "../../../lib/supabaseClient";
+import { supabase } from "../../../../lib/supabaseClient";
 import { format, addHours, startOfDay, endOfDay } from "date-fns";
 import { th } from "date-fns/locale";
 
