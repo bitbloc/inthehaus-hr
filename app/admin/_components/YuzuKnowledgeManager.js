@@ -430,6 +430,7 @@ export default function YuzuKnowledgeManager() {
                                     <tr>
                                         <th className="px-6 py-4">Time</th>
                                         <th className="px-6 py-4">Sender</th>
+                                        <th className="px-6 py-4">Staff</th>
                                         <th className="px-6 py-4">Amount (THB)</th>
                                         <th className="px-6 py-4">Proof</th>
                                         <th className="px-6 py-4 text-center">Action</th>
@@ -438,11 +439,11 @@ export default function YuzuKnowledgeManager() {
                                 <tbody className="divide-y divide-slate-50">
                                     {slipLoading ? (
                                         <tr>
-                                            <td colSpan="5" className="p-12 text-center text-slate-400 italic">กำลังดึงข้อมูลสลิป...</td>
+                                            <td colSpan="6" className="p-12 text-center text-slate-400 italic">กำลังดึงข้อมูลสลิป...</td>
                                         </tr>
                                     ) : slips.length === 0 ? (
                                         <tr>
-                                            <td colSpan="5" className="p-20 text-center">
+                                            <td colSpan="6" className="p-20 text-center">
                                                 <p className="text-slate-300 font-bold uppercase tracking-widest mb-1">No Transactions</p>
                                                 <p className="text-slate-400 text-[10px]">ไม่พบข้อมูลสลิปในวันที่เลือก</p>
                                             </td>
@@ -456,7 +457,12 @@ export default function YuzuKnowledgeManager() {
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <div className="font-medium text-slate-600">
-                                                        {getEmployeeName(slip.user_id, slip.sender_name)}
+                                                        {slip.sender_name || 'External'}
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="font-medium text-slate-500 text-[10px] uppercase font-bold tracking-widest">
+                                                        {getEmployeeName(slip.user_id, '-')}
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-4">
