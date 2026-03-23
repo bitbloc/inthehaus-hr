@@ -13,7 +13,7 @@ function SlipPDFReportContent() {
     const [loading, setLoading] = useState(true);
     const [employees, setEmployees] = useState([]);
 
-    const reportDate = dateParam || format(addHours(new Date(), 7), 'yyyy-MM-dd');
+    const reportDate = dateParam || format(new Date(), 'yyyy-MM-dd');
 
     useEffect(() => {
         const fetchData = async () => {
@@ -64,7 +64,7 @@ function SlipPDFReportContent() {
                 </div>
                 <div className="text-right">
                     <div className="text-4xl font-black tracking-tighter">{format(new Date(reportDate), 'dd MMM yyyy', { locale: th })}</div>
-                    <div className="text-[10px] font-bold tracking-widest uppercase opacity-40">Report Generated: {format(addHours(new Date(), 7), 'HH:mm:ss')}</div>
+                    <div className="text-[10px] font-bold tracking-widest uppercase opacity-40">Report Generated: {format(new Date(), 'HH:mm:ss')}</div>
                 </div>
             </div>
 
