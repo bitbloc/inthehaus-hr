@@ -97,9 +97,8 @@ export async function getDailyContent(groupId) {
         const nameMap = {};
         if (employees) {
             employees.forEach(emp => {
-                // Prioritize Bot ID, fallback to Check-in ID for chat mapping
-                const uid = emp.line_bot_id || emp.line_user_id;
-                if (uid) nameMap[uid] = emp.nickname || emp.name;
+                if (emp.line_bot_id) nameMap[emp.line_bot_id.toLowerCase()] = emp.nickname || emp.name;
+                if (emp.line_user_id) nameMap[emp.line_user_id.toLowerCase()] = emp.nickname || emp.name;
             });
         }
         
@@ -109,7 +108,7 @@ export async function getDailyContent(groupId) {
             if (item.message_type === 'image_description') prefix = '[ภาพ]: ';
             else if (item.message_type === 'mood_booster') prefix = '💖 [คำชม]: ';
             else if (item.role === 'user') {
-                const name = nameMap[item.user_id] || '(บุคคลนิรนาม/UID ผิด)';
+                const name = (item.user_id && nameMap[item.user_id.toLowerCase()]) || '(บุคคลนิรนาม/UID ผิด)';
                 prefix = `👤 ${name}: `;
             }
             
@@ -206,11 +205,11 @@ export async function getEmployeeByLineId(lineUserId) {
     try {
         const client = getSupabase();
         
-        // Match by line_bot_id (Yuzu's UID) or line_user_id as fallback
+        // Match by line_bot_id (Yuzu's UID) or line_user_id as fallback (Case-insensitive)
         const { data, error } = await client
             .from('employees')
             .select('name, nickname, position, employment_status, line_bot_id, line_user_id')
-            .or(`line_bot_id.eq.${lineUserId},line_user_id.eq.${lineUserId}`)
+            .or(`line_bot_id.ilike.${lineUserId},line_user_id.ilike.${lineUserId}`)
             .eq('is_active', true)
             .maybeSingle();
 
