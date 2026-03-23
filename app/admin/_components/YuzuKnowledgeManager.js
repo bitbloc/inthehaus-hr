@@ -59,7 +59,7 @@ export default function YuzuKnowledgeManager() {
             if (employees.length === 0) {
                 const { data: empData } = await supabase
                     .from('employees')
-                    .select('id, name, nickname')
+                    .select('id, name, nickname, line_bot_id, line_user_id')
                     .eq('is_active', true);
                 if (empData) setEmployees(empData);
             }
