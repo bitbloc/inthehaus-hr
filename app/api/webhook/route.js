@@ -512,7 +512,11 @@ export async function POST(request) {
                      await client.replyMessage(event.replyToken, { type: 'text', text: `เมี๊ยว~ บันทึกสลิปไม่สำเร็จค่ะ (Error: ${insertError.message || insertError.code || 'Unknown DB Error'})` });
                  }
               } else {
-                 await client.replyMessage(event.replyToken, { type: 'text', text: `บันทึกยอดโอน ${parsedAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท เรียบร้อยค่ะ เมี๊ยว~ 💸\nผู้ส่งสลิป: ${senderName}` });
+                 const msgText = `บันทึกยอดโอน ${parsedAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท เรียบร้อยค่ะ เมี๊ยว~ 💸\n` +
+                                 `ธนาคาร: ${result.bankName || 'ไม่ระบุ'}\n` +
+                                 `ผู้โอน: ${result.senderName || 'ไม่ระบุ'}\n` +
+                                 `ผู้ส่งสลิป: ${senderName}`;
+                 await client.replyMessage(event.replyToken, { type: 'text', text: msgText });
               }
               handledLocally = true;
             } 
