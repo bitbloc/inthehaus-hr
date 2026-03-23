@@ -414,7 +414,7 @@ export default function YuzuKnowledgeManager() {
                         </div>
                         
                         <a 
-                            href={`/admin/yuzu/slips/report?date=${selectedDate}`} 
+                            href={`/admin/report/slips?date=${selectedDate}`} 
                             target="_blank"
                             className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold text-[10px] tracking-[0.2em] uppercase shadow-xl hover:bg-black transition-all flex items-center gap-2"
                         >
