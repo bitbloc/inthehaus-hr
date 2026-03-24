@@ -14,6 +14,11 @@ export default function YuzuKnowledgeManager() {
     const [config, setConfig] = useState({ father_uid: '', mother_uid: '' });
     
     const [newContent, setNewContent] = useState('');
+    const [newImageUrl, setNewImageUrl] = useState('');
+    const [newFile, setNewFile] = useState(null);
+    const [editingId, setEditingId] = useState(null);
+    const [editingContent, setEditingContent] = useState('');
+    const [editingImageUrl, setEditingImageUrl] = useState('');
     const [loading, setLoading] = useState(false);
     const [slipLoading, setSlipLoading] = useState(false);
     const [message, setMessage] = useState('');
@@ -105,20 +110,69 @@ export default function YuzuKnowledgeManager() {
     };
 
     async function handleAddKnowledge() {
-        if (!newContent) return;
+        if (!newContent && !newFile) return;
         setLoading(true);
-        setMessage('กำลังประมวลผล Embedding...');
+        setMessage('กำลังประมวลผล...');
         
         try {
-            const res = await fetch('/api/yuzu/knowledge', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ content: newContent })
-            });
+            let res;
+            if (newFile) {
+                const formData = new FormData();
+                formData.append('file', newFile);
+                formData.append('metadata', JSON.stringify({ 
+                    image_url: newImageUrl,
+                    source: 'upload'
+                }));
+                res = await fetch('/api/yuzu/knowledge', {
+                    method: 'POST',
+                    body: formData
+                });
+            } else {
+                res = await fetch('/api/yuzu/knowledge', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        content: newContent,
+                        metadata: { image_url: newImageUrl }
+                    })
+                });
+            }
+            
             const result = await res.json();
             if (result.success) {
                 setMessage('เพิ่มความรู้สำเร็จ! ✨');
                 setNewContent('');
+                setNewImageUrl('');
+                setNewFile(null);
+                fetchData();
+            } else {
+                setMessage('ผิดพลาด: ' + result.error);
+            }
+        } catch (e) {
+            setMessage('Error: ' + e.message);
+        }
+        setLoading(false);
+    }
+
+    async function handleUpdateKnowledge() {
+        if (!editingId) return;
+        setLoading(true);
+        setMessage('กำลังอัปเดตข้อมูล...');
+        
+        try {
+            const res = await fetch('/api/yuzu/knowledge', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    id: editingId,
+                    content: editingContent,
+                    metadata: { image_url: editingImageUrl }
+                })
+            });
+            const result = await res.json();
+            if (result.success) {
+                setMessage('อัปเดตความรู้สำเร็จ! ✨');
+                setEditingId(null);
                 fetchData();
             } else {
                 setMessage('ผิดพลาด: ' + result.error);
@@ -245,21 +299,49 @@ export default function YuzuKnowledgeManager() {
                             Add New Fact
                         </h3>
                         <div className="space-y-3">
-                            <textarea
-                                className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl h-48 text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-orange-200 transition-all resize-none"
-                                placeholder="ป้อนข้อมูลความรู้ให้น้องยูซุ..."
-                                value={newContent}
-                                onChange={(e) => setNewContent(e.target.value)}
-                            />
-                            <button
-                                onClick={handleAddKnowledge}
-                                disabled={loading || !newContent}
-                                className="w-full py-3 bg-orange-500 text-white rounded-xl font-bold shadow-lg shadow-orange-100 hover:bg-orange-600 disabled:opacity-50 transition-all active:scale-95 flex items-center justify-center gap-2"
-                            >
-                                {loading ? <span className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" /> : <Icons.Plus size={16} />}
-                                {loading ? "Processing..." : "Teach Yuzu"}
-                            </button>
-                            {message && <p className={`text-xs font-bold text-center ${message.includes("สำเร็จ") ? "text-emerald-500" : "text-orange-500"}`}>{message}</p>}
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Content / Fact</label>
+                                <textarea
+                                    className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl h-40 text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-orange-200 transition-all resize-none"
+                                    placeholder="ป้อนข้อมูลความรู้ให้น้องยูซุ..."
+                                    value={newContent}
+                                    onChange={(e) => setNewContent(e.target.value)}
+                                />
+                            </div>
+                            
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Image URL (Optional)</label>
+                                <input
+                                    type="text"
+                                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-600 outline-none focus:ring-2 focus:ring-orange-200"
+                                    placeholder="https://example.com/image.png"
+                                    value={newImageUrl}
+                                    onChange={(e) => setNewImageUrl(e.target.value)}
+                                />
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Upload File (PDF/Image)</label>
+                                <input
+                                    type="file"
+                                    accept="application/pdf,image/*"
+                                    className="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-orange-50 file:text-orange-600 hover:file:bg-orange-100 cursor-pointer"
+                                    onChange={(e) => setNewFile(e.target.files[0])}
+                                />
+                                {newFile && <p className="text-[9px] text-emerald-500 font-bold px-1 mt-1">Ready to upload: {newFile.name}</p>}
+                            </div>
+
+                            <div className="pt-2">
+                                <button
+                                    onClick={handleAddKnowledge}
+                                    disabled={loading || (!newContent && !newFile)}
+                                    className="w-full py-3 bg-orange-500 text-white rounded-xl font-bold shadow-lg shadow-orange-100 hover:bg-orange-600 disabled:opacity-50 transition-all active:scale-95 flex items-center justify-center gap-2"
+                                >
+                                    {loading ? <span className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" /> : <Icons.Plus size={16} />}
+                                    {loading ? "Processing..." : "Teach Yuzu"}
+                                </button>
+                                {message && <p className={`text-xs font-bold text-center mt-3 ${message.includes("สำเร็จ") ? "text-emerald-500" : "text-orange-500"}`}>{message}</p>}
+                            </div>
                         </div>
                     </Card>
 
@@ -287,10 +369,61 @@ export default function YuzuKnowledgeManager() {
                                     <tbody className="divide-y divide-slate-50">
                                         {filteredKnowledge.map((k) => (
                                             <tr key={k.id} className="group hover:bg-orange-50/30 transition-colors">
-                                                <td className="px-6 py-4"><p className="text-slate-700 text-sm whitespace-pre-wrap leading-relaxed">{k.content}</p></td>
+                                                <td className="px-6 py-4">
+                                                    {editingId === k.id ? (
+                                                        <div className="space-y-3 p-2 bg-white rounded-xl border border-orange-100 shadow-sm">
+                                                            <textarea 
+                                                                className="w-full p-3 bg-slate-50 rounded-lg text-sm text-slate-700 outline-none h-40 resize-none font-medium border border-slate-200"
+                                                                value={editingContent}
+                                                                onChange={(e) => setEditingContent(e.target.value)}
+                                                            />
+                                                            <div className="space-y-1">
+                                                                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Image URL</label>
+                                                                <input 
+                                                                    type="text"
+                                                                    className="w-full p-2 bg-slate-50 rounded-lg text-xs font-medium border border-slate-200"
+                                                                    value={editingImageUrl}
+                                                                    onChange={(e) => setEditingImageUrl(e.target.value)}
+                                                                />
+                                                            </div>
+                                                            <div className="flex gap-2">
+                                                                <button onClick={handleUpdateKnowledge} className="flex-1 py-2 bg-orange-500 text-white rounded-lg font-bold text-xs hover:bg-orange-600">Save</button>
+                                                                <button onClick={() => setEditingId(null)} className="px-4 py-2 bg-slate-100 text-slate-500 rounded-lg font-bold text-xs hover:bg-slate-200">Cancel</button>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex gap-4 items-start">
+                                                            {k.metadata?.image_url && (
+                                                                <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 border border-slate-100">
+                                                                    <img src={k.metadata.image_url} alt="Reference" className="w-full h-full object-cover" />
+                                                                </div>
+                                                            )}
+                                                            <div className="space-y-2 flex-1">
+                                                                {k.metadata?.file_type === 'pdf' && (
+                                                                    <div className="flex items-center gap-2 text-[10px] font-bold text-rose-500 uppercase bg-rose-50 px-2 py-1 rounded w-fit">
+                                                                        <Icons.File size={10} /> PDF: {k.metadata.file_name}
+                                                                    </div>
+                                                                )}
+                                                                <p className="text-slate-700 text-sm whitespace-pre-wrap leading-relaxed">{k.content}</p>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </td>
                                                 <td className="px-6 py-4 whitespace-nowrap"><span className="text-[10px] font-bold text-slate-400">{new Date(k.created_at).toLocaleDateString("th-TH")}</span></td>
-                                                <td className="px-6 py-4 text-right">
-                                                    <button onClick={() => handleDeleteKnowledge(k.id)} className="p-2 text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 rounded-full hover:bg-rose-50 transition-all"><Icons.Trash size={14} /></button>
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                                                        <button 
+                                                            onClick={() => {
+                                                                setEditingId(k.id);
+                                                                setEditingContent(k.content);
+                                                                setEditingImageUrl(k.metadata?.image_url || '');
+                                                            }} 
+                                                            className="p-2 text-slate-300 hover:text-orange-500 rounded-full hover:bg-orange-50 transition-all"
+                                                        >
+                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4L18.5 2.5z"></path></svg>
+                                                        </button>
+                                                        <button onClick={() => handleDeleteKnowledge(k.id)} className="p-2 text-slate-300 hover:text-rose-500 rounded-full hover:bg-rose-50 transition-all"><Icons.Trash size={14} /></button>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         ))}

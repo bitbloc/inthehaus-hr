@@ -1,5 +1,6 @@
 import { getGenAI } from './gemini-client.js';
 import { createClient } from '@supabase/supabase-js';
+import { PDFParse } from 'pdf-parse';
 
 let supabase = null;
 
@@ -104,18 +105,65 @@ export async function addKnowledge(content, metadata = {}) {
         }
 
         const client = getSupabase();
-        const { error } = await client
+        const { data, error } = await client
             .from('yuzu_knowledge')
             .insert({
                 content,
                 metadata,
                 embedding: result.values
-            });
+            })
+            .select();
+
+        if (error) throw error;
+        return { success: true, data: data[0] };
+    } catch (error) {
+        console.error("Add Knowledge Error:", error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Update a knowledge entry
+ */
+export async function updateKnowledge(id, content, metadata = {}) {
+    try {
+        const client = getSupabase();
+        const updateData = { metadata };
+        
+        // If content is provided, regenerate embedding
+        if (content) {
+            updateData.content = content;
+            const result = await getEmbedding(content, 'RETRIEVAL_DOCUMENT', metadata.title || null);
+            if (result.error || !result.values) {
+                throw new Error(result.error || "Could not generate embedding for updated content");
+            }
+            updateData.embedding = result.values;
+        }
+
+        const { error } = await client
+            .from('yuzu_knowledge')
+            .update(updateData)
+            .eq('id', id);
 
         if (error) throw error;
         return { success: true };
     } catch (error) {
-        console.error("Add Knowledge Error:", error);
+        console.error("Update Knowledge Error:", error);
         return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Extract text from PDF buffer
+ */
+export async function extractTextFromPDF(buffer) {
+    try {
+        const parser = new PDFParse({ data: buffer });
+        const result = await parser.getText();
+        await parser.destroy();
+        return result.text;
+    } catch (error) {
+        console.error("PDF Extraction Error:", error);
+        throw new Error("Failed to extract text from PDF: " + error.message);
     }
 }
