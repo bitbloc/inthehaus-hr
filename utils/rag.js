@@ -1,6 +1,7 @@
 import { getGenAI } from './gemini-client.js';
 import { createClient } from '@supabase/supabase-js';
-import { PDFParse } from 'pdf-parse';
+
+let PDFParse = null;
 
 let supabase = null;
 
@@ -158,6 +159,22 @@ export async function updateKnowledge(id, content, metadata = {}) {
  */
 export async function extractTextFromPDF(buffer) {
     try {
+        if (!PDFParse) {
+            console.log("Attempting to load pdf-parse dynamically...");
+            try {
+                const pdfModule = await import('pdf-parse');
+                PDFParse = pdfModule.PDFParse;
+                console.log("PDFParse library loaded successfully");
+            } catch (importError) {
+                console.error("Failed to load pdf-parse library:", importError.message);
+                throw new Error("PDF support is currently unavailable: " + importError.message);
+            }
+        }
+        
+        if (!PDFParse) {
+            throw new Error("PDFParse library could not be initialized");
+        }
+
         const parser = new PDFParse({ data: buffer });
         const result = await parser.getText();
         await parser.destroy();

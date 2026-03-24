@@ -138,7 +138,15 @@ export default function YuzuKnowledgeManager() {
                 });
             }
             
-            const result = await res.json();
+            // Improved error handling for non-JSON responses
+            let result;
+            const contentType = res.headers.get("content-type");
+            if (contentType && contentType.includes("application/json")) {
+                result = await res.json();
+            } else {
+                const text = await res.text();
+                throw new Error(`Server returned non-JSON response (${res.status}): ${text.slice(0, 100)}...`);
+            }
             if (result.success) {
                 setMessage('เพิ่มความรู้สำเร็จ! ✨');
                 setNewContent('');
@@ -169,7 +177,17 @@ export default function YuzuKnowledgeManager() {
                     metadata: { image_url: editingImageUrl }
                 })
             });
-            const result = await res.json();
+
+            // Improved error handling for non-JSON responses
+            let result;
+            const contentType = res.headers.get("content-type");
+            if (contentType && contentType.includes("application/json")) {
+                result = await res.json();
+            } else {
+                const text = await res.text();
+                throw new Error(`Server returned non-JSON response (${res.status}): ${text.slice(0, 100)}...`);
+            }
+            
             if (result.success) {
                 setMessage('อัปเดตความรู้สำเร็จ! ✨');
                 setEditingId(null);
