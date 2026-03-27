@@ -114,16 +114,25 @@ export async function getGeminiResponse(query, context = "", history = [], userI
 /**
  * Handle Vision requests (Classify and Analyze)
  */
-export async function classifyAndAnalyzeImage(imageBase64, mimeType = "image/jpeg", context = "", isBoss = false, positionInstruction = "") {
+export async function classifyAndAnalyzeImage(imageBase64, mimeType = "image/jpeg", context = "", bossRole = null, positionInstruction = "") {
     try {
         const instance = getGenAI();
         if (!instance) return { isFood: false, analysis: "AI Instance error", shortDescription: "" };
         
         const model = instance.getGenerativeModel({ model: "gemini-3-flash-preview" });
         
-        const catInstruction = isBoss 
-            ? "พากย์ความรู้สึกแมวในรูป: ต้องนอบน้อม สุภาพ ประจบประแจง เหมือนแมวที่รักและเคารพเจ้าของมากที่สุดในโลก (เช่น รักคุณพ่อที่สุด, คุณแม่สวยจังเลยค่ะ, นวดๆ ให้ค่ะบอส)"
-            : `พากย์ความรู้สึกแมวในรูป: ต้องปากแซ่บ กวนประสาท จิกกัดคนถ่ายตามหน้าที่ความรับผิดชอบของเขา: ${positionInstruction || 'จิกกัดทั่วไปแบบแมวปากร้าย'}`;
+        const isBoss = bossRole !== null;
+        let catInstruction = "";
+        
+        if (bossRole === "คุณพ่อ") {
+            catInstruction = "พากย์ความรู้สึกแมวในรูป: ต้องนอบน้อม สุภาพ ประจบประแจง เหมือนแมวที่รักและเคารพคุณพ่อที่สุดในโลก (เช่น รักคุณพ่อที่สุดเลยค่ะ, นวดๆ ให้ค่ะคุณพ่อ)";
+        } else if (bossRole === "คุณแม่") {
+            catInstruction = "พากย์ความรู้สึกแมวในรูป: ต้องนอบน้อม สุภาพ ประจบประแจง เหมือนแมวที่รักและเคารพคุณแม่ที่สุดในโลก (เช่น รักคุณแม่ที่สุดเลยค่ะ, คุณแม่สวยจังเลยค่ะ, นวดๆ ให้ค่ะคุณแม่)";
+        } else if (isBoss) {
+            catInstruction = "พากย์ความรู้สึกแมวในรูป: ต้องนอบน้อม สุภาพ ประจบประแจง เหมือนแมวที่รักและเคารพเจ้านายที่สุดในโลก (เช่น รักบอสที่สุดเลยค่ะ, นวดๆ ให้ค่ะบอส)";
+        } else {
+            catInstruction = `พากย์ความรู้สึกแมวในรูป: ต้องปากแซ่บ กวนประสาท จิกกัดคนถ่ายตามหน้าที่ความรับผิดชอบของเขา: ${positionInstruction || 'จิกกัดทั่วไปแบบแมวปากร้าย'}`;
+        }
 
         const systemPrompt = `คุณคือระบบวิเคราะห์รูปภาพของ Yuzu Bot ทีมงาน In The Haus
         1. ตรวจสอบว่ารูปนี้คือ "รูปถ่ายสลิปโอนเงินธนาคาร", "รูปถ่ายอาหาร", "วัตถุดิบ", "ใบเสร็จซื้อของ" หรือ "รูปถ่ายแมว" หรือไม่

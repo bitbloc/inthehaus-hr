@@ -427,8 +427,14 @@ export async function POST(request) {
 
             const context = await getIngredientPrices();
 
+            // Resolve specific boss role
+            let bossRole = null;
+            if (userId === configs.father_uid) bossRole = "คุณพ่อ";
+            else if (userId === configs.mother_uid) bossRole = "คุณแม่";
+            else if (isBoss) bossRole = "บอส";
+
             // Refined Vision Logic with Role Context
-            const result = await classifyAndAnalyzeImage(base64, "image/jpeg", context, isBoss, positionInstruction);
+            const result = await classifyAndAnalyzeImage(base64, "image/jpeg", context, bossRole, positionInstruction);
 
             // Always save image description for summary (Retention 2 days handled in cleanup)
             await saveMessage(groupId, userId, 'user', result.shortDescription, 'image_description');
