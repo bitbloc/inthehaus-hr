@@ -103,13 +103,38 @@ export async function POST(request) {
                 { type: 'separator', margin: 'md' }
               ];
 
+              const { format, addHours, parseISO } = await import('date-fns');
+              
               roster.forEach(emp => {
+                const shiftStart = emp.shift?.start_time?.slice(0,5);
+                const shiftEnd = emp.shift?.end_time?.slice(0,5);
+                
+                let statusEmoji = "⏳";
+                let statusColor = "#666666";
+                let actualTimeStr = "";
+
+                if (emp.attendance?.check_in) {
+                  statusEmoji = "✅";
+                  statusColor = "#1DB446";
+                  actualTimeStr = format(addHours(new Date(emp.attendance.check_in), 7), "HH:mm");
+                  
+                  // Late detection: Compare actualTimeStr with shiftStart
+                  if (shiftStart && actualTimeStr > shiftStart) {
+                    statusColor = "#ff4b00"; // Late
+                    statusEmoji = "⚠️"; 
+                  }
+                }
+                if (emp.attendance?.check_out) {
+                  statusEmoji = "🛑";
+                  statusColor = "#666666";
+                }
+
                 contents.push({
                   type: 'box', layout: 'horizontal', margin: 'md',
                   contents: [
-                    { type: 'text', text: emp.nickname || emp.name, flex: 3, size: 'sm', weight: 'bold' },
-                    { type: 'text', text: emp.shift?.name || 'Custom', flex: 2, size: 'xs', color: '#666666', align: 'center' },
-                    { type: 'text', text: `${emp.shift?.start_time?.slice(0,5)}-${emp.shift?.end_time?.slice(0,5)}`, flex: 3, size: 'sm', align: 'end', color: emp.isOverride ? '#ff4b00' : '#333333' }
+                    { type: 'text', text: `${statusEmoji} ${emp.nickname || emp.name}`, flex: 3, size: 'sm', weight: 'bold', color: statusColor },
+                    { type: 'text', text: emp.shift?.name || 'Custom', flex: 2, size: 'xs', color: '#aaaaaa', align: 'center' },
+                    { type: 'text', text: actualTimeStr ? `${actualTimeStr} (${shiftStart})` : `${shiftStart}-${shiftEnd}`, flex: 3, size: 'sm', align: 'end', color: (statusColor === '#ff4b00') ? '#ff4b00' : (emp.isOverride ? '#007bff' : '#333333') }
                   ]
                 });
               });

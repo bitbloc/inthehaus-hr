@@ -46,6 +46,17 @@ export async function getEffectiveRoster(dateObj) {
         // Continue but without overrides
     }
 
+    // 3. Fetch Attendance Logs for this specific date
+    const { data: logs, error: logErr } = await supabase
+        .from('attendance_logs')
+        .select('employee_id, action_type, timestamp')
+        .gte('timestamp', startOfDay(targetDate).toISOString())
+        .lte('timestamp', endOfDay(targetDate).toISOString());
+
+    if (logErr) {
+        console.error("Error fetching attendance logs:", logErr);
+    }
+
     const rosterMap = new Map();
 
     // Populate base schedule
@@ -55,7 +66,8 @@ export async function getEffectiveRoster(dateObj) {
                 rosterMap.set(sched.employee_id, {
                     ...sched.employees,
                     shift: { ...sched.shifts },
-                    isOverride: false
+                    isOverride: false,
+                    attendance: { check_in: null, check_out: null }
                 });
             }
         });
@@ -69,16 +81,41 @@ export async function getEffectiveRoster(dateObj) {
                 rosterMap.delete(ov.employee_id);
             } else {
                 // Upsert with custom shift or custom time
-                // If they didn't have a shift, we add them
                 const shiftData = ov.shifts ? { ...ov.shifts } : { name: "Custom Shift" };
                 if (ov.custom_start_time) shiftData.start_time = ov.custom_start_time;
                 if (ov.custom_end_time) shiftData.end_time = ov.custom_end_time;
 
+                const existing = rosterMap.get(ov.employee_id);
                 rosterMap.set(ov.employee_id, {
                     ...ov.employees,
                     shift: shiftData,
-                    isOverride: true
+                    isOverride: true,
+                    attendance: existing?.attendance || { check_in: null, check_out: null }
                 });
+            }
+        });
+    }
+
+    // Apply Attendance Logs
+    if (logs) {
+        logs.forEach(log => {
+            const emp = rosterMap.get(log.employee_id);
+            if (emp) {
+                if (log.action_type === 'check_in') {
+                    // Use earliest check-in
+                    if (!emp.attendance.check_in || new Date(log.timestamp) < new Date(emp.attendance.check_in)) {
+                        emp.attendance.check_in = log.timestamp;
+                    }
+                } else if (log.action_type === 'check_out') {
+                    // Use latest check-out
+                    if (!emp.attendance.check_out || new Date(log.timestamp) > new Date(emp.attendance.check_out)) {
+                        emp.attendance.check_out = log.timestamp;
+                    }
+                }
+            } else {
+                // Someone checked in but NOT in roster
+                // Let's fetch their name if needed, but for now we might skip or just show "Extra"
+                // Actually, let's fetch in a separate step or just ignore for simplicity now
             }
         });
     }
