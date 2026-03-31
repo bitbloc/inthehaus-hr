@@ -611,11 +611,115 @@ export async function POST(request) {
                      await client.replyMessage(event.replyToken, { type: 'text', text: `เมี๊ยว~ บันทึกสลิปไม่สำเร็จค่ะ (Error: ${insertError.message || insertError.code || 'Unknown DB Error'})` });
                  }
               } else {
-                 const msgText = `บันทึกยอดโอน ${parsedAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท เรียบร้อยค่ะ เมี๊ยว~ 💸\n` +
-                                 `ธนาคาร: ${result.bankName || 'ไม่ระบุ'}\n` +
-                                 `ผู้โอน: ${result.senderName || 'ไม่ระบุ'}\n` +
-                                 `ผู้ส่งสลิป: ${senderName}`;
-                 await client.replyMessage(event.replyToken, { type: 'text', text: msgText });
+                 const slipFlexMsg = {
+                   type: 'flex',
+                   altText: `บันทึกยอดโอน ${parsedAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท เรียบร้อยค่ะ`,
+                   contents: {
+                     type: 'bubble',
+                     size: 'kilo',
+                     header: {
+                       type: 'box',
+                       layout: 'vertical',
+                       backgroundColor: '#1DB446',
+                       paddingAll: '20px',
+                       contents: [
+                         {
+                           type: 'text',
+                           text: 'RECEIPT',
+                           color: '#ffffff80',
+                           size: 'xs',
+                           weight: 'bold'
+                         },
+                         {
+                           type: 'text',
+                           text: 'บันทึกยอดเงินสำเร็จ',
+                           color: '#ffffff',
+                           size: 'lg',
+                           weight: 'bold',
+                           margin: 'xs'
+                         }
+                       ]
+                     },
+                     body: {
+                       type: 'box',
+                       layout: 'vertical',
+                       paddingAll: '20px',
+                       contents: [
+                         {
+                           type: 'box',
+                           layout: 'horizontal',
+                           contents: [
+                             {
+                               type: 'text',
+                               text: 'ยอดโอน',
+                               color: '#8c8c8c',
+                               size: 'sm',
+                               gravity: 'center',
+                               flex: 1
+                             },
+                             {
+                               type: 'text',
+                               text: `฿${parsedAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})}`,
+                               align: 'end',
+                               color: '#1DB446',
+                               size: 'xl',
+                               weight: 'bold',
+                               flex: 2
+                             }
+                           ]
+                         },
+                         { type: 'separator', margin: 'lg' },
+                         {
+                           type: 'box',
+                           layout: 'vertical',
+                           margin: 'lg',
+                           spacing: 'sm',
+                           contents: [
+                             {
+                               type: 'box',
+                               layout: 'horizontal',
+                               contents: [
+                                 { type: 'text', text: 'ธนาคาร', size: 'sm', color: '#8c8c8c', flex: 1 },
+                                 { type: 'text', text: result.bankName || 'ไม่ระบุ', size: 'sm', color: '#333333', align: 'end', flex: 2, wrap: true }
+                               ]
+                             },
+                             {
+                               type: 'box',
+                               layout: 'horizontal',
+                               contents: [
+                                 { type: 'text', text: 'ผู้โอน', size: 'sm', color: '#8c8c8c', flex: 1 },
+                                 { type: 'text', text: result.senderName || 'ไม่ระบุ', size: 'sm', color: '#333333', align: 'end', flex: 2, wrap: true }
+                               ]
+                             },
+                             {
+                               type: 'box',
+                               layout: 'horizontal',
+                               contents: [
+                                 { type: 'text', text: 'ผู้ส่งสลิป', size: 'sm', color: '#8c8c8c', flex: 1 },
+                                 { type: 'text', text: senderName, size: 'sm', color: '#333333', align: 'end', flex: 2, wrap: true }
+                               ]
+                             }
+                           ]
+                         }
+                       ]
+                     },
+                     footer: {
+                       type: 'box',
+                       layout: 'vertical',
+                       paddingAll: '20px',
+                       contents: [
+                         {
+                           type: 'text',
+                           text: 'Yuzu AI จัดการให้แล้วค่ะ เมี๊ยว~ 🐾',
+                           size: 'xs',
+                           align: 'center',
+                           color: '#b0b0b0'
+                         }
+                       ]
+                     }
+                   }
+                 };
+                 await client.replyMessage(event.replyToken, slipFlexMsg);
               }
               handledLocally = true;
             } 
