@@ -5,6 +5,7 @@ import { getGeminiResponse, classifyAndAnalyzeImage, getDailySummary, generateIm
 import { getGoldPrice, getOilPrice, getElectricityPrice, getIngredientPrices } from '../../../utils/price';
 import { saveMessage, getChatHistory, getDailyContent, cleanupOldHistory, getEmployeeHistory, getEmployeeByLineId, getAllEmployeesData, getYuzuConfigs, checkIsBoss } from '../../../utils/memory';
 import { getAccurateNews } from '../../../utils/news';
+import { getEffectiveRoster } from '../../../utils/roster';
 
 const client = new Client({
   channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN,
@@ -87,6 +88,38 @@ export async function POST(request) {
             if (count === 0) msg += "\nยังไม่มีการลงเวลาวันนี้";
 
             await client.replyMessage(event.replyToken, { type: 'text', text: msg });
+            handledLocally = true;
+          } else if (text === 'เช็คตาราง' || text === 'roster' || text === 'ตารางงาน') {
+            const { format, addHours, startOfTomorrow } = await import('date-fns');
+            const targetDate = text.includes('พรุ่งนี้') ? startOfTomorrow() : addHours(new Date(), 7);
+            const dateStr = format(targetDate, 'dd/MM/yyyy');
+            const roster = await getEffectiveRoster(targetDate);
+
+            if (roster.length === 0) {
+              await client.replyMessage(event.replyToken, { type: 'text', text: `📅 ตารางงานวันที่ ${dateStr}\n\nเมี๊ยว~ ยังไม่มีใครลงเวลายังไงเลยค่ะ` });
+            } else {
+              const contents = [
+                { type: 'text', text: `📅 ตารางงาน ${dateStr}`, weight: 'bold', size: 'lg', color: '#1DB446' },
+                { type: 'separator', margin: 'md' }
+              ];
+
+              roster.forEach(emp => {
+                contents.push({
+                  type: 'box', layout: 'horizontal', margin: 'md',
+                  contents: [
+                    { type: 'text', text: emp.nickname || emp.name, flex: 3, size: 'sm', weight: 'bold' },
+                    { type: 'text', text: emp.shift?.name || 'Custom', flex: 2, size: 'xs', color: '#666666', align: 'center' },
+                    { type: 'text', text: `${emp.shift?.start_time?.slice(0,5)}-${emp.shift?.end_time?.slice(0,5)}`, flex: 3, size: 'sm', align: 'end', color: emp.isOverride ? '#ff4b00' : '#333333' }
+                  ]
+                });
+              });
+
+              await client.replyMessage(event.replyToken, {
+                type: 'flex',
+                altText: `📅 ตารางงาน ${dateStr}`,
+                contents: { type: 'bubble', body: { type: 'box', layout: 'vertical', contents: contents } }
+              });
+            }
             handledLocally = true;
           } else if (text === 'ลางาน') {
             const { supabase } = await import('../../../lib/supabaseClient');
@@ -389,6 +422,42 @@ export async function POST(request) {
             await saveMessage(groupId, null, 'model', cleanedResponse, 'text');
 
             await client.replyMessage(event.replyToken, { type: 'text', text: cleanedResponse });
+            
+            // New: Handle Roster Proposals
+            if (response.includes('[ROSTER_ACTION]')) {
+              try {
+                const rosterPart = response.split('[ROSTER_ACTION]')[1].trim();
+                const actionData = JSON.parse(rosterPart);
+                
+                let summaryText = "";
+                if (actionData.type === 'LEAVE') summaryText = `ขอลาหยุด: ${actionData.employee_name}\nวันที่: ${actionData.date}\nเหตุผล: ${actionData.reason || '-'}`;
+                else if (actionData.type === 'SWAP') summaryText = `ขอสลับกะ: ${actionData.from} ↔️ ${actionData.to}\nวันที่: ${actionData.date}`;
+                else if (actionData.type === 'CHANGE') summaryText = `ขอปรับกะงาน: ${actionData.employee_name}\nวันที่: ${actionData.date}\nรายละเอียด: ${actionData.details?.note || '-'}`;
+
+                const confirmFlex = {
+                  type: 'bubble',
+                  header: { type: 'box', layout: 'vertical', backgroundColor: '#007bff', contents: [{ type: 'text', text: '📝 ยืนยันข้อมูลตารางงาน', color: '#ffffff', weight: 'bold' }] },
+                  body: {
+                    type: 'box', layout: 'vertical', contents: [
+                      { type: 'text', text: summaryText, wrap: true, size: 'sm' },
+                      { type: 'text', text: 'ข้อมูลถูกต้องไหมคะ? ถ้าใช่รบกวนกดยืนยันเพื่อส่งเรื่องให้บอสพิจารณาน้ำตาซึมค่ะ เมี๊ยว~', margin: 'md', size: 'xs', color: '#aaaaaa', wrap: true }
+                    ]
+                  },
+                  footer: {
+                    type: 'box', layout: 'horizontal', spacing: 'sm',
+                    contents: [
+                      { type: 'button', style: 'primary', color: '#06c755', action: { type: 'postback', label: '✅ ถูกต้อง', data: `action=confirm_roster&payload=${Buffer.from(JSON.stringify(actionData)).toString('base64')}` } },
+                      { type: 'button', style: 'secondary', action: { type: 'postback', label: '❌ ยกเลิก', data: 'action=cancel_roster' } }
+                    ]
+                  }
+                };
+
+                await client.pushMessage(groupId, { type: 'flex', altText: '📝 ยืนยันข้อมูลตารางงาน', contents: confirmFlex });
+              } catch (e) {
+                console.error("Roster Action Error:", e);
+              }
+            }
+
             handledLocally = true;
           } else {
             // Save all messages for the daily summary (even non-yuzu ones)
