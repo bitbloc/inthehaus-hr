@@ -428,6 +428,7 @@ export async function POST(request) {
               try {
                 const rosterPart = response.split('[ROSTER_ACTION]')[1].trim();
                 const actionData = JSON.parse(rosterPart);
+                const isBoss = await checkIsBoss(userId);
                 
                 let summaryText = "";
                 if (actionData.type === 'LEAVE') summaryText = `ขอลาหยุด: ${actionData.employee_name}\nวันที่: ${actionData.date}\nเหตุผล: ${actionData.reason || '-'}`;
@@ -436,23 +437,23 @@ export async function POST(request) {
 
                 const confirmFlex = {
                   type: 'bubble',
-                  header: { type: 'box', layout: 'vertical', backgroundColor: '#007bff', contents: [{ type: 'text', text: '📝 ยืนยันข้อมูลตารางงาน', color: '#ffffff', weight: 'bold' }] },
+                  header: { type: 'box', layout: 'vertical', backgroundColor: isBoss ? '#ffc107' : '#007bff', contents: [{ type: 'text', text: isBoss ? '👑 บอสสั่งแก้ตารางกะ!' : '📝 ยืนยันข้อมูลตารางงาน', color: isBoss ? '#000000' : '#ffffff', weight: 'bold' }] },
                   body: {
                     type: 'box', layout: 'vertical', contents: [
                       { type: 'text', text: summaryText, wrap: true, size: 'sm' },
-                      { type: 'text', text: 'ข้อมูลถูกต้องไหมคะ? ถ้าใช่รบกวนกดยืนยันเพื่อส่งเรื่องให้บอสพิจารณาน้ำตาซึมค่ะ เมี๊ยว~', margin: 'md', size: 'xs', color: '#aaaaaa', wrap: true }
+                      { type: 'text', text: isBoss ? 'ข้อมูลเป๊ะไหมคะบอส? กดอัปเดตเพื่อเปลี่ยนกะทันทีเงียบๆ ค่ะ เมี๊ยว~' : 'ข้อมูลถูกต้องไหมคะ? ถ้าใช่รบกวนกดยืนยันเพื่อส่งเรื่องให้บอสพิจารณาน้ำตาซึมค่ะ เมี๊ยว~', margin: 'md', size: 'xs', color: '#aaaaaa', wrap: true }
                     ]
                   },
                   footer: {
                     type: 'box', layout: 'horizontal', spacing: 'sm',
                     contents: [
-                      { type: 'button', style: 'primary', color: '#06c755', action: { type: 'postback', label: '✅ ถูกต้อง', data: `action=confirm_roster&payload=${Buffer.from(JSON.stringify(actionData)).toString('base64')}` } },
+                      { type: 'button', style: 'primary', color: '#06c755', action: { type: 'postback', label: isBoss ? '✅ ยืนยัน/อัปเดต' : '✅ ถูกต้อง', data: `action=confirm_roster&payload=${Buffer.from(JSON.stringify(actionData)).toString('base64')}` } },
                       { type: 'button', style: 'secondary', action: { type: 'postback', label: '❌ ยกเลิก', data: 'action=cancel_roster' } }
                     ]
                   }
                 };
 
-                await client.pushMessage(groupId, { type: 'flex', altText: '📝 ยืนยันข้อมูลตารางงาน', contents: confirmFlex });
+                await client.pushMessage(groupId, { type: 'flex', altText: isBoss ? '👑 บอสสั่งแก้ตาราง' : '📝 ยืนยันข้อมูลตารางงาน', contents: confirmFlex });
               } catch (e) {
                 console.error("Roster Action Error:", e);
               }
@@ -626,40 +627,157 @@ export async function POST(request) {
             console.error("Location Processing Error:", locationError);
           }
         }
+      } else if (event.type === 'postback') {
+        const groupId = event.source.groupId || event.source.userId;
+        const userId = event.source.userId;
+        const queryParams = new URLSearchParams(event.postback.data);
+        const action = queryParams.get('action');
+
+        if (action === 'confirm_roster') {
+          try {
+            const payload = JSON.parse(Buffer.from(queryParams.get('payload'), 'base64').toString());
+            const { supabase } = await import('../../../lib/supabaseClient');
+            const isBoss = await checkIsBoss(userId);
+            
+            // Resolve employee id
+            let targetEmpId = null;
+            let targetNickname = payload.employee_name;
+
+            if (isBoss && payload.employee_name) {
+              const { data: targetEmp } = await supabase.from('employees').select('id, nickname').ilike('nickname', `%${payload.employee_name}%`).limit(1).maybeSingle();
+              targetEmpId = targetEmp?.id;
+            }
+
+            if (!targetEmpId) {
+              const { data: senderEmp } = await supabase.from('employees').select('id, name, nickname').or(`line_bot_id.eq.${userId},line_user_id.eq.${userId}`).maybeSingle();
+              targetEmpId = senderEmp?.id;
+              targetNickname = senderEmp?.nickname || senderEmp?.name;
+            }
+            
+            if (!targetEmpId) {
+              await client.replyMessage(event.replyToken, { type: 'text', text: 'เมี๊ยว~ หาข้อมูลพนักงานไม่เจอค่ะ รบกวนแจ้งบอสให้ผูก ID ก่อนนะ' });
+              continue;
+            }
+
+            // Create Request (Status: APPROVED if Boss, PENDING if Staff)
+            const { data: request, error: reqErr } = await supabase.from('roster_requests').insert({
+              type: payload.type,
+              requester_id: (await getEmployeeByLineId(userId))?.id || targetEmpId,
+              target_date: payload.date,
+              reason: payload.reason || payload.details?.note || null,
+              new_shift_id: payload.details?.shift_id || null,
+              custom_start_time: payload.details?.start_time || null,
+              custom_end_time: payload.details?.end_time || null,
+              status: isBoss ? 'APPROVED' : 'PENDING',
+              manager_id: isBoss ? (await getEmployeeByLineId(userId))?.id : null
+            }).select().single();
+
+            if (reqErr) throw reqErr;
+
+            if (isBoss) {
+              // Boss Direct Update
+              if (payload.type === 'LEAVE') {
+                await supabase.from('roster_overrides').upsert({ employee_id: targetEmpId, date: payload.date, is_off: true, reference_request_id: request.id });
+              } else {
+                await supabase.from('roster_overrides').upsert({ 
+                  employee_id: targetEmpId, 
+                  date: payload.date, 
+                  shift_id: payload.details?.shift_id || null,
+                  custom_start_time: payload.details?.start_time || null,
+                  custom_end_time: payload.details?.end_time || null,
+                  is_off: false,
+                  reference_request_id: request.id 
+                });
+              }
+              await client.replyMessage(event.replyToken, { type: 'text', text: `✅ บอสสั่งมา ยูซุจัดให้! อัปเดตตารางของ "${targetNickname}" เรียบร้อยแล้วค่ะ เมี๊ยว~` });
+            } else {
+              // Notify Group for Approval
+              const approvalFlex = {
+                type: 'bubble',
+                header: { type: 'box', layout: 'vertical', backgroundColor: '#ffc107', contents: [{ type: 'text', text: '🔔 คำขอปรับตารางกะ', color: '#000000', weight: 'bold' }] },
+                body: {
+                  type: 'box', layout: 'vertical', contents: [
+                    { type: 'text', text: `👤 ผู้ขอ: ${targetNickname}`, weight: 'bold' },
+                    { type: 'text', text: `📅 วันที่: ${payload.date}`, size: 'sm' },
+                    { type: 'text', text: `📝 รายละเอียด: ${payload.reason || payload.details?.note || '-'}`, size: 'sm', wrap: true, margin: 'sm' }
+                  ]
+                },
+                footer: {
+                  type: 'box', layout: 'horizontal', spacing: 'sm',
+                  contents: [
+                    { type: 'button', style: 'primary', color: '#06c755', action: { type: 'postback', label: '✅ อนุมัติ', data: `action=approve_roster&id=${request.id}` } },
+                    { type: 'button', style: 'secondary', color: '#ff3b30', action: { type: 'postback', label: '❌ ปฏิเสธ', data: `action=reject_roster&id=${request.id}` } }
+                  ]
+                }
+              };
+
+              await client.replyMessage(event.replyToken, { type: 'text', text: 'รับทราบค่ะ! ยูซุส่งเรื่องให้บอสพิจารณาในกลุ่มเรียบร้อยแล้วนะคะ เมี๊ยว~' });
+              await client.pushMessage(groupId, { type: 'flex', altText: '🔔 คำขอปรับตารางใหม่', contents: approvalFlex });
+            }
+          } catch (e) {
+            console.error("Confirm Roster Error:", e);
+            await client.replyMessage(event.replyToken, { type: 'text', text: `เเม๊! เกิดข้อผิดพลาด: ${e.message}` });
+          }
+        } else if (action === 'approve_roster') {
+          const requestId = queryParams.get('id');
+          const { supabase } = await import('../../../lib/supabaseClient');
+          const isBoss = await checkIsBoss(userId);
+
+          if (!isBoss) {
+             await client.replyMessage(event.replyToken, { type: 'text', text: 'เมี๊ยว~ สิทธิ์ไม่พอค่ะ ต้องให้บอส (คุณพ่อ/คุณแม่) กดเท่านั้นนะคะ!' });
+             continue;
+          }
+
+          const { data: req } = await supabase.from('roster_requests').select('*').eq('id', requestId).single();
+          if (req && req.status === 'PENDING') {
+            await supabase.from('roster_requests').update({ status: 'APPROVED', manager_id: (await getEmployeeByLineId(userId))?.id }).eq('id', requestId);
+            
+            if (req.type === 'LEAVE') {
+              await supabase.from('roster_overrides').upsert({ employee_id: req.requester_id, date: req.target_date, is_off: true, reference_request_id: req.id });
+            } else {
+              await supabase.from('roster_overrides').upsert({ 
+                employee_id: req.requester_id, 
+                date: req.target_date, 
+                shift_id: req.new_shift_id,
+                custom_start_time: req.custom_start_time,
+                custom_end_time: req.custom_end_time,
+                is_off: false,
+                reference_request_id: req.id 
+              });
+            }
+            await client.replyMessage(event.replyToken, { type: 'text', text: '✅ อนุมัติเรียบร้อย! อัปเดตตารางให้แล้วค่ะ เมี๊ยว~' });
+          }
+        } else if (action === 'reject_roster') {
+          const requestId = queryParams.get('id');
+          const { supabase } = await import('../../../lib/supabaseClient');
+          if (await checkIsBoss(userId)) {
+             await supabase.from('roster_requests').update({ status: 'REJECTED', manager_id: (await getEmployeeByLineId(userId))?.id }).eq('id', requestId);
+             await client.replyMessage(event.replyToken, { type: 'text', text: '❌ ปฏิเสธคำขอเรียบร้อยค่ะ' });
+          }
+        } else if (action === 'cancel_roster') {
+          await client.replyMessage(event.replyToken, { type: 'text', text: 'โอเคค่ะ ยกเลิกรายการให้นะคะ เมี๊ยว~' });
+        }
       }
     }
 
-    // Always attempt to forward to Google Apps Script
-    // Forward to Google Apps Script ONLY IF it comes from the original group
     const isFromOriginalGroup = events.some(e => e.source?.groupId === 'C1210c7a0601b5a675060e312efe10bff');
-
     if (isFromOriginalGroup) {
       try {
-        const gasResponse = await fetch('https://script.google.com/macros/s/AKfycbyJ5WFOFmjwVJWoIUer6dwxHdeSShDvUfSWU0NNfsIH8Ek9WguCAzJG9QSbK5g77MH6/exec', {
+        await fetch('https://script.google.com/macros/s/AKfycbyJ5WFOFmjwVJWoIUer6dwxHdeSShDvUfSWU0NNfsIH8Ek9WguCAzJG9QSbK5g77MH6/exec', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
         });
-        console.log(`Forwarded to GAS, status: ${gasResponse.status}`);
       } catch (gasError) {
-        console.error("Error forwarding to Google Apps Script:", gasError);
+        console.error("Error forwarding to GAS:", gasError);
       }
-    } else {
-      console.log("Skipped GAS forwarding for non-primary group");
     }
 
-    if (handledLocally) {
-      return NextResponse.json({ success: true, handler: 'local' });
-    }
-
-    // Return success to avoid LINE retries
+    if (handledLocally) return NextResponse.json({ success: true, handler: 'local' });
     return NextResponse.json({ success: true, forwardedToGas: true });
 
   } catch (error) {
     console.error("Webhook Proxy Error:", error);
-    // Always return 200 to LINE to prevent retries
     return NextResponse.json({ success: false }, { status: 200 });
   }
 }

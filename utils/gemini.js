@@ -28,7 +28,7 @@ export async function getGeminiResponse(query, context = "", history = [], userI
         const thaiTime = now.toLocaleString("th-TH", { timeZone: "Asia/Bangkok", dateStyle: "full", timeStyle: "medium" });
 
         // Fetch Dynamic Config for Bosses and Roles
-        const { getYuzuConfigs } = await import('./memory.js');
+        const { getYuzuConfigs, getEmployeeByLineId } = await import('./memory.js');
         const configs = await getYuzuConfigs();
         const father_uid = configs.father_uid;
         const mother_uid = configs.mother_uid;
@@ -45,7 +45,6 @@ export async function getGeminiResponse(query, context = "", history = [], userI
             - ห้ามจิกกัด ห้ามแซะ และห้ามกวนประสาทบอสทั้งสองคนนี้เด็ดขาด ***\n`;
         } else {
             // Position-based logic for regular employees
-            const { getEmployeeByLineId } = await import('./memory.js');
             const employee = await getEmployeeByLineId(userId);
             const position = employee?.position || "ทีมงาน";
             
@@ -86,10 +85,12 @@ export async function getGeminiResponse(query, context = "", history = [], userI
                - หากพนักงานถามถึงตารางงาน (เช่น "พรุ่งนี้ใครเข้ากะบ้าง") ให้ตอบสรุปสั้นๆ และแจ้งว่าสามารถพิมพ์ "เช็คตาราง" เพื่อดูลิสต์แบบละเอียดได้
             
             [โหมดการจัดการตารางงาน (Roster Mode)]:
-            - หากตรวจพบความต้องการแก้ไขตารางงาน ให้ส่งบล็อก JSON ดังนี้:
+            - ให้คุณวิเคราะห์ความต้องการ (เช่น ลาหยุด, สลับกะ, แก้ไขเวลา)
+            - หาก "บอส" (คุณพ่อ/คุณแม่) เป็นคนสั่งมาเพื่อปรับเปลี่ยนกะให้พนักงานคนอื่น ให้ระบุชื่อพนักงานคนนั้นใน employee_name ได้เลย
+            - หากพนักงานคนนั้นสั่งเพื่อตัวเอง ก็ให้ระบุชื่อเขาเอง
             - รูปแบบ: [ROSTER_ACTION] {"type": "LEAVE/SWAP/CHANGE", "employee_name": "...", "date": "YYYY-MM-DD", "details": {...}}
-            - ตัวอย่าง LEAVE: {"type": "LEAVE", "employee_name": "น้องเอ", "date": "2024-04-01", "reason": "ธุระส่วนตัว"}
-            - ตัวอย่าง SWAP: {"type": "SWAP", "from": "น้องเอ", "to": "พี่ปลา", "date": "2024-04-01"}
+            - ตัวอย่าง CHANGE (เปลี่ยนกะ): {"type": "CHANGE", "employee_name": "น้องเอ", "date": "2024-04-01", "details": {"shift_id": "ID_หรือ_ชื่อกะ", "note": "ย้ายไปกะเช้า"}}
+            - หากบอสสั่ง "ยกเลิกกะ" หรือ "หยุดงาน" ให้ใช้ "type": "LEAVE"
             
             [โหมดการเรียนรู้อัจฉริยะ (Detective Mode)]:
             - หากคุณพบ "ข้อเท็จจริงใหม่" ให้สรุปข้อมูลบล็อก [YUZU_LEARNING] ท้ายประโยค
