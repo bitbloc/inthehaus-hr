@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabaseClient.js';
-import { format, getDay, parseISO } from 'date-fns';
+import { format, getDay, parseISO, startOfDay, endOfDay } from 'date-fns';
 
 /**
  * Get the effective roster for a specific date by merging the base schedule with overrides.
@@ -98,24 +98,36 @@ export async function getEffectiveRoster(dateObj) {
 
     // Apply Attendance Logs
     if (logs) {
+        const { data: allEmps } = await supabase.from('employees').select('id, name, nickname, position');
+        const empLookup = new Map(allEmps?.map(e => [e.id, e]));
+
         logs.forEach(log => {
-            const emp = rosterMap.get(log.employee_id);
+            let emp = rosterMap.get(log.employee_id);
+            if (!emp) {
+                // Someone checked in but NOT in roster (Extra)
+                const empInfo = empLookup.get(log.employee_id);
+                if (empInfo) {
+                    emp = {
+                        ...empInfo,
+                        shift: { name: "Extra" },
+                        isOverride: true,
+                        isExtra: true,
+                        attendance: { check_in: null, check_out: null }
+                    };
+                    rosterMap.set(log.employee_id, emp);
+                }
+            }
+
             if (emp) {
                 if (log.action_type === 'check_in') {
-                    // Use earliest check-in
                     if (!emp.attendance.check_in || new Date(log.timestamp) < new Date(emp.attendance.check_in)) {
                         emp.attendance.check_in = log.timestamp;
                     }
                 } else if (log.action_type === 'check_out') {
-                    // Use latest check-out
                     if (!emp.attendance.check_out || new Date(log.timestamp) > new Date(emp.attendance.check_out)) {
                         emp.attendance.check_out = log.timestamp;
                     }
                 }
-            } else {
-                // Someone checked in but NOT in roster
-                // Let's fetch their name if needed, but for now we might skip or just show "Extra"
-                // Actually, let's fetch in a separate step or just ignore for simplicity now
             }
         });
     }

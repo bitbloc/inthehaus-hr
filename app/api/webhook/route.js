@@ -90,7 +90,7 @@ export async function POST(request) {
             await client.replyMessage(event.replyToken, { type: 'text', text: msg });
             handledLocally = true;
           } else if (text.includes('เช็คตาราง') || text.includes('roster') || text.includes('ตารางงาน') || text.includes('ใครเข้ากะ')) {
-            const { format, addHours, startOfTomorrow } = await import('date-fns');
+            const { format, addHours, startOfTomorrow, parseISO } = await import('date-fns');
             const targetDate = text.includes('พรุ่งนี้') ? startOfTomorrow() : addHours(new Date(), 7);
             const dateStr = format(targetDate, 'dd/MM/yyyy');
             const roster = await getEffectiveRoster(targetDate);
@@ -102,8 +102,6 @@ export async function POST(request) {
                 { type: 'text', text: `📅 ตารางงาน ${dateStr}`, weight: 'bold', size: 'lg', color: '#1DB446' },
                 { type: 'separator', margin: 'md' }
               ];
-
-              const { format, addHours, parseISO } = await import('date-fns');
               
               roster.forEach(emp => {
                 const shiftStart = emp.shift?.start_time?.slice(0,5);
