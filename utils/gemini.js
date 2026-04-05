@@ -244,3 +244,55 @@ export async function generateImage(prompt) {
         return { success: false, message: "วาดไม่สำเร็จค่ะ" };
     }
 }
+
+/**
+ * Transcribe Audio and Extract Tasks
+ */
+export async function transcribeAudio(base64Audio, mimeType = "audio/m4a") {
+    try {
+        const instance = getGenAI();
+        const model = instance.getGenerativeModel({ model: "gemini-3-flash-preview" });
+
+        const prompt = `คุณคือผู้ช่วยสรุปงานจากเสียง (Audio transcriber) ของร้าน In The Haus
+        1. แปลงเสียงเป็นข้อความภาษาไทยให้แม่นยำที่สุด
+        2. วิเคราะห์ว่ามี "คำสั่งงาน" หรือ "สิ่งที่ต้องทำ (Task)" หรือไม่
+        3. หากมีคำสั่งงาน ให้สรุปรายการที่ต้องทำแยกออกมาเป็นข้อๆ
+        ตอบเป็น JSON: {"transcript": "ข้อความทั้งหมด", "tasks": ["งานที่ 1", "งานที่ 2"], "hasTasks": true/false}`;
+
+        const audioPart = {
+            inlineData: { data: base64Audio, mimeType }
+        };
+
+        const result = await model.generateContent([prompt, audioPart]);
+        const textResponse = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
+        return JSON.parse(textResponse);
+    } catch (error) {
+        console.error("Gemini Audio Error:", error);
+        return { transcript: "ขออภัยค่ะ ยูซุฟังไม่ชัด", tasks: [], hasTasks: false };
+    }
+}
+
+/**
+ * Extract Phone Order details from text
+ */
+export async function extractOrderFromText(text) {
+    try {
+        const instance = getGenAI();
+        const model = instance.getGenerativeModel({ model: "gemini-3-flash-preview" });
+
+        const prompt = `วิเคราะห์ข้อความสั่งอาหารทางโทรศัพท์นี้ และดึงข้อมูลออกมาเป็น JSON
+        - รายการอาหาร (items): ลิสต์ชื่ออาหารและจำนวน
+        - เบอร์โทรศัพท์ (phone): เบอร์ 10 หลัก
+        - ชื่อลูกค้า (customerName): ถ้ามี
+        ข้อความ: "${text}"
+        
+        ตอบเป็น JSON: {"items": [{"name": "ชื่ออาหาร", "qty": 1}], "phone": "08x-xxx-xxxx", "customerName": "..."}`;
+
+        const result = await model.generateContent(prompt);
+        const textResponse = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
+        return JSON.parse(textResponse);
+    } catch (error) {
+        console.error("Gemini Order Extraction Error:", error);
+        return null;
+    }
+}

@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { Client } from '@line/bot-sdk';
 import { getSchemaWeather, formatWeatherMessage } from '../../../utils/weather';
-import { getGeminiResponse, classifyAndAnalyzeImage, getDailySummary, generateImage } from '../../../utils/gemini';
+import { getGeminiResponse, classifyAndAnalyzeImage, getDailySummary, generateImage, transcribeAudio, extractOrderFromText } from '../../../utils/gemini';
 import { getGoldPrice, getOilPrice, getElectricityPrice, getIngredientPrices } from '../../../utils/price';
+import { getPriceComparison } from '../../../utils/price_scraper';
 import { saveMessage, getChatHistory, getDailyContent, cleanupOldHistory, getEmployeeHistory, getEmployeeByLineId, getAllEmployeesData, getYuzuConfigs, checkIsBoss } from '../../../utils/memory';
 import { getAccurateNews } from '../../../utils/news';
 import { getEffectiveRoster } from '../../../utils/roster';
@@ -409,7 +410,13 @@ export async function POST(request) {
             if (text.includes('น้ำมัน')) context += await getOilPrice() + "\n";
             if (text.includes('ไฟ')) context += await getElectricityPrice() + "\n";
             const ingredientKeywords = ['วัตถุดิบ', 'ราคาอาหาร', 'หมู', 'ไก่', 'เนื้อ', 'ปลา', 'ไข่', 'ผัก', 'ผลไม้', 'ข้าว'];
-            if (ingredientKeywords.some(kw => text.includes(kw))) context += await getIngredientPrices() + "\n";
+            if (ingredientKeywords.some(kw => text.includes(kw))) {
+               if (text.includes('ขึ้น') || text.includes('ลง') || text.includes('ไหม') || text.includes('เปรียบเทียบ')) {
+                  context += await getPriceComparison() + "\n";
+               } else {
+                  context += await getIngredientPrices() + "\n";
+               }
+            }
             if (text.includes('อากาศ')) context += formatWeatherMessage(await getSchemaWeather()) + "\n";
             
             // NEW: Injected Latest News Context for accurate real-time reporting
@@ -506,9 +513,87 @@ export async function POST(request) {
           } else {
             // Save all messages for the daily summary (even non-yuzu ones)
             await saveMessage(groupId, userId, 'user', rawText, 'text');
+
+            // --- AUTO DETECTION: Phone Orders ---
+            // Pattern: 10-digit phone number or keywords like "สั่ง"
+            const phoneRegex = /(0\d{1,2}-?\d{3,4}-?\d{3,4})/;
+            if (phoneRegex.test(rawText) && (rawText.includes('สั่ง') || rawText.length > 20)) {
+               console.log("Yuzu: Potential Phone Order Detected");
+               const orderData = await extractOrderFromText(rawText);
+               if (orderData && orderData.items?.length > 0) {
+                  const { supabase } = await import('../../../lib/supabaseClient');
+                  const { data: order, error } = await supabase.from('phone_orders').insert({
+                    items_json: orderData.items,
+                    customer_phone: orderData.phone,
+                    customer_name: orderData.customerName,
+                    staff_id: userId
+                  }).select().single();
+
+                  if (!error && order) {
+                    const itemsText = orderData.items.map(i => `- ${i.name} (x${i.qty})`).join('\n');
+                    const orderFlex = {
+                      type: 'bubble',
+                      header: { type: 'box', layout: 'vertical', backgroundColor: '#e8f5e9', contents: [{ type: 'text', text: '📞 พบรายการโทรสั่งอาหาร', weight: 'bold', color: '#2e7d32' }] },
+                      body: {
+                        type: 'box', layout: 'vertical', contents: [
+                          { type: 'text', text: `👤 ลูกค้า: ${orderData.customerName || 'ไม่ระบุ'}`, size: 'sm', weight: 'bold' },
+                          { type: 'text', text: `📱 เบอร์โทร: ${orderData.phone || 'ไม่ระบุ'}`, size: 'sm' },
+                          { type: 'separator', margin: 'md' },
+                          { type: 'text', text: itemsText, wrap: true, margin: 'md', size: 'sm' }
+                        ]
+                      },
+                      footer: {
+                        type: 'box', layout: 'horizontal', spacing: 'sm',
+                        contents: [
+                          { type: 'button', style: 'primary', color: '#1DB446', action: { type: 'postback', label: '✅ รับออเดอร์', data: `action=confirm_phone_order&id=${order.id}` } },
+                          { type: 'button', style: 'secondary', action: { type: 'postback', label: '✅ ทำเสร็จแล้ว', data: `action=done_phone_order&id=${order.id}` } }
+                        ]
+                      }
+                    };
+                    await client.replyMessage(event.replyToken, { type: 'flex', altText: '📞 บันทึกออเดอร์โทรศัพท์', contents: orderFlex });
+                    handledLocally = true;
+                  }
+               }
+            }
           }
         } 
         
+        // Handle Audio Messages
+        else if (event.message.type === 'audio') {
+          console.log("Yuzu Audio: Voice Message Received");
+          try {
+            const stream = await client.getMessageContent(event.message.id);
+            const chunks = [];
+            for await (const chunk of stream) chunks.push(chunk);
+            const buffer = Buffer.concat(chunks);
+            const base64 = buffer.toString('base64');
+
+            const result = await transcribeAudio(base64, "audio/m4a");
+            
+            if (result.transcript) {
+              await saveMessage(groupId, userId, 'user', `[Audio Transcribed] ${result.transcript}`, 'audio_transcript');
+              
+              let replyMsg = `👂 ยูซุฟังแล้ว สรุปได้ว่า:\n"${result.transcript}"`;
+              
+              if (result.hasTasks && result.tasks.length > 0) {
+                const { supabase } = await import('../../../lib/supabaseClient');
+                for (const task of result.tasks) {
+                  await supabase.from('staff_tasks').insert({
+                    description: task,
+                    source_message_id: event.message.id
+                  });
+                }
+                replyMsg += `\n\n📌 ยูซุจดเป็น Task ให้แล้ว ${result.tasks.length} รายการค่ะ เมี๊ยว~`;
+              }
+              
+              await client.replyMessage(event.replyToken, { type: 'text', text: replyMsg });
+              handledLocally = true;
+            }
+          } catch (audioError) {
+            console.error("Audio Processing Error:", audioError);
+          }
+        }
+
         // Handle Image Messages
         else if (event.message.type === 'image') {
           console.log("Yuzu Vision: Image Received");
@@ -903,6 +988,16 @@ export async function POST(request) {
           }
         } else if (action === 'cancel_roster') {
           await client.replyMessage(event.replyToken, { type: 'text', text: 'โอเคค่ะ ยกเลิกรายการให้นะคะ เมี๊ยว~' });
+        } else if (action === 'confirm_phone_order') {
+          const orderId = queryParams.get('id');
+          const { supabase } = await import('../../../lib/supabaseClient');
+          await supabase.from('phone_orders').update({ status: 'CONFIRMED', confirmed_at: new Date().toISOString() }).eq('id', orderId);
+          await client.replyMessage(event.replyToken, { type: 'text', text: '✅ รับออเดอร์เรียบรวยค่ะ! กำลังเตรียมอาหารให้ลูกค้านะคะ เมี๊ยว~ 🐾' });
+        } else if (action === 'done_phone_order') {
+          const orderId = queryParams.get('id');
+          const { supabase } = await import('../../../lib/supabaseClient');
+          await supabase.from('phone_orders').update({ status: 'DONE', done_at: new Date().toISOString() }).eq('id', orderId);
+          await client.replyMessage(event.replyToken, { type: 'text', text: '✅ ออเดอร์เสร็จเรียบร้อย! คุ้มค่าแก่การรอยคอยค่ะ เมี๊ยว~ 🏁' });
         }
       }
     }
