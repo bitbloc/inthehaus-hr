@@ -422,11 +422,13 @@ export async function POST(request) {
             let response = await getGeminiResponse(query, context, history, userId);
             
             // Proactive Learning: Extract and Save
+            // Proactive Learning: Extract and Save
             let cleanedResponse = response;
+            
+            // Extract YUZU_LEARNING
             if (response.includes('[YUZU_LEARNING]')) {
               try {
                 const parts = response.split('[YUZU_LEARNING]');
-                cleanedResponse = parts[0].trim();
                 const learningJson = parts[1].trim();
                 const factData = JSON.parse(learningJson);
                 await saveLearnedFact(groupId, factData);
@@ -435,6 +437,12 @@ export async function POST(request) {
                 console.error("Error parsing Yuzu Learning block:", e);
               }
             }
+
+            // Robust cleaning for ALL system tags to prevent them from showing in LINE
+            cleanedResponse = response
+              .split('[YUZU_LEARNING]')[0]
+              .split('[ROSTER_ACTION]')[0]
+              .trim();
 
             // Save Memory (use original response to keep system tags in history if desired, 
             // or cleanedResponse for cleaner memory. Let's use cleanedResponse for history.)
@@ -451,6 +459,18 @@ export async function POST(request) {
               try {
                 const rosterPart = response.split('[ROSTER_ACTION]')[1].trim();
                 const actionData = JSON.parse(rosterPart);
+
+                // Failsafe: Skip if placeholders are present
+                const hasPlaceholders = 
+                  actionData.employee_name === 'WAITING_FOR_NAME' || 
+                  actionData.date === 'YYYY-MM-DD' || 
+                  !actionData.type;
+
+                if (hasPlaceholders) {
+                  console.warn("Yuzu: Roster Action skipped due to placeholders:", actionData);
+                  continue; // Skip this action but allow other things to happen
+                }
+
                 const isBoss = await checkIsBoss(userId);
                 
                 let summaryText = "";
