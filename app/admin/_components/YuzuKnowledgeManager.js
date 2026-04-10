@@ -23,6 +23,7 @@ export default function YuzuKnowledgeManager() {
     const [slipLoading, setSlipLoading] = useState(false);
     const [message, setMessage] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
+    const [isFlowVisible, setIsFlowVisible] = useState(true);
     
     // Date filter for slips
     const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
@@ -467,24 +468,34 @@ export default function YuzuKnowledgeManager() {
                         
                         {/* Flowchart Hint */}
                         <Card className="lg:col-span-3 bg-slate-900 text-white overflow-hidden relative group">
+                            <button 
+                                onClick={() => setIsFlowVisible(!isFlowVisible)}
+                                className="absolute top-4 right-4 z-20 p-2 bg-white/10 hover:bg-white/20 rounded-lg transition-all"
+                            >
+                                {isFlowVisible ? <Icons.Up size={14} /> : <Icons.Down size={14} />}
+                            </button>
                             <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform">
                                 <Icons.Yuzu size={120} />
                             </div>
-                            <div className="relative z-10 p-6 space-y-2">
+                            <div className={`relative z-10 p-6 space-y-2 transition-all duration-500 ${isFlowVisible ? '' : 'opacity-40'}`}>
                                 <Badge color="purple" className="mb-2">KNOWLEDGE FLOW</Badge>
                                 <h3 className="text-lg font-bold">แผนผังการเรียนรู้ของยูซุ</h3>
-                                <p className="text-slate-400 text-sm max-w-md">ระบบจะเชื่อมโยงปัญหาและวิธีแก้ที่พบในแชทออกมาเป็น Flowchart ให้คุณพ่อเห็นภาพรวมครับ</p>
-                                
-                                {/* Simple Visual Flowchart (CSS based) */}
-                                <div className="mt-6 flex items-center gap-4 text-[10px] font-bold uppercase tracking-tighter overflow-x-auto no-scrollbar py-2">
-                                    <div className="px-3 py-2 bg-rose-500 rounded-lg whitespace-nowrap">Problem Found</div>
-                                    <div className="text-slate-600">→</div>
-                                    <div className="px-3 py-2 bg-indigo-500 rounded-lg whitespace-nowrap">AI Extraction</div>
-                                    <div className="text-slate-600">→</div>
-                                    <div className="px-3 py-2 bg-emerald-500 rounded-lg whitespace-nowrap">Boss Approval</div>
-                                    <div className="text-slate-600">→</div>
-                                    <div className="px-3 py-2 bg-amber-500 rounded-lg whitespace-nowrap">New Knowledge!</div>
-                                </div>
+                                {isFlowVisible && (
+                                    <>
+                                        <p className="text-slate-400 text-sm max-w-md">ระบบจะเชื่อมโยงปัญหาและวิธีแก้ที่พบในแชทออกมาเป็น Flowchart ให้คุณพ่อเห็นภาพรวมครับ</p>
+                                        
+                                        {/* Simple Visual Flowchart (CSS based) */}
+                                        <div className="mt-6 flex items-center gap-4 text-[10px] font-bold uppercase tracking-tighter overflow-x-auto no-scrollbar py-2 animate-in fade-in duration-500">
+                                            <div className="px-3 py-2 bg-rose-500 rounded-lg whitespace-nowrap">Problem Found</div>
+                                            <div className="text-slate-600">→</div>
+                                            <div className="px-3 py-2 bg-indigo-500 rounded-lg whitespace-nowrap">AI Extraction</div>
+                                            <div className="text-slate-600">→</div>
+                                            <div className="px-3 py-2 bg-emerald-500 rounded-lg whitespace-nowrap">Boss Approval</div>
+                                            <div className="text-slate-600">→</div>
+                                            <div className="px-3 py-2 bg-amber-500 rounded-lg whitespace-nowrap">New Knowledge!</div>
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         </Card>
                     </div>
@@ -515,13 +526,38 @@ export default function YuzuKnowledgeManager() {
                                             {item.content}
                                         </p>
                                         
-                                        <div className="space-y-2">
-                                            <label className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest block">Keywords (แก้ไขโดยใช้ลูกน้ำคั่น)</label>
+                                        <div className="space-y-2 py-2">
+                                            <label className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest block">Keywords (พิมพ์แล้วกด Enter)</label>
+                                            <div className="flex flex-wrap gap-1 mb-2">
+                                                {(item.metadata?.keywords || []).map((kw, idx) => (
+                                                    <span key={idx} className="bg-indigo-50 text-indigo-600 px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 group/tag transition-all hover:bg-indigo-100">
+                                                        {kw}
+                                                        <button 
+                                                            onClick={() => {
+                                                                const newKeywords = item.metadata.keywords.filter((_, i) => i !== idx);
+                                                                handleUpdateInsightKeywords(item.id, newKeywords.join(','));
+                                                            }}
+                                                            className="text-indigo-300 hover:text-rose-500 transition-colors"
+                                                        >
+                                                            <Icons.X size={10} />
+                                                        </button>
+                                                    </span>
+                                                ))}
+                                            </div>
                                             <input 
                                                 type="text" 
-                                                defaultValue={(item.metadata?.keywords || []).join(', ')}
-                                                onBlur={(e) => handleUpdateInsightKeywords(item.id, e.target.value)}
-                                                className="w-full text-xs font-bold text-indigo-600 bg-slate-50 p-2 rounded-lg outline-none focus:ring-1 focus:ring-purple-200"
+                                                placeholder="เพิ่ม keyword..."
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter' && e.target.value.trim()) {
+                                                        const val = e.target.value.trim();
+                                                        const currentKeywords = item.metadata?.keywords || [];
+                                                        if (!currentKeywords.includes(val)) {
+                                                            handleUpdateInsightKeywords(item.id, [...currentKeywords, val].join(','));
+                                                        }
+                                                        e.target.value = '';
+                                                    }
+                                                }}
+                                                className="w-full text-xs font-bold text-slate-600 bg-slate-50 p-2 rounded-xl outline-none focus:ring-1 focus:ring-purple-200 border border-slate-100 transition-all"
                                             />
                                         </div>
                                         

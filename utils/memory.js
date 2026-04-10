@@ -49,11 +49,11 @@ export async function saveMessage(groupId, userId, role, content, messageType = 
 export async function saveLearnedFact(groupId, factData) {
     try {
         const client = getSupabase();
-        if (!client) return;
+        if (!client) return null;
 
         const { fact, keywords, category, isProblem } = factData;
         
-        const { error } = await client
+        const { data, error } = await client
             .from('yuzu_knowledge')
             .insert({
                 content: fact,
@@ -66,11 +66,18 @@ export async function saveLearnedFact(groupId, factData) {
                     is_problem: isProblem || false,
                     learned_at: new Date().toISOString()
                 }
-            });
+            })
+            .select()
+            .single();
 
-        if (error) console.error("Error saving learned fact:", error);
+        if (error) {
+            console.error("Error saving learned fact:", error);
+            return null;
+        }
+        return data;
     } catch (err) {
         console.error("Memory Utility Error (save learned fact):", err);
+        return null;
     }
 }
 
