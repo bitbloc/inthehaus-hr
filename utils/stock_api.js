@@ -1,10 +1,16 @@
 const STOCK_API_BASE_URL = "https://lxfavbzmebqqsffgyyph.supabase.co/functions/v1/stock-api";
 const STOCK_API_KEY = process.env.STOCK_API_KEY || "1500323553";
 
-const getHeaders = () => ({
-  "Content-Type": "application/json",
-  "X-Internal-API-Key": STOCK_API_KEY
-});
+const getHeaders = () => {
+  const headers = {
+    "Content-Type": "application/json",
+    "X-Internal-API-Key": STOCK_API_KEY
+  };
+  if (process.env.STOCK_API_ANON_KEY) {
+    headers["Authorization"] = `Bearer ${process.env.STOCK_API_ANON_KEY}`;
+  }
+  return headers;
+};
 
 /**
  * Fetch all items or search by query

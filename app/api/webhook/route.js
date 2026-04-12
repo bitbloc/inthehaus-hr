@@ -8,6 +8,9 @@ import { saveMessage, getChatHistory, getDailyContent, cleanupOldHistory, getEmp
 import { getAccurateNews } from '../../../utils/news';
 import { getEffectiveRoster } from '../../../utils/roster';
 
+// Simple in-memory cache to prevent double-clicks
+const processedPostbacks = new Set();
+
 const client = new Client({
   channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN,
   channelSecret: process.env.CHANNEL_SECRET,
@@ -537,6 +540,35 @@ export async function POST(request) {
               }
             }
 
+            // New: Handle Stock Audit Form Request
+            if (response.includes('[STOCK_AUDIT_FORM]')) {
+              try {
+                // Determine the correct LIFF base URL based on ID
+                // Assume the NEXT_PUBLIC_LIFF_ID belongs to the main app domain hosted elsewhere, or 'https://liff.line.me/' + LIFF_ID
+                const liffUrl = `https://liff.line.me/${process.env.NEXT_PUBLIC_LIFF_ID}/stock/audit`;
+                
+                const auditFlex = {
+                  type: 'bubble',
+                  header: { type: 'box', layout: 'vertical', backgroundColor: '#ec4899', contents: [{ type: 'text', text: '📋 ฟอร์มตรวจนับสต็อก', color: '#ffffff', weight: 'bold' }] },
+                  body: {
+                    type: 'box', layout: 'vertical', contents: [
+                      { type: 'text', text: 'กดที่ปุ่มด้านล่างเพื่อเปิดฟอร์มนับสต็อกผ่านมือถือ ดึงข้อมูลแบบ Real-time ค่ะ เมี๊ยว~', wrap: true, size: 'sm' }
+                    ]
+                  },
+                  footer: {
+                    type: 'box', layout: 'vertical',
+                    contents: [
+                      { type: 'button', style: 'primary', color: '#111827', action: { type: 'uri', label: '📱 เปิดฟอร์มนับสต็อก', uri: liffUrl } }
+                    ]
+                  }
+                };
+
+                await client.pushMessage(groupId, { type: 'flex', altText: '📋 ฟอร์มตรวจนับสต็อกมาแล้ว', contents: auditFlex });
+              } catch (e) {
+                console.error("Stock Audit Form Error:", e);
+              }
+            }
+
             // New: Handle Stock Proposals
             if (response.includes('[STOCK_ACTION]')) {
               try {
@@ -630,6 +662,7 @@ export async function POST(request) {
                 }
               } catch (e) {
                 console.error("Stock Action Error:", e);
+                await client.pushMessage(groupId, { type: 'text', text: `เกิดข้อผิดพลาดในการดึงข้อมูลจาก API สต็อกค่ะ บอสเช็คโค้ดหรือแจ้งทีมงานทีนะคะ เมี๊ยว~ 😿\nError: ${e.message}` });
               }
             }
 
@@ -1161,8 +1194,16 @@ export async function POST(request) {
         } else if (action === 'cancel_stock') {
           await client.replyMessage(event.replyToken, { type: 'text', text: '✅ ยกเลิกการจัดการสต็อกแล้วค่ะ เมี๊ยว~' });
         } else if (action === 'confirm_stock') {
+          const payloadRaw = queryParams.get('payload');
+          if (processedPostbacks.has(payloadRaw)) {
+            // Already processed this exact payload recently! Ignore to prevent double-click duplicates.
+            return NextResponse.json({ success: true, handler: 'local_duplicate' });
+          }
+          processedPostbacks.add(payloadRaw);
+          setTimeout(() => processedPostbacks.delete(payloadRaw), 60000); // Clear after 60s
+
           try {
-            const payload = JSON.parse(Buffer.from(queryParams.get('payload'), 'base64').toString());
+            const payload = JSON.parse(Buffer.from(payloadRaw, 'base64').toString());
             const { fetchStockItems, addStockTransaction, updateStockItem, createStockItem } = await import('../../../utils/stock_api');
             const empName = await getEmployeeByLineId(userId).then(e => e?.nickname || e?.name || "LINE User") || "LINE User";
             
