@@ -480,6 +480,7 @@ export async function POST(request) {
               .split('[YUZU_LEARNING]')[0]
               .split('[ROSTER_ACTION]')[0]
               .split('[STOCK_ACTION]')[0]
+              .split('[STOCK_AUDIT_FORM]')[0]
               .trim();
 
             // Save Memory (use original response to keep system tags in history if desired, 
@@ -543,9 +544,8 @@ export async function POST(request) {
             // New: Handle Stock Audit Form Request
             if (response.includes('[STOCK_AUDIT_FORM]')) {
               try {
-                // Determine the correct LIFF base URL based on ID
-                // Assume the NEXT_PUBLIC_LIFF_ID belongs to the main app domain hosted elsewhere, or 'https://liff.line.me/' + LIFF_ID
-                const liffUrl = `https://liff.line.me/${process.env.NEXT_PUBLIC_LIFF_ID}/stock/audit`;
+                const reqOrigin = new URL(request.url).origin;
+                const liffUrl = `${reqOrigin}/stock/audit`;
                 
                 const auditFlex = {
                   type: 'bubble',
