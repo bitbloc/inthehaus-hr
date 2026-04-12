@@ -574,13 +574,13 @@ export default function AdminDashboard() {
 
                 {/* Navigation */}
                 <div className="max-w-7xl mx-auto px-4 md:px-6 pb-2 overflow-x-auto no-scrollbar">
-                    <div className="flex gap-2 min-w-max p-1">
+                    <div className="flex gap-1.5 min-w-max p-1">
                         {[
                             { id: 'dashboard', label: 'Overview', icon: Icons.Sun },
                             { id: 'shift_manage', label: 'Shifts', icon: Icons.Swap },
                             { id: 'payroll', label: 'Payroll', icon: Icons.Money },
                             { id: 'roster', label: 'Roster', icon: Icons.Clock },
-                            { id: 'orders', label: 'Orders', icon: Icons.Job },
+                            { id: 'orders', label: 'Orders', icon: Icons.Clock },
                             { id: 'reservations', label: 'Bookings', icon: Icons.Calendar },
                             { id: 'employees', label: 'Staff', icon: Icons.Staff },
                             { id: 'requests', label: 'Requests', icon: Icons.Bell },

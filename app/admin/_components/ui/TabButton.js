@@ -6,7 +6,7 @@ export function TabButton({ active, onClick, label, icon: Icon, id }) {
         <button
             onClick={onClick}
             className={clsx(
-                "relative flex items-center gap-2 px-5 py-3 rounded-2xl text-sm font-bold transition-all duration-300 ease-out z-10",
+                "relative flex items-center gap-2 px-3.5 py-2.5 rounded-2xl text-sm font-bold transition-all duration-300 ease-out z-10 flex-shrink-0",
                 active
                     ? "text-white scale-105"
                     : "text-slate-400 hover:bg-slate-50 hover:text-slate-600"
