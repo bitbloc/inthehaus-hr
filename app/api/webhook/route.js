@@ -1146,6 +1146,7 @@ export async function POST(request) {
               await client.replyMessage(event.replyToken, { type: 'text', text: 'รับทราบค่ะ! ยูซุส่งเรื่องให้บอสพิจารณาในกลุ่มเรียบร้อยแล้วนะคะ เมี๊ยว~' });
               await client.pushMessage(groupId, { type: 'flex', altText: '🔔 คำขอปรับตารางใหม่', contents: approvalFlex });
             }
+            handledLocally = true;
           } catch (e) {
             console.error("Confirm Roster Error:", e);
             await client.replyMessage(event.replyToken, { type: 'text', text: `เเม๊! เกิดข้อผิดพลาด: ${e.message}` });
@@ -1179,6 +1180,7 @@ export async function POST(request) {
             }
             await client.replyMessage(event.replyToken, { type: 'text', text: '✅ อนุมัติเรียบร้อย! อัปเดตตารางให้แล้วค่ะ เมี๊ยว~' });
           }
+          handledLocally = true;
         } else if (action === 'reject_roster') {
           const requestId = queryParams.get('id');
           const { supabase } = await import('../../../lib/supabaseClient');
@@ -1186,28 +1188,35 @@ export async function POST(request) {
              await supabase.from('roster_requests').update({ status: 'REJECTED', manager_id: (await getEmployeeByLineId(userId))?.id }).eq('id', requestId);
              await client.replyMessage(event.replyToken, { type: 'text', text: '❌ ปฏิเสธคำขอเรียบร้อยค่ะ' });
           }
+          handledLocally = true;
         } else if (action === 'cancel_roster') {
           await client.replyMessage(event.replyToken, { type: 'text', text: 'โอเคค่ะ ยกเลิกรายการให้นะคะ เมี๊ยว~' });
+          handledLocally = true;
         } else if (action === 'confirm_phone_order') {
           const orderId = queryParams.get('id');
           const { supabase } = await import('../../../lib/supabaseClient');
           await supabase.from('phone_orders').update({ status: 'CONFIRMED', confirmed_at: new Date().toISOString() }).eq('id', orderId);
           await client.replyMessage(event.replyToken, { type: 'text', text: '✅ รับออเดอร์เรียบรวยค่ะ! กำลังเตรียมอาหารให้ลูกค้านะคะ เมี๊ยว~ 🐾' });
+          handledLocally = true;
         } else if (action === 'done_phone_order') {
           const orderId = queryParams.get('id');
           const { supabase } = await import('../../../lib/supabaseClient');
           await supabase.from('phone_orders').update({ status: 'DONE', done_at: new Date().toISOString() }).eq('id', orderId);
           await client.replyMessage(event.replyToken, { type: 'text', text: '✅ ออเดอร์เสร็จเรียบร้อย! คุ้มค่าแก่การรอยคอยค่ะ เมี๊ยว~ 🏁' });
+          handledLocally = true;
         } else if (action === 'confirm_table_reservation') {
           const resId = queryParams.get('id');
           const { supabase } = await import('../../../lib/supabaseClient');
           await supabase.from('table_reservations').update({ status: 'CONFIRMED' }).eq('id', resId);
           await client.replyMessage(event.replyToken, { type: 'text', text: '✅ ยืนยันการจองคืนนี้เรียบร้อยค่ะ! เตรียมจัดโต๊ะรอรับบอสและลูกค้าเลยค่ะ เมี๊ยว~ 🥂' });
+          handledLocally = true;
         } else if (action === 'cancel_table_reservation') {
           const resId = queryParams.get('id');
           const { supabase } = await import('../../../lib/supabaseClient');
           await supabase.from('table_reservations').update({ status: 'CANCELLED' }).eq('id', resId);
           await client.replyMessage(event.replyToken, { type: 'text', text: '🌑 ยกเลิกการจองให้แล้วนะคะ เมี๊ยว~' });
+          handledLocally = true;
+          handledLocally = true;
         } else if (action === 'approve_insight') {
           const insightId = queryParams.get('id');
           const { supabase } = await import('../../../lib/supabaseClient');
@@ -1230,6 +1239,7 @@ export async function POST(request) {
           } else {
              await client.replyMessage(event.replyToken, { type: 'text', text: 'เเมี๊ยว~ บันทึกไม่สำเร็จค่ะ: ' + error.message });
           }
+          handledLocally = true;
         } else if (action === 'reject_insight') {
           const insightId = queryParams.get('id');
           const { supabase } = await import('../../../lib/supabaseClient');
@@ -1244,8 +1254,10 @@ export async function POST(request) {
           if (!error) {
             await client.replyMessage(event.replyToken, { type: 'text', text: '🗑️ ลืมข้อมูลนี้เรียบร้อยค่ะ! ยูซุก็ว่าแล้วว่ามันแปลกๆ เมี๊ยว~' });
           }
+          handledLocally = true;
         } else if (action === 'cancel_stock') {
           await client.replyMessage(event.replyToken, { type: 'text', text: '✅ ยกเลิกการจัดการสต็อกแล้วค่ะ เมี๊ยว~' });
+          handledLocally = true;
         } else if (action === 'confirm_stock') {
           const payloadRaw = queryParams.get('payload');
           if (processedPostbacks.has(payloadRaw)) {
@@ -1270,11 +1282,15 @@ export async function POST(request) {
                });
                await client.replyMessage(event.replyToken, { type: 'text', text: `✅ สร้างรายการสินค้า [${payload.itemName}] สำเร็จแล้วจ้า เมี๊ยว~` });
             } else {
-               // Find item uuid
+               // Find item uuid more strictly
                const searchItems = await fetchStockItems(payload.itemName);
-               const item = searchItems.find(i => i.name === payload.itemName) || searchItems[0];
+               const exactMatch = searchItems.find(i => i.name === payload.itemName);
+               // If there's an exact match, use it. Otherwise, if there is exactly 1 search result, use it. Otherwise, null.
+               const item = exactMatch || (searchItems.length === 1 ? searchItems[0] : null);
+               
                if (!item) {
-                 await client.replyMessage(event.replyToken, { type: 'text', text: `❌ ไม่พบรายการสินค้า "${payload.itemName}" ในระบบค่ะ ลองตรวจสอบชื่ออีกทีนะ เมี๊ยว~` });
+                 const optionsText = searchItems.length > 0 ? ` เล็งตัวไหนไว้คะ: ${searchItems.slice(0,3).map(i => i.name).join(', ')}?` : "";
+                 await client.replyMessage(event.replyToken, { type: 'text', text: `❌ ไม่พบรายการสินค้า "${payload.itemName}" ที่ชัดเจนในระบบค่ะ${optionsText} ลองตรวจสอบชื่อให้แม่นๆ อีกทีนะ เมี๊ยว~` });
                  return NextResponse.json({ success: true, handler: 'local' });
                }
 
@@ -1287,16 +1303,18 @@ export async function POST(request) {
                  await client.replyMessage(event.replyToken, { type: 'text', text: `✅ บันทึกยอดคลังสินค้า [${item.name}] สำเร็จแล้วจ้า ยูซุหิวเลย! เมี๊ยว~` });
                }
             }
+            handledLocally = true;
           } catch (err) {
             console.error("Stock Postback Error:", err);
             await client.replyMessage(event.replyToken, { type: 'text', text: `⚠️ ว้าย! เกิดข้อผิดพลาดจากฝั่ง API สินค้าค่ะ:\n${err.message}` });
+            handledLocally = true; // Error handled by telling user
           }
         }
       }
     }
 
     const isFromOriginalGroup = events.some(e => e.source?.groupId === 'C1210c7a0601b5a675060e312efe10bff');
-    if (isFromOriginalGroup) {
+    if (isFromOriginalGroup && !handledLocally) {
       try {
         await fetch('https://script.google.com/macros/s/AKfycbyJ5WFOFmjwVJWoIUer6dwxHdeSShDvUfSWU0NNfsIH8Ek9WguCAzJG9QSbK5g77MH6/exec', {
           method: 'POST',
