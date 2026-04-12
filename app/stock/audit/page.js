@@ -122,7 +122,7 @@ export default function StockAuditPage() {
           </div>
         </div>
         <button onClick={fetchItems} disabled={loading} className="p-2 bg-neutral-800 rounded-full hover:bg-neutral-700 transition">
-          <RefreshCw className={\`w-4 h-4 \${loading ? 'animate-spin' : ''}\`} />
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
         </button>
       </div>
 
