@@ -32,7 +32,10 @@ const initialState = {
     deductions: [],
     // Individual History
     individualLogs: [],
-    individualStats: { work_days: 0, late: 0, absent: 0 }
+    individualStats: { work_days: 0, late: 0, absent: 0 },
+    // Logistics
+    phoneOrders: [],
+    tableReservations: []
 };
 
 function dataReducer(state, action) {
@@ -147,6 +150,16 @@ export default function AdminDashboard() {
         dispatch({ type: 'SET_DATA', payload: { individualStats: { work_days: workDaysSet.size, late, absent } } });
     };
 
+    const fetchOrders = async () => {
+        const { data: orders } = await supabase.from("phone_orders").select("*").order("created_at", { ascending: false });
+        dispatch({ type: 'SET_DATA', payload: { phoneOrders: orders || [] } });
+    };
+
+    const fetchReservations = async () => {
+        const { data: res } = await supabase.from("table_reservations").select("*").order("reservation_date", { ascending: true });
+        dispatch({ type: 'SET_DATA', payload: { tableReservations: res || [] } });
+    };
+
     // --- Tab-based Lazy Loading ---
     useEffect(() => {
         fetchData('shifts', 'shifts');
@@ -172,6 +185,8 @@ export default function AdminDashboard() {
         if (activeTab === 'announcements') fetchData('announcements', 'announcements');
         if (activeTab === 'applications') fetchData('job_applications', 'jobApplications');
         if (activeTab === 'history') fetchIndividualLogs();
+        if (activeTab === 'orders') fetchOrders();
+        if (activeTab === 'reservations') fetchReservations();
     }, [activeTab, selectedMonth]);
 
     useEffect(() => {
@@ -447,6 +462,21 @@ export default function AdminDashboard() {
         XLSX.writeFile(wb, `Payroll_Detailed_${selectedMonth}.xlsx`);
     };
 
+    // Logistics Actions
+    const handleUpdateOrderStatus = async (id, status) => {
+        const { error } = await supabase.from('phone_orders').update({ 
+            status, 
+            confirmed_at: status === 'CONFIRMED' ? new Date().toISOString() : undefined,
+            done_at: status === 'DONE' ? new Date().toISOString() : undefined
+        }).eq('id', id);
+        if (!error) fetchOrders();
+    };
+
+    const handleUpdateReservationStatus = async (id, status) => {
+        const { error } = await supabase.from('table_reservations').update({ status }).eq('id', id);
+        if (!error) fetchReservations();
+    };
+
     // --- Helpers ---
     const getShiftStatus = (log) => {
         const date = new Date(log.timestamp);
@@ -550,6 +580,8 @@ export default function AdminDashboard() {
                             { id: 'shift_manage', label: 'Shifts', icon: Icons.Swap },
                             { id: 'payroll', label: 'Payroll', icon: Icons.Money },
                             { id: 'roster', label: 'Roster', icon: Icons.Clock },
+                            { id: 'orders', label: 'Orders', icon: Icons.Job },
+                            { id: 'reservations', label: 'Bookings', icon: Icons.Calendar },
                             { id: 'employees', label: 'Staff', icon: Icons.Staff },
                             { id: 'requests', label: 'Requests', icon: Icons.Bell },
                             { id: 'applications', label: 'Hiring', icon: Icons.Job },
@@ -981,6 +1013,105 @@ export default function AdminDashboard() {
                 )}
 
                 {/* --- HISTORY --- */}
+                {activeTab === 'orders' && (
+                    <div className="space-y-6">
+                        <div className="flex justify-between items-end">
+                            <h2 className="text-2xl font-bold text-slate-800">Phone Orders</h2>
+                        </div>
+                        <Card className="p-0 overflow-hidden">
+                            <table className="w-full text-sm text-left">
+                                <thead className="bg-slate-50 text-slate-400 font-bold text-[10px] uppercase tracking-wider">
+                                    <tr>
+                                        <th className="px-6 py-4">Created At</th>
+                                        <th className="px-6 py-4">Customer</th>
+                                        <th className="px-6 py-4">Items</th>
+                                        <th className="px-6 py-4">Status</th>
+                                        <th className="px-6 py-4 text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-50">
+                                    {data.phoneOrders.map(order => (
+                                        <tr key={order.id} className="hover:bg-slate-50">
+                                            <td className="px-6 py-4 font-mono text-xs">{formatDate(order.created_at)} {formatTime(order.created_at)}</td>
+                                            <td className="px-6 py-4">
+                                                <div className="font-bold">{order.customer_name || 'Anonymous'}</div>
+                                                <div className="text-xs text-slate-400">{order.customer_phone || '-'}</div>
+                                            </td>
+                                            <td className="px-6 py-4 italic">
+                                                {order.items_json?.map(i => `${i.name} x${i.qty}`).join(', ')}
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <Badge color={order.status === 'DONE' ? 'emerald' : order.status === 'CONFIRMED' ? 'blue' : 'amber'}>
+                                                    {order.status}
+                                                </Badge>
+                                            </td>
+                                            <td className="px-6 py-4 text-right space-x-2">
+                                                {order.status === 'PENDING' && (
+                                                    <button onClick={() => handleUpdateOrderStatus(order.id, 'CONFIRMED')} className="text-blue-500 font-bold text-xs hover:bg-blue-50 px-2 py-1 rounded">Confirm</button>
+                                                )}
+                                                {order.status !== 'DONE' && (
+                                                    <button onClick={() => handleUpdateOrderStatus(order.id, 'DONE')} className="text-emerald-500 font-bold text-xs hover:bg-emerald-50 px-2 py-1 rounded">Done</button>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                            {data.phoneOrders.length === 0 && <div className="p-12 text-center text-slate-400">No orders recorded yet.</div>}
+                        </Card>
+                    </div>
+                )}
+
+                {activeTab === 'reservations' && (
+                    <div className="space-y-6">
+                        <div className="flex justify-between items-end">
+                            <h2 className="text-2xl font-bold text-slate-800">Table Bookings</h2>
+                        </div>
+                        <Card className="p-0 overflow-hidden">
+                            <table className="w-full text-sm text-left">
+                                <thead className="bg-slate-50 text-slate-400 font-bold text-[10px] uppercase tracking-wider">
+                                    <tr>
+                                        <th className="px-6 py-4">Date/Time</th>
+                                        <th className="px-6 py-4">Customer</th>
+                                        <th className="px-6 py-4 text-center">Guests</th>
+                                        <th className="px-6 py-4">Status</th>
+                                        <th className="px-6 py-4 text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-50">
+                                    {data.tableReservations.map(res => (
+                                        <tr key={res.id} className="hover:bg-slate-50">
+                                            <td className="px-6 py-4">
+                                                <div className="font-bold">{formatDate(res.reservation_date)}</div>
+                                                <div className="font-mono text-xs text-slate-500">{res.reservation_time || '-'}</div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="font-bold">{res.customer_name || 'Anonymous'}</div>
+                                                <div className="text-xs text-slate-400">{res.customer_phone || '-'}</div>
+                                            </td>
+                                            <td className="px-6 py-4 text-center font-bold text-lg">{res.guests}</td>
+                                            <td className="px-6 py-4">
+                                                <Badge color={res.status === 'COMPLETED' ? 'emerald' : res.status === 'CONFIRMED' ? 'blue' : res.status === 'CANCELLED' ? 'rose' : 'amber'}>
+                                                    {res.status}
+                                                </Badge>
+                                            </td>
+                                            <td className="px-6 py-4 text-right space-x-2">
+                                                {res.status === 'PENDING' && (
+                                                    <button onClick={() => handleUpdateReservationStatus(res.id, 'CONFIRMED')} className="text-blue-500 font-bold text-xs hover:bg-blue-50 px-2 py-1 rounded">Confirm</button>
+                                                )}
+                                                {res.status !== 'CANCELLED' && res.status !== 'COMPLETED' && (
+                                                    <button onClick={() => handleUpdateReservationStatus(res.id, 'CANCELLED')} className="text-rose-500 font-bold text-xs hover:bg-rose-50 px-2 py-1 rounded">Cancel</button>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                            {data.tableReservations.length === 0 && <div className="p-12 text-center text-slate-400">No bookings yet.</div>}
+                        </Card>
+                    </div>
+                )}
+
                 {activeTab === 'history' && (
                     <div className="space-y-6">
                         <Card className="flex gap-4 items-center">

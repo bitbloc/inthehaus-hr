@@ -284,26 +284,69 @@ export async function transcribeAudio(base64Audio, mimeType = "audio/m4a") {
 }
 
 /**
- * Extract Phone Order details from text
+ * Extract Phone Order details from text (Refined)
  */
 export async function extractOrderFromText(text) {
     try {
         const instance = getGenAI();
         const model = instance.getGenerativeModel({ model: "gemini-3-flash-preview" });
 
-        const prompt = `วิเคราะห์ข้อความสั่งอาหารทางโทรศัพท์นี้ และดึงข้อมูลออกมาเป็น JSON
-        - รายการอาหาร (items): ลิสต์ชื่ออาหารและจำนวน
-        - เบอร์โทรศัพท์ (phone): เบอร์ 10 หลัก
-        - ชื่อลูกค้า (customerName): ถ้ามี
+        const prompt = `วิเคราะห์ข้อความสั่งอาหารทางโทรศัพท์ (Phone Order) สำหรับร้าน In The Haus
+        1. ดึงรายการอาหารและจำนวน (items) ออกมาให้ครบถ้วน แม้จะเขียนแบบย่อหรือไม่มีลักษณนาม
+        2. ดึงเบอร์โทรศัพท์ลูกค้า (phone) 10 หลัก
+        3. ดึงชื่อลูกค้า (customerName) หากมีการระบุ
+        
         ข้อความ: "${text}"
         
-        ตอบเป็น JSON: {"items": [{"name": "ชื่ออาหาร", "qty": 1}], "phone": "08x-xxx-xxxx", "customerName": "..."}`;
+        ตอบเป็น JSON เท่านั้น:
+        {
+          "items": [{"name": "ชื่ออาหารแบบเต็ม", "qty": 1}],
+          "phone": "08x-xxx-xxxx",
+          "customerName": "ชื่อลูกค้า หรือ null"
+        }`;
 
         const result = await model.generateContent(prompt);
         const textResponse = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
         return JSON.parse(textResponse);
     } catch (error) {
         console.error("Gemini Order Extraction Error:", error);
+        return null;
+    }
+}
+
+/**
+ * Extract Table Reservation details from text
+ */
+export async function extractReservationFromText(text) {
+    try {
+        const instance = getGenAI();
+        const model = instance.getGenerativeModel({ model: "gemini-3-flash-preview" });
+
+        const now = new Date();
+        const thaiTime = now.toLocaleString("th-TH", { timeZone: "Asia/Bangkok", dateStyle: "full" });
+
+        const prompt = `วิเคราะห์ข้อความจองโต๊ะสำหรับร้าน In The Haus
+        1. ดึงข้อมูล: ชื่อลูกค้า (name), เบอร์โทร (phone), วันที่จอง (date), เวลาจอง (time), จำนวนแขก (guests)
+        2. หากระบุว่า "วันนี้", "พรุ่งนี้", "มะรืน" ให้คำนวณเป็นวันที่แบบ YYYY-MM-DD โดยอ้างอิงจากวันนี้คือ ${thaiTime}
+        3. เวลาจอง (time) ให้ระบุเป็นรูปแบบ HH:mm (24-hour)
+        4. จำนวนแขก (guests) ให้ระบุเป็นตัวเลข
+        
+        ข้อความ: "${text}"
+        
+        ตอบเป็น JSON เท่านั้น:
+        {
+          "name": "...",
+          "phone": "...",
+          "date": "YYYY-MM-DD",
+          "time": "HH:mm",
+          "guests": 2
+        }`;
+
+        const result = await model.generateContent(prompt);
+        const textResponse = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
+        return JSON.parse(textResponse);
+    } catch (error) {
+        console.error("Gemini Reservation Extraction Error:", error);
         return null;
     }
 }

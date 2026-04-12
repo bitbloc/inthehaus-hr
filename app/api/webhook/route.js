@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { Client } from '@line/bot-sdk';
 import { getSchemaWeather, formatWeatherMessage } from '../../../utils/weather';
-import { getGeminiResponse, classifyAndAnalyzeImage, getDailySummary, generateImage, transcribeAudio, extractOrderFromText } from '../../../utils/gemini';
+import { getGeminiResponse, classifyAndAnalyzeImage, getDailySummary, generateImage, transcribeAudio, extractOrderFromText, extractReservationFromText } from '../../../utils/gemini';
 import { getGoldPrice, getOilPrice, getElectricityPrice, getIngredientPrices } from '../../../utils/price';
 import { getPriceComparison } from '../../../utils/price_scraper';
 import { saveMessage, getChatHistory, getDailyContent, cleanupOldHistory, getEmployeeHistory, getEmployeeByLineId, getAllEmployeesData, getYuzuConfigs, checkIsBoss } from '../../../utils/memory';
@@ -712,6 +712,49 @@ export async function POST(request) {
                   }
                }
             }
+
+            // --- AUTO DETECTION: Table Reservations ---
+            const reserveKeywords = ['จองโต๊ะ', 'จองไว้', 'กี่ที่', 'กี่คน', 'จองที่'];
+            if (reserveKeywords.some(kw => rawText.includes(kw))) {
+               console.log("Yuzu: Potential Reservation Detected");
+               const resData = await extractReservationFromText(rawText);
+               if (resData && resData.date) {
+                  const { supabase } = await import('../../../lib/supabaseClient');
+                  const { data: reservation, error } = await supabase.from('table_reservations').insert({
+                    customer_name: resData.name,
+                    customer_phone: resData.phone,
+                    reservation_date: resData.date,
+                    reservation_time: resData.time,
+                    guests: resData.guests,
+                    staff_id: userId
+                  }).select().single();
+
+                  if (!error && reservation) {
+                    const resFlex = {
+                      type: 'bubble',
+                      header: { type: 'box', layout: 'vertical', backgroundColor: '#fff3e0', contents: [{ type: 'text', text: '🗓️ พบการจองโต๊ะใหม่', weight: 'bold', color: '#e65100' }] },
+                      body: {
+                        type: 'box', layout: 'vertical', contents: [
+                          { type: 'text', text: `👤 ลูกค้า: ${resData.name || 'ไม่ระบุ'}`, size: 'sm', weight: 'bold' },
+                          { type: 'text', text: `📱 เบอร์โทร: ${resData.phone || 'ไม่ระบุ'}`, size: 'sm' },
+                          { type: 'text', text: `📅 วันที่: ${resData.date}`, size: 'sm' },
+                          { type: 'text', text: `⏰ เวลา: ${resData.time || 'ไม่ระบุ'}`, size: 'sm' },
+                          { type: 'text', text: `👥 จำนวน: ${resData.guests} ท่าน`, size: 'sm' }
+                        ]
+                      },
+                      footer: {
+                        type: 'box', layout: 'horizontal', spacing: 'sm',
+                        contents: [
+                          { type: 'button', style: 'primary', color: '#ff9800', action: { type: 'postback', label: '✅ ยืนยันจอง', data: `action=confirm_table_reservation&id=${reservation.id}` } },
+                          { type: 'button', style: 'secondary', action: { type: 'postback', label: '❌ ยกเลิก', data: `action=cancel_table_reservation&id=${reservation.id}` } }
+                        ]
+                      }
+                    };
+                    await client.replyMessage(event.replyToken, { type: 'flex', altText: '🗓️ บันทึกการจองโต๊ะ', contents: resFlex });
+                    handledLocally = true;
+                  }
+               }
+            }
           }
         } 
         
@@ -1155,6 +1198,16 @@ export async function POST(request) {
           const { supabase } = await import('../../../lib/supabaseClient');
           await supabase.from('phone_orders').update({ status: 'DONE', done_at: new Date().toISOString() }).eq('id', orderId);
           await client.replyMessage(event.replyToken, { type: 'text', text: '✅ ออเดอร์เสร็จเรียบร้อย! คุ้มค่าแก่การรอยคอยค่ะ เมี๊ยว~ 🏁' });
+        } else if (action === 'confirm_table_reservation') {
+          const resId = queryParams.get('id');
+          const { supabase } = await import('../../../lib/supabaseClient');
+          await supabase.from('table_reservations').update({ status: 'CONFIRMED' }).eq('id', resId);
+          await client.replyMessage(event.replyToken, { type: 'text', text: '✅ ยืนยันการจองคืนนี้เรียบร้อยค่ะ! เตรียมจัดโต๊ะรอรับบอสและลูกค้าเลยค่ะ เมี๊ยว~ 🥂' });
+        } else if (action === 'cancel_table_reservation') {
+          const resId = queryParams.get('id');
+          const { supabase } = await import('../../../lib/supabaseClient');
+          await supabase.from('table_reservations').update({ status: 'CANCELLED' }).eq('id', resId);
+          await client.replyMessage(event.replyToken, { type: 'text', text: '🌑 ยกเลิกการจองให้แล้วนะคะ เมี๊ยว~' });
         } else if (action === 'approve_insight') {
           const insightId = queryParams.get('id');
           const { supabase } = await import('../../../lib/supabaseClient');
