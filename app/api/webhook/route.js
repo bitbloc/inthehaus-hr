@@ -674,7 +674,11 @@ export async function POST(request) {
             // --- AUTO DETECTION: Phone Orders ---
             // Pattern: 10-digit phone number or keywords like "สั่ง"
             const phoneRegex = /(0\d{1,2}-?\d{3,4}-?\d{3,4})/;
-            if (phoneRegex.test(rawText) && (rawText.includes('สั่ง') || rawText.length > 20)) {
+            
+            const hasPhoneRegex = phoneRegex.test(rawText);
+            const isOrderIntent = rawText.startsWith('สั่ง') || rawText.includes('สั่งทางโทรศัพท์') || rawText.includes('สั่งทางโทรสัพท์');
+            
+            if ((hasPhoneRegex && (rawText.includes('สั่ง') || rawText.length > 20)) || isOrderIntent) {
                console.log("Yuzu: Potential Phone Order Detected");
                const orderData = await extractOrderFromText(rawText);
                if (orderData && orderData.items?.length > 0) {
