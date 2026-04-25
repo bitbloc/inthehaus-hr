@@ -3,6 +3,10 @@ const API_KEY = 'HHgiMMzP47XhYsmXzWHaFQxHeaBuoMSw'; // In production use process
 const SHOP_LAT = 17.390110564180162;
 const SHOP_LONG = 104.79292673153263;
 
+// In-memory cache (30 minutes)
+let weatherCache = { data: null, expiry: 0 };
+const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
+
 const weatherCodes = {
     1000: "ท้องฟ้าแจ่มใส ☀️",
     1100: "แจ่มใสเป็นส่วนใหญ่ 🌤️",
@@ -66,4 +70,27 @@ export function formatWeatherMessage(weather) {
 สูงสุด: ${weather.forecast.tempMax}°C | ต่ำสุด: ${weather.forecast.tempMin}°C
 โอกาสฝนตก: ${weather.forecast.chanceOfRain}%
 สภาพการณ์โดยรวม: ${weather.forecast.condition}`;
+}
+
+/**
+ * Get compact weather string for Yuzu context injection (cached 30 min)
+ * Returns a short one-liner like: "[WEATHER: 35°C ร้อนจัด โอกาสฝน 20%]"
+ */
+export async function getCompactWeather() {
+    try {
+        const now = Date.now();
+        if (weatherCache.data && now < weatherCache.expiry) {
+            return weatherCache.data;
+        }
+
+        const weather = await getSchemaWeather();
+        if (!weather) return "";
+
+        const compact = `[WEATHER: ${weather.current.temp}°C ${weather.current.condition} โอกาสฝน${weather.forecast.chanceOfRain}%]`;
+        weatherCache = { data: compact, expiry: now + CACHE_DURATION };
+        return compact;
+    } catch (e) {
+        console.error("Compact Weather Error:", e);
+        return "";
+    }
 }

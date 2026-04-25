@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { Client } from '@line/bot-sdk';
-import { getSchemaWeather, formatWeatherMessage } from '../../../utils/weather';
+import { getSchemaWeather, formatWeatherMessage, getCompactWeather } from '../../../utils/weather';
 import { getGeminiResponse, classifyAndAnalyzeImage, getDailySummary, generateImage, transcribeAudio, extractOrderFromText, extractReservationFromText } from '../../../utils/gemini';
 import { getGoldPrice, getOilPrice, getElectricityPrice, getIngredientPrices } from '../../../utils/price';
 import { getPriceComparison } from '../../../utils/price_scraper';
@@ -408,6 +408,10 @@ export async function POST(request) {
             } else {
               context += `(ไม่พบข้อมูลพนักงานในระบบสำหรับ LINE ID นี้: ${userId})\n`;
             }
+
+            // Auto-inject compact weather for Yuzu's time-aware personality
+            const compactWeather = await getCompactWeather();
+            if (compactWeather) context += `${compactWeather}\n`;
 
             const dailyLogs = await getDailyContent(groupId);
             if (dailyLogs) context += `\nเหตุการณ์ที่เกิดขึ้นในแชทกลุ่มวันนี้ (ใช้สำหรับอ้างอิงหรือแซวทีมงาน):\n${dailyLogs}\n`;
