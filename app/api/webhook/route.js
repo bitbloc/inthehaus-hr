@@ -8,6 +8,8 @@ import { saveMessage, getChatHistory, getDailyContent, cleanupOldHistory, getEmp
 import { getAccurateNews } from '../../../utils/news';
 import { getEffectiveRoster } from '../../../utils/roster';
 
+export const maxDuration = 60;
+
 // Simple in-memory cache to prevent double-clicks
 const processedPostbacks = new Set();
 
@@ -481,6 +483,7 @@ export async function POST(request) {
               .split('[ROSTER_ACTION]')[0]
               .split('[STOCK_ACTION]')[0]
               .split('[STOCK_AUDIT_FORM]')[0]
+              .split('[YUZU_MEME]')[0]
               .trim();
 
             // Save Memory (use original response to keep system tags in history if desired, 
@@ -492,6 +495,31 @@ export async function POST(request) {
             await saveMessage(groupId, null, 'model', cleanedResponse, 'text');
 
             await client.replyMessage(event.replyToken, { type: 'text', text: cleanedResponse });
+            
+            // New: Handle Yuzu Meme
+            if (response.includes('[YUZU_MEME]')) {
+              try {
+                // Extract just the JSON block (it might have trailing characters if something broke, but usually it's at the end)
+                const memePart = response.split('[YUZU_MEME]')[1].trim();
+                // Match the first valid JSON block
+                const jsonMatch = memePart.match(/\{[\s\S]*?\}/);
+                if (jsonMatch) {
+                   const memeData = JSON.parse(jsonMatch[0]);
+                   if (memeData.prompt) {
+                     const result = await generateImage(memeData.prompt);
+                     if (result.success && result.imageUrl) {
+                       await client.pushMessage(groupId, {
+                         type: 'image',
+                         originalContentUrl: result.imageUrl,
+                         previewImageUrl: result.imageUrl
+                       });
+                     }
+                   }
+                }
+              } catch (e) {
+                console.error("Meme Generation Error:", e);
+              }
+            }
             
             // New: Handle Roster Proposals
             if (response.includes('[ROSTER_ACTION]')) {
