@@ -37,14 +37,17 @@ export default function CheckIn() {
   const [showMoodSelector, setShowMoodSelector] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showWrapUp, setShowWrapUp] = useState(false);
+  const [wrapUpData, setWrapUpData] = useState(null);
+  const [lastCheckInTime, setLastCheckInTime] = useState(null);
 
   // Dev Mode State
   const [devMode, setDevMode] = useState(false);
   const fileInputRef = useRef(null);
 
   // --- Constants ---
-  const SHOP_LAT = 17.390110564180162;
-  const SHOP_LONG = 104.79292673153263;
+  const SHOP_LAT = 17.39009845004315;
+  const SHOP_LONG = 104.7929558480443;
   const ALLOWED_RADIUS_KM = 0.05;
 
   // --- Init ---
@@ -124,6 +127,12 @@ export default function CheckIn() {
       const today = new Date();
       const isToday = isSameDay(lastDate, today);
 
+      if (log.action_type === 'check_in') {
+        setLastCheckInTime(lastDate);
+      } else {
+        setLastCheckInTime(null);
+      }
+
       if (log.action_type === 'check_in' && !isToday && today.getHours() >= 1) {
         alert("คุณลืมลงชื่อออกเมื่อวาน ระบบจะเริ่มนับวันใหม่ให้");
         setLastAction('check_out'); // UI shows Check In
@@ -132,6 +141,7 @@ export default function CheckIn() {
       }
     } else {
       setLastAction('check_out');
+      setLastCheckInTime(null);
     }
   };
 
@@ -285,7 +295,7 @@ export default function CheckIn() {
 
     setIsUploading(true);
     try {
-      const resized = await resizeImage(file, 800);
+      const resized = await resizeImage(file, 600); // Optimized for speed
       const fileName = `${profile.userId}_${Date.now()}.jpg`;
 
       const { error: uploadError } = await supabase.storage.from('checkin-photos').upload(fileName, resized);
@@ -307,13 +317,20 @@ export default function CheckIn() {
 
       setShowCamera(false);
       fetchRecents();
+      
+      // Calculate Wrap Up Data if checking out
+      if (action === 'check_out' && lastCheckInTime) {
+        const diffMs = new Date() - lastCheckInTime;
+        const durationHours = Math.floor(diffMs / (1000 * 60 * 60));
+        const durationMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+        setWrapUpData({ hours: durationHours, minutes: durationMinutes });
+      } else {
+        setWrapUpData(null);
+      }
+
       fetchUserStatus(profile.userId);
 
-      if (action === 'check_in') {
-        setShowMoodSelector(true);
-      } else {
-        alert("Checked Out!");
-      }
+      setShowMoodSelector(true); // Ask for mood on both check-in and check-out
     } catch (err) {
       alert("Error: " + err.message);
     } finally {
@@ -324,7 +341,7 @@ export default function CheckIn() {
   const handleMoodSelect = async (mood) => {
     try {
       const { data: latestLog } = await supabase.from('attendance_logs')
-        .select('id')
+        .select('id, action_type')
         .eq('employee_id', employeeData.id)
         .order('timestamp', { ascending: false })
         .limit(1)
@@ -333,9 +350,18 @@ export default function CheckIn() {
       if (latestLog) {
         await supabase.from('attendance_logs').update({ mood_status: mood }).eq('id', latestLog.id);
         fetchRecents();
+        
+        if (latestLog.action_type === 'check_out') {
+           setWrapUpData(prev => ({ ...prev, mood }));
+        }
       }
     } catch (e) { console.error(e); }
     setShowMoodSelector(false);
+    
+    // Check if it was a checkout, show wrap up
+    if (wrapUpData) {
+      setShowWrapUp(true);
+    }
   };
 
   const handleDevLogin = () => {
@@ -482,6 +508,17 @@ export default function CheckIn() {
             <span className={cn("w-1.5 h-1.5 rounded-full animate-pulse", status.includes('Ready') ? 'bg-emerald-500' : 'bg-rose-500')}></span>
             {status}
           </motion.div>
+          
+          {/* Gamification: Early Bird Badge */}
+          {lastAction !== 'check_in' && shiftContext && !isLate && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-4 px-4 py-2 bg-gradient-to-r from-orange-100 to-amber-100 text-amber-700 rounded-full text-xs font-bold flex items-center gap-2 shadow-sm border border-amber-200"
+            >
+              🔥 มาเช้าจัง เยี่ยมไปเลย!
+            </motion.div>
+          )}
         </motion.div>
 
         {/* Moved Announcement Card */}
@@ -607,7 +644,10 @@ export default function CheckIn() {
             <motion.div
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="absolute inset-0 bg-black/20 backdrop-blur-sm pointer-events-auto"
-              onClick={() => setShowMoodSelector(false)}
+              onClick={() => {
+                setShowMoodSelector(false);
+                if (wrapUpData) setShowWrapUp(true);
+              }}
             />
             <motion.div
               initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
@@ -630,10 +670,65 @@ export default function CheckIn() {
                 ))}
               </div>
               <button
-                onClick={() => setShowMoodSelector(false)}
+                onClick={() => {
+                  setShowMoodSelector(false);
+                  if (wrapUpData) setShowWrapUp(true);
+                }}
                 className="w-full mt-8 text-neutral-400 text-xs font-bold tracking-widest uppercase hover:text-neutral-800 transition-colors"
               >
                 Skip This
+              </button>
+            </motion.div>
+          </div>
+        )}
+
+        {showWrapUp && wrapUpData && (
+          <div className="fixed inset-x-0 bottom-0 z-50 flex flex-col items-center justify-end pointer-events-none">
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm pointer-events-auto"
+              onClick={() => {
+                setShowWrapUp(false);
+                setWrapUpData(null);
+              }}
+            />
+            <motion.div
+              initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="w-full bg-[#FAFAFA] rounded-t-[2.5rem] p-8 pb-12 shadow-2xl pointer-events-auto relative overflow-hidden"
+            >
+              <div className="absolute top-0 right-0 p-4 text-6xl opacity-5">🐾</div>
+              <div className="w-12 h-1 bg-neutral-200 rounded-full mx-auto mb-6"></div>
+              
+              <div className="text-center mb-6">
+                <span className="inline-block p-4 bg-orange-100 text-orange-500 rounded-full text-4xl mb-4">🏆</span>
+                <h3 className="text-2xl font-black text-neutral-800 mb-2">เลิกงานแล้ว!</h3>
+                <p className="text-neutral-500 text-sm">
+                  กะที่ผ่านมาคุณทำงานไป <strong className="text-neutral-800">{wrapUpData.hours} ชั่วโมง {wrapUpData.minutes} นาที</strong>
+                </p>
+              </div>
+
+              <div className="bg-white border border-neutral-100 rounded-2xl p-5 shadow-sm mb-6 relative">
+                <p className="text-sm font-medium text-neutral-700 leading-relaxed">
+                  "ทำได้ดีมาก! ขอบคุณสำหรับความทุ่มเทในวันนี้นะ 🐾"
+                </p>
+                {(wrapUpData.mood === '😴' || wrapUpData.mood === '🤒') && (
+                  <div className="mt-3 pt-3 border-t border-neutral-100">
+                    <p className="text-xs text-orange-600 font-bold">
+                      💡 Yuzu says: พักผ่อนเยอะๆ นะ ดื่มน้ำอุ่นๆ ด้วยล่ะ!
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <button
+                onClick={() => {
+                  setShowWrapUp(false);
+                  setWrapUpData(null);
+                }}
+                className="w-full py-4 bg-neutral-900 text-white rounded-2xl text-sm font-bold shadow-md hover:bg-neutral-800 transition-colors"
+              >
+                ปิดหน้าต่าง
               </button>
             </motion.div>
           </div>
