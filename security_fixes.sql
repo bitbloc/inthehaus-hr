@@ -106,4 +106,10 @@ ALTER TABLE public.payroll_deductions ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Enable all access for authenticated users" ON public.payroll_deductions;
 CREATE POLICY "Enable all access for authenticated users" ON public.payroll_deductions FOR ALL TO authenticated USING (true) WITH CHECK (true);
 
+-- Table: roster_requests
+ALTER TABLE public.roster_requests ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Enable all access for authenticated users" ON public.roster_requests;
+CREATE POLICY "Enable all access for authenticated users" ON public.roster_requests FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
 -- Done!
+

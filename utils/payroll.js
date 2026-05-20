@@ -63,165 +63,201 @@ export const calculatePayroll = (employees, logs, schedules, shifts, payrollConf
         // Let's just stick to processing present logs for now to avoid breaking the "List of Logged Days" view.
         // However, I will implement robust "Late/Shift Match" using overrides.
 
-        Object.keys(empLogsByDate).sort().forEach(dateStr => {
+        const [year, month] = selectedMonth.split('-').map(Number);
+        const daysInMonth = new Date(year, month, 0).getDate();
+
+        for (let d = 1; d <= daysInMonth; d++) {
+            const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
             const dailyLogs = empLogsByDate[dateStr];
 
-            // A. Check Explicit Absent Log
-            if (dailyLogs.some(l => l.action_type === 'absent')) {
-                absentCount++;
-                dailyDetails.push({ date: dateStr, status: 'Absent', wage: 0, ot: 0, note: '-' });
-                return;
-            }
+            if (dailyLogs && dailyLogs.length > 0) {
+                // A. Check Explicit Absent Log
+                if (dailyLogs.some(l => l.action_type === 'absent')) {
+                    absentCount++;
+                    dailyDetails.push({ date: dateStr, status: 'Absent', wage: 0, ot: 0, note: '-' });
+                    continue;
+                }
 
-            dailyLogs.sort((a, b) => parseISO(a.timestamp) - parseISO(b.timestamp));
-            const checkIns = dailyLogs.filter(l => l.action_type === 'check_in');
-            const checkOuts = dailyLogs.filter(l => l.action_type === 'check_out');
+                dailyLogs.sort((a, b) => parseISO(a.timestamp) - parseISO(b.timestamp));
+                const checkIns = dailyLogs.filter(l => l.action_type === 'check_in');
+                const checkOuts = dailyLogs.filter(l => l.action_type === 'check_out');
 
-            if (checkIns.length > 1 || checkOuts.length > 1) {
-                duplicateCount += (Math.max(checkIns.length, checkOuts.length) - 1);
-            }
+                if (checkIns.length > 1 || checkOuts.length > 1) {
+                    duplicateCount += (Math.max(checkIns.length, checkOuts.length) - 1);
+                }
 
-            if (checkIns.length > 0 && checkOuts.length > 0) {
-                const firstIn = checkIns[0];
-                const lastOut = checkOuts[checkOuts.length - 1];
-                const logDate = parseISO(firstIn.timestamp);
-                const dayOfWeek = logDate.getDay();
+                if (checkIns.length > 0 && checkOuts.length > 0) {
+                    const firstIn = checkIns[0];
+                    const lastOut = checkOuts[checkOuts.length - 1];
+                    const logDate = parseISO(firstIn.timestamp);
+                    const dayOfWeek = logDate.getDay();
 
-                // --- DETERMINE SHIFT (The Guard Logic Integration) ---
-                let currentShift = null;
+                    // --- DETERMINE SHIFT (The Guard Logic Integration) ---
+                    let currentShift = null;
+                    const override = overridesMap.get(String(emp.id))?.[dateStr];
+
+                    if (override) {
+                        if (!override.is_off) {
+                            // Data Freezing: Use frozen times
+                            // Find shift definition for Name/Salary info
+                            const baseShift = shifts.find(s => String(s.id) === String(override.shift_id));
+                            currentShift = {
+                                ...baseShift, // inherits salary, name
+                                start_time: override.custom_start_time, // Override time
+                                end_time: override.custom_end_time
+                            };
+                            if (!currentShift.name) currentShift.name = "Extra Shift";
+                        }
+                        // If is_off, currentShift remains null (Ghost Shift -> Employee shouldn't be here!)
+                    } else {
+                        // Fallback to Weekly Template
+                        const schedule = schedules[emp.id]?.[dayOfWeek];
+                        if (schedule && !schedule.is_off) {
+                            currentShift = shifts.find(s => s.id === schedule.shift_id);
+                        }
+                    }
+
+                    // If they logged time but currentShift is null -> "Unexpected Work" (OT?)
+                    // If they logged time and currentShift exists -> Normal/Late logic.
+
+                    let dailyWage = 0;
+                    let dailyOT = 0;
+                    let dailyOTHours = 0;
+                    let status = 'Normal';
+                    let lateMins = 0;
+
+                    if (currentShift) {
+                        // --- Wage (Logic Preserved) ---
+                        const normName = currentShift.name.toLowerCase();
+                        let rateKey = null;
+                        if (normName.includes('เช้า') || normName.includes('morning')) rateKey = 'morning';
+                        else if (normName.includes('ค่ำ') || normName.includes('evening')) rateKey = 'evening';
+                        else if (normName.includes('ควบ') || normName.includes('double')) rateKey = 'double';
+
+                        if (rateKey && emp.shift_rates && emp.shift_rates[rateKey]) {
+                            dailyWage = Number(emp.shift_rates[rateKey]);
+                        } else {
+                            if (rateKey === 'double') dailyWage = parseFloat(payrollConfig.double_shift_rate) || 1000;
+                            else dailyWage = parseFloat(currentShift.salary) || 500;
+                        }
+
+                        totalSalary += dailyWage;
+                        workDays++;
+
+                        // --- Late Logic (Using Frozen Time) ---
+                        const [sh, sm] = currentShift.start_time.split(':');
+                        const shiftStart = new Date(logDate);
+                        shiftStart.setHours(sh, sm, 0);
+
+                        const inTimeDiff = differenceInMinutes(parseISO(firstIn.timestamp), shiftStart);
+                        if (inTimeDiff > 0) {
+                            lateCount++;
+                            lateMins = inTimeDiff;
+                            status = `Late (${lateMins}m)`;
+                        }
+
+                        // --- OT Logic (Using Frozen Time) ---
+                        const outTime = parseISO(lastOut.timestamp);
+                        const [eh, em] = currentShift.end_time.split(':').map(Number);
+                        const shiftEnd = new Date(logDate);
+                        shiftEnd.setHours(eh, em, 0);
+
+                        const [sh_check] = currentShift.start_time.split(':');
+                        if (eh < Number(sh_check)) shiftEnd.setDate(shiftEnd.getDate() + 1);
+
+                        const diffMinutes = differenceInMinutes(outTime, shiftEnd);
+                        if (diffMinutes >= 29) {
+                            let hours = Math.floor(diffMinutes / 60);
+                            const remainder = diffMinutes % 60;
+                            if (remainder >= 30) hours += 1;
+
+                            if (hours > 0) {
+                                dailyOTHours = hours;
+                                dailyOT = hours * (parseFloat(payrollConfig.ot_rate) || 50);
+                                totalOTHours += dailyOTHours;
+                                totalOTPay += dailyOT;
+                            }
+                        }
+                    } else {
+                        // Logged work but no shift (Extra Shift)
+                        status = 'Extra (พิเศษ)';
+
+                        // Attempt to find a base wage:
+                        if (emp.shift_rates?.morning) dailyWage = Number(emp.shift_rates.morning);
+                        else if (emp.shift_rates?.evening) dailyWage = Number(emp.shift_rates.evening);
+                        else dailyWage = 500; // Fallback
+
+                        totalSalary += dailyWage;
+                        workDays++;
+
+                        // OT Logic for Extra Shift (Assume standard 9 hours incl break)
+                        const start = parseISO(firstIn.timestamp);
+                        const end = parseISO(lastOut.timestamp);
+                        const durationMinutes = differenceInMinutes(end, start);
+
+                        if (durationMinutes > 540) { // > 9 hours
+                            const otMins = durationMinutes - 540;
+                            let hours = Math.floor(otMins / 60);
+                            if ((otMins % 60) >= 30) hours += 1;
+
+                            if (hours > 0) {
+                                dailyOTHours = hours;
+                                dailyOT = hours * (parseFloat(payrollConfig.ot_rate) || 50);
+                                totalOTHours += dailyOTHours;
+                                totalOTPay += dailyOT;
+                            }
+                        }
+                    }
+
+                    dailyDetails.push({
+                        date: dateStr,
+                        shift: currentShift?.name || 'Unscheduled',
+                        in: formatTime(parseISO(firstIn.timestamp)),
+                        out: formatTime(parseISO(lastOut.timestamp)),
+                        wage: dailyWage,
+                        ot: dailyOT,
+                        ot_hours: dailyOTHours,
+                        status: status
+                    });
+                } else {
+                    dailyDetails.push({ date: dateStr, status: 'Incomplete', wage: 0, ot: 0 });
+                }
+            } else {
+                // No logs for this date. Check if they were scheduled.
                 const override = overridesMap.get(String(emp.id))?.[dateStr];
-
+                let isScheduled = false;
+                let shiftName = '';
+                
                 if (override) {
                     if (!override.is_off) {
-                        // Data Freezing: Use frozen times
-                        // Find shift definition for Name/Salary info
-                        const baseShift = shifts.find(s => String(s.id) === String(override.shift_id));
-                        currentShift = {
-                            ...baseShift, // inherits salary, name
-                            start_time: override.custom_start_time, // Override time
-                            end_time: override.custom_end_time
-                        };
-                        if (!currentShift.name) currentShift.name = "Extra Shift";
+                        isScheduled = true;
+                        shiftName = shifts.find(s => String(s.id) === String(override.shift_id))?.name || 'Custom';
                     }
-                    // If is_off, currentShift remains null (Ghost Shift -> Employee shouldn't be here!)
                 } else {
-                    // Fallback to Weekly Template
+                    const dateObj = new Date(year, month - 1, d);
+                    const dayOfWeek = dateObj.getDay();
                     const schedule = schedules[emp.id]?.[dayOfWeek];
-                    if (schedule && !schedule.is_off) {
-                        currentShift = shifts.find(s => s.id === schedule.shift_id);
+                    if (schedule && !schedule.is_off && schedule.shift_id) {
+                        isScheduled = true;
+                        shiftName = shifts.find(s => s.id === schedule.shift_id)?.name || 'Template';
                     }
                 }
-
-                // If they logged time but currentShift is null -> "Unexpected Work" (OT?)
-                // If they logged time and currentShift exists -> Normal/Late logic.
-
-                let dailyWage = 0;
-                let dailyOT = 0;
-                let dailyOTHours = 0;
-                let status = 'Normal';
-                let lateMins = 0;
-
-                if (currentShift) {
-                    // --- Wage (Logic Preserved) ---
-                    const normName = currentShift.name.toLowerCase();
-                    let rateKey = null;
-                    if (normName.includes('เช้า') || normName.includes('morning')) rateKey = 'morning';
-                    else if (normName.includes('ค่ำ') || normName.includes('evening')) rateKey = 'evening';
-                    else if (normName.includes('ควบ') || normName.includes('double')) rateKey = 'double';
-
-                    if (rateKey && emp.shift_rates && emp.shift_rates[rateKey]) {
-                        dailyWage = Number(emp.shift_rates[rateKey]);
-                    } else {
-                        if (rateKey === 'double') dailyWage = parseFloat(payrollConfig.double_shift_rate) || 1000;
-                        else dailyWage = parseFloat(currentShift.salary) || 500;
-                    }
-
-                    totalSalary += dailyWage;
-                    workDays++;
-
-                    // --- Late Logic (Using Frozen Time) ---
-                    const [sh, sm] = currentShift.start_time.split(':');
-                    const shiftStart = new Date(logDate);
-                    shiftStart.setHours(sh, sm, 0);
-
-                    const inTimeDiff = differenceInMinutes(parseISO(firstIn.timestamp), shiftStart);
-                    if (inTimeDiff > 0) {
-                        lateCount++;
-                        lateMins = inTimeDiff;
-                        status = `Late (${lateMins}m)`;
-                    }
-
-                    // --- OT Logic (Using Frozen Time) ---
-                    const outTime = parseISO(lastOut.timestamp);
-                    const [eh, em] = currentShift.end_time.split(':').map(Number);
-                    const shiftEnd = new Date(logDate);
-                    shiftEnd.setHours(eh, em, 0);
-
-                    const [sh_check] = currentShift.start_time.split(':');
-                    if (eh < Number(sh_check)) shiftEnd.setDate(shiftEnd.getDate() + 1);
-
-                    const diffMinutes = differenceInMinutes(outTime, shiftEnd);
-                    if (diffMinutes >= 29) {
-                        let hours = Math.floor(diffMinutes / 60);
-                        const remainder = diffMinutes % 60;
-                        if (remainder >= 30) hours += 1;
-
-                        if (hours > 0) {
-                            dailyOTHours = hours;
-                            dailyOT = hours * (parseFloat(payrollConfig.ot_rate) || 50);
-                            totalOTHours += dailyOTHours;
-                            totalOTPay += dailyOT;
-                        }
-                    }
-                } else {
-                    // Logged work but no shift (Extra Shift)
-                    status = 'Extra (พิเศษ)';
-
-                    // Attempt to find a base wage:
-                    // 1. Try 'morning' rate
-                    // 2. Try 'evening' rate
-                    // 3. Default to 500
-                    if (emp.shift_rates?.morning) dailyWage = Number(emp.shift_rates.morning);
-                    else if (emp.shift_rates?.evening) dailyWage = Number(emp.shift_rates.evening);
-                    else dailyWage = 500; // Fallback
-
-                    totalSalary += dailyWage;
-                    workDays++;
-
-                    // OT Logic for Extra Shift (Assume standard 9 hours incl break)
-                    // If work duration > 9 hours, pay OT
-                    const start = parseISO(firstIn.timestamp);
-                    const end = parseISO(lastOut.timestamp);
-                    const durationMinutes = differenceInMinutes(end, start);
-
-                    if (durationMinutes > 540) { // > 9 hours
-                        const otMins = durationMinutes - 540;
-                        let hours = Math.floor(otMins / 60);
-                        if ((otMins % 60) >= 30) hours += 1;
-
-                        if (hours > 0) {
-                            dailyOTHours = hours;
-                            dailyOT = hours * (parseFloat(payrollConfig.ot_rate) || 50);
-                            totalOTHours += dailyOTHours;
-                            totalOTPay += dailyOT;
-                        }
-                    }
+                
+                if (isScheduled) {
+                    absentCount++;
+                    dailyDetails.push({
+                        date: dateStr,
+                        shift: shiftName,
+                        in: '-',
+                        out: '-',
+                        wage: 0,
+                        ot: 0,
+                        ot_hours: 0,
+                        status: 'Absent (No Show)'
+                    });
                 }
-
-                dailyDetails.push({
-                    date: dateStr,
-                    shift: currentShift?.name || 'Unscheduled',
-                    in: formatTime(parseISO(firstIn.timestamp)),
-                    out: formatTime(parseISO(lastOut.timestamp)),
-                    wage: dailyWage,
-                    ot: dailyOT,
-                    ot_hours: dailyOTHours,
-                    status: status
-                });
-            } else {
-                dailyDetails.push({ date: dateStr, status: 'Incomplete', wage: 0, ot: 0 });
             }
-        });
+        }
 
         // Deductions
         const empDeductions = deductionsMap.get(emp.id) || [];

@@ -203,7 +203,7 @@ export default function CheckIn() {
       }
 
       // 3. Check Weekly Schedule
-      const { data: weekly } = await supabase.from('roster_weekly_schedules')
+      const { data: weekly } = await supabase.from('employee_schedules')
         .select('shift_id, is_off')
         .eq('employee_id', emp.id)
         .eq('day_of_week', dayOfWeek === 0 ? 6 : dayOfWeek - 1) // Adjust if DB uses 0=Mon. Standard JS 0=Sun. 
@@ -224,7 +224,7 @@ export default function CheckIn() {
 
       const dayIndex = (dayOfWeek + 6) % 7;
 
-      const { data: weeklySchedule } = await supabase.from('roster_weekly_schedules')
+      const { data: weeklySchedule } = await supabase.from('employee_schedules')
         .select('shift_id, is_off')
         .eq('employee_id', emp.id)
         .eq('day_of_week', dayIndex)
