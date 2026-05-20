@@ -6,18 +6,18 @@ const getWeatherIcon = (code) => {
     // Codes: 1000=Clear, 1100=Mostly Clear, 1101=Partly Cloudy, 1001=Cloudy
     // 4000=Drizzle, 4001=Rain, 4200=Light Rain, 8000=Thunderstorm
     const map = {
-        1000: '☀️', 1100: '🌤️', 1101: 'bq', 1001: '☁️',
-        4000: 'Vm', 4001: '🌧️', 4200: '🌦️', 8000: '⛈️'
+        1000: '☀️', 1100: '🌤️', 1101: '⛅', 1001: '☁️',
+        4000: '🌧️', 4001: '🌧️', 4200: '🌦️', 8000: '⛈️'
     };
     return map[code] || '🌡️';
 };
 
 const getWeatherLabel = (code) => {
     const map = {
-        1000: 'Sunny', 1100: 'Mostly Sunny', 1101: 'Partly Cloudy', 1001: 'Cloudy',
-        4000: 'Drizzle', 4001: 'Rain', 4200: 'Light Rain', 8000: 'Thunderstorm'
+        1000: 'แจ่มใส', 1100: 'มีแดดเป็นส่วนมาก', 1101: 'มีเมฆบางส่วน', 1001: 'มีเมฆมาก',
+        4000: 'ฝนตกปรอยๆ', 4001: 'ฝนตก', 4200: 'ฝนตกเล็กน้อย', 8000: 'พายุฝนฟ้าคะนอง'
     };
-    return map[code] || 'Unknown';
+    return map[code] || 'ไม่ทราบสภาพอากาศ';
 }
 
 export default function WeatherCard({ latitude, longitude, locationName = "Current Location" }) {
@@ -67,52 +67,22 @@ export default function WeatherCard({ latitude, longitude, locationName = "Curre
             animate={{ opacity: 1, y: 0 }}
             className="w-full max-w-sm z-10 mb-6 px-6"
         >
-            <div className="flex items-center justify-between px-5 py-3 bg-white/60 backdrop-blur-md rounded-2xl border border-white/60 shadow-sm relative overflow-hidden">
-                {/* Decorative background blob */}
-                <div className="absolute -right-4 -top-4 w-20 h-20 bg-blue-400/20 blur-2xl rounded-full pointer-events-none" />
-
-                <div className="flex items-center gap-4 relative z-10 w-full">
-                    <div className="w-12 h-12 rounded-xl bg-blue-50/80 flex items-center justify-center text-2xl shadow-sm border border-blue-100">
-                        {loading ? (
-                            <div className="animate-spin w-4 h-4 border-2 border-blue-200 border-t-blue-500 rounded-full" />
-                        ) : (
-                            getWeatherIcon(weather?.conditionCode)
-                        )}
+            <div className="px-5 py-4 bg-white/80 backdrop-blur-xl rounded-2xl border border-white shadow-sm flex items-center gap-3">
+                {loading ? (
+                    <div className="flex items-center gap-3 w-full">
+                        <div className="animate-spin w-4 h-4 border-2 border-slate-300 border-t-slate-600 rounded-full" />
+                        <div className="h-4 w-40 bg-slate-200 animate-pulse rounded" />
                     </div>
-
-                    <div className="flex-1">
-                        <div className="flex justify-between items-start">
-                            <div>
-                                <h4 className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest flex items-center gap-1">
-                                    📍 {weather?.address || locationName}
-                                </h4>
-                                <div className="flex items-baseline gap-1">
-                                    {loading ? (
-                                        <div className="h-6 w-16 bg-neutral-200 animate-pulse rounded mt-1" />
-                                    ) : error ? (
-                                        <span className="text-xs text-red-400">Unavailable</span>
-                                    ) : (
-                                        <>
-                                            <span className="text-xl font-bold text-neutral-800">
-                                                {Math.round(weather.temperature)}°
-                                            </span>
-                                            <span className="text-xs font-medium text-neutral-500">
-                                                {getWeatherLabel(weather.conditionCode)}
-                                            </span>
-                                        </>
-                                    )}
-                                </div>
-                            </div>
-
-                            {!loading && !error && (
-                                <div className="text-right">
-                                    <div className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-0.5">Humidity</div>
-                                    <div className="text-xs font-semibold text-neutral-600">{weather.humidity}%</div>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
+                ) : error ? (
+                    <div className="text-xs text-red-500 font-medium">ไม่สามารถโหลดข้อมูลสภาพอากาศได้</div>
+                ) : (
+                    <p className="text-[13px] font-medium text-slate-700 leading-relaxed flex items-center gap-2">
+                        <span className="text-2xl drop-shadow-sm">{getWeatherIcon(weather?.conditionCode)}</span>
+                        <span>
+                            วันนี้อากาศ <strong>{getWeatherLabel(weather?.conditionCode)}</strong> อุณหภูมิประมาณ <strong>{Math.round(weather?.temperature)}°C</strong> ที่ {weather?.address || locationName}
+                        </span>
+                    </p>
+                )}
             </div>
         </motion.div>
     );
