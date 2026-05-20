@@ -412,17 +412,20 @@ export default function CheckIn() {
 
       {/* 1. Header (Glassmorphism) */}
       <motion.div
-        className="w-full px-6 py-4 flex justify-between items-center z-20 sticky top-0 bg-white/60 backdrop-blur-xl border-b border-white/20"
+        className="w-full px-6 py-4 flex justify-between items-center z-20 sticky top-0 bg-white/60 backdrop-blur-xl border-b border-white/20 relative"
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
       >
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl bg-neutral-900 flex items-center justify-center text-white font-bold text-xs shadow-lg">IH</div>
-          <span className="text-sm font-semibold tracking-tight text-neutral-800">In the haus</span>
+        <div className="flex items-center z-10">
           <button onClick={handleDevLogin} className="text-neutral-300 hover:text-neutral-900 transition-colors text-xs">🛠️</button>
         </div>
 
-        <div className="flex items-center gap-3">
+        {/* Center: Logo */}
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center z-10 pointer-events-none">
+           <img src="/logo.png" alt="In The Haus" className="h-10 object-contain drop-shadow-sm" />
+        </div>
+
+        <div className="flex items-center gap-3 z-10">
           <Link href="https://forms.gle/3LdW9zdjdTCpfpTe8" target="_blank" className="text-[10px] font-medium text-neutral-400 hover:text-neutral-800 transition-colors mr-1">
             คำขอเบิกเงินล่วงหน้า
           </Link>
