@@ -481,7 +481,7 @@ export default function CheckIn() {
 
 
       {/* 3. Hero Clock */}
-      <div className="flex-1 flex flex-col items-center justify-center w-full z-10 -mt-10">
+      <div className="flex-1 flex flex-col items-center justify-center w-full z-10 mt-4">
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
