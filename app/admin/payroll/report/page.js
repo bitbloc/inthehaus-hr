@@ -142,7 +142,7 @@ function PayrollPDFReportContent() {
     const IndividualReport = () => (
         <div className="bg-gray-100 min-h-screen py-8">
             {payrollData.filter(d => d.workDays > 0).map((item, index) => (
-                <div key={item.emp.id} className="print-page bg-white p-12 max-w-4xl mx-auto shadow-xl mb-8 rounded-xl border border-gray-200">
+                <div key={item.emp.id} className="print-page bg-white text-gray-800 p-12 max-w-4xl mx-auto shadow-xl mb-8 rounded-xl border border-gray-200">
                     {/* Payslip Header */}
                     <div className="flex justify-between items-start border-b-4 border-black pb-6 mb-8">
                         <div>
@@ -173,7 +173,7 @@ function PayrollPDFReportContent() {
                     <div className="mb-10">
                         <h3 className="text-xs font-bold tracking-[0.2em] uppercase text-gray-500 mb-4 border-b border-gray-200 pb-2">Daily Attendance Breakdown</h3>
                         <table className="w-full text-xs text-left">
-                            <thead className="text-gray-400 bg-gray-50 font-mono uppercase text-[9px] tracking-wider border-b border-gray-200">
+                            <thead className="text-gray-600 bg-gray-50 font-mono uppercase text-[9px] tracking-wider border-b border-gray-200">
                                 <tr>
                                     <th className="py-2 px-2">Date</th>
                                     <th className="py-2 px-2">Shift</th>
@@ -202,17 +202,17 @@ function PayrollPDFReportContent() {
                                     else if (isUnscheduled) statusColor = 'text-blue-600';
 
                                     return (
-                                        <tr key={i} className={`hover:bg-gray-50 ${isOff ? 'text-gray-400/80 bg-gray-50/20 opacity-60' : ''}`}>
+                                        <tr key={i} className={`hover:bg-gray-50 ${isOff ? 'text-gray-400 bg-gray-50/20' : 'text-gray-800'}`}>
                                             <td className="py-1.5 px-2 font-mono">{d.date.slice(5)}</td>
                                             <td className="py-1.5 px-2">{d.shift}</td>
-                                            <td className="py-1.5 px-2 font-mono text-gray-400">{d.scheduled_in ? `${d.scheduled_in}-${d.scheduled_out}` : '-'}</td>
+                                            <td className={`py-1.5 px-2 font-mono ${isOff ? 'text-gray-400' : 'text-gray-500'}`}>{d.scheduled_in ? `${d.scheduled_in}-${d.scheduled_out}` : '-'}</td>
                                             <td className="py-1.5 px-2 font-mono font-medium">{d.in !== '-' || d.out !== '-' ? `${d.in}-${d.out}` : '-'}</td>
                                             <td className={`py-1.5 px-2 font-bold ${statusColor}`}>{d.status}</td>
                                             <td className="py-1.5 px-2 text-right font-mono">{d.regular_hours > 0 ? Number(d.regular_hours).toFixed(1) : '-'}</td>
-                                            <td className="py-1.5 px-2 text-right font-mono text-orange-600">{d.ot_hours > 0 ? Number(d.ot_hours).toFixed(1) : '-'}</td>
+                                            <td className={`py-1.5 px-2 text-right font-mono ${isOff ? 'text-gray-400' : 'text-orange-600 font-medium'}`}>{d.ot_hours > 0 ? Number(d.ot_hours).toFixed(1) : '-'}</td>
                                             <td className="py-1.5 px-2 text-right font-mono">{d.wage > 0 ? d.wage.toLocaleString('th-TH', {minimumFractionDigits:2}) : '-'}</td>
-                                            <td className="py-1.5 px-2 text-right font-mono text-orange-600">{d.ot > 0 ? d.ot.toLocaleString('th-TH', {minimumFractionDigits:2}) : '-'}</td>
-                                            <td className="py-1.5 px-2 text-right font-mono font-bold text-gray-800">
+                                            <td className={`py-1.5 px-2 text-right font-mono ${isOff ? 'text-gray-400' : 'text-orange-600 font-medium'}`}>{d.ot > 0 ? d.ot.toLocaleString('th-TH', {minimumFractionDigits:2}) : '-'}</td>
+                                            <td className={`py-1.5 px-2 text-right font-mono font-bold ${isOff ? 'text-gray-400' : 'text-gray-800'}`}>
                                                 {(d.wage + d.ot) > 0 ? (d.wage + d.ot).toLocaleString('th-TH', {minimumFractionDigits:2}) : '-'}
                                             </td>
                                         </tr>

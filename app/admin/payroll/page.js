@@ -70,7 +70,7 @@ export default function PayrollDashboard() {
     const totalNetSalary = payrollData.reduce((sum, item) => sum + item.netSalary, 0);
 
     return (
-        <div className="p-6 max-w-7xl mx-auto space-y-6">
+        <div className="p-6 max-w-7xl mx-auto space-y-6 text-gray-800">
             <div className="mb-2">
                 <a href="/admin" className="text-sm text-gray-500 hover:text-gray-800 flex items-center gap-1 w-fit transition-colors">
                     <ChevronLeft size={16} /> กลับสู่หน้าแดชบอร์ดหลัก
@@ -145,9 +145,9 @@ export default function PayrollDashboard() {
                                 {payrollData.map(item => (
                                     <React.Fragment key={item.emp.id}>
                                         <tr 
-                                            className="hover:bg-gray-50 cursor-pointer transition-colors"
-                                            onClick={() => toggleExpand(item.emp.id)}
-                                        >
+                                             className="hover:bg-gray-50 cursor-pointer transition-colors text-gray-800"
+                                             onClick={() => toggleExpand(item.emp.id)}
+                                         >
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-gray-400">
@@ -205,10 +205,10 @@ export default function PayrollDashboard() {
                                                                     else if (isUnscheduled) statusBadgeColor = 'bg-blue-50 text-blue-700 border-blue-200';
 
                                                                     return (
-                                                                        <tr key={idx} className={`${isOff ? 'opacity-60 bg-gray-50/50' : 'hover:bg-gray-50'}`}>
+                                                                        <tr key={idx} className={`${isOff ? 'text-gray-400 bg-gray-50/50' : 'text-gray-800 hover:bg-gray-50'}`}>
                                                                             <td className="px-3 py-2 font-mono">{format(new Date(day.date), 'dd MMM yyyy', { locale: th })}</td>
                                                                             <td className="px-3 py-2">{day.shift}</td>
-                                                                            <td className="px-3 py-2 font-mono text-gray-500">{day.scheduled_in ? `${day.scheduled_in} - ${day.scheduled_out}` : '-'}</td>
+                                                                            <td className={`px-3 py-2 font-mono ${isOff ? 'text-gray-400' : 'text-gray-500'}`}>{day.scheduled_in ? `${day.scheduled_in} - ${day.scheduled_out}` : '-'}</td>
                                                                             <td className="px-3 py-2 font-mono font-medium">{day.in !== '-' || day.out !== '-' ? `${day.in} - ${day.out}` : '-'}</td>
                                                                             <td className="px-3 py-2">
                                                                                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${statusBadgeColor}`}>
@@ -216,10 +216,10 @@ export default function PayrollDashboard() {
                                                                                 </span>
                                                                             </td>
                                                                             <td className="px-3 py-2 text-center font-mono">{day.regular_hours > 0 ? day.regular_hours.toFixed(1) : '-'}</td>
-                                                                            <td className="px-3 py-2 text-center font-mono text-orange-600">{day.ot_hours > 0 ? day.ot_hours.toFixed(1) : '-'}</td>
+                                                                            <td className={`px-3 py-2 text-center font-mono ${isOff ? 'text-gray-400' : 'text-orange-600 font-medium'}`}>{day.ot_hours > 0 ? day.ot_hours.toFixed(1) : '-'}</td>
                                                                             <td className="px-3 py-2 text-right font-mono">{day.wage > 0 ? day.wage.toLocaleString('th-TH', { minimumFractionDigits: 2 }) : '-'}</td>
-                                                                            <td className="px-3 py-2 text-right font-mono text-orange-600">{day.ot > 0 ? day.ot.toLocaleString('th-TH', { minimumFractionDigits: 2 }) : '-'}</td>
-                                                                            <td className="px-3 py-2 text-right font-mono font-bold text-gray-800">
+                                                                            <td className={`px-3 py-2 text-right font-mono ${isOff ? 'text-gray-400' : 'text-orange-600 font-medium'}`}>{day.ot > 0 ? day.ot.toLocaleString('th-TH', { minimumFractionDigits: 2 }) : '-'}</td>
+                                                                            <td className={`px-3 py-2 text-right font-mono font-bold ${isOff ? 'text-gray-400' : 'text-gray-800'}`}>
                                                                                 {(day.wage + day.ot) > 0 ? (day.wage + day.ot).toLocaleString('th-TH', { minimumFractionDigits: 2 }) : '-'}
                                                                             </td>
                                                                         </tr>
