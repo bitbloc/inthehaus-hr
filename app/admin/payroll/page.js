@@ -62,6 +62,11 @@ export default function PayrollDashboard() {
 
     return (
         <div className="p-6 max-w-7xl mx-auto space-y-6">
+            <div className="mb-2">
+                <a href="/admin" className="text-sm text-gray-500 hover:text-gray-800 flex items-center gap-1 w-fit transition-colors">
+                    <ChevronLeft size={16} /> กลับสู่หน้าแดชบอร์ดหลัก
+                </a>
+            </div>
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-800">ระบบสรุปเงินเดือน (Payroll)</h1>

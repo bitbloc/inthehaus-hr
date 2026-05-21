@@ -616,7 +616,17 @@ export default function AdminDashboard() {
                             { id: 'yuzu', label: 'Yuzu AI', icon: Icons.Yuzu },
                             { id: 'settings', label: 'Settings', icon: Icons.Settings },
                         ].map(tab => (
-                            <TabButton key={tab.id} active={activeTab === tab.id} onClick={() => setActiveTab(tab.id)} label={tab.label} icon={tab.icon} />
+                            <TabButton 
+                                key={tab.id} 
+                                active={activeTab === tab.id} 
+                                onClick={() => {
+                                    if (tab.id === 'payroll') window.location.href = '/admin/payroll';
+                                    else if (tab.id === 'roster') window.location.href = '/admin/roster';
+                                    else setActiveTab(tab.id);
+                                }} 
+                                label={tab.label} 
+                                icon={tab.icon} 
+                            />
                         ))}
                     </div>
                 </div>
