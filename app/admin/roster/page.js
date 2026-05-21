@@ -313,12 +313,20 @@ export default function AdminRosterPage() {
                                                         {slots.length === 0 && <span className="text-gray-300 text-xs m-auto block text-center">+</span>}
                                                         {slots.map((s, idx) => {
                                                             const shiftObj = shifts.find(sh => sh.id === s.shift_id);
-                                                            const bgColor = getShiftColorClass(s, shiftObj);
                                                             const timeStr = s.custom_start_time ? `${s.custom_start_time.slice(0,5)}-${s.custom_end_time?.slice(0,5)}` : (shiftObj ? `${shiftObj.start_time.slice(0,5)}-${shiftObj.end_time.slice(0,5)}` : '');
+
+                                                            // Match against saved presets for custom slots
+                                                            const matchedPreset = (!s.shift_id && s.custom_start_time && s.custom_end_time)
+                                                                ? customPresets.find(p => p.start === s.custom_start_time && p.end === s.custom_end_time)
+                                                                : null;
+                                                            const bgColor = matchedPreset
+                                                                ? `${getPresetColor(matchedPreset.color).bg} ${getPresetColor(matchedPreset.color).border} ${getPresetColor(matchedPreset.color).text}`
+                                                                : getShiftColorClass(s, shiftObj);
+                                                            const cellLabel = s.is_off ? 'OFF (วันหยุด)' : (matchedPreset ? `${matchedPreset.icon || '⏰'} ${matchedPreset.name}` : (shiftObj?.name || 'Custom'));
 
                                                             return (
                                                                     <div key={idx} className={`p-1.5 rounded text-xs border ${bgColor} ${s.status === 'DRAFT' ? 'border-dashed border-2' : ''}`}>
-                                                                        <div className="font-semibold">{s.is_off ? 'OFF (วันหยุด)' : (shiftObj?.name || 'Custom')}</div>
+                                                                        <div className="font-semibold">{cellLabel}</div>
                                                                         {!s.is_off && <div className="text-[10px] font-bold text-black mt-0.5">{timeStr}</div>}
                                                                         {s.slot_type !== 'MAIN' && <div className="text-[9px] uppercase font-bold tracking-wider opacity-60 mt-0.5">{s.slot_type}</div>}
                                                                     </div>
