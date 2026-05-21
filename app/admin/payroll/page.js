@@ -5,12 +5,17 @@ import { supabase } from '../../../lib/supabaseClient';
 import { calculatePayroll } from '../../../utils/payroll';
 import { format, startOfMonth, endOfMonth, addDays } from 'date-fns';
 import { th } from 'date-fns/locale';
-import { FileText, Printer, ChevronLeft, ChevronRight } from 'lucide-react';
+import { FileText, Printer, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
 
 export default function PayrollDashboard() {
     const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
     const [payrollData, setPayrollData] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [expandedEmpId, setExpandedEmpId] = useState(null);
+
+    const toggleExpand = (empId) => {
+        setExpandedEmpId(expandedEmpId === empId ? null : empId);
+    };
 
     useEffect(() => {
         fetchData();
@@ -138,19 +143,95 @@ export default function PayrollDashboard() {
                             </thead>
                             <tbody className="divide-y divide-gray-100">
                                 {payrollData.map(item => (
-                                    <tr key={item.emp.id} className="hover:bg-gray-50">
-                                        <td className="px-6 py-4">
-                                            <div className="font-medium text-gray-800">{item.emp.nickname || item.emp.name}</div>
-                                            <div className="text-xs text-gray-400">{item.emp.position}</div>
-                                        </td>
-                                        <td className="px-6 py-4 text-center">{item.workDays}</td>
-                                        <td className="px-6 py-4 text-center text-blue-600 font-medium">{item.totalRegularHours.toFixed(1)}</td>
-                                        <td className="px-6 py-4 text-center text-orange-600 font-medium">{item.totalOTHours.toFixed(1)}</td>
-                                        <td className="px-6 py-4 text-center text-red-500">{item.lateCount > 0 ? item.lateCount : '-'}</td>
-                                        <td className="px-6 py-4 text-right text-gray-600">{item.totalSalary.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td>
-                                        <td className="px-6 py-4 text-right text-gray-600">{item.totalOTPay.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td>
-                                        <td className="px-6 py-4 text-right font-bold text-green-600">{item.netSalary.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td>
-                                    </tr>
+                                    <React.Fragment key={item.emp.id}>
+                                        <tr 
+                                            className="hover:bg-gray-50 cursor-pointer transition-colors"
+                                            onClick={() => toggleExpand(item.emp.id)}
+                                        >
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-gray-400">
+                                                        {expandedEmpId === item.emp.id ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                                    </span>
+                                                    <div>
+                                                        <div className="font-medium text-gray-800">{item.emp.nickname || item.emp.name}</div>
+                                                        <div className="text-xs text-gray-400">{item.emp.position}</div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-center">{item.workDays}</td>
+                                            <td className="px-6 py-4 text-center text-blue-600 font-medium">{item.totalRegularHours.toFixed(1)}</td>
+                                            <td className="px-6 py-4 text-center text-orange-600 font-medium">{item.totalOTHours.toFixed(1)}</td>
+                                            <td className="px-6 py-4 text-center text-red-500">{item.lateCount > 0 ? item.lateCount : '-'}</td>
+                                            <td className="px-6 py-4 text-right text-gray-600">{item.totalSalary.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td>
+                                            <td className="px-6 py-4 text-right text-gray-600">{item.totalOTPay.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td>
+                                            <td className="px-6 py-4 text-right font-bold text-green-600">{item.netSalary.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td>
+                                        </tr>
+                                        {expandedEmpId === item.emp.id && (
+                                            <tr>
+                                                <td colSpan={8} className="px-6 py-4 bg-gray-50/50 border-t border-b border-gray-200">
+                                                    <div className="p-4 bg-white rounded-lg border border-gray-200 shadow-inner max-h-96 overflow-y-auto">
+                                                        <h4 className="font-bold text-gray-700 mb-3 flex items-center gap-2">
+                                                            📅 บันทึกการเข้า-ออกงานและค่าแรงรายวันของ {item.emp.nickname || item.emp.name}
+                                                        </h4>
+                                                        <table className="w-full text-xs text-left">
+                                                            <thead className="bg-gray-100 text-gray-600 border-b border-gray-200">
+                                                                <tr>
+                                                                    <th className="px-3 py-2">วันที่</th>
+                                                                    <th className="px-3 py-2">กะงาน</th>
+                                                                    <th className="px-3 py-2">เวลาตามตาราง</th>
+                                                                    <th className="px-3 py-2">เวลาเข้า-ออกจริง</th>
+                                                                    <th className="px-3 py-2">สถานะ</th>
+                                                                    <th className="px-3 py-2 text-center">ชม.ปกติ</th>
+                                                                    <th className="px-3 py-2 text-center">OT (ชม.)</th>
+                                                                    <th className="px-3 py-2 text-right">ค่าแรง (บาท)</th>
+                                                                    <th className="px-3 py-2 text-right">ค่า OT (บาท)</th>
+                                                                    <th className="px-3 py-2 text-right">รวม (บาท)</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody className="divide-y divide-gray-100">
+                                                                {item.dailyDetails.map((day, idx) => {
+                                                                    const isOff = day.shift === 'OFF' || day.status === 'Off Day';
+                                                                    const isAbsent = day.status?.includes('Absent');
+                                                                    const isIncomplete = day.status?.includes('Incomplete');
+                                                                    const isLate = day.status?.includes('Late');
+                                                                    const isUnscheduled = day.status === 'Unscheduled Work';
+                                                                    
+                                                                    let statusBadgeColor = 'bg-green-50 text-green-700 border-green-200';
+                                                                    if (isOff) statusBadgeColor = 'bg-gray-50 text-gray-500 border-gray-200';
+                                                                    else if (isAbsent) statusBadgeColor = 'bg-red-50 text-red-700 border-red-200';
+                                                                    else if (isIncomplete) statusBadgeColor = 'bg-amber-50 text-amber-700 border-amber-200';
+                                                                    else if (isLate) statusBadgeColor = 'bg-rose-50 text-rose-700 border-rose-200';
+                                                                    else if (isUnscheduled) statusBadgeColor = 'bg-blue-50 text-blue-700 border-blue-200';
+
+                                                                    return (
+                                                                        <tr key={idx} className={`${isOff ? 'opacity-60 bg-gray-50/50' : 'hover:bg-gray-50'}`}>
+                                                                            <td className="px-3 py-2 font-mono">{format(new Date(day.date), 'dd MMM yyyy', { locale: th })}</td>
+                                                                            <td className="px-3 py-2">{day.shift}</td>
+                                                                            <td className="px-3 py-2 font-mono text-gray-500">{day.scheduled_in ? `${day.scheduled_in} - ${day.scheduled_out}` : '-'}</td>
+                                                                            <td className="px-3 py-2 font-mono font-medium">{day.in !== '-' || day.out !== '-' ? `${day.in} - ${day.out}` : '-'}</td>
+                                                                            <td className="px-3 py-2">
+                                                                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${statusBadgeColor}`}>
+                                                                                    {day.status}
+                                                                                </span>
+                                                                            </td>
+                                                                            <td className="px-3 py-2 text-center font-mono">{day.regular_hours > 0 ? day.regular_hours.toFixed(1) : '-'}</td>
+                                                                            <td className="px-3 py-2 text-center font-mono text-orange-600">{day.ot_hours > 0 ? day.ot_hours.toFixed(1) : '-'}</td>
+                                                                            <td className="px-3 py-2 text-right font-mono">{day.wage > 0 ? day.wage.toLocaleString('th-TH', { minimumFractionDigits: 2 }) : '-'}</td>
+                                                                            <td className="px-3 py-2 text-right font-mono text-orange-600">{day.ot > 0 ? day.ot.toLocaleString('th-TH', { minimumFractionDigits: 2 }) : '-'}</td>
+                                                                            <td className="px-3 py-2 text-right font-mono font-bold text-gray-800">
+                                                                                {(day.wage + day.ot) > 0 ? (day.wage + day.ot).toLocaleString('th-TH', { minimumFractionDigits: 2 }) : '-'}
+                                                                            </td>
+                                                                        </tr>
+                                                                    );
+                                                                })}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </React.Fragment>
                                 ))}
                             </tbody>
                         </table>
