@@ -19,8 +19,8 @@ function createTimeRange(dateStr, startTimeStr, endTimeStr) {
 /**
  * Calculates payroll, OT, and attendance stats for all employees using roster_transactions.
  */
-export const calculatePayroll = (employees, logs, transactions, shifts, payrollConfig, deductions, selectedMonth) => {
-    // 1. Pre-process logs into Map { empId: { date: [logs] } }
+export const calculatePayroll = (employees, logs, transactions, shifts, payrollConfig, deductions, selectedMonth, weeklySchedules = []) => {
+    // 1. Pre-process logs into Map { empId: [logs] }
     const logsMap = new Map();
     logs.forEach(log => {
         if (!logsMap.has(log.employee_id)) logsMap.set(log.employee_id, []);
@@ -72,9 +72,38 @@ export const calculatePayroll = (employees, logs, transactions, shifts, payrollC
 
         for (let d = 1; d <= daysInMonth; d++) {
             const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-            const dailyTxs = empTxs[dateStr] || [];
+            let dailyTxs = empTxs[dateStr] || [];
 
-            // If scheduled to work
+            // FALLBACK 1: If no daily transactions, check weekly template schedule
+            if (dailyTxs.length === 0 && weeklySchedules.length > 0) {
+                const dateObj = new Date(year, month - 1, d);
+                const dayOfWeekJS = dateObj.getDay(); // 0=Sun, 1=Mon...
+                const dbDayOfWeek = (dayOfWeekJS + 6) % 7; // Mon=0, ..., Sun=6
+
+                const weeklySched = weeklySchedules.find(s => s.employee_id === emp.id && s.day_of_week === dbDayOfWeek);
+                if (weeklySched) {
+                    if (weeklySched.is_off) {
+                        dailyTxs = [{
+                            is_off: true,
+                            slot_type: 'MAIN',
+                            status: 'PUBLISHED' // Weekly template defaults to published expectations
+                        }];
+                    } else if (weeklySched.shift_id) {
+                        dailyTxs = [{
+                            employee_id: emp.id,
+                            date: dateStr,
+                            slot_type: 'MAIN',
+                            shift_id: weeklySched.shift_id,
+                            custom_start_time: null,
+                            custom_end_time: null,
+                            is_off: false,
+                            status: 'PUBLISHED'
+                        }];
+                    }
+                }
+            }
+
+            // Process daily transactions if they exist (either overrides or weekly template fallback)
             if (dailyTxs.length > 0 && !dailyTxs.some(t => t.is_off)) {
                 
                 dailyTxs.forEach(tx => {
@@ -91,7 +120,7 @@ export const calculatePayroll = (employees, logs, transactions, shifts, payrollC
                     const { start: scheduledStart, end: scheduledEnd } = createTimeRange(dateStr, startTimeStr, endTimeStr);
                     const scheduledMins = differenceInMinutes(scheduledEnd, scheduledStart);
 
-                    // Find matching logs (within 8 hour radius)
+                    // Find matching logs (within 8 hour radius from shift midpoint)
                     empLogs.forEach(log => {
                         const logTime = new Date(log.timestamp);
                         const centerTime = new Date((scheduledStart.getTime() + scheduledEnd.getTime()) / 2);
@@ -117,7 +146,7 @@ export const calculatePayroll = (employees, logs, transactions, shifts, payrollC
                         isAbsent = false;
                         if (isAfter(checkIn, scheduledStart)) {
                             lateMins = differenceInMinutes(checkIn, scheduledStart);
-                            if (lateMins > 0) lateCount++;
+                            if (lateMins > 15) lateCount++; // Grace period of 15 minutes
                         }
 
                         actualMins = differenceInMinutes(checkOut, checkIn);
@@ -170,13 +199,15 @@ export const calculatePayroll = (employees, logs, transactions, shifts, payrollC
                     } else {
                         // Incomplete or Absent
                         if (!checkIn && !checkOut) {
-                            absentCount++;
+                            if (tx.status === 'PUBLISHED') {
+                                absentCount++;
+                            }
                             dailyDetails.push({
                                 date: dateStr,
                                 shift: shift?.name || 'Custom',
                                 in: '-', out: '-',
                                 wage: 0, ot: 0, ot_hours: 0, regular_hours: 0,
-                                status: 'Absent (No Show)'
+                                status: tx.status === 'PUBLISHED' ? 'Absent (No Show)' : 'Draft (Unscheduled)'
                             });
                         } else {
                             dailyDetails.push({
@@ -198,6 +229,51 @@ export const calculatePayroll = (employees, logs, transactions, shifts, payrollC
                     wage: 0, ot: 0, ot_hours: 0, regular_hours: 0,
                     status: 'Off Day'
                 });
+            } else {
+                // FALLBACK 2: No schedule at all (unscheduled day), but let's check if they checked in & out
+                const logsOnDate = empLogs.filter(log => log.timestamp.startsWith(dateStr));
+                const checkInLog = logsOnDate.find(l => l.action_type === 'check_in');
+                const checkOutLog = logsOnDate.find(l => l.action_type === 'check_out');
+
+                if (checkInLog && checkOutLog) {
+                    const checkInTime = new Date(checkInLog.timestamp);
+                    const checkOutTime = new Date(checkOutLog.timestamp);
+                    const actualMins = differenceInMinutes(checkOutTime, checkInTime);
+
+                    if (actualMins > 0) {
+                        // 8-hour rule for unscheduled work
+                        const maxRegularMins = 8 * 60;
+                        const regularMins = Math.min(actualMins, maxRegularMins);
+                        const otMins = actualMins > maxRegularMins ? actualMins - maxRegularMins : 0;
+
+                        const rHours = regularMins / 60;
+                        const oHours = otMins / 60;
+
+                        const dailyWage = rHours * hourlyRate;
+                        const dailyOT = oHours * otRate;
+
+                        totalRegularHours += rHours;
+                        totalOTHours += oHours;
+                        totalSalary += dailyWage;
+                        totalOTPay += dailyOT;
+                        workDays++;
+
+                        dailyDetails.push({
+                            date: dateStr,
+                            slot_type: 'MAIN',
+                            shift: 'Unscheduled',
+                            scheduled_in: '-',
+                            scheduled_out: '-',
+                            in: formatTime(checkInTime),
+                            out: formatTime(checkOutTime),
+                            wage: dailyWage,
+                            ot: dailyOT,
+                            ot_hours: oHours,
+                            regular_hours: rHours,
+                            status: 'Unscheduled Work'
+                        });
+                    }
+                }
             }
         }
 
@@ -227,6 +303,7 @@ export const calculatePayroll = (employees, logs, transactions, shifts, payrollC
         };
     });
 };
+
 
 const formatTime = (date) => {
     return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });

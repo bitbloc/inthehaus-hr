@@ -24,11 +24,13 @@ export default function PayrollDashboard() {
         const startStr = format(startDate, 'yyyy-MM-dd');
         const endStr = format(endDate, 'yyyy-MM-dd');
 
-        const [empRes, shiftRes, transRes, logRes] = await Promise.all([
+        const [empRes, shiftRes, transRes, logRes, schedRes, deductRes] = await Promise.all([
             supabase.from('employees').select('*'),
             supabase.from('shifts').select('*'),
-            supabase.from('roster_transactions').select('*').gte('date', startStr).lte('date', endStr).eq('status', 'PUBLISHED'),
-            supabase.from('attendance_logs').select('*').gte('timestamp', startDate.toISOString()).lte('timestamp', addDays(endDate, 2).toISOString())
+            supabase.from('roster_transactions').select('*').gte('date', startStr).lte('date', endStr), // Query all draft & published overrides
+            supabase.from('attendance_logs').select('*').gte('timestamp', startDate.toISOString()).lte('timestamp', addDays(endDate, 2).toISOString()),
+            supabase.from('employee_schedules').select('*'),
+            supabase.from('payroll_deductions').select('*')
         ]);
 
         if (empRes.data && transRes.data && logRes.data) {
@@ -38,13 +40,15 @@ export default function PayrollDashboard() {
                 transRes.data, 
                 shiftRes.data || [], 
                 { hourly_rate: 50, ot_rate: 75 }, // Default config
-                [], // Deductions (can fetch from DB if needed)
-                selectedMonth
+                deductRes.data || [], 
+                selectedMonth,
+                schedRes.data || []
             );
             setPayrollData(data);
         }
         setLoading(false);
     }
+
 
     const prevMonth = () => {
         const [year, month] = selectedMonth.split('-');

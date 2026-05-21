@@ -212,11 +212,23 @@ export default function AdminDashboard() {
     // --- Payroll Memoization ---
     const payrollData = useMemo(() => {
         if (!data.employees.length) return [];
+        const flatSchedules = [];
+        if (data.schedules) {
+            Object.values(data.schedules).forEach(empScheds => {
+                if (empScheds) {
+                    Object.values(empScheds).forEach(s => {
+                        if (s) flatSchedules.push(s);
+                    });
+                }
+            });
+        }
         return calculatePayroll(
             data.employees, data.logs, data.transactions, data.shifts,
-            data.payrollConfig, data.deductions, selectedMonth
+            data.payrollConfig, data.deductions, selectedMonth,
+            flatSchedules
         );
-    }, [data.employees, data.logs, data.transactions, data.shifts, data.payrollConfig, data.deductions, selectedMonth]);
+    }, [data.employees, data.logs, data.transactions, data.shifts, data.payrollConfig, data.deductions, selectedMonth, data.schedules]);
+
 
     // --- Actions ---
     // --- Actions ---
