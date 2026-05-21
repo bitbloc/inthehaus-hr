@@ -36,11 +36,66 @@ export default function LeaveRequest() {
       } catch (e) { console.error(e); }
     };
     init();
-  }, []);
+  }, []);  const checkConsecutiveDays = (newDateStr) => {
+    // 1. ดึงวันที่ลางานที่มีอยู่แล้ว (เฉพาะที่อนุมัติแล้ว หรือรออนุมัติอยู่)
+    const activeDates = history
+      .filter(h => h.status !== 'rejected')
+      .map(h => h.leave_date);
+    
+    if (!activeDates.includes(newDateStr)) {
+      activeDates.push(newDateStr);
+    }
+    
+    let consecutiveCount = 1;
+    
+    const formatDateLocal = (dateObj) => {
+      const y = dateObj.getFullYear();
+      const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+      const d = String(dateObj.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    };
+    
+    const parts = newDateStr.split('-');
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2], 10);
+    
+    // ย้อนกลับไปข้างหลัง (ถอยทีละวัน)
+    let prevDate = new Date(year, month, day);
+    while (true) {
+      prevDate.setDate(prevDate.getDate() - 1);
+      const formatted = formatDateLocal(prevDate);
+      if (activeDates.includes(formatted)) {
+        consecutiveCount++;
+      } else {
+        break;
+      }
+    }
+    
+    // เดินหน้าไปข้างหน้า (เพิ่มทีละวัน)
+    let nextDate = new Date(year, month, day);
+    while (true) {
+      nextDate.setDate(nextDate.getDate() + 1);
+      const formatted = formatDateLocal(nextDate);
+      if (activeDates.includes(formatted)) {
+        consecutiveCount++;
+      } else {
+        break;
+      }
+    }
+    
+    return consecutiveCount;
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!employee) return alert("ไม่พบข้อมูลพนักงานในระบบ");
+
+    // ตรวจสอบจำนวนวันลาติดต่อกัน
+    const consecutiveDays = checkConsecutiveDays(formData.date);
+    if (consecutiveDays > 3) {
+      return alert("❌ การขอลาหยุดติดต่อกันต้องไม่เกิน 3 วัน\nหากต้องการลามากกว่านี้ กรุณาติดต่อผู้จัดการโดยตรงค่ะ");
+    }
 
     setLoading(true);
 

@@ -1,9 +1,64 @@
-import { format, addHours, startOfTomorrow, parseISO } from 'date-fns';
+import { format, addHours, startOfTomorrow, parseISO, startOfWeek, addDays } from 'date-fns';
 import { getEffectiveRoster } from '../../../../utils/roster';
 import { getEmployeeByLineId, checkIsBoss } from '../../../../utils/memory';
 import { supabase } from '../../../../lib/supabaseClient';
 
 export async function handleRosterCommand(event, client, text, rawText, userId) {
+  if (text === 'stcalendar' || text === 'ตารางทั้งสัปดาห์' || text === 'วีคนี้' || text.includes('calendar')) {
+    const today = addHours(new Date(), 7);
+    const start = startOfWeek(today, { weekStartsOn: 1 }); // Monday
+    const daysTitle = ["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์"];
+    
+    const contents = [];
+    contents.push({ type: 'text', text: '📅 ตารางงานสัปดาห์นี้', weight: 'bold', size: 'xl', color: '#1DB446', align: 'center' });
+    contents.push({ type: 'separator', margin: 'md' });
+
+    for (let i = 0; i < 7; i++) {
+      const currentDay = addDays(start, i);
+      const dayIndex = currentDay.getDay();
+      const dateStr = format(currentDay, 'dd/MM');
+      const roster = await getEffectiveRoster(currentDay);
+
+      if (roster.length > 0) {
+        contents.push({
+          type: 'box', layout: 'horizontal', margin: 'lg',
+          contents: [
+            { type: 'text', text: `${daysTitle[dayIndex]} ${dateStr}`, weight: 'bold', size: 'sm', color: '#333333', flex: 2 },
+            { type: 'text', text: `${roster.length} คน`, size: 'xs', color: '#aaaaaa', align: 'end', flex: 1 }
+          ]
+        });
+        roster.forEach(emp => {
+          const shiftStart = emp.shift?.start_time?.slice(0,5) || '?';
+          const shiftName = emp.shift?.name || 'Custom';
+          contents.push({
+            type: 'box', layout: 'horizontal', margin: 'xs',
+            contents: [
+              { type: 'text', text: `• ${emp.nickname || emp.name}`, size: 'xs', color: '#555555', flex: 3 },
+              { type: 'text', text: `${shiftName} (${shiftStart})`, size: 'xs', color: emp.isOverride ? '#ff4b00' : '#007bff', align: 'end', flex: 3 }
+            ]
+          });
+        });
+        contents.push({ type: 'separator', margin: 'sm' });
+      } else {
+         contents.push({
+          type: 'box', layout: 'horizontal', margin: 'lg',
+          contents: [
+            { type: 'text', text: `${daysTitle[dayIndex]} ${dateStr}`, weight: 'bold', size: 'sm', color: '#333333', flex: 2 },
+            { type: 'text', text: `ไม่มีคนเข้ากะ`, size: 'xs', color: '#aaaaaa', align: 'end', flex: 1 }
+          ]
+        });
+        contents.push({ type: 'separator', margin: 'sm' });
+      }
+    }
+
+    await client.replyMessage(event.replyToken, {
+      type: 'flex',
+      altText: '📅 ตารางงานสัปดาห์นี้',
+      contents: { type: 'bubble', size: 'mega', body: { type: 'box', layout: 'vertical', contents: contents } }
+    });
+    return true;
+  }
+
   if (text.includes('เช็คตาราง') || text.includes('roster') || text.includes('ตารางงาน') || text.includes('ใครเข้ากะ')) {
     const targetDate = text.includes('พรุ่งนี้') ? startOfTomorrow() : addHours(new Date(), 7);
     const dateStr = format(targetDate, 'dd/MM/yyyy');

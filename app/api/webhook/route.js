@@ -89,24 +89,57 @@ export async function POST(request) {
             const summaryList = Object.values(summary).sort((a, b) => (a.in?.getTime() || 0) - (b.in?.getTime() || 0));
             const safeThaiTime = (date) => format(addHours(date, 7), 'HH:mm');
             const todayStr = format(addHours(new Date(), 7), 'dd/MM/yyyy');
-            let msg = `สรุปการเข้างาน ${todayStr}\n`;
-            let count = 0;
+            
+            const contents = [
+              { type: 'text', text: `📊 สรุปการเข้างาน`, weight: 'bold', size: 'lg', color: '#1DB446' },
+              { type: 'text', text: todayStr, size: 'xs', color: '#aaaaaa', margin: 'sm' },
+              { type: 'separator', margin: 'md' }
+            ];
 
+            let count = 0;
             for (const s of summaryList) {
               count++;
               const inTime = s.in ? safeThaiTime(s.in) : '-';
               const outTime = s.out ? safeThaiTime(s.out) : '-';
-              let durationStr = '';
+              let durationStr = '-';
               if (s.in) {
                 const diff = differenceInMinutes(s.out || new Date(), s.in);
-                durationStr = `(${Math.floor(diff / 60)}ชม. ${diff % 60}น.)`;
-                if (!s.out) durationStr += ' [Working]';
+                durationStr = `${Math.floor(diff / 60)}h ${diff % 60}m`;
+                if (!s.out) durationStr = 'กำลังทำงาน ⏳';
               }
-              msg += `\n👤 ${s.name} (${s.position})\n   เข้า: ${inTime} | ออก: ${outTime}\n   รวม: ${durationStr}\n`;
-            }
-            if (count === 0) msg += "\nยังไม่มีการลงเวลาวันนี้";
 
-            await client.replyMessage(event.replyToken, { type: 'text', text: msg });
+              contents.push({
+                type: 'box', layout: 'vertical', margin: 'md', spacing: 'sm',
+                contents: [
+                  {
+                    type: 'box', layout: 'horizontal',
+                    contents: [
+                      { type: 'text', text: `👤 ${s.name}`, weight: 'bold', size: 'sm', color: '#333333', flex: 3 },
+                      { type: 'text', text: s.position, size: 'xs', color: '#aaaaaa', align: 'end', flex: 2 }
+                    ]
+                  },
+                  {
+                    type: 'box', layout: 'horizontal',
+                    contents: [
+                      { type: 'text', text: `เข้า: ${inTime}`, size: 'xs', color: '#1DB446', flex: 1 },
+                      { type: 'text', text: `ออก: ${outTime}`, size: 'xs', color: '#ff4b00', flex: 1 },
+                      { type: 'text', text: durationStr, size: 'xs', color: (durationStr.includes('กำลัง') ? '#007bff' : '#666666'), align: 'end', flex: 1, weight: 'bold' }
+                    ]
+                  }
+                ]
+              });
+              contents.push({ type: 'separator', margin: 'sm' });
+            }
+
+            if (count === 0) {
+              contents.push({ type: 'text', text: 'ยังไม่มีการลงเวลาวันนี้', margin: 'md', size: 'sm', color: '#aaaaaa', align: 'center' });
+            }
+
+            await client.replyMessage(event.replyToken, {
+              type: 'flex',
+              altText: `สรุปการเข้างาน ${todayStr}`,
+              contents: { type: 'bubble', body: { type: 'box', layout: 'vertical', contents: contents } }
+            });
             handledLocally = true;
           } 
           
