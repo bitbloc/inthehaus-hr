@@ -325,7 +325,7 @@ export default function AdminRosterPage() {
                                                 <select 
                                                     value={slot.shift_id || ''}
                                                     onChange={e => handleSlotChange(index, 'shift_id', e.target.value)}
-                                                    className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                                    className="w-full border border-gray-300 rounded-md p-2 text-sm text-gray-900 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
                                                 >
                                                     <option value="">-- กะกำหนดเอง (Custom) --</option>
                                                     {shifts.map(sh => (
