@@ -91,7 +91,11 @@ export default function AdminDashboard() {
 
     // --- Helper Fetchers ---
     const fetchData = async (table, keyInState, transform = null) => {
-        const { data: res } = await supabase.from(table).select("*").order("id");
+        let query = supabase.from(table).select("*");
+        if (table === 'leave_requests') {
+            query = supabase.from(table).select("*, employees(name, position)");
+        }
+        const { data: res } = await query.order("id");
         dispatch({ type: 'SET_DATA', payload: { [keyInState]: transform ? transform(res) : res || [] } });
     };
 
@@ -339,6 +343,16 @@ export default function AdminDashboard() {
         if (!confirm(`Confirm ${newStatus}?`)) return;
         const { error } = await supabase.from('leave_requests').update({ status: newStatus }).eq('id', req.id);
         if (!error) {
+            if (newStatus === 'approved') {
+                const { error: overrideError } = await supabase.from('roster_overrides').upsert({
+                    employee_id: req.employee_id,
+                    date: req.leave_date,
+                    is_off: true
+                });
+                if (overrideError) {
+                    console.error("Failed to create roster override:", overrideError);
+                }
+            }
             try {
                 const notifyRes = await fetch('/api/notify-leave-status', {
                     method: 'POST',

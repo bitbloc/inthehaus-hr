@@ -11,6 +11,17 @@ export default function LeaveRequest() {
   const [history, setHistory] = useState([]);
   const [employee, setEmployee] = useState(null);
 
+  const fetchEmployeeAndHistory = async (userId) => {
+    // 1. ดึงข้อมูลพนักงาน
+    const { data: emp } = await supabase.from('employees').select('*').eq('line_user_id', userId).single();
+    if (emp) {
+      setEmployee(emp);
+      // 2. ดึงประวัติการลา
+      const { data } = await supabase.from('leave_requests').select('*').eq('employee_id', emp.id).order('leave_date', { ascending: false });
+      setHistory(data || []);
+    }
+  };
+
   useEffect(() => {
     const init = async () => {
       try {
@@ -27,17 +38,6 @@ export default function LeaveRequest() {
     init();
   }, []);
 
-  const fetchEmployeeAndHistory = async (userId) => {
-    // 1. ดึงข้อมูลพนักงาน
-    const { data: emp } = await supabase.from('employees').select('*').eq('line_user_id', userId).single();
-    if (emp) {
-      setEmployee(emp);
-      // 2. ดึงประวัติการลา
-      const { data } = await supabase.from('leave_requests').select('*').eq('employee_id', emp.id).order('leave_date', { ascending: false });
-      setHistory(data || []);
-    }
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!employee) return alert("ไม่พบข้อมูลพนักงานในระบบ");
@@ -45,12 +45,12 @@ export default function LeaveRequest() {
     setLoading(true);
 
     // 1. บันทึกลง Database
-    const { error } = await supabase.from('leave_requests').insert({
+    const { data: insertedData, error } = await supabase.from('leave_requests').insert({
       employee_id: employee.id,
       leave_date: formData.date,
       leave_type: formData.type,
       reason: formData.reason
-    });
+    }).select().single();
 
     if (!error) {
       // 2. ✅ ส่งแจ้งเตือนเข้ากลุ่ม LINE (สำคัญ!)
@@ -68,7 +68,8 @@ export default function LeaveRequest() {
             action: 'leave_request',     // บอกว่าเป็นใบลา
             time: formData.date,         // ใช้วันที่แทนเวลา
             locationStatus: typeLabel,   // เอาประเภทไปใส่ช่องพิกัด
-            statusDetail: formData.reason // เอาเหตุผลไปใส่ช่องสถานะ
+            statusDetail: formData.reason, // เอาเหตุผลไปใส่ช่องสถานะ
+            leaveId: insertedData?.id     // ส่ง ID การลาไปด้วยเพื่ออนุมัติ
           }),
           headers: { 'Content-Type': 'application/json' }
         });

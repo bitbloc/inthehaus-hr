@@ -14,7 +14,7 @@ const client = new Client({
 
 export async function POST(request) {
   try {
-    const { name, position, action, time, locationStatus, statusDetail, photoUrl } = await request.json();
+    const { name, position, action, time, locationStatus, statusDetail, photoUrl, leaveId } = await request.json();
 
     // --- กำหนดค่าตามประเภท Action ---
     let title = "";
@@ -139,6 +139,36 @@ export async function POST(request) {
         styles: { footer: { separator: true } }
       }
     };
+
+    if (action === 'leave_request' && leaveId) {
+      message.contents.footer = {
+        type: 'box',
+        layout: 'horizontal',
+        spacing: 'sm',
+        contents: [
+          {
+            type: 'button',
+            style: 'primary',
+            color: '#06c755',
+            action: {
+              type: 'postback',
+              label: '✅ อนุมัติ',
+              data: `action=approve_leave&id=${leaveId}`
+            }
+          },
+          {
+            type: 'button',
+            style: 'secondary',
+            color: '#ef4444',
+            action: {
+              type: 'postback',
+              label: '❌ ปฏิเสธ',
+              data: `action=reject_leave&id=${leaveId}`
+            }
+          }
+        ]
+      };
+    }
 
     // Push to all groups
     await Promise.all(

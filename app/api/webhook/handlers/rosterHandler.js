@@ -213,6 +213,143 @@ export async function handleRosterPostback(event, client, action, queryParams, u
     return true;
   }
 
+  if (action === 'approve_leave' || action === 'reject_leave') {
+    const leaveId = queryParams.get('id');
+    const isBoss = await checkIsBoss(userId);
+
+    if (!isBoss) {
+      await client.replyMessage(event.replyToken, { type: 'text', text: 'เมี๊ยว~ สิทธิ์ไม่พอค่ะ ต้องให้บอส (คุณพ่อ/คุณแม่) กดเท่านั้นนะคะ!' });
+      return true;
+    }
+
+    const newStatus = action === 'approve_leave' ? 'approved' : 'rejected';
+
+    // 1. ดึงข้อมูลใบลา
+    const { data: req, error: fetchErr } = await supabase
+      .from('leave_requests')
+      .select('*, employees(name, nickname, position)')
+      .eq('id', leaveId)
+      .single();
+
+    if (fetchErr || !req) {
+      await client.replyMessage(event.replyToken, { type: 'text', text: 'เมี๊ยว~ ไม่พบข้อมูลใบลาหยุดนี้ในระบบค่ะ' });
+      return true;
+    }
+
+    if (req.status !== 'pending') {
+      await client.replyMessage(event.replyToken, { type: 'text', text: `เมี๊ยว~ ใบลาหยุดนี้ได้รับการตัดสินไปแล้ว (สถานะปัจจุบัน: ${req.status})` });
+      return true;
+    }
+
+    // 2. อัปเดตสถานะใบลา
+    const { error: updateErr } = await supabase
+      .from('leave_requests')
+      .update({ status: newStatus })
+      .eq('id', leaveId);
+
+    if (updateErr) {
+      await client.replyMessage(event.replyToken, { type: 'text', text: `เเ๊! เกิดข้อผิดพลาดในการอัปเดตสถานะ: ${updateErr.message}` });
+      return true;
+    }
+
+    // 3. ถ้าอนุมัติ ให้ทำ roster_overrides
+    if (newStatus === 'approved') {
+      const { error: overrideErr } = await supabase
+        .from('roster_overrides')
+        .upsert({
+          employee_id: req.employee_id,
+          date: req.leave_date,
+          is_off: true
+        });
+
+      if (overrideErr) {
+        console.error("Override Error:", overrideErr);
+      }
+    }
+
+    // 4. ส่งข้อความอัปเดตและแจ้งเตือนเข้ากลุ่ม
+    const name = req.employees?.nickname || req.employees?.name || 'พนักงาน';
+    const isApproved = newStatus === 'approved';
+    const color = isApproved ? '#06c755' : '#ff334b';
+    const title = isApproved ? '✅ อนุมัติการลา (ผ่าน LINE)' : '❌ ไม่อนุมัติการลา (ผ่าน LINE)';
+    const typeText = req.leave_type === 'sick' ? 'ลาป่วย 😷' : req.leave_type === 'business' ? 'ลากิจ 💼' : 'พักร้อน 🏖️';
+
+    const message = {
+      type: 'flex',
+      altText: `ผลการขอลา: ${isApproved ? 'อนุมัติ' : 'ไม่อนุมัติ'}`,
+      contents: {
+        type: 'bubble',
+        size: 'kilo',
+        body: {
+          type: 'box',
+          layout: 'vertical',
+          contents: [
+            {
+              type: 'box',
+              layout: 'horizontal',
+              contents: [
+                { type: 'text', text: title, weight: 'bold', size: 'md', color: color }
+              ]
+            },
+            { type: 'separator', margin: 'md' },
+            {
+              type: 'box',
+              layout: 'vertical',
+              margin: 'md',
+              spacing: 'sm',
+              contents: [
+                {
+                  type: 'box', layout: 'baseline',
+                  contents: [
+                    { type: 'text', text: 'ชื่อ:', color: '#aaaaaa', size: 'sm', flex: 2 },
+                    { type: 'text', text: name, weight: 'bold', color: '#666666', size: 'sm', flex: 4 }
+                  ]
+                },
+                {
+                  type: 'box', layout: 'baseline',
+                  contents: [
+                    { type: 'text', text: 'วันที่:', color: '#aaaaaa', size: 'sm', flex: 2 },
+                    { type: 'text', text: req.leave_date, color: '#666666', size: 'sm', flex: 4 }
+                  ]
+                },
+                {
+                  type: 'box', layout: 'baseline',
+                  contents: [
+                    { type: 'text', text: 'ประเภท:', color: '#aaaaaa', size: 'sm', flex: 2 },
+                    { type: 'text', text: typeText, color: '#666666', size: 'sm', flex: 4 }
+                  ]
+                },
+                {
+                  type: 'box', layout: 'baseline',
+                  contents: [
+                    { type: 'text', text: 'เหตุผล:', color: '#aaaaaa', size: 'sm', flex: 2 },
+                    { type: 'text', text: req.reason || '-', color: '#666666', size: 'sm', flex: 4, wrap: true }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        styles: {
+          footer: { separator: true }
+        }
+      }
+    };
+
+    await client.replyMessage(event.replyToken, { type: 'text', text: `เมี๊ยว~ ยูซุดำเนินการ${isApproved ? 'อนุมัติ' : 'ปฏิเสธ'}การลางานของ ${name} เรียบร้อยแล้วค่ะ!` });
+
+    // ส่งเข้าทุกกลุ่ม
+    const GROUP_IDS = [
+      'C1210c7a0601b5a675060e312efe10bff',
+      'C71db3c7339b11f43dc8f1ec34bf46f43'
+    ];
+    await Promise.all(
+      GROUP_IDS.map(groupId => client.pushMessage(groupId, [message]))
+    );
+
+    return true;
+  }
+
   if (action === 'cancel_roster') {
     await client.replyMessage(event.replyToken, { type: 'text', text: 'โอเคค่ะ ยกเลิกรายการให้นะคะ เมี๊ยว~' });
     return true;

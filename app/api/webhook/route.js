@@ -17,6 +17,10 @@ const client = new Client({
   channelSecret: process.env.CHANNEL_SECRET,
 });
 
+export async function GET() {
+  return NextResponse.json({ status: "active", message: "pong" });
+}
+
 export async function POST(request) {
   try {
     const body = await request.json();
@@ -40,8 +44,14 @@ export async function POST(request) {
           const rawText = event.message.text.trim();
           const text = rawText.toLowerCase();
           
+          // 0. Diagnostic Ping-Pong
+          if (text === 'ping') {
+            await client.replyMessage(event.replyToken, { type: 'text', text: 'pong 🏓' });
+            handledLocally = true;
+          } 
+          
           // 1. Weather check (local helper)
-          if (text === 'อากาศ' || text === 'weather') {
+          else if (text === 'อากาศ' || text === 'weather') {
             const weatherData = await getSchemaWeather();
             const replyText = formatWeatherMessage(weatherData);
             await client.replyMessage(event.replyToken, { type: 'text', text: replyText });
@@ -260,6 +270,27 @@ export async function POST(request) {
             handledLocally = true;
           }
         }
+      }
+      
+      // --- Handle Follow (Add Friend) Events ---
+      else if (event.type === 'follow') {
+        const welcomeText = "สวัสดีค่ะ! ยูซุยินดีต้อนรับนะคะ 🍊🐱 ยูซุเป็นผู้ช่วย AI ประจำร้าน In The Haus ค่ะ สามารถถามเรื่องตารางงาน สรุปยอดขาย เช็คสภาพอากาศ วาดรูป หรือพิมพ์คุยเล่นกับยูซุได้เลยนะคะ พิมพ์ 'yuzu คุยด้วยหน่อย' เพื่อเริ่มต้นได้เลยค่ะ เมี๊ยว~";
+        await client.replyMessage(event.replyToken, { type: 'text', text: welcomeText });
+        handledLocally = true;
+      }
+      
+      // --- Handle Join Group Events ---
+      else if (event.type === 'join') {
+        const welcomeGroupText = "สวัสดีค่าทุกคนในกลุ่ม! 🍊🐱 ยูซุเป็นผู้ช่วย AI ประจำร้าน In The Haus เข้าร่วมกลุ่มแล้วค่ะ! ทุกคนสามารถเรียกใช้ยูซุได้โดยการพิมพ์ขึ้นต้นว่า 'yuzu' หรือ 'ยูซุ' นะคะ (เช่น 'yuzu พรุ่งนี้ฝนตกไหม' หรือ 'yuzu ช่วยสลับกะให้หน่อย') ฝากเนื้อฝากตัวด้วยนะคะ เมี๊ยว~";
+        await client.replyMessage(event.replyToken, { type: 'text', text: welcomeGroupText });
+        handledLocally = true;
+      }
+      
+      // --- Handle Member Joined Group Events ---
+      else if (event.type === 'memberJoined') {
+        const welcomeMemberText = "ยินดีต้อนรับสมาชิกใหม่เข้าสู่กลุ่มค่ะ! 🍊🐱 หนูชื่อยูซุ เป็น AI ผู้ช่วยประจำร้านนะคะ ถ้ามีอะไรให้หนูช่วยเรื่องตารางงานหรือข้อมูลร้าน เรียกใช้หนูได้ตลอดเลยค่ะ เมี๊ยว~";
+        await client.replyMessage(event.replyToken, { type: 'text', text: welcomeMemberText });
+        handledLocally = true;
       }
     }
 
