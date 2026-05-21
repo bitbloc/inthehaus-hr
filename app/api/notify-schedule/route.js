@@ -13,11 +13,26 @@ const client = new Client({
   channelSecret: process.env.CHANNEL_SECRET,
 });
 
+function getShiftColorHex(shiftName) {
+  const name = (shiftName || '').toLowerCase();
+  
+  if (name.includes('ควบ') || name.includes('double')) {
+    return '#e11d48'; // Rose
+  }
+  if (name.includes('ค่ำ') || name.includes('ดึก') || name.includes('night') || name.includes('evening')) {
+    return '#4f46e5'; // Indigo
+  }
+  if (name.includes('เช้า') || name.includes('morning')) {
+    return '#d97706'; // Amber
+  }
+  return '#ca8a04'; // Yellow
+}
+
 export async function POST(request) {
   try {
     const { data: schedules } = await supabase
       .from('employee_schedules')
-      .select('day_of_week, employees(name), shifts(name, start_time, end_time)')
+      .select('day_of_week, employees(name, nickname), shifts(name, start_time, end_time)')
       .eq('is_off', false)
       .order('day_of_week', { ascending: true });
 
@@ -28,10 +43,14 @@ export async function POST(request) {
     daysTitle.forEach((_, index) => rosterByDay[index] = []);
 
     schedules.forEach(item => {
+      const shiftStart = item.shifts?.start_time?.slice(0, 5) || '';
+      const shiftEnd = item.shifts?.end_time?.slice(0, 5) || '';
+      const timeStr = shiftStart && shiftEnd ? `${shiftStart}-${shiftEnd}` : shiftStart;
+      
       rosterByDay[item.day_of_week].push({
-        name: item.employees?.name,
-        shift: item.shifts?.name,
-        time: `${item.shifts?.start_time}-${item.shifts?.end_time}`
+        name: item.employees?.nickname || item.employees?.name || 'พนักงาน',
+        shift: item.shifts?.name || 'Custom',
+        time: timeStr
       });
     });
 
@@ -54,11 +73,13 @@ export async function POST(request) {
           ]
         });
         staffList.forEach(staff => {
+          const shiftText = staff.time ? `${staff.shift} (${staff.time})` : staff.shift;
+          const shiftColor = getShiftColorHex(staff.shift);
           contents.push({
             type: 'box', layout: 'horizontal', margin: 'xs',
             contents: [
-              { type: 'text', text: `• ${staff.name}`, size: 'xs', color: '#555555', flex: 3 },
-              { type: 'text', text: `${staff.shift}`, size: 'xs', color: '#007bff', align: 'end', flex: 2 }
+              { type: 'text', text: `• ${staff.name}`, size: 'xs', color: '#333333', flex: 3 },
+              { type: 'text', text: shiftText, size: 'xs', color: shiftColor, align: 'end', flex: 3 }
             ]
           });
         });

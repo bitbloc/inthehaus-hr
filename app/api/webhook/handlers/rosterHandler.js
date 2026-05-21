@@ -3,38 +3,77 @@ import { getEffectiveRoster } from '../../../../utils/roster';
 import { getEmployeeByLineId, checkIsBoss } from '../../../../utils/memory';
 import { supabase } from '../../../../lib/supabaseClient';
 
+function getShiftColorHex(shiftName, isOff, isCustomOrExtra) {
+  if (isOff) return '#dc2626'; // Red
+  if (isCustomOrExtra) return '#0284c7'; // Sky/Teal
+  
+  const name = (shiftName || '').toLowerCase();
+  
+  if (name.includes('ควบ') || name.includes('double')) {
+    return '#e11d48'; // Rose
+  }
+  if (name.includes('ค่ำ') || name.includes('ดึก') || name.includes('night') || name.includes('evening')) {
+    return '#4f46e5'; // Indigo
+  }
+  if (name.includes('เช้า') || name.includes('morning')) {
+    return '#d97706'; // Amber
+  }
+  return '#ca8a04'; // Yellow
+}
+
 export async function handleRosterCommand(event, client, text, rawText, userId) {
   if (text === 'stcalendar' || text === 'ตารางทั้งสัปดาห์' || text === 'วีคนี้' || text.includes('calendar')) {
     const today = addHours(new Date(), 7);
-    const start = startOfWeek(today, { weekStartsOn: 1 }); // Monday
+    const startOfThisWeek = startOfWeek(today, { weekStartsOn: 1 });
+    const tomorrow = addDays(today, 1);
+    const tomorrowDateStr = format(tomorrow, 'yyyy-MM-dd');
+    const start = startOfWeek(tomorrow, { weekStartsOn: 1 }); // Monday of tomorrow's week
+    const isNextWeek = format(start, 'yyyy-MM-dd') > format(startOfThisWeek, 'yyyy-MM-dd');
+    const titleText = isNextWeek ? '📅 ตารางงานสัปดาห์หน้า' : '📅 ตารางงานสัปดาห์นี้';
+    
     const daysTitle = ["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์"];
     
     const contents = [];
-    contents.push({ type: 'text', text: '📅 ตารางงานสัปดาห์นี้', weight: 'bold', size: 'xl', color: '#1DB446', align: 'center' });
+    contents.push({ type: 'text', text: titleText, weight: 'bold', size: 'xl', color: '#1DB446', align: 'center' });
     contents.push({ type: 'separator', margin: 'md' });
 
     for (let i = 0; i < 7; i++) {
       const currentDay = addDays(start, i);
+      const currentDayStr = format(currentDay, 'yyyy-MM-dd');
+      
+      // Skip past days and today
+      if (currentDayStr < tomorrowDateStr) {
+        continue;
+      }
+      
       const dayIndex = currentDay.getDay();
       const dateStr = format(currentDay, 'dd/MM');
       const roster = await getEffectiveRoster(currentDay);
+      const workingRoster = roster.filter(emp => !emp.is_off && emp.shift?.name !== 'OFF');
 
-      if (roster.length > 0) {
+      if (workingRoster.length > 0) {
         contents.push({
           type: 'box', layout: 'horizontal', margin: 'lg',
           contents: [
             { type: 'text', text: `${daysTitle[dayIndex]} ${dateStr}`, weight: 'bold', size: 'sm', color: '#333333', flex: 2 },
-            { type: 'text', text: `${roster.length} คน`, size: 'xs', color: '#aaaaaa', align: 'end', flex: 1 }
+            { type: 'text', text: `${workingRoster.length} คน`, size: 'xs', color: '#aaaaaa', align: 'end', flex: 1 }
           ]
         });
-        roster.forEach(emp => {
-          const shiftStart = emp.shift?.start_time?.slice(0,5) || '?';
+        workingRoster.forEach(emp => {
+          const isOff = emp.is_off || emp.shift?.name === 'OFF';
+          const isCustomOrExtra = emp.isExtra || !emp.shift?.id || emp.shift?.name?.includes('Custom') || emp.shift?.name?.includes('Extra');
+          const shiftStart = emp.shift?.start_time?.slice(0,5) || '';
+          const shiftEnd = emp.shift?.end_time?.slice(0,5) || '';
           const shiftName = emp.shift?.name || 'Custom';
+          const timeStr = shiftStart && shiftEnd ? ` (${shiftStart}-${shiftEnd})` : shiftStart ? ` (${shiftStart})` : '';
+          
+          const colorHex = getShiftColorHex(shiftName, isOff, isCustomOrExtra);
+
           contents.push({
             type: 'box', layout: 'horizontal', margin: 'xs',
             contents: [
-              { type: 'text', text: `• ${emp.nickname || emp.name}`, size: 'xs', color: '#555555', flex: 3 },
-              { type: 'text', text: `${shiftName} (${shiftStart})`, size: 'xs', color: emp.isOverride ? '#ff4b00' : '#007bff', align: 'end', flex: 3 }
+              { type: 'text', text: `• ${emp.nickname || emp.name}`, size: 'xs', color: '#333333', flex: 3 },
+              { type: 'text', text: `${shiftName}${timeStr}`, size: 'xs', color: colorHex, align: 'end', flex: 3 }
             ]
           });
         });
@@ -53,7 +92,7 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
 
     await client.replyMessage(event.replyToken, {
       type: 'flex',
-      altText: '📅 ตารางงานสัปดาห์นี้',
+      altText: titleText,
       contents: { type: 'bubble', size: 'mega', body: { type: 'box', layout: 'vertical', contents: contents } }
     });
     return true;
