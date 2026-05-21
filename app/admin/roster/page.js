@@ -16,6 +16,21 @@ export default function AdminRosterPage() {
     const [editingCell, setEditingCell] = useState(null); // { employee, date, slots: [] }
     const [saving, setSaving] = useState(false);
     const [customPresets, setCustomPresets] = useState([]);
+    const [presetModal, setPresetModal] = useState(null); // { start, end } or null
+
+    const PRESET_COLORS = [
+        { id: 'sky', label: 'ฟ้า', bg: 'bg-sky-50', text: 'text-sky-800', border: 'border-sky-200', dot: 'bg-sky-500' },
+        { id: 'amber', label: 'ส้ม', bg: 'bg-amber-50', text: 'text-amber-800', border: 'border-amber-200', dot: 'bg-amber-500' },
+        { id: 'indigo', label: 'ม่วง', bg: 'bg-indigo-50', text: 'text-indigo-800', border: 'border-indigo-200', dot: 'bg-indigo-500' },
+        { id: 'rose', label: 'ชมพู', bg: 'bg-rose-50', text: 'text-rose-800', border: 'border-rose-200', dot: 'bg-rose-500' },
+        { id: 'emerald', label: 'เขียว', bg: 'bg-emerald-50', text: 'text-emerald-800', border: 'border-emerald-200', dot: 'bg-emerald-500' },
+        { id: 'violet', label: 'ม่วงอ่อน', bg: 'bg-violet-50', text: 'text-violet-800', border: 'border-violet-200', dot: 'bg-violet-500' },
+        { id: 'slate', label: 'เทา', bg: 'bg-slate-100', text: 'text-slate-800', border: 'border-slate-300', dot: 'bg-slate-500' },
+        { id: 'teal', label: 'น้ำเงินเขียว', bg: 'bg-teal-50', text: 'text-teal-800', border: 'border-teal-200', dot: 'bg-teal-500' },
+    ];
+    const PRESET_ICONS = ['⏰', '☀️', '🌙', '🔥', '⚡', '💼', '🍳', '🌊', '🎯', '✨', '🛎️', '🍽️'];
+
+    const getPresetColor = (colorId) => PRESET_COLORS.find(c => c.id === colorId) || PRESET_COLORS[0];
 
     useEffect(() => {
         try {
@@ -28,18 +43,26 @@ export default function AdminRosterPage() {
         }
     }, []);
 
-    const saveCustomPreset = (start, end) => {
-        if (!start || !end) return alert('กรุณากรอกทั้งเวลาเริ่มและเวลาเลิก');
-        if (customPresets.some(p => p.start === start && p.end === end)) {
-            return;
-        }
-        const newPresets = [...customPresets, { start, end }];
-        setCustomPresets(newPresets);
-        localStorage.setItem('roster_custom_presets', JSON.stringify(newPresets));
+    const openPresetModal = (start, end) => {
+        setPresetModal({ start, end, name: '', color: 'sky', icon: '⏰' });
     };
 
-    const deleteCustomPreset = (start, end) => {
-        const newPresets = customPresets.filter(p => !(p.start === start && p.end === end));
+    const confirmSavePreset = () => {
+        if (!presetModal) return;
+        const { start, end, name, color, icon } = presetModal;
+        if (!start || !end) return alert('กรุณากรอกทั้งเวลาเริ่มและเวลาเลิก');
+        if (customPresets.some(p => p.start === start && p.end === end)) {
+            setPresetModal(null);
+            return;
+        }
+        const newPresets = [...customPresets, { start, end, name: name || `${start}-${end}`, color: color || 'sky', icon: icon || '⏰' }];
+        setCustomPresets(newPresets);
+        localStorage.setItem('roster_custom_presets', JSON.stringify(newPresets));
+        setPresetModal(null);
+    };
+
+    const deleteCustomPreset = (idx) => {
+        const newPresets = customPresets.filter((_, i) => i !== idx);
         setCustomPresets(newPresets);
         localStorage.setItem('roster_custom_presets', JSON.stringify(newPresets));
     };
@@ -393,40 +416,45 @@ export default function AdminRosterPage() {
                                                     {slot.custom_start_time && slot.custom_end_time && (
                                                         <button 
                                                             type="button"
-                                                            onClick={() => saveCustomPreset(slot.custom_start_time, slot.custom_end_time)}
+                                                            onClick={() => openPresetModal(slot.custom_start_time, slot.custom_end_time)}
                                                             className="text-xs text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1 mt-1 transition-colors"
                                                         >
-                                                            💾 บันทึกเวลานี้ไว้ใช้ซ้ำ ({slot.custom_start_time} - {slot.custom_end_time})
+                                                            💾 บันทึกเป็น Preset ({slot.custom_start_time} - {slot.custom_end_time})
                                                         </button>
                                                     )}
 
                                                     {customPresets.length > 0 && (
-                                                        <div className="mt-2">
-                                                            <label className="block text-xs text-black font-semibold mb-1">เวลากำหนดเองที่บันทึกไว้:</label>
-                                                            <div className="flex flex-wrap gap-1.5">
-                                                                {customPresets.map((preset, pIdx) => (
-                                                                    <div 
-                                                                        key={pIdx}
-                                                                        className="flex items-center gap-1 px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-800 rounded text-xs font-semibold cursor-pointer border border-blue-200 transition-colors"
-                                                                        onClick={() => {
-                                                                            handleSlotChange(index, 'custom_start_time', preset.start);
-                                                                            handleSlotChange(index, 'custom_end_time', preset.end);
-                                                                        }}
-                                                                    >
-                                                                        <span>{preset.start} - {preset.end}</span>
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={(e) => {
-                                                                                e.stopPropagation();
-                                                                                deleteCustomPreset(preset.start, preset.end);
+                                                        <div className="mt-3">
+                                                            <label className="block text-xs text-black font-bold mb-1.5">⚡ Preset ที่บันทึกไว้:</label>
+                                                            <div className="flex flex-wrap gap-2">
+                                                                {customPresets.map((preset, pIdx) => {
+                                                                    const pc = getPresetColor(preset.color);
+                                                                    return (
+                                                                        <div 
+                                                                            key={pIdx}
+                                                                            className={`flex items-center gap-1.5 px-3 py-1.5 ${pc.bg} hover:opacity-80 ${pc.text} rounded-full text-xs font-bold cursor-pointer border ${pc.border} transition-all shadow-sm hover:shadow`}
+                                                                            onClick={() => {
+                                                                                handleSlotChange(index, 'custom_start_time', preset.start);
+                                                                                handleSlotChange(index, 'custom_end_time', preset.end);
                                                                             }}
-                                                                            className="text-blue-400 hover:text-red-600 ml-1 font-bold text-sm"
-                                                                            title="ลบ"
                                                                         >
-                                                                            ×
-                                                                        </button>
-                                                                    </div>
-                                                                ))}
+                                                                            <span>{preset.icon || '⏰'}</span>
+                                                                            <span>{preset.name || `${preset.start}-${preset.end}`}</span>
+                                                                            <span className="opacity-50 text-[10px] font-semibold">({preset.start}-{preset.end})</span>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    deleteCustomPreset(pIdx);
+                                                                                }}
+                                                                                className="opacity-40 hover:opacity-100 hover:text-red-600 ml-0.5 font-bold text-sm leading-none"
+                                                                                title="ลบ"
+                                                                            >
+                                                                                ×
+                                                                            </button>
+                                                                        </div>
+                                                                    );
+                                                                })}
                                                             </div>
                                                         </div>
                                                     )}
@@ -455,6 +483,100 @@ export default function AdminRosterPage() {
                                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium shadow-sm transition-colors flex items-center gap-2"
                             >
                                 {saving ? 'กำลังบันทึก...' : <><Save size={16} /> บันทึก</>}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Preset Creation Modal */}
+            {presetModal && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+                        <div className="px-6 py-5 border-b border-gray-100">
+                            <h3 className="text-lg font-black text-gray-900">✨ สร้าง Preset ใหม่</h3>
+                            <p className="text-xs text-gray-500 mt-1 font-medium">เวลา: {presetModal.start} - {presetModal.end}</p>
+                        </div>
+                        <div className="px-6 py-5 space-y-5">
+                            {/* Name */}
+                            <div>
+                                <label className="block text-xs font-bold text-gray-700 mb-1.5">ชื่อ Preset</label>
+                                <input
+                                    type="text"
+                                    value={presetModal.name}
+                                    onChange={e => setPresetModal(p => ({ ...p, name: e.target.value }))}
+                                    placeholder={`เช่น กะพิเศษ, เปิดร้าน...`}
+                                    className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm font-medium text-gray-900 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                                />
+                            </div>
+                            {/* Icon */}
+                            <div>
+                                <label className="block text-xs font-bold text-gray-700 mb-1.5">เลือก Icon</label>
+                                <div className="flex flex-wrap gap-2">
+                                    {PRESET_ICONS.map(icon => (
+                                        <button
+                                            key={icon}
+                                            type="button"
+                                            onClick={() => setPresetModal(p => ({ ...p, icon }))}
+                                            className={`w-10 h-10 rounded-xl text-lg flex items-center justify-center border-2 transition-all ${
+                                                presetModal.icon === icon
+                                                    ? 'border-blue-500 bg-blue-50 scale-110 shadow-md'
+                                                    : 'border-gray-200 bg-gray-50 hover:border-gray-300'
+                                            }`}
+                                        >
+                                            {icon}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            {/* Color */}
+                            <div>
+                                <label className="block text-xs font-bold text-gray-700 mb-1.5">เลือกสี</label>
+                                <div className="flex flex-wrap gap-2">
+                                    {PRESET_COLORS.map(c => (
+                                        <button
+                                            key={c.id}
+                                            type="button"
+                                            onClick={() => setPresetModal(p => ({ ...p, color: c.id }))}
+                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border-2 transition-all ${c.bg} ${c.text} ${
+                                                presetModal.color === c.id
+                                                    ? `${c.border} ring-2 ring-offset-1 ring-blue-400 scale-105`
+                                                    : 'border-transparent hover:border-gray-300'
+                                            }`}
+                                        >
+                                            <span className={`w-2.5 h-2.5 rounded-full ${c.dot}`}></span>
+                                            {c.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            {/* Preview */}
+                            <div>
+                                <label className="block text-xs font-bold text-gray-700 mb-1.5">ตัวอย่าง</label>
+                                {(() => {
+                                    const pc = getPresetColor(presetModal.color);
+                                    return (
+                                        <div className={`inline-flex items-center gap-1.5 px-4 py-2 ${pc.bg} ${pc.text} rounded-full text-sm font-bold border ${pc.border} shadow-sm`}>
+                                            <span>{presetModal.icon || '⏰'}</span>
+                                            <span>{presetModal.name || `${presetModal.start}-${presetModal.end}`}</span>
+                                            <span className="opacity-50 text-[10px] font-semibold">({presetModal.start}-{presetModal.end})</span>
+                                        </div>
+                                    );
+                                })()}
+                            </div>
+                        </div>
+                        <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 bg-gray-50/50">
+                            <button
+                                onClick={() => setPresetModal(null)}
+                                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-xl font-medium text-sm transition-colors"
+                            >
+                                ยกเลิก
+                            </button>
+                            <button
+                                onClick={confirmSavePreset}
+                                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm shadow-sm transition-colors"
+                            >
+                                💾 บันทึก Preset
                             </button>
                         </div>
                     </div>
