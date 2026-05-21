@@ -588,6 +588,28 @@ export default function AdminDashboard() {
         }
     }, [activeTab]);
 
+    const draftWeeks = useMemo(() => {
+        // Group draft transactions by their week start (Monday)
+        const weeks = {};
+        data.transactions?.forEach(tx => {
+            if (tx.status === 'DRAFT') {
+                const txDate = parseISO(tx.date);
+                const mon = startOfWeek(txDate, { weekStartsOn: 1 });
+                const monStr = format(mon, 'yyyy-MM-dd');
+                if (!weeks[monStr]) {
+                    const sun = addDays(mon, 6);
+                    weeks[monStr] = {
+                        start: monStr,
+                        end: format(sun, 'yyyy-MM-dd'),
+                        count: 0
+                    };
+                }
+                weeks[monStr].count++;
+            }
+        });
+        return Object.values(weeks).sort((a, b) => a.start.localeCompare(b.start));
+    }, [data.transactions]);
+
     const handleLogin = (e) => {
         e.preventDefault();
         if (loginUser === "inthehaus" && loginPass === "inthehaus1120100144907") {
@@ -637,27 +659,7 @@ export default function AdminDashboard() {
                 </Card>
             </div>
         );
-    }    const draftWeeks = useMemo(() => {
-        // Group draft transactions by their week start (Monday)
-        const weeks = {};
-        data.transactions?.forEach(tx => {
-            if (tx.status === 'DRAFT') {
-                const txDate = parseISO(tx.date);
-                const mon = startOfWeek(txDate, { weekStartsOn: 1 });
-                const monStr = format(mon, 'yyyy-MM-dd');
-                if (!weeks[monStr]) {
-                    const sun = addDays(mon, 6);
-                    weeks[monStr] = {
-                        start: monStr,
-                        end: format(sun, 'yyyy-MM-dd'),
-                        count: 0
-                    };
-                }
-                weeks[monStr].count++;
-            }
-        });
-        return Object.values(weeks).sort((a, b) => a.start.localeCompare(b.start));
-    }, [data.transactions]);
+    }
 
     const handlePublishRoster = async (startDateStr, endDateStr) => {
         if (!confirm(`ต้องการอนุมัติและประกาศตารางงานจากกะ Draft ในวันที่ ${startDateStr} ถึง ${endDateStr} ใช่หรือไม่?`)) return;
