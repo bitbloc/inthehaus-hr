@@ -27,6 +27,7 @@ const initialState = {
     jobApplications: [],
     swapRequests: [],
     rosterOverrides: [],
+    transactions: [],
     announcements: [],
     payrollConfig: { ot_rate: 60, double_shift_rate: 1000 },
     deductions: [],
@@ -112,6 +113,17 @@ export default function AdminDashboard() {
         dispatch({ type: 'SET_DATA', payload: { schedules: map } });
     };
 
+    const fetchTransactions = async () => {
+        const startDate = startOfMonth(parseISO(selectedMonth + "-01")).toISOString();
+        const endDate = endOfMonth(parseISO(selectedMonth + "-01")).toISOString();
+        const { data: txs } = await supabase.from("roster_transactions")
+            .select("*")
+            .gte("date", startDate.split('T')[0])
+            .lte("date", endDate.split('T')[0])
+            .eq("status", "PUBLISHED");
+        dispatch({ type: 'SET_DATA', payload: { transactions: txs || [] } });
+    };
+
     const fetchLogs = async () => {
         const startDate = startOfMonth(parseISO(selectedMonth + "-01")).toISOString();
         const endDate = endOfMonth(parseISO(selectedMonth + "-01")).toISOString();
@@ -178,7 +190,7 @@ export default function AdminDashboard() {
 
     useEffect(() => {
         if (activeTab === 'dashboard') fetchLogs();
-        if (activeTab === 'payroll') { fetchLogs(); fetchData('payroll_deductions', 'deductions'); fetchData('roster_overrides', 'rosterOverrides'); }
+        if (activeTab === 'payroll') { fetchLogs(); fetchData('payroll_deductions', 'deductions'); fetchTransactions(); }
         if (activeTab === 'roster') { fetchSchedules(); fetchData('roster_overrides', 'rosterOverrides'); }
         if (activeTab === 'requests') fetchData('leave_requests', 'leaveRequests');
         if (activeTab === 'shift_manage') {
@@ -201,10 +213,10 @@ export default function AdminDashboard() {
     const payrollData = useMemo(() => {
         if (!data.employees.length) return [];
         return calculatePayroll(
-            data.employees, data.logs, data.schedules, data.shifts,
-            data.payrollConfig, data.deductions, selectedMonth, data.rosterOverrides
+            data.employees, data.logs, data.transactions, data.shifts,
+            data.payrollConfig, data.deductions, selectedMonth
         );
-    }, [data.employees, data.logs, data.schedules, data.shifts, data.payrollConfig, data.deductions, selectedMonth, data.rosterOverrides]);
+    }, [data.employees, data.logs, data.transactions, data.shifts, data.payrollConfig, data.deductions, selectedMonth]);
 
     // --- Actions ---
     // --- Actions ---
