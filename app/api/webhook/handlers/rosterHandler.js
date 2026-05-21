@@ -184,17 +184,18 @@ export async function handleRosterPostback(event, client, action, queryParams, u
 
       if (isBoss) {
         if (payload.type === 'LEAVE') {
-          await supabase.from('roster_overrides').upsert({ employee_id: targetEmpId, date: payload.date, is_off: true, reference_request_id: request.id });
+          await supabase.from('roster_transactions').upsert({ employee_id: targetEmpId, date: payload.date, is_off: true, slot_type: 'MAIN', status: 'PUBLISHED' }, { onConflict: 'employee_id, date, slot_type' });
         } else {
-          await supabase.from('roster_overrides').upsert({ 
+          await supabase.from('roster_transactions').upsert({ 
             employee_id: targetEmpId, 
             date: payload.date, 
             shift_id: payload.details?.shift_id || null,
             custom_start_time: payload.details?.start_time || null,
             custom_end_time: payload.details?.end_time || null,
+            slot_type: 'MAIN',
             is_off: false,
-            reference_request_id: request.id 
-          });
+            status: 'PUBLISHED'
+          }, { onConflict: 'employee_id, date, slot_type' });
         }
         await client.replyMessage(event.replyToken, { type: 'text', text: `✅ บอสสั่งมา ยูซุจัดให้! อัปเดตตารางของ "${targetNickname}" เรียบร้อยแล้วค่ะ เมี๊ยว~` });
       } else {
@@ -242,17 +243,18 @@ export async function handleRosterPostback(event, client, action, queryParams, u
       await supabase.from('roster_requests').update({ status: 'APPROVED', manager_id: (await getEmployeeByLineId(userId))?.id }).eq('id', requestId);
       
       if (req.type === 'LEAVE') {
-        await supabase.from('roster_overrides').upsert({ employee_id: req.requester_id, date: req.target_date, is_off: true, reference_request_id: req.id });
+        await supabase.from('roster_transactions').upsert({ employee_id: req.requester_id, date: req.target_date, is_off: true, slot_type: 'MAIN', status: 'PUBLISHED' }, { onConflict: 'employee_id, date, slot_type' });
       } else {
-        await supabase.from('roster_overrides').upsert({ 
+        await supabase.from('roster_transactions').upsert({ 
           employee_id: req.requester_id, 
           date: req.target_date, 
           shift_id: req.new_shift_id,
           custom_start_time: req.custom_start_time,
           custom_end_time: req.custom_end_time,
           is_off: false,
-          reference_request_id: req.id 
-        });
+          slot_type: 'MAIN',
+          status: 'PUBLISHED'
+        }, { onConflict: 'employee_id, date, slot_type' });
       }
       await client.replyMessage(event.replyToken, { type: 'text', text: '✅ อนุมัติเรียบร้อย! อัปเดตตารางให้แล้วค่ะ เมี๊ยว~' });
     }
@@ -307,15 +309,17 @@ export async function handleRosterPostback(event, client, action, queryParams, u
       return true;
     }
 
-    // 3. ถ้าอนุมัติ ให้ทำ roster_overrides
+    // 3. ถ้าอนุมัติ ให้ทำ roster_transactions
     if (newStatus === 'approved') {
       const { error: overrideErr } = await supabase
-        .from('roster_overrides')
+        .from('roster_transactions')
         .upsert({
           employee_id: req.employee_id,
           date: req.leave_date,
-          is_off: true
-        });
+          is_off: true,
+          slot_type: 'MAIN',
+          status: 'PUBLISHED'
+        }, { onConflict: 'employee_id, date, slot_type' });
 
       if (overrideErr) {
         console.error("Override Error:", overrideErr);
