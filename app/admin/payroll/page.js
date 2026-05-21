@@ -163,8 +163,8 @@ export default function PayrollDashboard() {
                                             <td className="px-6 py-4 text-center text-blue-600 font-medium">{item.totalRegularHours.toFixed(1)}</td>
                                             <td className="px-6 py-4 text-center text-orange-600 font-medium">{item.totalOTHours.toFixed(1)}</td>
                                             <td className="px-6 py-4 text-center text-red-500">{item.lateCount > 0 ? item.lateCount : '-'}</td>
-                                            <td className="px-6 py-4 text-right text-gray-600">{item.totalSalary.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td>
-                                            <td className="px-6 py-4 text-right text-gray-600">{item.totalOTPay.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td>
+                                            <td className="px-6 py-4 text-right text-black font-semibold">{item.totalSalary.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td>
+                                            <td className="px-6 py-4 text-right text-black font-semibold">{item.totalOTPay.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td>
                                             <td className="px-6 py-4 text-right font-bold text-green-600">{item.netSalary.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td>
                                         </tr>
                                         {expandedEmpId === item.emp.id && (
@@ -208,18 +208,18 @@ export default function PayrollDashboard() {
                                                                         <tr key={idx} className={`${isOff ? 'text-gray-400 bg-gray-50/50' : 'text-gray-800 hover:bg-gray-50'}`}>
                                                                             <td className="px-3 py-2 font-mono">{format(new Date(day.date), 'dd MMM yyyy', { locale: th })}</td>
                                                                             <td className="px-3 py-2">{day.shift}</td>
-                                                                            <td className={`px-3 py-2 font-mono ${isOff ? 'text-gray-400' : 'text-gray-500'}`}>{day.scheduled_in ? `${day.scheduled_in} - ${day.scheduled_out}` : '-'}</td>
-                                                                            <td className="px-3 py-2 font-mono font-medium">{day.in !== '-' || day.out !== '-' ? `${day.in} - ${day.out}` : '-'}</td>
+                                                                            <td className={`px-3 py-2 font-mono ${isOff ? 'text-gray-400' : 'text-black font-semibold'}`}>{day.scheduled_in ? `${day.scheduled_in} - ${day.scheduled_out}` : '-'}</td>
+                                                                            <td className={`px-3 py-2 font-mono font-bold ${isOff ? 'text-gray-400' : 'text-black'}`}>{day.in !== '-' || day.out !== '-' ? `${day.in} - ${day.out}` : '-'}</td>
                                                                             <td className="px-3 py-2">
                                                                                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${statusBadgeColor}`}>
                                                                                     {day.status}
                                                                                 </span>
                                                                             </td>
-                                                                            <td className="px-3 py-2 text-center font-mono">{day.regular_hours > 0 ? day.regular_hours.toFixed(1) : '-'}</td>
+                                                                            <td className={`px-3 py-2 text-center font-mono font-semibold ${isOff ? 'text-gray-400' : 'text-black'}`}>{day.regular_hours > 0 ? day.regular_hours.toFixed(1) : '-'}</td>
                                                                             <td className={`px-3 py-2 text-center font-mono ${isOff ? 'text-gray-400' : 'text-orange-600 font-medium'}`}>{day.ot_hours > 0 ? day.ot_hours.toFixed(1) : '-'}</td>
-                                                                            <td className="px-3 py-2 text-right font-mono">{day.wage > 0 ? day.wage.toLocaleString('th-TH', { minimumFractionDigits: 2 }) : '-'}</td>
+                                                                            <td className={`px-3 py-2 text-right font-mono font-semibold ${isOff ? 'text-gray-400' : 'text-black'}`}>{day.wage > 0 ? day.wage.toLocaleString('th-TH', { minimumFractionDigits: 2 }) : '-'}</td>
                                                                             <td className={`px-3 py-2 text-right font-mono ${isOff ? 'text-gray-400' : 'text-orange-600 font-medium'}`}>{day.ot > 0 ? day.ot.toLocaleString('th-TH', { minimumFractionDigits: 2 }) : '-'}</td>
-                                                                            <td className={`px-3 py-2 text-right font-mono font-bold ${isOff ? 'text-gray-400' : 'text-gray-800'}`}>
+                                                                            <td className={`px-3 py-2 text-right font-mono font-bold ${isOff ? 'text-gray-400' : 'text-black'}`}>
                                                                                 {(day.wage + day.ot) > 0 ? (day.wage + day.ot).toLocaleString('th-TH', { minimumFractionDigits: 2 }) : '-'}
                                                                             </td>
                                                                         </tr>

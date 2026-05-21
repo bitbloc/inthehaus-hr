@@ -15,6 +15,34 @@ export default function AdminRosterPage() {
     // Modal State
     const [editingCell, setEditingCell] = useState(null); // { employee, date, slots: [] }
     const [saving, setSaving] = useState(false);
+    const [customPresets, setCustomPresets] = useState([]);
+
+    useEffect(() => {
+        try {
+            const saved = localStorage.getItem('roster_custom_presets');
+            if (saved) {
+                setCustomPresets(JSON.parse(saved));
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }, []);
+
+    const saveCustomPreset = (start, end) => {
+        if (!start || !end) return alert('กรุณากรอกทั้งเวลาเริ่มและเวลาเลิก');
+        if (customPresets.some(p => p.start === start && p.end === end)) {
+            return;
+        }
+        const newPresets = [...customPresets, { start, end }];
+        setCustomPresets(newPresets);
+        localStorage.setItem('roster_custom_presets', JSON.stringify(newPresets));
+    };
+
+    const deleteCustomPreset = (start, end) => {
+        const newPresets = customPresets.filter(p => !(p.start === start && p.end === end));
+        setCustomPresets(newPresets);
+        localStorage.setItem('roster_custom_presets', JSON.stringify(newPresets));
+    };
 
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 }); // Monday
     const weekEnd = addDays(weekStart, 6);
@@ -231,8 +259,8 @@ export default function AdminRosterPage() {
                                     <th className="px-4 py-3 font-semibold border-b border-gray-200 min-w-[150px]">พนักงาน</th>
                                     {dates.map((date, i) => (
                                         <th key={i} className="px-4 py-3 font-semibold border-b border-gray-200 text-center min-w-[140px]">
-                                            <div className="text-xs text-gray-400">{daysTitle[i]}</div>
-                                            <div>{format(date, 'dd/MM')}</div>
+                                            <div className="text-xs text-black font-semibold">{daysTitle[i]}</div>
+                                            <div className="text-black font-bold">{format(date, 'dd/MM')}</div>
                                         </th>
                                     ))}
                                 </tr>
@@ -242,7 +270,7 @@ export default function AdminRosterPage() {
                                     <tr key={emp.id} className="border-b border-gray-100 hover:bg-gray-50">
                                         <td className="px-4 py-3 font-medium text-gray-800">
                                             {emp.nickname || emp.name}
-                                            <div className="text-xs text-gray-400 font-normal">{emp.position}</div>
+                                            <div className="text-xs text-black font-medium">{emp.position}</div>
                                         </td>
                                         {dates.map((date, i) => {
                                             const slots = getCellSlots(emp.id, date);
@@ -261,11 +289,11 @@ export default function AdminRosterPage() {
                                                             const timeStr = s.custom_start_time ? `${s.custom_start_time.slice(0,5)}-${s.custom_end_time?.slice(0,5)}` : (shiftObj ? `${shiftObj.start_time.slice(0,5)}-${shiftObj.end_time.slice(0,5)}` : '');
 
                                                             return (
-                                                                <div key={idx} className={`p-1.5 rounded text-xs border ${bgColor}`}>
-                                                                    <div className="font-semibold">{s.is_off ? 'OFF (วันหยุด)' : (shiftObj?.name || 'Custom')}</div>
-                                                                    {!s.is_off && <div className="text-[10px] opacity-80">{timeStr}</div>}
-                                                                    {s.slot_type !== 'MAIN' && <div className="text-[9px] uppercase font-bold tracking-wider opacity-60 mt-0.5">{s.slot_type}</div>}
-                                                                </div>
+                                                                    <div key={idx} className={`p-1.5 rounded text-xs border ${bgColor}`}>
+                                                                        <div className="font-semibold">{s.is_off ? 'OFF (วันหยุด)' : (shiftObj?.name || 'Custom')}</div>
+                                                                        {!s.is_off && <div className="text-[10px] font-bold text-black mt-0.5">{timeStr}</div>}
+                                                                        {s.slot_type !== 'MAIN' && <div className="text-[9px] uppercase font-bold tracking-wider opacity-60 mt-0.5">{s.slot_type}</div>}
+                                                                    </div>
                                                             )
                                                         })}
                                                     </div>
@@ -321,7 +349,7 @@ export default function AdminRosterPage() {
                                     {!slot.is_off && (
                                         <>
                                             <div>
-                                                <label className="block text-xs text-gray-500 mb-1">เลือกกะสำเร็จรูป</label>
+                                                <label className="block text-xs text-black font-semibold mb-1">เลือกกะสำเร็จรูป</label>
                                                 <select 
                                                     value={slot.shift_id || ''}
                                                     onChange={e => handleSlotChange(index, 'shift_id', e.target.value)}
@@ -335,25 +363,68 @@ export default function AdminRosterPage() {
                                             </div>
 
                                             {!slot.shift_id && (
-                                                <div className="grid grid-cols-2 gap-3">
-                                                    <div>
-                                                        <label className="block text-xs text-gray-500 mb-1">เวลาเริ่ม</label>
-                                                        <input 
-                                                            type="time" 
-                                                            value={slot.custom_start_time || ''}
-                                                            onChange={e => handleSlotChange(index, 'custom_start_time', e.target.value)}
-                                                            className="w-full border border-gray-300 rounded-md p-2 text-sm"
-                                                        />
+                                                <div className="space-y-2 border-t border-gray-100 pt-2">
+                                                    <div className="grid grid-cols-2 gap-3">
+                                                        <div>
+                                                            <label className="block text-xs text-black font-semibold mb-1">เวลาเริ่ม</label>
+                                                            <input 
+                                                                type="time" 
+                                                                value={slot.custom_start_time || ''}
+                                                                onChange={e => handleSlotChange(index, 'custom_start_time', e.target.value)}
+                                                                className="w-full border border-gray-300 rounded-md p-2 text-sm text-gray-900 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-xs text-black font-semibold mb-1">เวลาเลิก</label>
+                                                            <input 
+                                                                type="time" 
+                                                                value={slot.custom_end_time || ''}
+                                                                onChange={e => handleSlotChange(index, 'custom_end_time', e.target.value)}
+                                                                className="w-full border border-gray-300 rounded-md p-2 text-sm text-gray-900 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                                                            />
+                                                        </div>
                                                     </div>
-                                                    <div>
-                                                        <label className="block text-xs text-gray-500 mb-1">เวลาเลิก</label>
-                                                        <input 
-                                                            type="time" 
-                                                            value={slot.custom_end_time || ''}
-                                                            onChange={e => handleSlotChange(index, 'custom_end_time', e.target.value)}
-                                                            className="w-full border border-gray-300 rounded-md p-2 text-sm"
-                                                        />
-                                                    </div>
+
+                                                    {slot.custom_start_time && slot.custom_end_time && (
+                                                        <button 
+                                                            type="button"
+                                                            onClick={() => saveCustomPreset(slot.custom_start_time, slot.custom_end_time)}
+                                                            className="text-xs text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1 mt-1 transition-colors"
+                                                        >
+                                                            💾 บันทึกเวลานี้ไว้ใช้ซ้ำ ({slot.custom_start_time} - {slot.custom_end_time})
+                                                        </button>
+                                                    )}
+
+                                                    {customPresets.length > 0 && (
+                                                        <div className="mt-2">
+                                                            <label className="block text-xs text-black font-semibold mb-1">เวลากำหนดเองที่บันทึกไว้:</label>
+                                                            <div className="flex flex-wrap gap-1.5">
+                                                                {customPresets.map((preset, pIdx) => (
+                                                                    <div 
+                                                                        key={pIdx}
+                                                                        className="flex items-center gap-1 px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-800 rounded text-xs font-semibold cursor-pointer border border-blue-200 transition-colors"
+                                                                        onClick={() => {
+                                                                            handleSlotChange(index, 'custom_start_time', preset.start);
+                                                                            handleSlotChange(index, 'custom_end_time', preset.end);
+                                                                        }}
+                                                                    >
+                                                                        <span>{preset.start} - {preset.end}</span>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                deleteCustomPreset(preset.start, preset.end);
+                                                                            }}
+                                                                            className="text-blue-400 hover:text-red-600 ml-1 font-bold text-sm"
+                                                                            title="ลบ"
+                                                                        >
+                                                                            ×
+                                                                        </button>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             )}
                                         </>

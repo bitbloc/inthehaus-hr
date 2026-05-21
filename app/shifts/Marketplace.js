@@ -76,7 +76,7 @@ export default function Marketplace({ currentUser, initialRequests }) {
                                     </div>
                                     <div>
                                         <p className="font-bold text-slate-700">{req.requester?.name}</p>
-                                        <p className="text-xs text-slate-400">ตำแหน่ง: {req.requester?.position || 'Staff'}</p>
+                                        <p className="text-xs text-slate-900 font-bold">ตำแหน่ง: {req.requester?.position || 'Staff'}</p>
                                     </div>
                                 </div>
                                 <div className="text-right">
@@ -87,17 +87,17 @@ export default function Marketplace({ currentUser, initialRequests }) {
 
                             <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 mb-4">
                                 <div className="flex justify-between items-center mb-1">
-                                    <span className="text-xs font-bold text-slate-500 uppercase">กะงาน</span>
-                                    <span className="text-xs font-bold text-slate-700">{req.shift?.name}</span>
+                                    <span className="text-xs font-bold text-slate-900 uppercase">กะงาน</span>
+                                    <span className="text-xs font-bold text-slate-900">{req.shift?.name}</span>
                                 </div>
                                 <div className="flex justify-between items-center">
-                                    <span className="text-xs font-bold text-slate-500 uppercase">เวลา</span>
-                                    <span className="text-xs font-mono text-slate-600">{req.shift?.start_time} - {req.shift?.end_time}</span>
+                                    <span className="text-xs font-bold text-slate-900 uppercase">เวลา</span>
+                                    <span className="text-xs font-mono font-bold text-slate-950">{req.shift?.start_time} - {req.shift?.end_time}</span>
                                 </div>
                             </div>
 
                             {req.notes && (
-                                <p className="text-xs text-slate-500 italic mb-4">"{req.notes}"</p>
+                                <p className="text-xs text-slate-950 font-bold italic mb-4">"{req.notes}"</p>
                             )}
 
                             <button

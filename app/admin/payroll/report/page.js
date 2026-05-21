@@ -101,18 +101,18 @@ function PayrollPDFReportContent() {
                     <div key={item.emp.id} className="grid grid-cols-12 gap-4 py-4 border-b border-slate-100 hover:bg-slate-50 items-center">
                         <div className="col-span-3">
                             <p className="text-sm font-black tracking-tight">{item.emp.nickname || item.emp.name}</p>
-                            <p className="text-[9px] font-bold uppercase tracking-tight text-slate-500">{item.emp.position}</p>
+                            <p className="text-[9px] font-bold uppercase tracking-tight text-slate-900">{item.emp.position}</p>
                         </div>
-                        <div className="col-span-2 text-center font-mono text-xs font-bold text-slate-600">
+                        <div className="col-span-2 text-center font-mono text-xs font-bold text-black">
                             {item.workDays}
                         </div>
-                        <div className="col-span-2 text-center font-mono text-[10px] text-slate-500">
+                        <div className="col-span-2 text-center font-mono text-[10px] font-bold text-black">
                             {item.totalRegularHours.toFixed(1)} / {item.totalOTHours.toFixed(1)}
                         </div>
-                        <div className="col-span-2 text-right font-mono text-xs text-slate-600">
+                        <div className="col-span-2 text-right font-mono text-xs text-black font-semibold">
                             {item.totalSalary.toLocaleString('th-TH', { minimumFractionDigits: 2 })}
                         </div>
-                        <div className="col-span-1 text-right font-mono text-xs text-orange-600">
+                        <div className="col-span-1 text-right font-mono text-xs text-orange-600 font-bold">
                             {item.totalOTPay.toLocaleString('th-TH', { minimumFractionDigits: 2 })}
                         </div>
                         <div className="col-span-2 text-right text-base font-black tracking-tight text-green-600">
@@ -205,14 +205,14 @@ function PayrollPDFReportContent() {
                                         <tr key={i} className={`hover:bg-gray-50 ${isOff ? 'text-gray-400 bg-gray-50/20' : 'text-gray-800'}`}>
                                             <td className="py-1.5 px-2 font-mono">{d.date.slice(5)}</td>
                                             <td className="py-1.5 px-2">{d.shift}</td>
-                                            <td className={`py-1.5 px-2 font-mono ${isOff ? 'text-gray-400' : 'text-gray-500'}`}>{d.scheduled_in ? `${d.scheduled_in}-${d.scheduled_out}` : '-'}</td>
-                                            <td className="py-1.5 px-2 font-mono font-medium">{d.in !== '-' || d.out !== '-' ? `${d.in}-${d.out}` : '-'}</td>
+                                            <td className={`py-1.5 px-2 font-mono ${isOff ? 'text-gray-400' : 'text-black font-semibold'}`}>{d.scheduled_in ? `${d.scheduled_in}-${d.scheduled_out}` : '-'}</td>
+                                            <td className={`py-1.5 px-2 font-mono font-bold ${isOff ? 'text-gray-400' : 'text-black'}`}>{d.in !== '-' || d.out !== '-' ? `${d.in}-${d.out}` : '-'}</td>
                                             <td className={`py-1.5 px-2 font-bold ${statusColor}`}>{d.status}</td>
-                                            <td className="py-1.5 px-2 text-right font-mono">{d.regular_hours > 0 ? Number(d.regular_hours).toFixed(1) : '-'}</td>
+                                            <td className={`py-1.5 px-2 text-right font-mono font-semibold ${isOff ? 'text-gray-400' : 'text-black'}`}>{d.regular_hours > 0 ? Number(d.regular_hours).toFixed(1) : '-'}</td>
                                             <td className={`py-1.5 px-2 text-right font-mono ${isOff ? 'text-gray-400' : 'text-orange-600 font-medium'}`}>{d.ot_hours > 0 ? Number(d.ot_hours).toFixed(1) : '-'}</td>
-                                            <td className="py-1.5 px-2 text-right font-mono">{d.wage > 0 ? d.wage.toLocaleString('th-TH', {minimumFractionDigits:2}) : '-'}</td>
+                                            <td className={`py-1.5 px-2 text-right font-mono font-semibold ${isOff ? 'text-gray-400' : 'text-black'}`}>{d.wage > 0 ? d.wage.toLocaleString('th-TH', {minimumFractionDigits:2}) : '-'}</td>
                                             <td className={`py-1.5 px-2 text-right font-mono ${isOff ? 'text-gray-400' : 'text-orange-600 font-medium'}`}>{d.ot > 0 ? d.ot.toLocaleString('th-TH', {minimumFractionDigits:2}) : '-'}</td>
-                                            <td className={`py-1.5 px-2 text-right font-mono font-bold ${isOff ? 'text-gray-400' : 'text-gray-800'}`}>
+                                            <td className={`py-1.5 px-2 text-right font-mono font-bold ${isOff ? 'text-gray-400' : 'text-black'}`}>
                                                 {(d.wage + d.ot) > 0 ? (d.wage + d.ot).toLocaleString('th-TH', {minimumFractionDigits:2}) : '-'}
                                             </td>
                                         </tr>

@@ -94,20 +94,20 @@ function SlipPDFReportContent() {
                 {slips.map((slip, i) => {
                     const { staffName, sender } = getSenderDisplay(slip);
                     return (
-                        <div key={slip.id} className="grid grid-cols-12 gap-4 py-6 border-b border-slate-100 hover:bg-slate-50 transition-colors items-center">
-                            <div className="col-span-1 font-mono text-xs font-bold text-slate-400">
+                        <div key={slip.id} className="grid grid-cols-12 gap-4 py-6 border-b border-slate-100 hover:bg-slate-50 transition-colors items-center text-black">
+                            <div className="col-span-1 font-mono text-xs font-bold text-black">
                                 {format(new Date(slip.timestamp), 'HH:mm')}
                             </div>
                             <div className="col-span-3">
                                 <p className="text-sm font-black tracking-tight">{sender}</p>
                             </div>
                              <div className="col-span-2">
-                                <p className="text-[9px] font-bold uppercase tracking-tight text-slate-500 whitespace-nowrap overflow-hidden text-ellipsis">{staffName}</p>
+                                <p className="text-[9px] font-bold uppercase tracking-tight text-slate-900 whitespace-nowrap overflow-hidden text-ellipsis">{staffName}</p>
                             </div>
                             <div className="col-span-1">
-                                <p className="text-[9px] font-bold uppercase tracking-tight text-slate-400">{slip.bank_name || "-"}</p>
+                                <p className="text-[9px] font-bold uppercase tracking-tight text-slate-900">{slip.bank_name || "-"}</p>
                             </div>
-                            <div className="col-span-3 font-mono text-[8px] text-slate-300 break-all leading-tight">
+                            <div className="col-span-3 font-mono text-[8px] text-slate-900 break-all leading-tight">
                                 {slip.transaction_ref || "-"}
                             </div>
                             <div className="col-span-2 text-right text-base font-black tracking-tight">

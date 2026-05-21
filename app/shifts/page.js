@@ -76,7 +76,7 @@ export default function ShiftsPage() {
         window.location.reload(); // Simple reload for prototype to refresh data context
     };
 
-    if (loading) return <div className="p-8 text-center text-slate-400 animate-pulse">กำลังโหลดตารางงาน...</div>;
+    if (loading) return <div className="p-8 text-center text-slate-800 font-bold animate-pulse">กำลังโหลดตารางงาน...</div>;
 
     return (
         <div className="min-h-screen bg-slate-50 pb-20 font-sans text-slate-800">
@@ -86,7 +86,7 @@ export default function ShiftsPage() {
                 <div className="flex justify-between items-center mb-6">
                     <div>
                         <h1 className="text-2xl font-bold text-slate-800">ตารางเข้างาน</h1>
-                        <p className="text-xs text-slate-500">จัดการตารางงานของคุณ</p>
+                        <p className="text-xs text-slate-900 font-bold">จัดการตารางงานของคุณ</p>
                     </div>
                     <div>
                         <select
@@ -103,20 +103,20 @@ export default function ShiftsPage() {
                 <div className="flex bg-white p-1 rounded-xl shadow-sm border border-slate-100 mb-6">
                     <button
                         onClick={() => setActiveTab('my-shifts')}
-                        className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition ${activeTab === 'my-shifts' ? 'bg-slate-800 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+                        className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition ${activeTab === 'my-shifts' ? 'bg-slate-800 text-white shadow-md' : 'text-slate-600 hover:text-slate-900'}`}
                     >
                         📅 ตารางของฉัน
                     </button>
                     <button
                         onClick={() => setActiveTab('market')}
-                        className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition flex items-center justify-center gap-2 ${activeTab === 'market' ? 'bg-slate-800 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+                        className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition flex items-center justify-center gap-2 ${activeTab === 'market' ? 'bg-slate-800 text-white shadow-md' : 'text-slate-600 hover:text-slate-900'}`}
                     >
                         <span>🌐</span> ตลาดแลกกะ
                         {poolRequests.length > 0 && <span className="bg-red-500 text-white text-[10px] px-1.5 rounded-full">{poolRequests.length}</span>}
                     </button>
                     <button
                         onClick={() => setActiveTab('team')}
-                        className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition ${activeTab === 'team' ? 'bg-slate-800 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+                        className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition ${activeTab === 'team' ? 'bg-slate-800 text-white shadow-md' : 'text-slate-600 hover:text-slate-900'}`}
                     >
                         👥 ทีม
                     </button>

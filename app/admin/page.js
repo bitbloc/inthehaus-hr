@@ -879,11 +879,11 @@ export default function AdminDashboard() {
                                                 <td className="px-6 py-4 text-center text-slate-400 text-xs">{expandedPayrollRow === row.emp.id ? '▼' : '▶'}</td>
                                                 <td className="px-6 py-4 font-bold text-slate-700 flex items-center gap-3">
                                                     <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center text-xs">{row.emp.name.charAt(0)}</div>
-                                                    <div>{row.emp.name}<div className="text-[10px] font-normal text-slate-400">{row.emp.position}</div></div>
+                                                    <div>{row.emp.name}<div className="text-[10px] font-normal text-slate-800">{row.emp.position}</div></div>
                                                 </td>
                                                 <td className="px-6 py-4 text-center font-bold text-slate-600">{row.workDays}</td>
-                                                <td className="px-6 py-4 text-right font-mono text-slate-500">{row.totalSalary.toLocaleString()}</td>
-                                                <td className="px-6 py-4 text-right font-mono text-blue-500">{row.totalOTPay.toLocaleString()}</td>
+                                                <td className="px-6 py-4 text-right font-mono text-slate-900 font-semibold">{row.totalSalary.toLocaleString()}</td>
+                                                <td className="px-6 py-4 text-right font-mono text-blue-700 font-bold">{row.totalOTPay.toLocaleString()}</td>
                                                 <td className="px-6 py-4 text-right font-mono text-rose-500 font-bold">{row.totalDeduct > 0 ? `-${row.totalDeduct}` : '-'}</td>
                                                 <td className="px-6 py-4 text-right font-mono text-emerald-600 font-black text-base">{row.netSalary.toLocaleString()} ฿</td>
                                                 <td className="px-6 py-4 text-center"><div className="flex justify-center gap-1">{row.lateCount > 0 && <Badge color="amber">L:{row.lateCount}</Badge>}{row.absentCount > 0 && <Badge color="rose">A:{row.absentCount}</Badge>}</div></td>
@@ -897,13 +897,13 @@ export default function AdminDashboard() {
                                                                 <span className="font-mono">Wage: {row.totalSalary} | OT: {row.totalOTPay} ({row.totalOTHours}h)</span>
                                                             </div>
                                                             <table className="w-full text-xs text-left">
-                                                                <thead className="border-b border-slate-100 bg-white text-slate-400"><tr><th className="p-3">Date</th><th className="p-3">Shift</th><th className="p-3 text-center">Time</th><th className="p-3 text-right">Wage</th><th className="p-3 text-right">OT</th><th className="p-3">Status</th></tr></thead>
+                                                                <thead className="border-b border-slate-100 bg-white text-slate-900"><tr><th className="p-3">Date</th><th className="p-3">Shift</th><th className="p-3 text-center">Time</th><th className="p-3 text-right">Wage</th><th className="p-3 text-right">OT</th><th className="p-3">Status</th></tr></thead>
                                                                 <tbody className="divide-y divide-slate-50">
                                                                     {row.dailyDetails.map((day, idx) => (
                                                                         <tr key={idx}>
-                                                                            <td className="p-3 font-mono text-slate-500">{formatDate(day.date, "dd MMM")}</td>
+                                                                            <td className="p-3 font-mono text-slate-900 font-semibold">{formatDate(day.date, "dd MMM")}</td>
                                                                             <td className="p-3 font-bold text-slate-700">{day.shift}</td>
-                                                                            <td className="p-3 text-center font-mono text-slate-500">{day.in} - {day.out}</td>
+                                                                            <td className="p-3 text-center font-mono text-black font-bold">{day.in} - {day.out}</td>
                                                                             <td className="p-3 text-right font-mono">{day.wage > 0 ? day.wage : '-'}</td>
                                                                             <td className="p-3 text-right font-mono text-blue-600 font-bold">{day.ot > 0 ? `+${day.ot}` : '-'}</td>
                                                                             <td className="p-3"><Badge color={day.status.includes('Late') ? 'amber' : day.status === 'Absent' ? 'rose' : day.status.includes('Extra') ? 'purple' : day.status === 'Normal' ? 'emerald' : 'slate'}>{day.status}</Badge></td>

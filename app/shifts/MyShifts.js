@@ -25,7 +25,7 @@ export default function MyShifts({ currentUser, employees, schedules, shifts, ov
         <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
             <div className="p-6 border-b border-slate-50 flex justify-between items-center">
                 <h3 className="font-bold text-lg text-slate-700">📅 ตารางของฉัน</h3>
-                <div className="text-xs font-bold text-slate-400 uppercase">{format(selectedDate, "MMMM yyyy", { locale: th })}</div>
+                <div className="text-xs font-bold text-slate-900 uppercase">{format(selectedDate, "MMMM yyyy", { locale: th })}</div>
             </div>
 
             <div className="divide-y divide-slate-50">
@@ -51,7 +51,7 @@ export default function MyShifts({ currentUser, employees, schedules, shifts, ov
                     return (
                         <div key={dateStr} className={`p-4 flex items-center justify-between hover:bg-slate-50 transition ${isToday(day) ? 'bg-slate-50/50' : ''}`}>
                             <div className="flex items-center gap-4">
-                                <div className={`text-center min-w-[50px] ${isToday(day) ? 'text-blue-600' : 'text-slate-500'}`}>
+                                <div className={`text-center min-w-[50px] ${isToday(day) ? 'text-blue-600 font-bold' : 'text-slate-950 font-bold'}`}>
                                     <div className="text-xs font-bold uppercase">{format(day, "EEE", { locale: th })}</div>
                                     <div className="text-xl font-black">{format(day, "d")}</div>
                                 </div>
@@ -63,12 +63,12 @@ export default function MyShifts({ currentUser, employees, schedules, shifts, ov
                                                 {myShift.shift_name}
                                                 {myShift.source === 'OVERRIDE' && <span className="bg-purple-100 text-purple-600 text-[10px] px-1.5 py-0.5 rounded font-bold">SWAPPED</span>}
                                             </div>
-                                            <div className="text-xs font-mono text-slate-400">
+                                            <div className="text-xs font-mono font-bold text-slate-950">
                                                 {myShift.start_time.slice(0, 5)} - {myShift.end_time.slice(0, 5)}
                                             </div>
                                         </>
                                     ) : (
-                                        <div className="text-slate-400 font-bold">หยุด</div>
+                                        <div className="text-slate-950 font-black">หยุด</div>
                                     )}
 
                                     {/* Status Indicator */}
@@ -99,7 +99,7 @@ export default function MyShifts({ currentUser, employees, schedules, shifts, ov
                     const myShift = dailyRoster.find(r => String(r.employee.id) === String(currentUser.id));
                     return !myShift;
                 }) && (
-                        <div className="p-8 text-center text-slate-400">ไม่มีกะงานในเดือนนี้</div>
+                        <div className="p-8 text-center text-slate-800 font-bold">ไม่มีกะงานในเดือนนี้</div>
                     )}
             </div>
 
