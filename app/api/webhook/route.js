@@ -67,7 +67,7 @@ export async function POST(request) {
             
             const { data: logs, error } = await supabase
               .from('attendance_logs')
-              .select('*, employees(name, position)')
+              .select('*, employees(id, name, position)')
               .gte('timestamp', START_OF_DAY_UTC.toISOString())
               .order('timestamp', { ascending: true });
 
@@ -77,11 +77,36 @@ export async function POST(request) {
               continue;
             }
 
+            // Fetch today's roster transactions for shift time comparison
+            const todayDateStr = format(addHours(new Date(), 7), 'yyyy-MM-dd');
+            const todayDayOfWeek = addHours(new Date(), 7).getDay();
+            const { data: rosterTxs } = await supabase
+              .from('roster_transactions')
+              .select('*, shifts(name, start_time, end_time)')
+              .eq('date', todayDateStr);
+            const { data: weeklyScheds } = await supabase
+              .from('employee_schedules')
+              .select('*, shifts(name, start_time, end_time)')
+              .eq('day_of_week', todayDayOfWeek);
+
+            const getScheduledStart = (empId) => {
+              // 1. Check roster transaction first
+              const tx = rosterTxs?.find(t => t.employee_id === empId && !t.is_off);
+              if (tx) {
+                return tx.custom_start_time?.slice(0,5) || tx.shifts?.start_time?.slice(0,5) || null;
+              }
+              // 2. Fallback to weekly schedule
+              const sch = weeklyScheds?.find(s => s.employee_id === empId && !s.is_off);
+              if (sch) return sch.shifts?.start_time?.slice(0,5) || null;
+              return null;
+            };
+
             const summary = {};
             logs.forEach(log => {
               const name = log.employees?.name || 'Unknown';
+              const empId = log.employees?.id || log.employee_id;
               const position = log.employees?.position || '-';
-              if (!summary[name]) summary[name] = { name, position, in: null, out: null };
+              if (!summary[name]) summary[name] = { name, empId, position, in: null, out: null };
               if (log.action_type === 'check_in') summary[name].in = new Date(log.timestamp);
               if (log.action_type === 'check_out') summary[name].out = new Date(log.timestamp);
             });
@@ -92,7 +117,7 @@ export async function POST(request) {
             
             const contents = [
               { type: 'text', text: `📊 สรุปการเข้างาน`, weight: 'bold', size: 'lg', color: '#1DB446' },
-              { type: 'text', text: todayStr, size: 'xs', color: '#aaaaaa', margin: 'sm' },
+              { type: 'text', text: todayStr, size: 'xs', color: '#555555', margin: 'sm' },
               { type: 'separator', margin: 'md' }
             ];
 
@@ -108,25 +133,60 @@ export async function POST(request) {
                 if (!s.out) durationStr = 'กำลังทำงาน ⏳';
               }
 
+              // Calculate late/on-time status
+              let statusText = '';
+              let statusColor = '#999999';
+              const scheduledStart = getScheduledStart(s.empId);
+              if (s.in && scheduledStart) {
+                const inTimeStr = safeThaiTime(s.in);
+                const [schH, schM] = scheduledStart.split(':').map(Number);
+                const [inH, inM] = inTimeStr.split(':').map(Number);
+                const schMinutes = schH * 60 + schM;
+                const inMinutes = inH * 60 + inM;
+                const diffMin = inMinutes - schMinutes;
+                if (diffMin > 15) {
+                  statusText = `สาย +${diffMin} นาที`;
+                  statusColor = '#ff4b00';
+                } else if (diffMin < -5) {
+                  statusText = `มาเร็ว ${Math.abs(diffMin)} นาที`;
+                  statusColor = '#007bff';
+                } else {
+                  statusText = `✓ ตรงเวลา`;
+                  statusColor = '#1DB446';
+                }
+              }
+
+              const rowContents = [
+                {
+                  type: 'box', layout: 'horizontal',
+                  contents: [
+                    { type: 'text', text: `👤 ${s.name}`, weight: 'bold', size: 'sm', color: '#333333', flex: 3 },
+                    { type: 'text', text: s.position, size: 'xs', color: '#555555', align: 'end', flex: 2 }
+                  ]
+                },
+                {
+                  type: 'box', layout: 'horizontal',
+                  contents: [
+                    { type: 'text', text: `เข้า: ${inTime}`, size: 'xs', color: '#1DB446', flex: 1 },
+                    { type: 'text', text: `ออก: ${outTime}`, size: 'xs', color: '#ff4b00', flex: 1 },
+                    { type: 'text', text: durationStr, size: 'xs', color: (durationStr.includes('กำลัง') ? '#007bff' : '#333333'), align: 'end', flex: 1, weight: 'bold' }
+                  ]
+                }
+              ];
+
+              if (statusText) {
+                rowContents.push({
+                  type: 'box', layout: 'horizontal', margin: 'xs',
+                  contents: [
+                    { type: 'text', text: statusText, size: 'xs', weight: 'bold', color: statusColor, flex: 2 },
+                    ...(scheduledStart ? [{ type: 'text', text: `(กะ ${scheduledStart})`, size: 'xxs', color: '#888888', align: 'end', flex: 1 }] : [])
+                  ]
+                });
+              }
+
               contents.push({
                 type: 'box', layout: 'vertical', margin: 'md', spacing: 'sm',
-                contents: [
-                  {
-                    type: 'box', layout: 'horizontal',
-                    contents: [
-                      { type: 'text', text: `👤 ${s.name}`, weight: 'bold', size: 'sm', color: '#333333', flex: 3 },
-                      { type: 'text', text: s.position, size: 'xs', color: '#aaaaaa', align: 'end', flex: 2 }
-                    ]
-                  },
-                  {
-                    type: 'box', layout: 'horizontal',
-                    contents: [
-                      { type: 'text', text: `เข้า: ${inTime}`, size: 'xs', color: '#1DB446', flex: 1 },
-                      { type: 'text', text: `ออก: ${outTime}`, size: 'xs', color: '#ff4b00', flex: 1 },
-                      { type: 'text', text: durationStr, size: 'xs', color: (durationStr.includes('กำลัง') ? '#007bff' : '#666666'), align: 'end', flex: 1, weight: 'bold' }
-                    ]
-                  }
-                ]
+                contents: rowContents
               });
               contents.push({ type: 'separator', margin: 'sm' });
             }
