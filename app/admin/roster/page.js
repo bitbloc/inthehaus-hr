@@ -51,11 +51,13 @@ export default function AdminRosterPage() {
         if (!presetModal) return;
         const { start, end, name, color, icon } = presetModal;
         if (!start || !end) return alert('กรุณากรอกทั้งเวลาเริ่มและเวลาเลิก');
-        if (customPresets.some(p => p.start === start && p.end === end)) {
+        const normStart = start.slice(0, 5);
+        const normEnd = end.slice(0, 5);
+        if (customPresets.some(p => (p.start || '').slice(0, 5) === normStart && (p.end || '').slice(0, 5) === normEnd)) {
             setPresetModal(null);
             return;
         }
-        const newPresets = [...customPresets, { start, end, name: name || `${start}-${end}`, color: color || 'sky', icon: icon || '⏰' }];
+        const newPresets = [...customPresets, { start: normStart, end: normEnd, name: name || `${normStart}-${normEnd}`, color: color || 'sky', icon: icon || '⏰' }];
         setCustomPresets(newPresets);
         localStorage.setItem('roster_custom_presets', JSON.stringify(newPresets));
         setPresetModal(null);
@@ -317,7 +319,7 @@ export default function AdminRosterPage() {
 
                                                             // Match against saved presets for custom slots
                                                             const matchedPreset = (!s.shift_id && s.custom_start_time && s.custom_end_time)
-                                                                ? customPresets.find(p => p.start === s.custom_start_time && p.end === s.custom_end_time)
+                                                                ? customPresets.find(p => (p.start || '').slice(0, 5) === s.custom_start_time.slice(0, 5) && (p.end || '').slice(0, 5) === s.custom_end_time.slice(0, 5))
                                                                 : null;
                                                             const bgColor = matchedPreset
                                                                 ? `${getPresetColor(matchedPreset.color).bg} ${getPresetColor(matchedPreset.color).border} ${getPresetColor(matchedPreset.color).text}`

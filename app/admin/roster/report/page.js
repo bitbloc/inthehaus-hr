@@ -14,6 +14,30 @@ function RosterPDFReportContent() {
     const [shifts, setShifts] = useState([]);
     const [transactions, setTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [customPresets, setCustomPresets] = useState([]);
+
+    const PRESET_COLORS = [
+        { id: 'sky', bg: 'bg-sky-50', text: 'text-sky-800', border: 'border-sky-200' },
+        { id: 'amber', bg: 'bg-amber-50', text: 'text-amber-800', border: 'border-amber-200' },
+        { id: 'indigo', bg: 'bg-indigo-50', text: 'text-indigo-800', border: 'border-indigo-200' },
+        { id: 'rose', bg: 'bg-rose-50', text: 'text-rose-800', border: 'border-rose-200' },
+        { id: 'emerald', bg: 'bg-emerald-50', text: 'text-emerald-800', border: 'border-emerald-200' },
+        { id: 'violet', bg: 'bg-violet-50', text: 'text-violet-800', border: 'border-violet-200' },
+        { id: 'slate', bg: 'bg-slate-100', text: 'text-slate-800', border: 'border-slate-300' },
+        { id: 'teal', bg: 'bg-teal-50', text: 'text-teal-800', border: 'border-teal-200' },
+    ];
+    const getPresetColor = (colorId) => PRESET_COLORS.find(c => c.id === colorId) || PRESET_COLORS[0];
+
+    useEffect(() => {
+        try {
+            const saved = localStorage.getItem('roster_custom_presets');
+            if (saved) {
+                setCustomPresets(JSON.parse(saved));
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }, []);
 
     const weekStart = startOfWeek(parseISO(startParam), { weekStartsOn: 1 });
     const weekEnd = addDays(weekStart, 6);
@@ -124,10 +148,16 @@ function RosterPDFReportContent() {
                                                 ) : (
                                                     slots.map((s, idx) => {
                                                         const shiftObj = shifts.find(sh => sh.id === s.shift_id);
-                                                        const colorClass = getShiftColorClass(s, shiftObj);
+                                                        const matchedPreset = (!s.shift_id && s.custom_start_time && s.custom_end_time)
+                                                            ? customPresets.find(p => (p.start || '').slice(0, 5) === s.custom_start_time.slice(0, 5) && (p.end || '').slice(0, 5) === s.custom_end_time.slice(0, 5))
+                                                            : null;
+                                                        const colorClass = matchedPreset
+                                                            ? `${getPresetColor(matchedPreset.color).bg} ${getPresetColor(matchedPreset.color).border} ${getPresetColor(matchedPreset.color).text}`
+                                                            : getShiftColorClass(s, shiftObj);
                                                         const timeStr = s.custom_start_time 
                                                             ? `${s.custom_start_time.slice(0,5)}-${s.custom_end_time?.slice(0,5)}` 
                                                             : (shiftObj ? `${shiftObj.start_time.slice(0,5)}-${shiftObj.end_time.slice(0,5)}` : '');
+                                                        const cellLabel = s.is_off ? 'OFF (หยุด)' : (matchedPreset ? `${matchedPreset.icon || '⏰'} ${matchedPreset.name}` : (shiftObj?.name || 'Custom'));
 
                                                         return (
                                                             <div 
@@ -137,7 +167,7 @@ function RosterPDFReportContent() {
                                                                 }`}
                                                             >
                                                                 <div className="font-bold text-[10px] uppercase tracking-wide">
-                                                                    {s.is_off ? 'OFF (หยุด)' : (shiftObj?.name || 'Custom')}
+                                                                    {cellLabel}
                                                                 </div>
                                                                 {!s.is_off && timeStr && (
                                                                     <div className="text-[10px] font-black text-slate-800 mt-0.5">
