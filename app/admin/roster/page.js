@@ -282,14 +282,12 @@ export default function AdminRosterPage() {
                                                     >
                                                         {slots.length === 0 && <span className="text-gray-300 text-xs m-auto block text-center">+</span>}
                                                         {slots.map((s, idx) => {
-                                                            let bgColor = s.status === 'PUBLISHED' ? 'bg-green-100 border-green-200 text-green-800' : 'bg-yellow-100 border-yellow-200 text-yellow-800';
-                                                            if (s.is_off) bgColor = 'bg-red-50 border-red-200 text-red-700';
-                                                            
                                                             const shiftObj = shifts.find(sh => sh.id === s.shift_id);
+                                                            const bgColor = getShiftColorClass(s, shiftObj);
                                                             const timeStr = s.custom_start_time ? `${s.custom_start_time.slice(0,5)}-${s.custom_end_time?.slice(0,5)}` : (shiftObj ? `${shiftObj.start_time.slice(0,5)}-${shiftObj.end_time.slice(0,5)}` : '');
 
                                                             return (
-                                                                    <div key={idx} className={`p-1.5 rounded text-xs border ${bgColor}`}>
+                                                                    <div key={idx} className={`p-1.5 rounded text-xs border ${bgColor} ${s.status === 'DRAFT' ? 'border-dashed border-2' : ''}`}>
                                                                         <div className="font-semibold">{s.is_off ? 'OFF (วันหยุด)' : (shiftObj?.name || 'Custom')}</div>
                                                                         {!s.is_off && <div className="text-[10px] font-bold text-black mt-0.5">{timeStr}</div>}
                                                                         {s.slot_type !== 'MAIN' && <div className="text-[9px] uppercase font-bold tracking-wider opacity-60 mt-0.5">{s.slot_type}</div>}
@@ -458,3 +456,26 @@ export default function AdminRosterPage() {
         </div>
     );
 }
+
+const getShiftColorClass = (s, shiftObj) => {
+    if (s.is_off) return 'bg-red-50 border-red-200 text-red-700';
+    if (!s.shift_id || s.custom_start_time || !shiftObj) {
+        return 'bg-sky-50 border-sky-200 text-sky-950';
+    }
+
+    const name = (shiftObj.name || '').toLowerCase();
+    
+    if (name.includes('ควบ') || name.toLowerCase().includes('double')) {
+        return 'bg-rose-50 border-rose-200 text-rose-950';
+    }
+    
+    if (name.includes('ค่ำ') || name.includes('ดึก') || name.toLowerCase().includes('night') || name.toLowerCase().includes('evening')) {
+        return 'bg-indigo-50 border-indigo-200 text-indigo-950';
+    }
+    
+    if (name.includes('เช้า') || name.toLowerCase().includes('morning')) {
+        return 'bg-amber-50 border-amber-200 text-amber-950';
+    }
+    
+    return 'bg-yellow-50 border-yellow-200 text-yellow-950';
+};

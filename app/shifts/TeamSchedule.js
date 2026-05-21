@@ -55,11 +55,9 @@ export default function TeamSchedule({ employees, schedules, overrides, shifts }
                                         return (
                                             <td key={day.toString()} className={`p-2 text-center border-l border-slate-50 ${isSameDay(day, today) ? 'bg-blue-50/30' : ''}`}>
                                                 {shift ? (
-                                                    <div className={`rounded-lg p-1.5 text-xs font-bold border ${shift.source === 'OVERRIDE' ? 'bg-purple-50 text-purple-700 border-purple-100' :
-                                                            'bg-emerald-50 text-emerald-700 border-emerald-100'
-                                                        }`}>
+                                                    <div className={`rounded-lg p-1.5 text-xs font-bold border ${getShiftColorClass(shift.shift_name)}`}>
                                                         <div className="truncate max-w-[80px] mx-auto">{shift.shift_name}</div>
-                                                        <div className="text-[10px] font-mono font-bold text-slate-950 mt-0.5">{shift.start_time}-{shift.end_time}</div>
+                                                        <div className="text-[10px] font-mono font-bold mt-0.5">{shift.start_time.slice(0, 5)}-{shift.end_time.slice(0, 5)}</div>
                                                     </div>
                                                 ) : (
                                                     <span className="text-slate-500 text-[10px] font-bold">-</span>
@@ -76,3 +74,25 @@ export default function TeamSchedule({ employees, schedules, overrides, shifts }
         </div>
     );
 }
+
+const getShiftColorClass = (shiftName) => {
+    const name = (shiftName || '').toLowerCase();
+    
+    if (name.includes('custom')) {
+        return 'bg-sky-50 text-sky-950 border-sky-200';
+    }
+    
+    if (name.includes('ควบ') || name.toLowerCase().includes('double')) {
+        return 'bg-rose-50 text-rose-950 border-rose-200';
+    }
+    
+    if (name.includes('ค่ำ') || name.includes('ดึก') || name.toLowerCase().includes('night') || name.toLowerCase().includes('evening')) {
+        return 'bg-indigo-50 text-indigo-950 border-indigo-200';
+    }
+    
+    if (name.includes('เช้า') || name.toLowerCase().includes('morning')) {
+        return 'bg-amber-50 text-amber-950 border-amber-200';
+    }
+    
+    return 'bg-yellow-50 text-yellow-950 border-yellow-200';
+};
