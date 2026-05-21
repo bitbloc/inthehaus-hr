@@ -57,10 +57,13 @@ function SlipPDFReportContent() {
     return (
         <div className="min-h-screen bg-white text-black p-8 md:p-16 font-sans selection:bg-black selection:text-white">
             {/* Header */}
-            <div className="flex justify-between items-start border-b-4 border-black pb-8 mb-12">
-                <div>
-                    <h1 className="text-6xl font-black tracking-tighter leading-none mb-2">IN THE HAUS</h1>
-                    <p className="text-xs font-bold tracking-[0.3em] uppercase opacity-50">Transfer Slips Summary Report</p>
+            <div className="flex justify-between items-center border-b-4 border-black pb-8 mb-12">
+                <div className="flex items-center gap-4">
+                    <img src="/logo.png" className="h-14 w-auto object-contain" alt="In The Haus Logo" />
+                    <div>
+                        <h1 className="text-3xl font-black tracking-tighter leading-none mb-1">IN THE HAUS</h1>
+                        <p className="text-[10px] font-bold tracking-[0.3em] uppercase opacity-50">Transfer Slips Summary Report</p>
+                    </div>
                 </div>
                 <div className="text-right">
                     <div className="text-4xl font-black tracking-tighter">{format(new Date(reportDate), 'dd MMM yyyy', { locale: th })}</div>
@@ -138,7 +141,11 @@ function SlipPDFReportContent() {
             <style jsx global>{`
                 @media print {
                     .no-print { display: none; }
-                    body { padding: 0; }
+                    body { 
+                        padding: 0; 
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
                 }
             `}</style>
 

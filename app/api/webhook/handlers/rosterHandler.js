@@ -56,7 +56,7 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
           type: 'box', layout: 'horizontal', margin: 'lg',
           contents: [
             { type: 'text', text: `${daysTitle[dayIndex]} ${dateStr}`, weight: 'bold', size: 'sm', color: '#333333', flex: 2 },
-            { type: 'text', text: `${workingRoster.length} คน`, size: 'xs', color: '#aaaaaa', align: 'end', flex: 1 }
+            { type: 'text', text: `${workingRoster.length} คน`, size: 'xs', color: '#555555', align: 'end', flex: 1 }
           ]
         });
         workingRoster.forEach(emp => {
@@ -83,7 +83,7 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
           type: 'box', layout: 'horizontal', margin: 'lg',
           contents: [
             { type: 'text', text: `${daysTitle[dayIndex]} ${dateStr}`, weight: 'bold', size: 'sm', color: '#333333', flex: 2 },
-            { type: 'text', text: `ไม่มีคนเข้ากะ`, size: 'xs', color: '#aaaaaa', align: 'end', flex: 1 }
+            { type: 'text', text: `ไม่มีคนเข้ากะ`, size: 'xs', color: '#555555', align: 'end', flex: 1 }
           ]
         });
         contents.push({ type: 'separator', margin: 'sm' });
@@ -138,7 +138,7 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
           type: 'box', layout: 'horizontal', margin: 'md',
           contents: [
             { type: 'text', text: `${statusEmoji} ${emp.nickname || emp.name}`, flex: 3, size: 'sm', weight: 'bold', color: statusColor },
-            { type: 'text', text: emp.shift?.name || 'Custom', flex: 2, size: 'xs', color: '#aaaaaa', align: 'center' },
+            { type: 'text', text: emp.shift?.name || 'Custom', flex: 2, size: 'xs', color: '#555555', align: 'center' },
             { type: 'text', text: actualTimeStr ? `${actualTimeStr} (${shiftStart})` : `${shiftStart}-${shiftEnd}`, flex: 3, size: 'sm', align: 'end', color: (statusColor === '#ff4b00') ? '#ff4b00' : (emp.isOverride ? '#007bff' : '#333333') }
           ]
         });
@@ -399,29 +399,29 @@ export async function handleRosterPostback(event, client, action, queryParams, u
                 {
                   type: 'box', layout: 'baseline',
                   contents: [
-                    { type: 'text', text: 'ชื่อ:', color: '#aaaaaa', size: 'sm', flex: 2 },
-                    { type: 'text', text: name, weight: 'bold', color: '#666666', size: 'sm', flex: 4 }
+                    { type: 'text', text: 'ชื่อ:', color: '#555555', size: 'sm', flex: 2 },
+                    { type: 'text', text: name, weight: 'bold', color: '#333333', size: 'sm', flex: 4 }
                   ]
                 },
                 {
                   type: 'box', layout: 'baseline',
                   contents: [
-                    { type: 'text', text: 'วันที่:', color: '#aaaaaa', size: 'sm', flex: 2 },
-                    { type: 'text', text: req.leave_date, color: '#666666', size: 'sm', flex: 4 }
+                    { type: 'text', text: 'วันที่:', color: '#555555', size: 'sm', flex: 2 },
+                    { type: 'text', text: req.leave_date, color: '#333333', size: 'sm', flex: 4 }
                   ]
                 },
                 {
                   type: 'box', layout: 'baseline',
                   contents: [
-                    { type: 'text', text: 'ประเภท:', color: '#aaaaaa', size: 'sm', flex: 2 },
-                    { type: 'text', text: typeText, color: '#666666', size: 'sm', flex: 4 }
+                    { type: 'text', text: 'ประเภท:', color: '#555555', size: 'sm', flex: 2 },
+                    { type: 'text', text: typeText, color: '#333333', size: 'sm', flex: 4 }
                   ]
                 },
                 {
                   type: 'box', layout: 'baseline',
                   contents: [
-                    { type: 'text', text: 'เหตุผล:', color: '#aaaaaa', size: 'sm', flex: 2 },
-                    { type: 'text', text: req.reason || '-', color: '#666666', size: 'sm', flex: 4, wrap: true }
+                    { type: 'text', text: 'เหตุผล:', color: '#555555', size: 'sm', flex: 2 },
+                    { type: 'text', text: req.reason || '-', color: '#333333', size: 'sm', flex: 4, wrap: true }
                   ]
                 }
               ]

@@ -61,10 +61,13 @@ function PayrollPDFReportContent() {
 
     const MasterReport = () => (
         <div className="min-h-screen bg-white text-black p-8 md:p-16 font-sans">
-            <div className="flex justify-between items-start border-b-4 border-black pb-8 mb-12">
-                <div>
-                    <h1 className="text-6xl font-black tracking-tighter leading-none mb-2">IN THE HAUS</h1>
-                    <p className="text-xs font-bold tracking-[0.3em] uppercase opacity-50">Master Payroll Report</p>
+            <div className="flex justify-between items-center border-b-4 border-black pb-8 mb-12">
+                <div className="flex items-center gap-4">
+                    <img src="/logo.png" className="h-14 w-auto object-contain" alt="In The Haus Logo" />
+                    <div>
+                        <h1 className="text-3xl font-black tracking-tighter leading-none mb-1">IN THE HAUS</h1>
+                        <p className="text-[10px] font-bold tracking-[0.3em] uppercase opacity-50">Master Payroll Report</p>
+                    </div>
                 </div>
                 <div className="text-right">
                     <div className="text-4xl font-black tracking-tighter">{printDateStr}</div>
@@ -144,10 +147,13 @@ function PayrollPDFReportContent() {
             {payrollData.filter(d => d.workDays > 0).map((item, index) => (
                 <div key={item.emp.id} className="print-page bg-white text-gray-800 p-12 max-w-4xl mx-auto shadow-xl mb-8 rounded-xl border border-gray-200">
                     {/* Payslip Header */}
-                    <div className="flex justify-between items-start border-b-4 border-black pb-6 mb-8">
-                        <div>
-                            <h1 className="text-5xl font-black tracking-tighter leading-none mb-1">IN THE HAUS</h1>
-                            <p className="text-xs font-bold tracking-[0.3em] uppercase opacity-50">Payslip / สลิปเงินเดือน</p>
+                    <div className="flex justify-between items-center border-b-4 border-black pb-6 mb-8">
+                        <div className="flex items-center gap-4">
+                            <img src="/logo.png" className="h-12 w-auto object-contain" alt="In The Haus Logo" />
+                            <div>
+                                <h1 className="text-3xl font-black tracking-tighter leading-none mb-1">IN THE HAUS</h1>
+                                <p className="text-[10px] font-bold tracking-[0.3em] uppercase opacity-50">Payslip / สลิปเงินเดือน</p>
+                            </div>
                         </div>
                         <div className="text-right">
                             <div className="text-3xl font-black tracking-tighter">{printDateStr}</div>
@@ -258,7 +264,12 @@ function PayrollPDFReportContent() {
             <style jsx global>{`
                 @media print {
                     .no-print { display: none !important; }
-                    body { padding: 0; background: white; }
+                    body { 
+                        padding: 0; 
+                        background: white;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
                     .print-page { 
                         page-break-after: always; 
                         box-shadow: none !important; 

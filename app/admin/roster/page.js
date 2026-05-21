@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../../lib/supabaseClient';
 import { startOfWeek, endOfWeek, addDays, format, subWeeks, addWeeks, parseISO } from 'date-fns';
-import { ChevronLeft, ChevronRight, Copy, CheckCircle, Save, Plus, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Copy, CheckCircle, Save, Plus, Trash2, Printer } from 'lucide-react';
 
 export default function AdminRosterPage() {
     const [currentDate, setCurrentDate] = useState(new Date());
@@ -234,6 +234,13 @@ export default function AdminRosterPage() {
                     <button onClick={copyLastWeek} className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors">
                         <Copy size={16} /> Copy from Last Week
                     </button>
+                    <a 
+                        href={`/admin/roster/report?start=${format(weekStart, 'yyyy-MM-dd')}`} 
+                        target="_blank"
+                        className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-black text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
+                    >
+                        <Printer size={16} /> Export PDF
+                    </a>
                     <button onClick={publishWeek} className="flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-medium shadow-sm transition-colors">
                         <CheckCircle size={16} /> Publish & Notify
                     </button>
