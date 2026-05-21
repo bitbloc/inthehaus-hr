@@ -141,13 +141,12 @@ export async function POST(request) {
           ]
         });
         staffList.forEach(staff => {
-          const shiftText = staff.time ? `${staff.shift} (${staff.time})` : staff.shift;
           const shiftColor = getShiftColorHex(staff.shift);
           contents.push({
             type: 'box', layout: 'horizontal', margin: 'xs',
             contents: [
               { type: 'text', text: `• ${staff.name}`, size: 'xs', color: '#333333', flex: 3 },
-              { type: 'text', text: shiftText, size: 'xs', color: shiftColor, align: 'end', flex: 3 }
+              { type: 'text', text: staff.time || '', size: 'xs', color: shiftColor, align: 'end', flex: 2, weight: 'bold' }
             ]
           });
         });

@@ -69,11 +69,12 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
           
           const colorHex = getShiftColorHex(shiftName, isOff, isCustomOrExtra);
 
+          const displayTime = shiftStart && shiftEnd ? `${shiftStart}-${shiftEnd}` : shiftStart || '';
           contents.push({
             type: 'box', layout: 'horizontal', margin: 'xs',
             contents: [
               { type: 'text', text: `• ${emp.nickname || emp.name}`, size: 'xs', color: '#333333', flex: 3 },
-              { type: 'text', text: `${shiftName}${timeStr}`, size: 'xs', color: colorHex, align: 'end', flex: 3 }
+              { type: 'text', text: displayTime, size: 'xs', color: colorHex, align: 'end', flex: 2, weight: 'bold' }
             ]
           });
         });
