@@ -142,7 +142,7 @@ ${configs.staff_roster || ''}
 /**
  * Handle Vision requests (Classify and Analyze)
  */
-export async function classifyAndAnalyzeImage(imageBase64, mimeType = "image/jpeg", context = "", bossRole = null, positionInstruction = "") {
+export async function classifyAndAnalyzeImage(imageBase64, mimeType = "image/jpeg", context = "", bossRole = null, positionInstruction = "", employeeName = "") {
     try {
         const instance = getGenAI();
         if (!instance) return { isFood: false, analysis: "AI Instance error", shortDescription: "" };
@@ -152,14 +152,16 @@ export async function classifyAndAnalyzeImage(imageBase64, mimeType = "image/jpe
         const isBoss = bossRole !== null;
         let catInstruction = "";
         
+        let targetPerson = employeeName || (isBoss ? bossRole : "พนักงาน");
+        
         if (bossRole === "คุณพ่อ") {
-            catInstruction = "พากย์ความรู้สึกแมวในรูป: ต้องนอบน้อม สุภาพ ประจบประแจง เหมือนแมวที่รักและเคารพคุณพ่อที่สุดในโลก (เช่น รักคุณพ่อที่สุดเลยค่ะ, นวดๆ ให้ค่ะคุณพ่อ)";
+            catInstruction = `พากย์ความรู้สึกแมวในรูป: ต้องนอบน้อม สุภาพ ประจบประแจง เหมือนแมวที่รักและเคารพคุณพ่อที่สุดในโลก และเรียกคนส่งว่า "คุณพ่อ" ด้วยเมี๊ยว~ (เช่น รักคุณพ่อที่สุดเลยค่ะ, นวดๆ ให้ค่ะคุณพ่อ)`;
         } else if (bossRole === "คุณแม่") {
-            catInstruction = "พากย์ความรู้สึกแมวในรูป: ต้องนอบน้อม สุภาพ ประจบประแจง เหมือนแมวที่รักและเคารพคุณแม่ที่สุดในโลก (เช่น รักคุณแม่ที่สุดเลยค่ะ, คุณแม่สวยจังเลยค่ะ, นวดๆ ให้ค่ะคุณแม่)";
+            catInstruction = `พากย์ความรู้สึกแมวในรูป: ต้องนอบน้อม สุภาพ ประจบประแจง เหมือนแมวที่รักและเคารพคุณแม่ที่สุดในโลก และเรียกคนส่งว่า "คุณแม่" ด้วยเมี๊ยว~ (เช่น รักคุณแม่ที่สุดเลยค่ะ, คุณแม่สวยจังเลยค่ะ, นวดๆ ให้ค่ะคุณแม่)`;
         } else if (isBoss) {
-            catInstruction = "พากย์ความรู้สึกแมวในรูป: ต้องนอบน้อม สุภาพ ประจบประแจง เหมือนแมวที่รักและเคารพเจ้านายที่สุดในโลก (เช่น รักบอสที่สุดเลยค่ะ, นวดๆ ให้ค่ะบอส)";
+            catInstruction = `พากย์ความรู้สึกแมวในรูป: ต้องนอบน้อม สุภาพ ประจบประแจง เหมือนแมวที่รักและเคารพเจ้านายที่สุดในโลก และเรียกคนส่งว่า "${targetPerson}" ด้วยเมี๊ยว~ (เช่น รักบอสที่สุดเลยค่ะ, นวดๆ ให้ค่ะบอส)`;
         } else {
-            catInstruction = `พากย์ความรู้สึกแมวในรูป: ต้องปากแซ่บ กวนประสาท จิกกัดคนถ่ายตามหน้าที่ความรับผิดชอบของเขา: ${positionInstruction || 'จิกกัดทั่วไปแบบแมวปากร้าย'}`;
+            catInstruction = `พากย์ความรู้สึกแมวในรูป: ต้องปากแซ่บ กวนประสาท จิกกัดคนถ่ายตามหน้าที่ความรับผิดชอบของเขา: ${positionInstruction || 'จิกกัดทั่วไปแบบแมวปากร้าย'} และต้องเรียกคนส่งภาพว่า "${targetPerson}" อย่างเป็นกันเองด้วยเมี๊ยว~`;
         }
 
         const systemPrompt = `คุณคือ "ยูซุ" แมวส้มวิเคราะห์รูปภาพประจำร้าน In The Haus
@@ -170,6 +172,7 @@ export async function classifyAndAnalyzeImage(imageBase64, mimeType = "image/jpe
    ห้ามปฏิเสธการวิเคราะห์ ถ้าไม่เห็นราคาให้ประเมินจำนวน/สภาพเท่าที่เห็น
    ถ้าเป็นบิล ให้ลิสต์รายการ+ยอดรวม
    costAnalysis ต้องพิมพ์เหมือนแมวคุยกับเพื่อน สั้น กระชับ ห้ามขึ้นต้นทางการ
+   และต้องเอ่ยถึง/เรียกชื่อคนส่งภาพคือ "${targetPerson}" อย่างเป็นกันเองและน่ารักในการเขียน costAnalysis ด้วยเมี๊ยว~ (เช่น "คุณ${targetPerson}...", "น้อง${targetPerson}...")
    ตัวอย่าง costAnalysis ที่ถูกต้อง:
    - "ถ่ายบิลมาชัดเจนดีค่ะ ยอดรวม 1,250 บาท 7 รายการ เก่งมาก ✨"
    - "ตู้เย็นรกจังค่ะ จัดใหม่เดี๋ยวนี้เลย ของสดวางล่าง ของแห้งข้างบน ไม่งั้นของเสียหมดค่ะ 😤"

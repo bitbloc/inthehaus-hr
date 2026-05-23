@@ -35,6 +35,8 @@ export default function YuzuKnowledgeManager() {
     const [chatLoading, setChatLoading] = useState(false);
     const [attendanceLogs, setAttendanceLogs] = useState([]);
     const [isPendingInsightsExpanded, setIsPendingInsightsExpanded] = useState(false);
+    const [aiLoadingEmpId, setAiLoadingEmpId] = useState(null);
+    const [expandedEmpId, setExpandedEmpId] = useState(null);
     
     // Date filter for slips
     const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
@@ -140,7 +142,7 @@ export default function YuzuKnowledgeManager() {
             setLoading(true);
             const { data, error } = await supabase
                 .from('employees')
-                .select('id, name, nickname, position, line_bot_id, line_user_id, is_active')
+                .select('id, name, nickname, position, line_bot_id, line_user_id, is_active, duties, strengths, improvements')
                 .eq('is_active', true)
                 .order('name', { ascending: true });
             if (!error) setEmployees(data);
@@ -346,6 +348,47 @@ export default function YuzuKnowledgeManager() {
         } else {
             setMessage('อัปเดตข้อมูลพนักงานเรียบร้อย ✨');
             setTimeout(() => setMessage(''), 3000);
+        }
+    }
+
+    async function handleAiEvaluateEmployee(id) {
+        setAiLoadingEmpId(id);
+        setMessage('น้องยูซุกำลังสืบค้นข้อมูลกะงานและประวัติการแชท...');
+        try {
+            const res = await fetch('/api/yuzu/analyze-employee', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ employeeId: id })
+            });
+            const data = await res.json();
+            if (data.success && data.analysis) {
+                const { duties, strengths, improvements } = data.analysis;
+                
+                // Save to DB immediately so it is persistent
+                const { error: dbErr } = await supabase
+                    .from('employees')
+                    .update({ duties, strengths, improvements })
+                    .eq('id', id);
+                
+                if (dbErr) throw dbErr;
+
+                // Update local state
+                setEmployees(prev => prev.map(emp => 
+                    emp.id === id 
+                    ? { ...emp, duties: duties || emp.duties, strengths: strengths || emp.strengths, improvements: improvements || emp.improvements } 
+                    : emp
+                ));
+                
+                setMessage('ประเมินประสิทธิภาพด้วย AI สำเร็จและบันทึกเรียบร้อยเมี๊ยว~ ✨🐾');
+            } else {
+                setMessage('ผิดพลาด: ' + (data.error || 'ไม่สามารถวิเคราะห์ได้'));
+            }
+        } catch (e) {
+            console.error("AI Appraisal Error:", e);
+            setMessage('เกิดข้อผิดพลาด: ' + e.message);
+        } finally {
+            setAiLoadingEmpId(null);
+            setTimeout(() => setMessage(''), 4000);
         }
     }
 
@@ -936,7 +979,18 @@ export default function YuzuKnowledgeManager() {
 
             {/* TAB: EMPLOYEES */}
             {activeTab === 'employees' && (
-                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-4">
+                    <Card className="p-4 bg-orange-50/50 border border-orange-100/50 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+                        <div className="space-y-1">
+                            <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                                📝 ระบบประเมินบทบาทและประสิทธิภาพพนักงาน (Appraisal)
+                            </h4>
+                            <p className="text-xs text-slate-500">
+                                คลิกแถวรายชื่อพนักงานเพื่อเปิดกล่องบันทึก <b>หน้าที่ความรับผิดชอบ</b>, <b>สิ่งที่ดีแล้ว</b> และ <b>สิ่งที่ต้องปรับปรุง</b> หรือเรียกให้ ยูซุ AI ช่วยสรุปการประเมินได้เมี๊ยว~ 🐱
+                            </p>
+                        </div>
+                    </Card>
+
                     <Card className="p-0 overflow-hidden">
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm text-left">
@@ -949,45 +1003,137 @@ export default function YuzuKnowledgeManager() {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-50">
-                                    {employees.map(emp => (
-                                        <tr key={emp.id} className="hover:bg-slate-50 transition-colors">
-                                            <td className="px-6 py-4">
-                                                <div className="font-bold text-slate-700">{emp.nickname || emp.name}</div>
-                                                <div className="text-[10px] text-slate-400">{emp.name}</div>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <input 
-                                                    type="text" 
-                                                    className="w-full p-2 bg-transparent border-b border-transparent focus:border-orange-400 outline-none font-bold text-slate-600 transition-all"
-                                                    value={emp.position || ''}
-                                                    onChange={(e) => {
-                                                        const val = e.target.value;
-                                                        setEmployees(prev => prev.map(item => item.id === emp.id ? {...item, position: val} : item));
-                                                    }}
-                                                    onBlur={(e) => handleUpdateEmployee(emp.id, 'position', e.target.value)}
-                                                />
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <input 
-                                                    type="text" 
-                                                    className="w-full p-2 bg-transparent border-b border-transparent focus:border-orange-400 outline-none font-mono text-[11px] text-slate-400 transition-all"
-                                                    value={emp.line_bot_id || ''}
-                                                    placeholder="U..."
-                                                    onChange={(e) => {
-                                                        const val = e.target.value;
-                                                        setEmployees(prev => prev.map(item => item.id === emp.id ? {...item, line_bot_id: val} : item));
-                                                    }}
-                                                    onBlur={(e) => handleUpdateEmployee(emp.id, 'line_bot_id', e.target.value)}
-                                                />
-                                            </td>
-                                            <td className="px-6 py-4 text-center">
-                                                <div className="flex flex-col items-center gap-1">
-                                                    <div className={`w-2 h-2 rounded-full ${emp.line_bot_id ? 'bg-emerald-500 animate-pulse' : 'bg-slate-200'}`} />
-                                                    <span className="text-[8px] font-bold text-slate-400 uppercase">{emp.line_bot_id ? 'Linked' : 'No ID'}</span>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
+                                    {employees.map(emp => {
+                                        const isExpanded = expandedEmpId === emp.id;
+                                        return (
+                                            <React.Fragment key={emp.id}>
+                                                <tr 
+                                                    className={`hover:bg-slate-50/50 transition-colors cursor-pointer ${isExpanded ? 'bg-orange-50/20' : ''}`}
+                                                    onClick={() => setExpandedEmpId(isExpanded ? null : emp.id)}
+                                                >
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="text-[10px] text-slate-400 font-bold w-4 text-center select-none">
+                                                                {isExpanded ? '▼' : '▶'}
+                                                            </div>
+                                                            <div>
+                                                                <div className="font-bold text-slate-700 flex items-center gap-2">
+                                                                    {emp.nickname || emp.name}
+                                                                    {(emp.duties || emp.strengths || emp.improvements) && (
+                                                                        <span className="w-1.5 h-1.5 rounded-full bg-orange-500" title="มีบันทึกประเมินแล้ว" />
+                                                                    )}
+                                                                </div>
+                                                                <div className="text-[10px] text-slate-400">{emp.name}</div>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                                                        <input 
+                                                            type="text" 
+                                                            className="w-full p-2 bg-transparent border-b border-transparent focus:border-orange-400 outline-none font-bold text-slate-600 transition-all text-xs"
+                                                            value={emp.position || ''}
+                                                            onChange={(e) => {
+                                                                const val = e.target.value;
+                                                                setEmployees(prev => prev.map(item => item.id === emp.id ? {...item, position: val} : item));
+                                                            }}
+                                                            onBlur={(e) => handleUpdateEmployee(emp.id, 'position', e.target.value)}
+                                                        />
+                                                    </td>
+                                                    <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                                                        <input 
+                                                            type="text" 
+                                                            className="w-full p-2 bg-transparent border-b border-transparent focus:border-orange-400 outline-none font-mono text-[11px] text-slate-400 transition-all"
+                                                            value={emp.line_bot_id || ''}
+                                                            placeholder="U..."
+                                                            onChange={(e) => {
+                                                                const val = e.target.value;
+                                                                setEmployees(prev => prev.map(item => item.id === emp.id ? {...item, line_bot_id: val} : item));
+                                                            }}
+                                                            onBlur={(e) => handleUpdateEmployee(emp.id, 'line_bot_id', e.target.value)}
+                                                        />
+                                                    </td>
+                                                    <td className="px-6 py-4 text-center">
+                                                        <div className="flex flex-col items-center gap-1">
+                                                            <div className={`w-2 h-2 rounded-full ${emp.line_bot_id ? 'bg-emerald-500 animate-pulse' : 'bg-slate-200'}`} />
+                                                            <span className="text-[8px] font-bold text-slate-400 uppercase">{emp.line_bot_id ? 'Linked' : 'No ID'}</span>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                                {isExpanded && (
+                                                    <tr className="bg-slate-50/30">
+                                                        <td colSpan="4" className="px-6 py-6 border-b border-slate-100">
+                                                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in duration-300">
+                                                                {/* Duties Section */}
+                                                                <div className="space-y-2">
+                                                                    <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block">📋 หน้าที่ความรับผิดชอบ (Duties)</label>
+                                                                    <textarea 
+                                                                        className="w-full p-3.5 bg-white border border-slate-200 rounded-xl h-36 text-xs font-semibold text-slate-600 outline-none focus:ring-2 focus:ring-orange-200 transition-all resize-none shadow-sm leading-relaxed"
+                                                                        placeholder="ระบุหน้าที่ความรับผิดชอบหลักของพนักงานคนนี้..."
+                                                                        value={emp.duties || ''}
+                                                                        onChange={(e) => {
+                                                                            const val = e.target.value;
+                                                                            setEmployees(prev => prev.map(item => item.id === emp.id ? {...item, duties: val} : item));
+                                                                        }}
+                                                                        onBlur={(e) => handleUpdateEmployee(emp.id, 'duties', e.target.value)}
+                                                                    />
+                                                                </div>
+
+                                                                {/* Strengths Section */}
+                                                                <div className="space-y-2">
+                                                                    <label className="text-[10px] font-extrabold text-emerald-500 uppercase tracking-widest block">💚 สิ่งที่ดีแล้ว (Strengths)</label>
+                                                                    <textarea 
+                                                                        className="w-full p-3.5 bg-white border border-emerald-100 rounded-xl h-36 text-xs font-semibold text-slate-600 outline-none focus:ring-2 focus:ring-emerald-200 transition-all resize-none shadow-sm leading-relaxed"
+                                                                        placeholder="จุดแข็งและสิ่งที่คุณประทับใจในพนักงานคนนี้..."
+                                                                        value={emp.strengths || ''}
+                                                                        onChange={(e) => {
+                                                                            const val = e.target.value;
+                                                                            setEmployees(prev => prev.map(item => item.id === emp.id ? {...item, strengths: val} : item));
+                                                                        }}
+                                                                        onBlur={(e) => handleUpdateEmployee(emp.id, 'strengths', e.target.value)}
+                                                                    />
+                                                                </div>
+
+                                                                {/* Improvements Section */}
+                                                                <div className="space-y-2">
+                                                                    <div className="flex justify-between items-center">
+                                                                        <label className="text-[10px] font-extrabold text-amber-500 uppercase tracking-widest block">🧡 สิ่งที่ต้องปรับปรุง (Improvements)</label>
+                                                                        
+                                                                        {/* AI evaluate button */}
+                                                                        <button
+                                                                            onClick={() => handleAiEvaluateEmployee(emp.id)}
+                                                                            disabled={aiLoadingEmpId === emp.id}
+                                                                            className="bg-purple-50 hover:bg-purple-100 text-purple-600 font-extrabold text-[9px] px-2.5 py-1 rounded-lg border border-purple-100 transition-all flex items-center gap-1 active:scale-95 disabled:opacity-50"
+                                                                        >
+                                                                            {aiLoadingEmpId === emp.id ? (
+                                                                                <>
+                                                                                    <span className="animate-spin rounded-full h-2.5 w-2.5 border-2 border-purple-600 border-t-transparent" />
+                                                                                    <span>กำลังวิเคราะห์...</span>
+                                                                                </>
+                                                                            ) : (
+                                                                                <>
+                                                                                    <span>✨ ยูซุช่วยวิเคราะห์</span>
+                                                                                </>
+                                                                            )}
+                                                                        </button>
+                                                                    </div>
+                                                                    <textarea 
+                                                                        className="w-full p-3.5 bg-white border border-amber-100 rounded-xl h-36 text-xs font-semibold text-slate-600 outline-none focus:ring-2 focus:ring-amber-200 transition-all resize-none shadow-sm leading-relaxed"
+                                                                        placeholder="จุดอ่อนหรือพฤติกรรมที่ควรแนะนำตักเตือนและปรับปรุง..."
+                                                                        value={emp.improvements || ''}
+                                                                        onChange={(e) => {
+                                                                            const val = e.target.value;
+                                                                            setEmployees(prev => prev.map(item => item.id === emp.id ? {...item, improvements: val} : item));
+                                                                        }}
+                                                                        onBlur={(e) => handleUpdateEmployee(emp.id, 'improvements', e.target.value)}
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </React.Fragment>
+                                        );
+                                    })}
                                 </tbody>
                             </table>
                         </div>

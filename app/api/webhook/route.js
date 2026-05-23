@@ -277,12 +277,29 @@ export async function POST(request) {
             const configs = await getYuzuConfigs();
             const isBoss = await checkIsBoss(userId);
 
-            let positionInstruction = "";
-            let empDataForVision = null;
+            const empData = await getEmployeeByLineId(userId);
+            let friendlyName = empData ? (empData.nickname || empData.name) : null;
 
+            // Resolve specific boss role
+            let bossRole = null;
+            if (userId === configs.father_uid) {
+              bossRole = "คุณพ่อ";
+              friendlyName = friendlyName || "คุณพ่อ";
+            } else if (userId === configs.mother_uid) {
+              bossRole = "คุณแม่";
+              friendlyName = friendlyName || "คุณแม่";
+            } else if (isBoss) {
+              bossRole = "บอส";
+              friendlyName = friendlyName || "บอส";
+            }
+
+            if (!friendlyName) {
+              friendlyName = "พนักงาน";
+            }
+
+            let positionInstruction = "";
             if (!isBoss) {
-              empDataForVision = await getEmployeeByLineId(userId);
-              const position = empDataForVision?.position || "ทีมงาน";
+              const position = empData?.position || "ทีมงาน";
               
               if (position.includes("Bar") || position.includes("Floor")) {
                 positionInstruction = configs['role_instruction_Bar&Floor'];
@@ -295,14 +312,8 @@ export async function POST(request) {
 
             const context = await getIngredientPrices();
 
-            // Resolve specific boss role
-            let bossRole = null;
-            if (userId === configs.father_uid) bossRole = "คุณพ่อ";
-            else if (userId === configs.mother_uid) bossRole = "คุณแม่";
-            else if (isBoss) bossRole = "บอส";
-
-            // Refined Vision Logic
-            const result = await classifyAndAnalyzeImage(base64, "image/jpeg", context, bossRole, positionInstruction);
+            // Refined Vision Logic (passing friendlyName)
+            const result = await classifyAndAnalyzeImage(base64, "image/jpeg", context, bossRole, positionInstruction, friendlyName);
 
             await saveMessage(groupId, userId, 'user', result.shortDescription, 'image_description');
 
