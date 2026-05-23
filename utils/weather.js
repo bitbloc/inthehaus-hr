@@ -45,7 +45,7 @@ export async function getSchemaWeather(lat = SHOP_LAT, lon = SHOP_LONG) {
             forecast: {
                 tempMax: Math.round(daily.temperatureMax),
                 tempMin: Math.round(daily.temperatureMin),
-                chanceOfRain: daily.precipitationProbability,
+                chanceOfRain: daily.precipitationProbabilityMax !== undefined ? daily.precipitationProbabilityMax : (daily.precipitationProbabilityAvg !== undefined ? daily.precipitationProbabilityAvg : 0),
                 condition: getThaiCondition(daily.weatherCodeMax || daily.weatherCodeMin) // Simplified
             }
         };
@@ -71,6 +71,227 @@ export function formatWeatherMessage(weather) {
 โอกาสฝนตก: ${weather.forecast.chanceOfRain}%
 สภาพการณ์โดยรวม: ${weather.forecast.condition}`;
 }
+
+export function formatWeatherFlex(weather) {
+    if (!weather) return null;
+
+    return {
+        type: "flex",
+        altText: `🌤️ รายงานสภาพอากาศ: ปัจจุบัน ${weather.current.temp}°C - ${weather.current.condition}`,
+        contents: {
+            type: "bubble",
+            size: "mega",
+            styles: {
+                header: {
+                    backgroundColor: "#1e293b"
+                },
+                body: {
+                    backgroundColor: "#0f172a"
+                }
+            },
+            header: {
+                type: "box",
+                layout: "vertical",
+                contents: [
+                    {
+                        type: "text",
+                        text: "🌤️ รายงานสภาพอากาศ (In The Haus)",
+                        weight: "bold",
+                        color: "#ffffff",
+                        size: "md"
+                    },
+                    {
+                        type: "text",
+                        text: "ข้อมูลเรียลไทม์จากระบบพยากรณ์อากาศ",
+                        color: "#94a3b8",
+                        size: "xs",
+                        margin: "xs"
+                    }
+                ]
+            },
+            body: {
+                type: "box",
+                layout: "vertical",
+                spacing: "md",
+                contents: [
+                    {
+                        type: "box",
+                        layout: "horizontal",
+                        contents: [
+                            {
+                                type: "box",
+                                layout: "vertical",
+                                flex: 3,
+                                contents: [
+                                    {
+                                        type: "text",
+                                        text: "อุณหภูมิปัจจุบัน",
+                                        size: "xs",
+                                        color: "#94a3b8"
+                                    },
+                                    {
+                                        type: "text",
+                                        text: `${weather.current.temp}°C`,
+                                        size: "3xl",
+                                        weight: "bold",
+                                        color: "#ffffff",
+                                        margin: "sm"
+                                    },
+                                    {
+                                        type: "text",
+                                        text: weather.current.condition,
+                                        size: "sm",
+                                        color: "#38bdf8",
+                                        weight: "bold",
+                                        margin: "xs"
+                                    }
+                                ]
+                            },
+                            {
+                                type: "box",
+                                layout: "vertical",
+                                flex: 3,
+                                spacing: "md",
+                                contents: [
+                                    {
+                                        type: "box",
+                                        layout: "horizontal",
+                                        contents: [
+                                            {
+                                                type: "text",
+                                                text: "ความชื้น",
+                                                size: "xs",
+                                                color: "#64748b",
+                                                flex: 1
+                                            },
+                                            {
+                                                type: "text",
+                                                text: `${weather.current.humidity}%`,
+                                                size: "xs",
+                                                color: "#e2e8f0",
+                                                align: "end",
+                                                weight: "bold",
+                                                flex: 1
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        type: "box",
+                                        layout: "horizontal",
+                                        contents: [
+                                            {
+                                                type: "text",
+                                                text: "ความเร็วลม",
+                                                size: "xs",
+                                                color: "#64748b",
+                                                flex: 1
+                                            },
+                                            {
+                                                type: "text",
+                                                text: `${weather.current.wind} m/s`,
+                                                size: "xs",
+                                                color: "#e2e8f0",
+                                                align: "end",
+                                                weight: "bold",
+                                                flex: 1
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        type: "separator",
+                        color: "#334155",
+                        margin: "md"
+                    },
+                    {
+                        type: "box",
+                        layout: "vertical",
+                        spacing: "sm",
+                        contents: [
+                            {
+                                type: "text",
+                                text: "🔮 พยากรณ์วันนี้",
+                                weight: "bold",
+                                size: "sm",
+                                color: "#f1f5f9"
+                            },
+                            {
+                                type: "box",
+                                layout: "horizontal",
+                                contents: [
+                                    {
+                                        type: "text",
+                                        text: "สูงสุด / ต่ำสุด",
+                                        size: "xs",
+                                        color: "#94a3b8",
+                                        flex: 2
+                                    },
+                                    {
+                                        type: "text",
+                                        text: `${weather.forecast.tempMax}°C / ${weather.forecast.tempMin}°C`,
+                                        size: "xs",
+                                        color: "#ffffff",
+                                        align: "end",
+                                        weight: "bold",
+                                        flex: 2
+                                    }
+                                ]
+                            },
+                            {
+                                type: "box",
+                                layout: "horizontal",
+                                contents: [
+                                    {
+                                        type: "text",
+                                        text: "โอกาสฝนตก",
+                                        size: "xs",
+                                        color: "#94a3b8",
+                                        flex: 2
+                                    },
+                                    {
+                                        type: "text",
+                                        text: `${weather.forecast.chanceOfRain}%`,
+                                        size: "xs",
+                                        color: "#38bdf8",
+                                        align: "end",
+                                        weight: "bold",
+                                        flex: 2
+                                    }
+                                ]
+                            },
+                            {
+                                type: "box",
+                                layout: "horizontal",
+                                contents: [
+                                    {
+                                        type: "text",
+                                        text: "สภาพการณ์โดยรวม",
+                                        size: "xs",
+                                        color: "#94a3b8",
+                                        flex: 2
+                                    },
+                                    {
+                                        type: "text",
+                                        text: weather.forecast.condition,
+                                        size: "xs",
+                                        color: "#ffffff",
+                                        align: "end",
+                                        weight: "bold",
+                                        flex: 2
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    };
+}
+
 
 /**
  * Get compact weather string for Yuzu context injection (cached 30 min)

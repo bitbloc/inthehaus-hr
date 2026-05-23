@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { Client } from '@line/bot-sdk';
-import { getSchemaWeather, formatWeatherMessage } from '../../../utils/weather';
+import { getSchemaWeather, formatWeatherMessage, formatWeatherFlex } from '../../../utils/weather';
 import { getGeminiResponse, classifyAndAnalyzeImage, transcribeAudio } from '../../../utils/gemini';
 import { getIngredientPrices } from '../../../utils/price';
 import { saveMessage, cleanupOldHistory, getEmployeeByLineId, getYuzuConfigs, checkIsBoss } from '../../../utils/memory';
@@ -53,8 +53,12 @@ export async function POST(request) {
           // 1. Weather check (local helper)
           else if (text === 'อากาศ' || text === 'weather') {
             const weatherData = await getSchemaWeather();
-            const replyText = formatWeatherMessage(weatherData);
-            await client.replyMessage(event.replyToken, { type: 'text', text: replyText });
+            if (!weatherData) {
+              await client.replyMessage(event.replyToken, { type: 'text', text: 'ไม่สามารถดึงข้อมูลสภาพอากาศได้ในขณะนี้' });
+            } else {
+              const flexMsg = formatWeatherFlex(weatherData);
+              await client.replyMessage(event.replyToken, flexMsg);
+            }
             handledLocally = true;
           } 
           

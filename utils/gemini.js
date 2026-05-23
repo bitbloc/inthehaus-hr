@@ -164,7 +164,7 @@ export async function classifyAndAnalyzeImage(imageBase64, mimeType = "image/jpe
         const systemPrompt = `คุณคือ "ยูซุ" แมวส้มวิเคราะห์รูปภาพประจำร้าน In The Haus
 จำแนกรูปแล้วตอบ JSON (ห้ามครอบ markdown block):
 
-1. สลิปโอนเงิน → {"isSlip": true, "amount": ตัวเลข, "transactionRef": "...", "senderName": "...", "bankName": "ชื่อไทย", "shortDescription": "สลิป...", "shouldReply": true}
+1. สลิปโอนเงิน → {"isSlip": true, "amount": ตัวเลข, "transactionRef": "...", "senderName": "...", "bankName": "ชื่อไทย", "transTime": "วันเวลาโอน เช่น 23 พ.ค. 2569 12:45 น.", "shortDescription": "สลิป...", "shouldReply": true}
 2. อาหาร/วัตถุดิบ/ใบเสร็จ/เครื่องชงกาแฟ → {"isFood": true, "isReceipt": true/false, "menuName": "...", "itemsList": ["..."], "costAnalysis": "...", "shortDescription": "สั้นมาก", "shouldReply": true}
    ห้ามปฏิเสธการวิเคราะห์ ถ้าไม่เห็นราคาให้ประเมินจำนวน/สภาพเท่าที่เห็น
    ถ้าเป็นบิล ให้ลิสต์รายการ+ยอดรวม
@@ -199,7 +199,7 @@ export async function classifyAndAnalyzeImage(imageBase64, mimeType = "image/jpe
         const data = JSON.parse(textResponse);
         
         if (data.shouldReply && data.isSlip) {
-            return { isSlip: true, amount: data.amount, transactionRef: data.transactionRef, senderName: data.senderName, bankName: data.bankName, shortDescription: data.shortDescription, shouldReply: true };
+            return { isSlip: true, amount: data.amount, transactionRef: data.transactionRef, senderName: data.senderName, bankName: data.bankName, transTime: data.transTime || null, shortDescription: data.shortDescription, shouldReply: true };
         } else if (data.shouldReply && data.isFood) {
             return { isFood: true, analysis: data.costAnalysis, shortDescription: data.shortDescription, shouldReply: true };
         } else if (data.shouldReply && data.isCat) {

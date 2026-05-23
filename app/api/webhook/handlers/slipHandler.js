@@ -132,6 +132,22 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
                    type: 'box',
                    layout: 'horizontal',
                    contents: [
+                     { type: 'text', text: 'วันเวลาโอน', size: 'sm', color: '#8c8c8c', flex: 1 },
+                     { type: 'text', text: result.transTime || 'ไม่ระบุ', size: 'sm', color: '#333333', align: 'end', flex: 2, wrap: true }
+                   ]
+                 },
+                 {
+                   type: 'box',
+                   layout: 'horizontal',
+                   contents: [
+                     { type: 'text', text: 'รหัสอ้างอิง', size: 'sm', color: '#8c8c8c', flex: 1 },
+                     { type: 'text', text: result.transactionRef || 'ไม่ระบุ', size: 'sm', color: '#333333', align: 'end', flex: 2, wrap: true }
+                   ]
+                 },
+                 {
+                   type: 'box',
+                   layout: 'horizontal',
+                   contents: [
                      { type: 'text', text: 'ผู้ส่งสลิป', size: 'sm', color: '#8c8c8c', flex: 1 },
                      { type: 'text', text: senderName, size: 'sm', color: '#333333', align: 'end', flex: 2, wrap: true }
                    ]
