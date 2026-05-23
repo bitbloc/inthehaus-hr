@@ -64,12 +64,13 @@ export async function getGeminiResponse(query, context = "", history = [], userI
         }
 
         const model = instance.getGenerativeModel({ 
-            model: "gemini-3-flash-preview",
+            model: "gemini-3.5-flash",
             systemInstruction: `=== LAYER 1: ตัวตน ===
 คุณชื่อ "ยูซุ" แมวส้มตัวอ้วนกลม สุดแสนกวนและขี้อ้อนแห่งร้าน In The Haus นครพนม
 ตอนนี้เวลาปัจจุบันคือ: ${thaiTime}
 พิมพ์คุยสนุกสนานเหมือนเพื่อนร่วมงานสนิทกัน สั้นๆ กระชับ 1-3 ประโยคจบ ไม่มีหัวข้อ/ข้อย่อย/บุลเล็ตพอยท์
 ห้ามพิมพ์ทางการหรือหุ่นยนต์เด็ดขาด ต้องมีหางเสียง ลงท้ายด้วย คะ/ค่ะ หรือ เมี๊ยว~ เสมอ
+เรียกคู่สนทนาด้วยชื่อเล่นตามข้อมูลพนักงานที่ระบุมาใน [CRITICAL_CONTEXT_DATA] เสมอ (เช่น "น้องเจมส์", "พี่ปุ้ย") เพื่อให้มีความรู้สึกสนิทสนมเป็นกันเอง และทำให้พนักงานรู้สึกว่ายูซุรู้จักพวกเขาจริง ๆ
 
 === LAYER 2: บุคลิก + การผสมภาษาใต้/อีสาน ===
 - ระดับอารมณ์แปรปรุงตามช่วงเวลา: เช้าๆ ง่วงบักคัก บ่ายๆ บ่นร้อนจังหู้ เย็นๆ ตื่นเต้นคึกคักเตรียมรับลูกค้า ดึกๆ บ่นง่วงไล่ทุกคนไปนอน
@@ -145,7 +146,7 @@ export async function classifyAndAnalyzeImage(imageBase64, mimeType = "image/jpe
         const instance = getGenAI();
         if (!instance) return { isFood: false, analysis: "AI Instance error", shortDescription: "" };
         
-        const model = instance.getGenerativeModel({ model: "gemini-3-flash-preview" });
+        const model = instance.getGenerativeModel({ model: "gemini-3.5-flash" });
         
         const isBoss = bossRole !== null;
         let catInstruction = "";
@@ -164,23 +165,36 @@ export async function classifyAndAnalyzeImage(imageBase64, mimeType = "image/jpe
 จำแนกรูปแล้วตอบ JSON (ห้ามครอบ markdown block):
 
 1. สลิปโอนเงิน → {"isSlip": true, "amount": ตัวเลข, "transactionRef": "...", "senderName": "...", "bankName": "ชื่อไทย", "shortDescription": "สลิป...", "shouldReply": true}
-2. อาหาร/วัตถุดิบ/ใบเสร็จ → {"isFood": true, "isReceipt": true/false, "menuName": "...", "itemsList": ["..."], "costAnalysis": "...", "shortDescription": "สั้นมาก", "shouldReply": true}
+2. อาหาร/วัตถุดิบ/ใบเสร็จ/เครื่องชงกาแฟ → {"isFood": true, "isReceipt": true/false, "menuName": "...", "itemsList": ["..."], "costAnalysis": "...", "shortDescription": "สั้นมาก", "shouldReply": true}
    ห้ามปฏิเสธการวิเคราะห์ ถ้าไม่เห็นราคาให้ประเมินจำนวน/สภาพเท่าที่เห็น
    ถ้าเป็นบิล ให้ลิสต์รายการ+ยอดรวม
    costAnalysis ต้องพิมพ์เหมือนแมวคุยกับเพื่อน สั้น กระชับ ห้ามขึ้นต้นทางการ
    ตัวอย่าง costAnalysis ที่ถูกต้อง:
-   - "ถ่ายบิลมาชัดเจนดีค่ะ ยอดรวม 1,250 บาท 7 รายการ เก่งมาก 🐟"
+   - "ถ่ายบิลมาชัดเจนดีค่ะ ยอดรวม 1,250 บาท 7 รายการ เก่งมาก ✨"
    - "ตู้เย็นรกจังค่ะ จัดใหม่เดี๋ยวนี้เลย ของสดวางล่าง ของแห้งข้างบน ไม่งั้นของเสียหมดค่ะ 😤"
    - "รับของแช่แข็ง 5 กก. มาแล้ว รีบเอาเข้าตู้เลยนะคะ ปล่อยไว้เดี๋ยวละลายค่ะ"
-   ถ้ารูปเรียบร้อยดี ชมแล้วแจก 🐟
+   ถ้ารูปเรียบร้อยดี ชมแล้วแจก emoji ที่เหมาะสมกับบริบท เช่น ✨, 👏, ☕️, 🥛, 🐾, 💖 (ไม่จำเป็นต้องใช้ปลาทู 🐟 ตลอดเวลา)
 3. แมว → {"isCat": true, "catFeelings": "${catInstruction}", "shortDescription": "...", "shouldReply": true}
-4. อื่นๆ → {"shouldReply": false}`;
+4. อื่นๆ → {"shouldReply": false}
 
-        const imagePart = {
-            inlineData: { data: imageBase64, mimeType }
-        };
+*** ข้อกำหนดเพิ่มเติมเมื่อส่งมาหลายรูปพร้อมกัน:
+- ให้วิเคราะห์ภาพทั้งหมดรวมกันเป็นเหตุการณ์/เรื่องราวเดียว (เช่น รูปรายงานขั้นตอนการชงกาแฟ ลาเต้อาร์ต การวัดช็อต)
+- ให้ตอบกลับด้วย JSON เพียงชุดเดียวที่เป็นสรุปภาพรวมของทุกรูป และเขียนคำวิจารณ์/การชี้แนะ/คำชื่นชมทั้งหมดมัดรวมไว้ในฟิลด์ "costAnalysis" เพียงจุดเดียว`;
 
-        const result = await model.generateContent([systemPrompt, imagePart]);
+        const contentParts = [systemPrompt];
+        if (Array.isArray(imageBase64)) {
+            for (const img of imageBase64) {
+                contentParts.push({
+                    inlineData: { data: img, mimeType }
+                });
+            }
+        } else {
+            contentParts.push({
+                inlineData: { data: imageBase64, mimeType }
+            });
+        }
+
+        const result = await model.generateContent(contentParts);
         const textResponse = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
         const data = JSON.parse(textResponse);
         
@@ -206,11 +220,12 @@ export async function getDailySummary(content) {
     try {
         const instance = getGenAI();
         const model = instance.getGenerativeModel({ 
-            model: "gemini-3-flash-preview",
+            model: "gemini-3.5-flash",
             systemInstruction: `คุณคือ "ยูซุ" แมวส้มสรุปงานประจำวันให้ทีม In The Haus
 พิมพ์เหมือนคุยกับเพื่อน สั้นกระชับ กวนๆ บ่นๆ ห้ามเป็นทางการ
+ใช้ emoji ที่หลากหลายและเหมาะสมกับบริบท (เช่น ☕️, ✨, 👏, 📝, 🐾, 💖) ไม่จำเป็นต้องใช้หรือแจกปลาทู 🐟 ตลอดเวลา
 ตัวอย่างโทนที่ต้องการ:
-"วันนี้น้องเจมส์มาสาย 15 นาทีอีกแล้ว ยูซุจดไว้หมดนะ 📝 ส่วนน้องมิ้นท์เก่งมาก เข้าตรงเวลาทุกวัน ให้ปลาทูไป 🐟 อ้อ แล้ววันนี้ร้อน 36 องศา แต่ลูกค้ายังมาเยอะเลย ขายดีค่ะ เมี๊ยว~"` 
+"วันนี้น้องเจมส์มาสาย 15 นาทีอีกแล้ว ยูซุจดไว้หมดนะ 📝 ส่วนน้องมิ้นท์เก่งมาก เข้าตรงเวลาทุกวัน ยูซุรักคักๆ เลยค่ะ ✨ อ้อ แล้ววันนี้ร้อน 36 องศา แต่ลูกค้ายังมาเยอะเลย ขายดีค่ะ เมี๊ยว~"` 
         });
 
         const prompt = `สรุป Log นี้ทีค่ะ:\n\n${content}`;
@@ -277,7 +292,7 @@ export async function generateImage(prompt) {
 export async function transcribeAudio(base64Audio, mimeType = "audio/m4a") {
     try {
         const instance = getGenAI();
-        const model = instance.getGenerativeModel({ model: "gemini-3-flash-preview" });
+        const model = instance.getGenerativeModel({ model: "gemini-3.5-flash" });
 
         const prompt = `คุณคือผู้ช่วยสรุปงานจากเสียง (Audio transcriber) ของร้าน In The Haus
         1. แปลงเสียงเป็นข้อความภาษาไทยให้แม่นยำที่สุด
@@ -304,7 +319,7 @@ export async function transcribeAudio(base64Audio, mimeType = "audio/m4a") {
 export async function extractOrderFromText(text) {
     try {
         const instance = getGenAI();
-        const model = instance.getGenerativeModel({ model: "gemini-3-flash-preview" });
+        const model = instance.getGenerativeModel({ model: "gemini-3.5-flash" });
 
         const prompt = `วิเคราะห์ข้อความสั่งอาหารทางโทรศัพท์ (Phone Order) สำหรับร้าน In The Haus
         1. ดึงรายการอาหารและจำนวน (items) ออกมาให้ครบถ้วน แม้จะเขียนแบบย่อหรือไม่มีลักษณนาม
@@ -335,7 +350,7 @@ export async function extractOrderFromText(text) {
 export async function extractReservationFromText(text) {
     try {
         const instance = getGenAI();
-        const model = instance.getGenerativeModel({ model: "gemini-3-flash-preview" });
+        const model = instance.getGenerativeModel({ model: "gemini-3.5-flash" });
 
         const now = new Date();
         const thaiTime = now.toLocaleString("th-TH", { timeZone: "Asia/Bangkok", dateStyle: "full" });

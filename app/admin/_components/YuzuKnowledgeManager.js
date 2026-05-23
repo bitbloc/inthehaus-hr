@@ -24,12 +24,79 @@ export default function YuzuKnowledgeManager() {
     const [message, setMessage] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
     const [isFlowVisible, setIsFlowVisible] = useState(true);
+
+    // New States for AI Operations Dashboard
+    const [aiBrief, setAiBrief] = useState('');
+    const [briefLoading, setBriefLoading] = useState(false);
+    const [chatMessages, setChatMessages] = useState([
+        { role: 'model', content: 'สวัสดีค่ะเจ้านาย! ยูซุ แมวส้มแสนรู้ประจำร้าน In The Haus พร้อมให้บริการแล้วค่ะ มีอะไรเกี่ยวกับข้อมูลร้าน กะงาน หรืออารมณ์ของพนักงานที่อยากคุยกับยูซุ แหลงมาได้เลยนะคะเมี๊ยว~ 🐱🍊' }
+    ]);
+    const [chatInput, setChatInput] = useState('');
+    const [chatLoading, setChatLoading] = useState(false);
+    const [attendanceLogs, setAttendanceLogs] = useState([]);
+    const [isPendingInsightsExpanded, setIsPendingInsightsExpanded] = useState(false);
     
     // Date filter for slips
     const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
 
+    async function handleGenerateBrief() {
+        setBriefLoading(true);
+        try {
+            const res = await fetch('/api/yuzu/brief');
+            const data = await res.json();
+            if (data.success) {
+                setAiBrief(data.brief);
+            } else {
+                setAiBrief('ไม่สามารถสรุปข้อมูลได้ในขณะนี้: ' + data.error);
+            }
+        } catch (e) {
+            setAiBrief('เกิดข้อผิดพลาดในการดึงข้อมูลสรุป: ' + e.message);
+        }
+        setBriefLoading(false);
+    }
+
+    async function handleSendConsoleChat() {
+        if (!chatInput.trim()) return;
+        const userMsg = chatInput.trim();
+        setChatInput('');
+        setChatMessages(prev => [...prev, { role: 'user', content: userMsg }]);
+        setChatLoading(true);
+        
+        try {
+            const res = await fetch('/api/yuzu/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: userMsg, userId: config.father_uid || 'admin_dashboard' })
+            });
+            const data = await res.json();
+            if (data.success) {
+                setChatMessages(prev => [...prev, { role: 'model', content: data.response }]);
+            } else {
+                setChatMessages(prev => [...prev, { role: 'model', content: 'มีปัญหาบางอย่างเมี๊ยว: ' + data.error }]);
+            }
+        } catch (e) {
+            setChatMessages(prev => [...prev, { role: 'model', content: 'ติดต่อหนูไม่ได้เมี๊ยว: ' + e.message }]);
+        }
+        setChatLoading(false);
+    }
+
+    const getMoodStats = () => {
+        const stats = { '🔥': 0, '😊': 0, '😐': 0, '😴': 0, '🤒': 0 };
+        let total = 0;
+        attendanceLogs.forEach(log => {
+            if (log.mood_status && stats[log.mood_status] !== undefined) {
+                stats[log.mood_status]++;
+                total++;
+            }
+        });
+        return { stats, total };
+    };
+
     useEffect(() => {
         fetchData();
+        if (activeTab === 'insights') {
+            handleGenerateBrief();
+        }
     }, [activeTab, selectedDate]);
 
     async function fetchData() {
@@ -43,12 +110,22 @@ export default function YuzuKnowledgeManager() {
             setLoading(false);
         } else if (activeTab === 'insights') {
             setLoading(true);
-            const { data, error } = await supabase
+            // 1. Fetch pending insights
+            const { data: insightsData, error: insightsErr } = await supabase
                 .from('yuzu_knowledge')
                 .select('*')
                 .filter('metadata->>status', 'eq', 'pending')
                 .order('created_at', { ascending: false });
-            if (!error) setInsights(data);
+            if (!insightsErr) setInsights(insightsData || []);
+
+            // 2. Fetch today's & recent attendance logs for mood index
+            const { data: attData, error: attErr } = await supabase
+                .from('attendance_logs')
+                .select('*, employees(id, name, nickname, position)')
+                .order('timestamp', { ascending: false })
+                .limit(30);
+            if (!attErr && attData) setAttendanceLogs(attData);
+
             setLoading(false);
         } else if (activeTab === 'config') {
             setLoading(true);
@@ -288,7 +365,7 @@ export default function YuzuKnowledgeManager() {
                 <div className="bg-slate-100 p-1 rounded-xl flex gap-1 self-start overflow-x-auto no-scrollbar">
                     {[
                         { id: 'knowledge', label: 'Knowledge', icon: Icons.File },
-                        { id: 'insights', label: 'AI Insights', icon: Icons.Yuzu },
+                        { id: 'insights', label: 'AI Dashboard', icon: Icons.Yuzu },
                         { id: 'config', label: 'System Config', icon: Icons.Settings },
                         { id: 'employees', label: 'Staff Roles', icon: Icons.Staff },
                         { id: 'slips', label: 'Transfer Slips', icon: Icons.Money }
@@ -458,128 +535,326 @@ export default function YuzuKnowledgeManager() {
             {/* TAB: INSIGHTS */}
             {activeTab === 'insights' && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                        {/* Summary Stats */}
-                        <Card className="bg-purple-50 border-purple-100 flex flex-col items-center justify-center p-6 text-center">
-                            <Icons.Yuzu size={32} className="text-purple-600 mb-2" />
-                            <h4 className="text-xl font-black text-purple-900">{insights.length}</h4>
-                            <p className="text-[10px] font-bold text-purple-400 uppercase tracking-widest">New AI Insights</p>
-                        </Card>
-                        
-                        {/* Flowchart Hint */}
-                        <Card className="lg:col-span-3 bg-slate-900 text-white overflow-hidden relative group">
-                            <button 
-                                onClick={() => setIsFlowVisible(!isFlowVisible)}
-                                className="absolute top-4 right-4 z-20 p-2 bg-white/10 hover:bg-white/20 rounded-lg transition-all"
-                            >
-                                {isFlowVisible ? <Icons.Up size={14} /> : <Icons.Down size={14} />}
-                            </button>
-                            <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform">
-                                <Icons.Yuzu size={120} />
-                            </div>
-                            <div className={`relative z-10 p-6 space-y-2 transition-all duration-500 ${isFlowVisible ? '' : 'opacity-40'}`}>
-                                <Badge color="purple" className="mb-2">KNOWLEDGE FLOW</Badge>
-                                <h3 className="text-lg font-bold">แผนผังการเรียนรู้ของยูซุ</h3>
-                                {isFlowVisible && (
-                                    <>
-                                        <p className="text-slate-400 text-sm max-w-md">ระบบจะเชื่อมโยงปัญหาและวิธีแก้ที่พบในแชทออกมาเป็น Flowchart ให้คุณพ่อเห็นภาพรวมครับ</p>
-                                        
-                                        {/* Simple Visual Flowchart (CSS based) */}
-                                        <div className="mt-6 flex items-center gap-4 text-[10px] font-bold uppercase tracking-tighter overflow-x-auto no-scrollbar py-2 animate-in fade-in duration-500">
-                                            <div className="px-3 py-2 bg-rose-500 rounded-lg whitespace-nowrap">Problem Found</div>
-                                            <div className="text-slate-600">→</div>
-                                            <div className="px-3 py-2 bg-indigo-500 rounded-lg whitespace-nowrap">AI Extraction</div>
-                                            <div className="text-slate-600">→</div>
-                                            <div className="px-3 py-2 bg-emerald-500 rounded-lg whitespace-nowrap">Boss Approval</div>
-                                            <div className="text-slate-600">→</div>
-                                            <div className="px-3 py-2 bg-amber-500 rounded-lg whitespace-nowrap">New Knowledge!</div>
-                                        </div>
-                                    </>
-                                )}
-                            </div>
-                        </Card>
+                    
+                    {/* Header Row */}
+                    <div className="flex justify-between items-center bg-gradient-to-r from-orange-500 to-amber-500 p-6 rounded-2xl text-white shadow-lg shadow-orange-100">
+                        <div className="space-y-1">
+                            <h3 className="text-xl font-bold flex items-center gap-2">
+                                <Icons.Yuzu size={22} className="animate-bounce" />
+                                Yuzu AI Operations Dashboard
+                            </h3>
+                            <p className="text-orange-100 text-xs">วิเคราะห์พฤติกรรม สรุปงานรายวัน และแชทคุยเพื่อสั่งงานยูซุได้ทันที</p>
+                        </div>
+                        <button
+                            onClick={handleGenerateBrief}
+                            disabled={briefLoading}
+                            className="bg-white text-orange-600 hover:bg-orange-50 transition-all font-bold text-xs py-2.5 px-5 rounded-xl shadow-md disabled:opacity-50 active:scale-95 flex items-center gap-2"
+                        >
+                            {briefLoading ? (
+                                <span className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-orange-600 border-t-transparent" />
+                            ) : (
+                                <Icons.Yuzu size={14} />
+                            )}
+                            สรุปภาพรวมร้านวันนี้
+                        </button>
                     </div>
 
-                    <div className="space-y-4">
-                        <h3 className="font-bold text-slate-800 flex items-center gap-2 px-1">
-                            <Icons.Alert size={18} className="text-purple-500" />
-                            สิ่งที่ยูซุแอบจำมาจากแชท (ต้องยืนยัน)
-                        </h3>
+                    {/* Dashboard Grid */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         
-                        {insights.length === 0 ? (
-                            <Card className="py-20 text-center">
-                                <p className="text-slate-300 font-bold uppercase tracking-widest">No New Insights yet</p>
-                                <p className="text-slate-400 text-xs">ยูซุยังไม่พบความรู้อันไหนที่น่าสนใจในแชทวันนี้เลยค่ะเมี๊ยว~</p>
+                        {/* Left Column: AI Daily Briefing */}
+                        <div className="space-y-6">
+                            <Card className="p-6 space-y-4 border-t-4 border-t-orange-500">
+                                <div className="flex justify-between items-center">
+                                    <h4 className="font-bold text-slate-800 flex items-center gap-2">
+                                        <Icons.File size={18} className="text-orange-500" />
+                                        AI Operations Briefing
+                                    </h4>
+                                    <Badge color="orange">สรุปรายวัน</Badge>
+                                </div>
+                                
+                                {briefLoading ? (
+                                    <div className="py-12 flex flex-col items-center justify-center space-y-3 text-slate-400">
+                                        <span className="animate-spin rounded-full h-8 w-8 border-4 border-orange-500 border-t-transparent" />
+                                        <p className="text-xs font-bold animate-pulse">ยูซุกำลังวิเคราะห์ข้อมูลกะงานและสรุปห้องแชท...</p>
+                                    </div>
+                                ) : aiBrief ? (
+                                    <div className="bg-orange-50/50 p-4 rounded-xl border border-orange-100 text-slate-700 text-sm font-medium whitespace-pre-wrap leading-relaxed">
+                                        {aiBrief}
+                                    </div>
+                                ) : (
+                                    <div className="py-12 text-center text-slate-400 space-y-3">
+                                        <p className="text-xs font-medium">ยังไม่มีการสร้างสรุปประจำวันนี้</p>
+                                        <button 
+                                            onClick={handleGenerateBrief}
+                                            className="text-xs font-bold text-orange-500 hover:text-orange-600 underline"
+                                        >
+                                            กดเพื่อสร้างสรุปเมี๊ยว~
+                                        </button>
+                                    </div>
+                                )}
                             </Card>
-                        ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {insights.map(item => (
-                                    <Card key={item.id} className="group hover:border-purple-200 transition-all border-l-4 border-l-purple-500 p-6 space-y-4">
-                                        <div className="flex justify-between items-start">
-                                            <Badge color={item.metadata?.is_problem ? "rose" : "purple"}>
-                                                {item.metadata?.category || 'GENERAL'}
-                                            </Badge>
-                                            <span className="text-[10px] font-bold text-slate-400">{new Date(item.created_at).toLocaleTimeString('th-TH')}</span>
-                                        </div>
-                                        
-                                        <p className="text-sm font-medium text-slate-700 leading-relaxed">
-                                            {item.content}
-                                        </p>
-                                        
-                                        <div className="space-y-2 py-2">
-                                            <label className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest block">Keywords (พิมพ์แล้วกด Enter)</label>
-                                            <div className="flex flex-wrap gap-1 mb-2">
-                                                {(item.metadata?.keywords || []).map((kw, idx) => (
-                                                    <span key={idx} className="bg-indigo-50 text-indigo-600 px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 group/tag transition-all hover:bg-indigo-100">
-                                                        {kw}
-                                                        <button 
-                                                            onClick={() => {
-                                                                const newKeywords = item.metadata.keywords.filter((_, i) => i !== idx);
-                                                                handleUpdateInsightKeywords(item.id, newKeywords.join(','));
-                                                            }}
-                                                            className="text-indigo-300 hover:text-rose-500 transition-colors"
-                                                        >
-                                                            <Icons.X size={10} />
-                                                        </button>
-                                                    </span>
-                                                ))}
+
+                            {/* Sentiment Tracker & Mood Index */}
+                            <Card className="p-6 space-y-4 border-t-4 border-t-purple-500">
+                                <h4 className="font-bold text-slate-800 flex items-center gap-2">
+                                    <Icons.Alert size={18} className="text-purple-500" />
+                                    Sentiment Tracker (ดัชนีอารมณ์ทีมงาน)
+                                </h4>
+                                
+                                {(() => {
+                                    const { stats, total } = getMoodStats();
+                                    return (
+                                        <div className="space-y-4">
+                                            <div className="grid grid-cols-5 gap-2 text-center">
+                                                {Object.entries(stats).map(([mood, count]) => {
+                                                    const percentage = total > 0 ? Math.round((count / total) * 100) : 0;
+                                                    const label = mood === '🔥' ? 'Fired Up' : mood === '😊' ? 'Happy' : mood === '😐' ? 'Neutral' : mood === '😴' ? 'Sleepy' : 'Sick';
+                                                    const color = mood === '🔥' ? 'text-amber-500' : mood === '😊' ? 'text-emerald-500' : mood === '😐' ? 'text-blue-500' : mood === '😴' ? 'text-violet-500' : 'text-rose-500';
+                                                    return (
+                                                        <div key={mood} className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 space-y-1">
+                                                            <span className="text-2xl block">{mood}</span>
+                                                            <span className={`text-[10px] font-extrabold block ${color}`}>{label}</span>
+                                                            <span className="text-xs font-black text-slate-700">{count} คน ({percentage}%)</span>
+                                                        </div>
+                                                    );
+                                                })}
                                             </div>
-                                            <input 
-                                                type="text" 
-                                                placeholder="เพิ่ม keyword..."
-                                                onKeyDown={(e) => {
-                                                    if (e.key === 'Enter' && e.target.value.trim()) {
-                                                        const val = e.target.value.trim();
-                                                        const currentKeywords = item.metadata?.keywords || [];
-                                                        if (!currentKeywords.includes(val)) {
-                                                            handleUpdateInsightKeywords(item.id, [...currentKeywords, val].join(','));
-                                                        }
-                                                        e.target.value = '';
-                                                    }
-                                                }}
-                                                className="w-full text-xs font-bold text-slate-600 bg-slate-50 p-2 rounded-xl outline-none focus:ring-1 focus:ring-purple-200 border border-slate-100 transition-all"
-                                            />
+
+                                            {/* Beautiful horizontal bar of mood breakdown */}
+                                            <div className="w-full h-3 rounded-full bg-slate-100 overflow-hidden flex">
+                                                {Object.entries(stats).map(([mood, count]) => {
+                                                    if (count === 0) return null;
+                                                    const percentage = (count / total) * 100;
+                                                    const bg = mood === '🔥' ? 'bg-amber-500' : mood === '😊' ? 'bg-emerald-500' : mood === '😐' ? 'bg-blue-500' : mood === '😴' ? 'bg-violet-500' : 'bg-rose-500';
+                                                    return (
+                                                        <div 
+                                                            key={mood} 
+                                                            style={{ width: `${percentage}%` }} 
+                                                            className={`${bg} transition-all duration-500`}
+                                                            title={`${mood}: ${count} คน`}
+                                                        />
+                                                    );
+                                                })}
+                                            </div>
+                                            <p className="text-[10px] font-bold text-slate-400 text-center uppercase tracking-wider">
+                                                Mood logs count: {total} record(s) today
+                                            </p>
                                         </div>
-                                        
-                                        <div className="flex gap-2 pt-2">
-                                            <button 
-                                                onClick={() => handleVerifyInsight(item.id)}
-                                                className="flex-1 bg-emerald-500 text-white py-2 rounded-xl text-xs font-bold hover:bg-emerald-600 transition-all shadow-sm"
-                                            >
-                                                Approve & Save
-                                            </button>
-                                            <button 
-                                                onClick={() => handleDeleteKnowledge(item.id)}
-                                                className="px-4 bg-slate-100 text-slate-400 py-2 rounded-xl text-xs font-bold hover:bg-rose-50 hover:text-rose-500 transition-all"
-                                            >
-                                                Delete
-                                            </button>
+                                    );
+                                })()}
+                            </Card>
+                        </div>
+
+                        {/* Right Column: Interactive Chat & Timeline */}
+                        <div className="space-y-6">
+                            
+                            {/* Interactive Console Chat */}
+                            <Card className="p-0 border border-slate-900 rounded-2xl overflow-hidden flex flex-col h-[350px] shadow-xl">
+                                {/* Header */}
+                                <div className="bg-slate-950 px-4 py-3 flex justify-between items-center text-white border-b border-slate-800">
+                                    <div className="flex items-center gap-2">
+                                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
+                                        <span className="font-mono text-xs font-bold text-emerald-400">YUZU_INTERACTIVE_CONSOLE v3.5</span>
+                                    </div>
+                                    <Badge color="purple" className="font-mono text-[9px]">GEMINI-3.5-FLASH</Badge>
+                                </div>
+
+                                {/* Messages list */}
+                                <div className="bg-slate-950 flex-1 p-4 overflow-y-auto space-y-3 custom-scrollbar font-mono text-xs text-slate-300">
+                                    {chatMessages.map((msg, idx) => (
+                                        <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                            <div className={`max-w-[85%] p-3 rounded-2xl leading-relaxed whitespace-pre-wrap ${
+                                                msg.role === 'user' 
+                                                ? 'bg-orange-500 text-white rounded-tr-none' 
+                                                : 'bg-slate-900 border border-slate-800 text-emerald-400 rounded-tl-none'
+                                            }`}>
+                                                <div className="text-[9px] text-slate-500 font-bold mb-1">
+                                                    {msg.role === 'user' ? 'BOSS' : '🐱 YUZU'}
+                                                </div>
+                                                {msg.content}
+                                            </div>
                                         </div>
-                                    </Card>
-                                ))}
+                                    ))}
+                                    {chatLoading && (
+                                        <div className="flex justify-start">
+                                            <div className="bg-slate-900 border border-slate-800 text-slate-400 p-3 rounded-2xl rounded-tl-none flex items-center gap-2">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-bounce delay-100" />
+                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-bounce delay-200" />
+                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-bounce delay-300" />
+                                                <span className="text-[9px] font-bold">Yuzu is thinking...</span>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Form Input */}
+                                <form 
+                                    onSubmit={(e) => {
+                                        e.preventDefault();
+                                        handleSendConsoleChat();
+                                    }}
+                                    className="bg-slate-900 p-3 flex gap-2 border-t border-slate-800"
+                                >
+                                    <input 
+                                        type="text" 
+                                        placeholder="ถามตารางกะงาน, ราคาของ, หรือประเมินพนักงาน..."
+                                        className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-xs font-mono text-emerald-400 outline-none focus:ring-1 focus:ring-orange-500"
+                                        value={chatInput}
+                                        onChange={(e) => setChatInput(e.target.value)}
+                                        disabled={chatLoading}
+                                    />
+                                    <button 
+                                        type="submit"
+                                        disabled={chatLoading || !chatInput.trim()}
+                                        className="bg-orange-500 text-white font-bold text-xs py-2 px-4 rounded-xl hover:bg-orange-600 disabled:opacity-40 transition-all"
+                                    >
+                                        ส่ง
+                                    </button>
+                                </form>
+                            </Card>
+
+                            {/* Staff Mood Timeline */}
+                            <Card className="p-6 space-y-4 max-h-[300px] overflow-y-auto custom-scrollbar">
+                                <h4 className="font-bold text-slate-800 flex items-center gap-2 sticky top-0 bg-white py-1">
+                                    <Icons.Clock size={18} className="text-slate-600" />
+                                    Staff Mood & Notes Timeline (บันทึกอารมณ์ล่าสุด)
+                                </h4>
+                                
+                                <div className="space-y-3">
+                                    {attendanceLogs.filter(log => log.mood_status || log.mood_note).length === 0 ? (
+                                        <p className="text-center text-xs text-slate-400 py-6">ยังไม่มีการบันทึกอารมณ์ในขณะนี้</p>
+                                    ) : (
+                                        attendanceLogs
+                                            .filter(log => log.mood_status || log.mood_note)
+                                            .map((log) => {
+                                                const empName = log.employees?.nickname || log.employees?.name || 'พนักงาน';
+                                                const time = new Date(log.timestamp).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+                                                const actionLabel = log.action_type === 'check_in' ? 'เข้างาน' : 'ออกงาน';
+                                                return (
+                                                    <div key={log.id} className="flex gap-3 items-start border-b border-slate-50 pb-2.5 last:border-0 last:pb-0">
+                                                        <span className="text-2xl bg-slate-50 p-1.5 rounded-xl border border-slate-100 flex-shrink-0">
+                                                            {log.mood_status || '😐'}
+                                                        </span>
+                                                        <div className="space-y-0.5 flex-1">
+                                                            <div className="flex justify-between items-center">
+                                                                <span className="font-bold text-slate-700 text-xs">{empName}</span>
+                                                                <span className="text-[10px] text-slate-400 font-bold">{time} ({actionLabel})</span>
+                                                            </div>
+                                                            {log.mood_note && (
+                                                                <p className="text-xs bg-slate-50 text-slate-600 p-2 rounded-lg border border-slate-100 italic">
+                                                                    "{log.mood_note}"
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })
+                                    )}
+                                </div>
+                            </Card>
+                        </div>
+                    </div>
+
+                    {/* Collapsible Pending Facts Accordion */}
+                    <Card className="border border-purple-200 overflow-hidden p-0 shadow-lg shadow-purple-50">
+                        {/* Accordion Trigger Header */}
+                        <button 
+                            onClick={() => setIsPendingInsightsExpanded(!isPendingInsightsExpanded)}
+                            className="w-full bg-purple-50 hover:bg-purple-100/70 p-4 px-6 flex justify-between items-center text-purple-900 font-bold transition-all"
+                        >
+                            <div className="flex items-center gap-2">
+                                <Icons.Yuzu size={18} className="text-purple-600" />
+                                <span>คลังความรู้ที่ยูซุแอบจำมารอการอนุมัติ ({insights.length} รายการ)</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Badge color="purple">{insights.length}</Badge>
+                                {isPendingInsightsExpanded ? <Icons.Up size={16} /> : <Icons.Down size={16} />}
+                            </div>
+                        </button>
+
+                        {/* Accordion Content */}
+                        {isPendingInsightsExpanded && (
+                            <div className="p-6 bg-white border-t border-purple-100 space-y-4 animate-in slide-in-from-top-2 duration-300">
+                                <p className="text-xs text-slate-500 leading-relaxed">
+                                    นี่คือชุดข้อมูล/ข้อเท็จจริงใหม่ที่ยูซุคัดกรองจากบทสนทนาในห้องแชทของร้าน In The Haus คุณพ่อคุณแม่สามารถเลือก Approve เพื่อบันทึกเข้าฐานความรู้หลัก (Knowledge Base) สำหรับใช้ตอบคำถาม หรือคลิก Delete เพื่อยกเลิกข้อมูลดังกล่าวได้ครับ
+                                </p>
+                                
+                                {insights.length === 0 ? (
+                                    <div className="py-12 text-center text-slate-400">
+                                        <p className="text-xs font-bold">ไม่มีรายการค้างอนุมัติเมี๊ยว~ 💤</p>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {insights.map(item => (
+                                            <Card key={item.id} className="group hover:border-purple-200 transition-all border-l-4 border-l-purple-500 p-5 space-y-4 bg-slate-50/50">
+                                                <div className="flex justify-between items-start">
+                                                    <Badge color={item.metadata?.is_problem ? "rose" : "purple"}>
+                                                        {item.metadata?.category || 'GENERAL'}
+                                                    </Badge>
+                                                    <span className="text-[10px] font-bold text-slate-400">{new Date(item.created_at).toLocaleTimeString('th-TH')}</span>
+                                                </div>
+                                                
+                                                <p className="text-sm font-medium text-slate-700 leading-relaxed">
+                                                    {item.content}
+                                                </p>
+                                                
+                                                <div className="space-y-2 py-2">
+                                                    <label className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest block">Keywords (พิมพ์แล้วกด Enter)</label>
+                                                    <div className="flex flex-wrap gap-1 mb-2">
+                                                        {(item.metadata?.keywords || []).map((kw, idx) => (
+                                                            <span key={idx} className="bg-indigo-50 text-indigo-600 px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 group/tag transition-all hover:bg-indigo-100">
+                                                                {kw}
+                                                                <button 
+                                                                    onClick={() => {
+                                                                        const newKeywords = item.metadata.keywords.filter((_, i) => i !== idx);
+                                                                        handleUpdateInsightKeywords(item.id, newKeywords.join(','));
+                                                                    }}
+                                                                    className="text-indigo-300 hover:text-rose-500 transition-colors"
+                                                                >
+                                                                    <Icons.X size={10} />
+                                                                </button>
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                    <input 
+                                                        type="text" 
+                                                        placeholder="เพิ่ม keyword..."
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter' && e.target.value.trim()) {
+                                                                const val = e.target.value.trim();
+                                                                const currentKeywords = item.metadata?.keywords || [];
+                                                                if (!currentKeywords.includes(val)) {
+                                                                    handleUpdateInsightKeywords(item.id, [...currentKeywords, val].join(','));
+                                                                }
+                                                                e.target.value = '';
+                                                            }
+                                                        }}
+                                                        className="w-full text-xs font-bold text-slate-600 bg-white p-2 rounded-xl outline-none focus:ring-1 focus:ring-purple-200 border border-slate-200 transition-all"
+                                                    />
+                                                </div>
+                                                
+                                                <div className="flex gap-2 pt-2">
+                                                    <button 
+                                                        onClick={() => handleVerifyInsight(item.id)}
+                                                        className="flex-1 bg-emerald-500 text-white py-2 rounded-xl text-xs font-bold hover:bg-emerald-600 transition-all shadow-sm"
+                                                    >
+                                                        Approve & Save
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => handleDeleteKnowledge(item.id)}
+                                                        className="px-4 bg-white border border-slate-200 text-slate-400 py-2 rounded-xl text-xs font-bold hover:bg-rose-50 hover:text-rose-500 transition-all"
+                                                    >
+                                                        Delete
+                                                    </button>
+                                                </div>
+                                            </Card>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         )}
-                    </div>
+                    </Card>
                 </div>
             )}
 

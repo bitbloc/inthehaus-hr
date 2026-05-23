@@ -248,17 +248,31 @@ export async function getEmployeeByLineId(lineUserId) {
     try {
         const client = getSupabase();
         
-        // Match by line_bot_id (Yuzu's UID) or line_user_id as fallback (Case-insensitive)
-        const { data, error } = await client
+        // Match by line_bot_id (BOT CHAT ID) first
+        let { data, error } = await client
             .from('employees')
             .select('name, nickname, position, employment_status, line_bot_id, line_user_id')
-            .or(`line_bot_id.ilike.${lineUserId},line_user_id.ilike.${lineUserId}`)
+            .ilike('line_bot_id', lineUserId)
             .eq('is_active', true)
             .maybeSingle();
 
         if (error) {
-            console.error("Error fetching employee by LINE ID:", error);
-            return null;
+            console.error("Error fetching employee by LINE BOT ID:", error);
+        }
+
+        if (!data) {
+            // Fallback to line_user_id (LIFF UID)
+            const fallbackResult = await client
+                .from('employees')
+                .select('name, nickname, position, employment_status, line_bot_id, line_user_id')
+                .ilike('line_user_id', lineUserId)
+                .eq('is_active', true)
+                .maybeSingle();
+            
+            data = fallbackResult.data;
+            if (fallbackResult.error) {
+                console.error("Error fetching employee by LINE USER ID fallback:", fallbackResult.error);
+            }
         }
 
         return data;
