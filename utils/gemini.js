@@ -104,6 +104,7 @@ ${configs.staff_roster || ''}
 [คลังสินค้า]: ถ้าถามเรื่องสต็อก → ส่งบล็อกท้ายข้อความ:
 - เช็คของใกล้หมด: [STOCK_ACTION] {"action": "CHECK_LOW"}
 - เช็คทั้งหมด: [STOCK_ACTION] {"action": "CHECK_ALL"}
+- เช็คสินค้าเฉพาะชิ้น/บางชิ้น: [STOCK_ACTION] {"action": "CHECK_ITEM", "itemName": "ชื่อสินค้าที่ต้องการเช็ค"}
 - เช็คประวัติ: [STOCK_ACTION] {"action": "CHECK_HISTORY", "itemName": "ชื่อ(ถ้ามี)"}
 - รับเข้า: [STOCK_ACTION] {"action": "RESTOCK", "itemName": "...", "quantity": N, "note": "..."}
 - เบิกออก: [STOCK_ACTION] {"action": "DEDUCT", "itemName": "...", "quantity": -N, "note": "..."}
