@@ -10,8 +10,8 @@ export async function GET() {
             process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
         );
 
-        const startOfDay = new Date();
-        startOfDay.setHours(0, 0, 0, 0);
+        const bangkokDateStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Bangkok' });
+        const startOfDay = new Date(`${bangkokDateStr}T00:00:00+07:00`);
 
         // 1. Fetch Today's Attendance Logs
         const { data: attendance, error: attError } = await supabase
@@ -27,7 +27,7 @@ export async function GET() {
             attendance.forEach(log => {
                 const empName = log.employees?.nickname || log.employees?.name || 'พนักงานนิรนาม';
                 const position = log.employees?.position || 'ทั่วไป';
-                const time = new Date(log.timestamp).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+                const time = new Date(log.timestamp).toLocaleTimeString('th-TH', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit' });
                 const action = log.action_type === 'check_in' ? 'เข้างาน' : 'ออกงาน';
                 const mood = log.mood_status ? ` อารมณ์: ${log.mood_status}` : '';
                 const note = log.mood_note ? ` (โน้ต: ${log.mood_note})` : '';

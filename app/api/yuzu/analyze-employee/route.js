@@ -70,8 +70,8 @@ export async function POST(request) {
         context += `--- ข้อมูลการเข้างานย้อนหลัง 30 วัน ---\n`;
         if (attendance && attendance.length > 0) {
             attendance.forEach(log => {
-                const dateStr = new Date(log.timestamp).toLocaleDateString('th-TH');
-                const timeStr = new Date(log.timestamp).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+                const dateStr = new Date(log.timestamp).toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok' });
+                const timeStr = new Date(log.timestamp).toLocaleTimeString('th-TH', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit' });
                 const action = log.action_type === 'check_in' ? 'เข้างาน (Check-In)' : 'ออกงาน (Check-Out)';
                 const mood = log.mood_status ? `อารมณ์: ${log.mood_status}` : '';
                 const note = log.mood_note ? `บันทึกความรู้สึก: "${log.mood_note}"` : '';

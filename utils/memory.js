@@ -146,7 +146,7 @@ export async function getDailyContent(groupId) {
         }
         
         return logs.map(item => {
-            const time = new Date(item.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+            const time = new Date(item.created_at).toLocaleTimeString('th-TH', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit' });
             let prefix = '🤖: ';
             if (item.message_type === 'image_description') prefix = '[ภาพ]: ';
             else if (item.message_type === 'mood_booster') prefix = '💖 [คำชม]: ';
@@ -231,8 +231,8 @@ export async function getEmployeeHistory(userId, days = 30) {
         if (error) throw error;
         
         return data.reverse().map(item => {
-            const date = new Date(item.created_at).toLocaleDateString('th-TH');
-            const time = new Date(item.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+            const date = new Date(item.created_at).toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok' });
+            const time = new Date(item.created_at).toLocaleTimeString('th-TH', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit' });
             return `[${date} ${time}]: ${item.content}`;
         }).join('\n');
     } catch (err) {
