@@ -251,7 +251,7 @@ export async function getEmployeeByLineId(lineUserId) {
         // Match by line_bot_id (BOT CHAT ID) first
         let { data, error } = await client
             .from('employees')
-            .select('name, nickname, position, employment_status, line_bot_id, line_user_id')
+            .select('name, nickname, position, employment_status, line_bot_id, line_user_id, strengths, improvements, duties')
             .ilike('line_bot_id', lineUserId)
             .eq('is_active', true)
             .maybeSingle();
@@ -291,7 +291,7 @@ export async function getAllEmployeesData() {
         if (!client) return [];
         const { data, error } = await client
             .from('employees')
-            .select('line_user_id, line_bot_id, name, nickname, position, is_active')
+            .select('line_user_id, line_bot_id, name, nickname, position, is_active, strengths, improvements, duties')
             .eq('is_active', true);
 
         if (error) {
@@ -334,7 +334,7 @@ export async function getYuzuConfigs() {
         // Fetch staff roster to inject into system prompt
         const { data: employees } = await client
             .from('employees')
-            .select('name, nickname, position')
+            .select('name, nickname, position, strengths, improvements, duties')
             .eq('is_active', true);
         
         if (employees) {

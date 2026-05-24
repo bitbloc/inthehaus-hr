@@ -230,48 +230,7 @@ export async function handleChatCommand(event, client, text, rawText, userId, gr
     }
 
     let response = await getGeminiResponse(query, context, history, userId);
-    let cleanedResponse = response;
-    
-    // Learning Fact check
-    if (response.includes('[YUZU_LEARNING]')) {
-      try {
-        const parts = response.split('[YUZU_LEARNING]');
-        const learningJson = parts[1].trim();
-        const factData = JSON.parse(learningJson);
-        const savedFact = await saveLearnedFact(groupId, factData);
-        
-        if (savedFact) {
-          console.log("Yuzu Learned a New Fact:", savedFact.content);
-          const insightFlex = {
-            type: 'bubble',
-            size: 'kilo',
-            header: { type: 'box', layout: 'vertical', backgroundColor: '#9333ea', contents: [{ type: 'text', text: '💡 พบความรู้ใหม่แว่วมาจากแชท', color: '#ffffff', weight: 'bold', size: 'sm' }] },
-            body: {
-              type: 'box', layout: 'vertical', spacing: 'md', contents: [
-                { type: 'text', text: savedFact.content, wrap: true, size: 'sm', weight: 'medium', color: '#333333' },
-                { type: 'box', layout: 'horizontal', spacing: 'sm', contents: [
-                  { type: 'text', text: 'Keywords:', size: 'xxs', color: '#aaaaaa', flex: 0 },
-                  { type: 'text', text: (savedFact.metadata?.keywords || []).join(', '), size: 'xxs', color: '#6366f1', flex: 1, wrap: true }
-                ]}
-              ]
-            },
-            footer: {
-              type: 'box', layout: 'horizontal', spacing: 'sm',
-              contents: [
-                { type: 'button', style: 'primary', color: '#10b981', action: { type: 'postback', label: '✅ อนุมัติ', data: `action=approve_insight&id=${savedFact.id}` } },
-                { type: 'button', style: 'secondary', color: '#f43f5e', action: { type: 'postback', label: '❌ ลบออก', data: `action=reject_insight&id=${savedFact.id}` } }
-              ]
-            }
-          };
-          await client.pushMessage(groupId, { type: 'flex', altText: '💡 ยูซุพบความรู้ใหม่ที่ต้องอนุมัติค่ะ!', contents: insightFlex });
-        }
-      } catch (e) {
-        console.error("Error parsing Yuzu Learning block:", e);
-      }
-    }
-
-    // Clean up response tags
-    cleanedResponse = response
+    let cleanedResponse = response
       .split('[YUZU_LEARNING]')[0]
       .split('[ROSTER_ACTION]')[0]
       .split('[STOCK_ACTION]')[0]
@@ -279,15 +238,9 @@ export async function handleChatCommand(event, client, text, rawText, userId, gr
       .split('[YUZU_MEME]')[0]
       .trim();
 
-    const isMoodBooster = ['ชม', 'ขอบคุณ', 'ขอบใจ', 'ดีมาก', 'เก่ง'].some(kw => query.includes(kw));
-    const messageType = isMoodBooster ? 'mood_booster' : 'text';
-    
-    await saveMessage(groupId, userId, 'user', query, messageType);
-    await saveMessage(groupId, null, 'model', cleanedResponse, 'text');
+    const replyMessages = [{ type: 'text', text: cleanedResponse }];
 
-    await client.replyMessage(event.replyToken, { type: 'text', text: cleanedResponse });
-    
-    // Meme generation check
+    // 1. Meme generation check
     if (response.includes('[YUZU_MEME]')) {
       try {
         const memePart = response.split('[YUZU_MEME]')[1].trim();
@@ -297,7 +250,7 @@ export async function handleChatCommand(event, client, text, rawText, userId, gr
            if (memeData.prompt) {
              const result = await generateImage(memeData.prompt);
              if (result.success && result.imageUrl) {
-               await client.pushMessage(groupId, {
+               replyMessages.push({
                  type: 'image',
                  originalContentUrl: result.imageUrl,
                  previewImageUrl: result.imageUrl
@@ -310,10 +263,18 @@ export async function handleChatCommand(event, client, text, rawText, userId, gr
       }
     }
 
-    // Delegate stock tags handling and roster action tags to separate helpers
+    // 2. Delegate stock tags handling
     const { handleStockResponseTags } = await import('./stockHandler');
-    const stockHandled = await handleStockResponseTags(response, client, groupId, request);
+    const stockMsg = await handleStockResponseTags(response, request, query);
+    if (stockMsg) {
+      if (Array.isArray(stockMsg)) {
+        replyMessages.push(...stockMsg);
+      } else {
+        replyMessages.push(stockMsg);
+      }
+    }
     
+    // 3. Roster Actions
     if (response.includes('[ROSTER_ACTION]')) {
       try {
         const rosterPart = response.split('[ROSTER_ACTION]')[1].trim();
@@ -350,12 +311,59 @@ export async function handleChatCommand(event, client, text, rawText, userId, gr
             }
           };
 
-          await client.pushMessage(groupId, { type: 'flex', altText: isBossUser ? '👑 บอสสั่งแก้ตาราง' : '📝 ยืนยันข้อมูลตารางงาน', contents: confirmFlex });
+          replyMessages.push({ type: 'flex', altText: isBossUser ? '👑 บอสสั่งแก้ตาราง' : '📝 ยืนยันข้อมูลตารางงาน', contents: confirmFlex });
         }
       } catch (e) {
         console.error("Roster Action Error in chatHandler:", e);
       }
     }
+
+    // 4. Learning Fact check
+    if (response.includes('[YUZU_LEARNING]')) {
+      try {
+        const parts = response.split('[YUZU_LEARNING]');
+        const learningJson = parts[1].trim();
+        const factData = JSON.parse(learningJson);
+        const savedFact = await saveLearnedFact(groupId, factData);
+        
+        if (savedFact) {
+          console.log("Yuzu Learned a New Fact:", savedFact.content);
+          const insightFlex = {
+            type: 'bubble',
+            size: 'kilo',
+            header: { type: 'box', layout: 'vertical', backgroundColor: '#9333ea', contents: [{ type: 'text', text: '💡 พบความรู้ใหม่แว่วมาจากแชท', color: '#ffffff', weight: 'bold', size: 'sm' }] },
+            body: {
+              type: 'box', layout: 'vertical', spacing: 'md', contents: [
+                { type: 'text', text: savedFact.content, wrap: true, size: 'sm', weight: 'medium', color: '#333333' },
+                { type: 'box', layout: 'horizontal', spacing: 'sm', contents: [
+                  { type: 'text', text: 'Keywords:', size: 'xxs', color: '#aaaaaa', flex: 0 },
+                  { type: 'text', text: (savedFact.metadata?.keywords || []).join(', '), size: 'xxs', color: '#6366f1', flex: 1, wrap: true }
+                ]}
+              ]
+            },
+            footer: {
+              type: 'box', layout: 'horizontal', spacing: 'sm',
+              contents: [
+                { type: 'button', style: 'primary', color: '#10b981', action: { type: 'postback', label: '✅ อนุมัติ', data: `action=approve_insight&id=${savedFact.id}` } },
+                { type: 'button', style: 'secondary', color: '#f43f5e', action: { type: 'postback', label: '❌ ลบออก', data: `action=reject_insight&id=${savedFact.id}` } }
+              ]
+            }
+          };
+          replyMessages.push({ type: 'flex', altText: '💡 ยูซุพบความรู้ใหม่ที่ต้องอนุมัติค่ะ!', contents: insightFlex });
+        }
+      } catch (e) {
+        console.error("Error parsing Yuzu Learning block:", e);
+      }
+    }
+
+    const isMoodBooster = ['ชม', 'ขอบคุณ', 'ขอบใจ', 'ดีมาก', 'เก่ง'].some(kw => query.includes(kw));
+    const messageType = isMoodBooster ? 'mood_booster' : 'text';
+    
+    await saveMessage(groupId, userId, 'user', query, messageType);
+    await saveMessage(groupId, null, 'model', cleanedResponse, 'text');
+
+    const slicedMessages = replyMessages.slice(0, 5);
+    await client.replyMessage(event.replyToken, slicedMessages);
 
     return true;
   }

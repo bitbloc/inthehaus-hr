@@ -3,7 +3,28 @@ import { getEmployeeByLineId } from '../../../../utils/memory';
 
 const processedPostbacks = new Set();
 
-export async function handleStockResponseTags(response, client, groupId, request) {
+const cleanString = (str) => str.toLowerCase().replace(/[^a-zA-Z0-9\u0e00-\u0e7f]/g, '');
+
+function filterStockItemsByQuery(allItems, searchQuery) {
+  const cleanSearch = cleanString(searchQuery);
+  if (!cleanSearch) return [];
+
+  const tokens = searchQuery
+    .toLowerCase()
+    .split(/\s+|และ|,|，|、|\/|\|/g)
+    .map(t => cleanString(t))
+    .filter(t => t.length > 1);
+
+  return allItems.filter(item => {
+    const cleanItemName = cleanString(item.name);
+    if (cleanItemName.includes(cleanSearch) || cleanSearch.includes(cleanItemName)) {
+      return true;
+    }
+    return tokens.some(token => cleanItemName.includes(token));
+  });
+}
+
+export async function handleStockResponseTags(response, request, query = "") {
   // 1. Handle Stock Proposals
   if (response.includes('[STOCK_ACTION]')) {
     try {
@@ -15,38 +36,37 @@ export async function handleStockResponseTags(response, client, groupId, request
       if (actionData.action === 'CHECK_LOW') {
          const lowStockData = await fetchLowStock();
          if (lowStockData.length === 0) {
-            await client.pushMessage(groupId, { type: 'text', text: '✅ เช็คให้แล้วค่ะ ไม่มีรายการสินค้าที่เหลือน้อยเลย สบายใจได้ เมี๊ยว~' });
+            return { type: 'text', text: '✅ เช็คให้แล้วค่ะ ไม่มีรายการสินค้าที่เหลือน้อยเลย สบายใจได้ เมี๊ยว~' };
          } else {
-            const flexMsg = formatLowStockFlex(lowStockData);
-            await client.pushMessage(groupId, flexMsg);
+            return formatLowStockFlex(lowStockData);
          }
       } else if (actionData.action === 'CHECK_ALL') {
          const allItems = await fetchStockItems();
          if (allItems.length === 0) {
-            await client.pushMessage(groupId, { type: 'text', text: 'ยังไม่มีสินค้าในระบบค่ะ' });
+            return { type: 'text', text: 'ยังไม่มีสินค้าในระบบค่ะ' };
          } else {
-            const flexMsg = formatAllStockFlex(allItems);
-            await client.pushMessage(groupId, flexMsg);
+            return formatAllStockFlex(allItems);
          }
       } else if (actionData.action === 'CHECK_ITEM') {
          const search = actionData.itemName || '';
          if (!search) {
-            await client.pushMessage(groupId, { type: 'text', text: '❌ ระบุชื่อสินค้าที่ต้องการเช็คด้วยนะ เมี๊ยว~' });
+            return { type: 'text', text: '❌ ระบุชื่อสินค้าที่ต้องการเช็คด้วยนะ เมี๊ยว~' };
          } else {
-            const items = await fetchStockItems(search);
-            const exactMatch = items.find(i => i.name.toLowerCase() === search.toLowerCase());
-            
-            if (exactMatch) {
-               const flexMsg = formatSingleItemStockFlex(exactMatch);
-               await client.pushMessage(groupId, flexMsg);
-            } else if (items.length === 1) {
-               const flexMsg = formatSingleItemStockFlex(items[0]);
-               await client.pushMessage(groupId, flexMsg);
-            } else if (items.length > 1) {
-               const flexMsg = formatStockSelectionFlex(search, items);
-               await client.pushMessage(groupId, flexMsg);
+            const allItems = await fetchStockItems();
+            let matchedItems = [];
+            if (query) {
+               matchedItems = filterStockItemsByQuery(allItems, query);
+            }
+            if (matchedItems.length === 0) {
+               matchedItems = filterStockItemsByQuery(allItems, search);
+            }
+
+            if (matchedItems.length === 1) {
+               return formatSingleItemStockFlex(matchedItems[0]);
+            } else if (matchedItems.length > 1) {
+               return formatMultiItemsStockFlex(search, matchedItems);
             } else {
-               await client.pushMessage(groupId, { type: 'text', text: `❌ ไม่พบสินค้าชื่อ "${search}" ในคลังค่ะ เมี๊ยว~` });
+               return { type: 'text', text: `❌ ไม่พบสินค้าชื่อ "${search}" ในคลังค่ะ เมี๊ยว~` };
             }
          }
       } else if (actionData.action === 'CHECK_HISTORY') {
@@ -54,30 +74,32 @@ export async function handleStockResponseTags(response, client, groupId, request
          let title = 'ประวัติอัปเดตสต็อกล่าสุด';
          
          if (actionData.itemName && actionData.itemName !== 'ชื่อสินค้า(มีหรือไม่มีก็ได้)') {
-            const searchItems = await fetchStockItems(actionData.itemName);
-            const exactMatch = searchItems.find(i => i.name.toLowerCase() === actionData.itemName.toLowerCase());
-            const item = exactMatch || (searchItems.length === 1 ? searchItems[0] : null);
+            const allItems = await fetchStockItems();
+            let matchedItems = [];
+            if (query) {
+               matchedItems = filterStockItemsByQuery(allItems, query);
+            }
+            if (matchedItems.length === 0) {
+               matchedItems = filterStockItemsByQuery(allItems, actionData.itemName);
+            }
+            const item = matchedItems[0] || null;
             
             if (item) {
                historyData = await fetchStockHistory(item.id);
                title = `ประวัติอัปเดตสต็อก: ${item.name}`;
-            } else if (searchItems.length > 1) {
-               const selectionFlex = formatStockSelectionFlex(actionData.itemName, searchItems);
-               await client.pushMessage(groupId, selectionFlex);
-               return true;
+            } else if (matchedItems.length > 1) {
+               return formatStockSelectionFlex(actionData.itemName, matchedItems);
             } else {
-               await client.pushMessage(groupId, { type: 'text', text: `❌ หาประวัติของ "${actionData.itemName}" ไม่เจอค่ะ ไม่มีสินค้านี้ในระบบ เมี๊ยว~` });
-               return true;
+               return { type: 'text', text: `❌ หาประวัติของ "${actionData.itemName}" ไม่เจอค่ะ ไม่มีสินค้านี้ในระบบ เมี๊ยว~` };
             }
          } else {
             historyData = await fetchStockHistory();
          }
          
          if (historyData.length === 0) {
-            await client.pushMessage(groupId, { type: 'text', text: `ไม่มีการเคลื่อนไหวสต็อกเลยค่ะ สงบเงียบมาก เมี๊ยว~` });
+            return { type: 'text', text: `ไม่มีการเคลื่อนไหวสต็อกเลยค่ะ สงบเงียบมาก เมี๊ยว~` };
          } else {
-            const flexMsg = formatStockHistoryFlex(historyData, title);
-            await client.pushMessage(groupId, flexMsg);
+            return formatStockHistoryFlex(historyData, title);
          }
       } else if (['RESTOCK', 'DEDUCT', 'UPDATE_ITEM', 'CREATE_ITEM'].includes(actionData.action)) {
          let confirmMsg = '';
@@ -107,13 +129,11 @@ export async function handleStockResponseTags(response, client, groupId, request
              }
            }
          };
-         await client.pushMessage(groupId, confirmFlex);
+         return confirmFlex;
       }
-      return true;
     } catch (e) {
       console.error("Stock Action Error:", e);
-      await client.pushMessage(groupId, { type: 'text', text: `เกิดข้อผิดพลาดในการดึงข้อมูลจาก API สต็อกค่ะ บอสเช็คโค้ดหรือแจ้งทีมงานทีนะคะ เมี๊ยว~ 😿\nError: ${e.message}` });
-      return true;
+      return { type: 'text', text: `เกิดข้อผิดพลาดในการดึงข้อมูลจาก API สต็อกค่ะ บอสเช็คโค้ดหรือแจ้งทีมงานทีนะคะ เมี๊ยว~ 😿\nError: ${e.message}` };
     }
   }
 
@@ -139,15 +159,14 @@ export async function handleStockResponseTags(response, client, groupId, request
         }
       };
 
-      await client.pushMessage(groupId, { type: 'flex', altText: '📋 ฟอร์มตรวจนับสต็อกมาแล้ว', contents: auditFlex });
-      return true;
+      return { type: 'flex', altText: '📋 ฟอร์มตรวจนับสต็อกมาแล้ว', contents: auditFlex };
     } catch (e) {
       console.error("Stock Audit Form Error:", e);
-      return true;
+      return null;
     }
   }
 
-  return false;
+  return null;
 }
 
 export async function handleStockPostback(event, client, action, queryParams, userId) {
@@ -807,6 +826,115 @@ function formatSingleItemStockFlex(item) {
             ]
           }
         ]
+      }
+    }
+  };
+}
+
+function formatMultiItemsStockFlex(searchQuery, items) {
+  const contents = [
+    {
+      type: "text",
+      text: "🔍 รายการสินค้าที่พบในคลัง",
+      weight: "bold",
+      size: "md",
+      color: "#ffffff"
+    },
+    {
+      type: "text",
+      text: `ผลการค้นหาสำหรับ "${searchQuery}" (${items.length} รายการ)`,
+      color: "#94a3b8",
+      size: "xs",
+      margin: "xs"
+    },
+    {
+      type: "separator",
+      margin: "md",
+      color: "#475569"
+    }
+  ];
+
+  const itemRows = items.slice(0, 15).map(item => {
+    const isLow = item.current_quantity <= (item.reorder_point || 0);
+    return {
+      type: "box",
+      layout: "horizontal",
+      margin: "sm",
+      contents: [
+        {
+          type: "text",
+          text: item.name,
+          weight: "bold",
+          size: "sm",
+          color: "#f8fafc",
+          flex: 3,
+          wrap: true
+        },
+        {
+          type: "text",
+          text: `${item.current_quantity} ${item.unit}`,
+          align: "end",
+          weight: "bold",
+          size: "sm",
+          color: isLow ? "#ef4444" : "#10b981",
+          flex: 2
+        }
+      ]
+    };
+  });
+
+  contents.push(...itemRows);
+
+  if (items.length > 15) {
+    contents.push(
+      {
+        type: "separator",
+        margin: "md",
+        color: "#334155"
+      },
+      {
+        type: "text",
+        text: `... และรายการอื่นๆ อีก ${items.length - 15} รายการ`,
+        size: "xs",
+        color: "#64748b",
+        margin: "md",
+        align: "center"
+      }
+    );
+  }
+
+  return {
+    type: "flex",
+    altText: `🔍 ค้นหาสินค้า: ${searchQuery} (${items.length} รายการ)`,
+    contents: {
+      type: "bubble",
+      size: "mega",
+      styles: {
+        header: {
+          backgroundColor: "#f59e0b"
+        },
+        body: {
+          backgroundColor: "#0f172a"
+        }
+      },
+      header: {
+        type: "box",
+        layout: "vertical",
+        contents: [
+          {
+            type: "text",
+            text: "🔍 ตรวจสอบสต็อกสินค้า",
+            weight: "bold",
+            color: "#ffffff",
+            size: "md"
+          }
+        ]
+      },
+      body: {
+        type: "box",
+        layout: "vertical",
+        spacing: "xs",
+        contents: contents
       }
     }
   };
