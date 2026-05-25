@@ -1,16 +1,14 @@
-import { useState, useEffect } from 'react';
-import { startOfMonth, endOfMonth, eachDayOfInterval, format, isSameDay, parseISO, isToday } from 'date-fns';
+import { useState } from 'react';
+import { startOfMonth, endOfMonth, eachDayOfInterval, format, isToday } from 'date-fns';
 import { th } from 'date-fns/locale';
 import SwapRequestModal from './SwapRequestModal';
 import { getEffectiveDailyRoster } from '../../utils/roster_logic';
 
-export default function MyShifts({ currentUser, employees, schedules, shifts, overrides, requests }) {
-    const [selectedDate, setSelectedDate] = useState(new Date());
+export default function MyShifts({ currentUser, employees, schedules, shifts, overrides, requests, leaveRequests = [] }) {
+    const [selectedDate] = useState(new Date());
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [modalData, setModalData] = useState(null);
 
-    // Generate Calendar Days for current month view
-    // (Simplified: Just showing 2 weeks or current month)
     const days = eachDayOfInterval({
         start: startOfMonth(selectedDate),
         end: endOfMonth(selectedDate)
@@ -22,70 +20,108 @@ export default function MyShifts({ currentUser, employees, schedules, shifts, ov
     };
 
     return (
-        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
-            <div className="p-6 border-b border-slate-50 flex justify-between items-center">
-                <h3 className="font-bold text-lg text-slate-700">📅 ตารางของฉัน</h3>
-                <div className="text-xs font-bold text-slate-900 uppercase">{format(selectedDate, "MMMM yyyy", { locale: th })}</div>
+        <div className="bg-slate-950/40 backdrop-blur-md border border-indigo-900/30 rounded-[2rem] shadow-2xl shadow-indigo-950/20 overflow-hidden">
+            <div className="p-6 border-b border-indigo-950/50 flex justify-between items-center">
+                <h3 className="font-extrabold text-sm text-slate-300 tracking-wide uppercase">📅 ตารางของฉัน</h3>
+                <div className="text-xs font-black tracking-widest uppercase text-indigo-400 bg-indigo-500/10 px-2.5 py-1 rounded-full border border-indigo-500/20">
+                    {format(selectedDate, "MMMM yyyy", { locale: th })}
+                </div>
             </div>
 
-            <div className="divide-y divide-slate-50">
+            <div className="divide-y divide-indigo-950/30">
                 {days.map(day => {
                     const dateStr = format(day, "yyyy-MM-dd");
 
                     // 1. Calculate Effective Roster for THIS user on THIS day
-                    // We pass a single-item array [currentUser] to reuse the aggregator logic efficiently
                     const dailyRoster = getEffectiveDailyRoster([currentUser], schedules, overrides, shifts, day);
                     const myShift = dailyRoster.find(r => String(r.employee.id) === String(currentUser.id));
 
-                    // 2. Check for Pending Requests on this day
+                    // 2. Check for Pending Swap Requests on this day
                     const pendingReq = requests.find(r => r.target_date === dateStr && r.status !== 'REJECTED' && r.status !== 'CANCELLED');
+
+                    // 3. Check for Leave Requests on this day
+                    const myLeave = leaveRequests.find(l => String(l.employee_id) === String(currentUser.id) && l.leave_date === dateStr);
 
                     const isWork = !!myShift;
                     const isPast = day < new Date().setHours(0, 0, 0, 0);
+                    const hasLeave = !!myLeave;
 
-                    if (!isWork && !pendingReq) return null; // Hide off days or keep them? Let's show them for completeness/swapping into? 
-                    // Better: Show all days or list style. Let's do list style of Work Days.
-                    // If Off but has request, show request.
-                    if (!isWork && !pendingReq) return null;
+                    // Hide day if not working, no swap request, and no leave request
+                    if (!isWork && !pendingReq && !hasLeave) return null;
+
+                    // Create Leave Badge element
+                    let leaveBadge = null;
+                    if (hasLeave) {
+                        const typeEmojiLabel = myLeave.leave_type === 'sick' ? 'ลาป่วย 😷' : myLeave.leave_type === 'business' ? 'ลากิจ 💼' : 'พักร้อน 🏖️';
+                        const statusLabel = myLeave.status === 'approved' ? 'อนุมัติแล้ว' : 'รออนุมัติ';
+                        const statusColor = myLeave.status === 'approved' 
+                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25' 
+                            : 'bg-amber-500/10 text-amber-400 border-amber-500/25';
+                        
+                        leaveBadge = (
+                            <div className="mt-1.5 flex flex-col gap-1.5">
+                                <div className={`inline-flex items-center gap-1.5 text-[10px] font-black px-2.5 py-0.5 rounded-full border ${statusColor} w-max`}>
+                                    <span>{typeEmojiLabel} ({statusLabel})</span>
+                                </div>
+                                {myLeave.replacement_employee && (
+                                    <div className="text-[10px] text-indigo-400 flex items-center gap-1 font-bold">
+                                        <span>👤 คนแทน:</span>
+                                        <span className="bg-indigo-950/50 border border-indigo-900/30 px-1.5 py-0.5 rounded-md text-slate-300">
+                                            {myLeave.replacement_employee.name} {myLeave.replacement_employee.nickname ? `(${myLeave.replacement_employee.nickname})` : ""}
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    }
 
                     return (
-                        <div key={dateStr} className={`p-4 flex items-center justify-between hover:bg-slate-50 transition ${isToday(day) ? 'bg-slate-50/50' : ''}`}>
+                        <div key={dateStr} className={`p-4 flex items-center justify-between hover:bg-slate-900/20 transition-all ${isToday(day) ? 'bg-indigo-950/20 border-y border-indigo-500/20' : ''}`}>
                             <div className="flex items-center gap-4">
-                                <div className={`text-center min-w-[50px] ${isToday(day) ? 'text-blue-600 font-bold' : 'text-slate-950 font-bold'}`}>
-                                    <div className="text-xs font-bold uppercase">{format(day, "EEE", { locale: th })}</div>
+                                <div className={`text-center min-w-[50px] ${isToday(day) ? 'text-indigo-400' : 'text-slate-300'}`}>
+                                    <div className="text-[10px] font-bold uppercase">{format(day, "EEE", { locale: th })}</div>
                                     <div className="text-xl font-black">{format(day, "d")}</div>
                                 </div>
 
                                 <div>
                                     {isWork ? (
                                         <>
-                                            <div className="font-bold text-slate-700 flex items-center gap-2">
+                                            <div className="font-extrabold text-sm text-slate-200 flex items-center gap-2">
                                                 {myShift.shift_name}
-                                                {myShift.source === 'OVERRIDE' && <span className="bg-purple-100 text-purple-600 text-[10px] px-1.5 py-0.5 rounded font-bold">SWAPPED</span>}
+                                                {myShift.source === 'OVERRIDE' && (
+                                                    <span className="bg-purple-500/25 text-purple-400 text-[9px] px-2 py-0.5 rounded-full font-black border border-purple-500/25">สลับกะ</span>
+                                                )}
                                             </div>
-                                            <div className="text-xs font-mono font-bold text-slate-950">
+                                            <div className="text-xs font-mono font-bold text-slate-400 mt-0.5">
                                                 {myShift.start_time.slice(0, 5)} - {myShift.end_time.slice(0, 5)}
                                             </div>
                                         </>
                                     ) : (
-                                        <div className="text-slate-950 font-black">หยุด</div>
+                                        <div className="text-sm font-extrabold text-slate-500">
+                                            {hasLeave && myLeave.status === 'approved' ? 'หยุด (ลาหยุด)' : 'หยุด'}
+                                        </div>
                                     )}
 
-                                    {/* Status Indicator */}
+                                    {/* Leave Badge */}
+                                    {leaveBadge}
+
+                                    {/* Swap Request Status Indicator */}
                                     {pendingReq && (
-                                        <div className="mt-1 flex items-center gap-1">
-                                            <span className="w-2 h-2 rounded-full bg-orange-400 animate-pulse"></span>
-                                            <span className="text-[10px] font-bold text-orange-500 uppercase">{pendingReq.status.replace('_', ' ')}</span>
+                                        <div className="mt-1.5 flex items-center gap-1.5">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+                                            <span className="text-[10px] font-black text-amber-400 uppercase tracking-wider">
+                                                ขอสลับ: {pendingReq.status === 'PENDING_PEER' ? 'รอเพื่อนตกลง' : 'รอผู้จัดการอนุมัติ'}
+                                            </span>
                                         </div>
                                     )}
                                 </div>
                             </div>
 
                             {/* Actions */}
-                            {!isPast && isWork && !pendingReq && (
+                            {!isPast && isWork && !pendingReq && !hasLeave && (
                                 <button
                                     onClick={() => handleSwapClick(dateStr, myShift)}
-                                    className="px-4 py-2 border border-slate-200 rounded-xl text-slate-500 text-xs font-bold hover:bg-slate-800 hover:text-white transition shadow-sm"
+                                    className="px-4 py-2 border border-indigo-900/50 rounded-xl text-indigo-400 text-xs font-black hover:bg-indigo-500 hover:text-white transition-all shadow-sm active:scale-95"
                                 >
                                     แลกเปลี่ยน
                                 </button>
@@ -97,13 +133,16 @@ export default function MyShifts({ currentUser, employees, schedules, shifts, ov
                     const dateStr = format(d, "yyyy-MM-dd");
                     const dailyRoster = getEffectiveDailyRoster([currentUser], schedules, overrides, shifts, d);
                     const myShift = dailyRoster.find(r => String(r.employee.id) === String(currentUser.id));
-                    return !myShift;
+                    const myLeave = leaveRequests.find(l => String(l.employee_id) === String(currentUser.id) && l.leave_date === dateStr);
+                    return !myShift && !myLeave;
                 }) && (
-                        <div className="p-8 text-center text-slate-800 font-bold">ไม่มีกะงานในเดือนนี้</div>
-                    )}
+                    <div className="p-8 text-center text-slate-500 font-bold text-xs">
+                        ไม่มีกะงานหรือวันลาในเดือนนี้
+                    </div>
+                )}
             </div>
 
-            {/* Reuse Modal */}
+            {/* Swap Request Modal */}
             {isModalOpen && modalData && (
                 <SwapRequestModal
                     isOpen={isModalOpen}

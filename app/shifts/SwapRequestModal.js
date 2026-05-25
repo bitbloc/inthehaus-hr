@@ -121,43 +121,45 @@ export default function SwapRequestModal({ isOpen, onClose, currentUser, shiftDa
     };
 
     return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4">
-            <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4">
+            <div className="bg-slate-900 w-full max-w-md rounded-[2rem] border border-indigo-900/30 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
 
                 {/* Header */}
-                <div className="bg-slate-50 p-4 border-b border-slate-100 flex justify-between items-center">
+                <div className="bg-slate-950/60 p-5 border-b border-indigo-950 flex justify-between items-center">
                     <div>
-                        <h3 className="font-bold text-slate-800 text-lg">จัดการกะงาน</h3>
-                        <p className="text-xs text-slate-900 font-bold">{format(new Date(shiftDate), "EEEE dd MMM", { locale: th })} • {shiftData.shift_name}</p>
+                        <h3 className="font-extrabold text-slate-200 text-lg">จัดการกะงาน</h3>
+                        <p className="text-xs text-indigo-400 font-bold mt-1">
+                            {format(new Date(shiftDate), "EEEE dd MMM", { locale: th })} • {shiftData.shift_name}
+                        </p>
                     </div>
-                    <button onClick={onClose} className="bg-slate-200 text-slate-700 rounded-full w-8 h-8 font-bold">×</button>
+                    <button onClick={onClose} className="bg-slate-800 text-slate-300 hover:text-white rounded-full w-8 h-8 font-bold flex items-center justify-center border border-indigo-900/20">×</button>
                 </div>
 
-                <div className="p-6 overflow-y-auto">
+                <div className="p-6 overflow-y-auto space-y-4">
                     {/* STEP 1: CONVERSATION - "What do you want to do?" */}
                     {step === 1 && (
                         <div className="space-y-4 animate-fade-in-up">
-                            <h2 className="text-2xl font-bold text-slate-700 text-center">ต้องการทำอะไร?</h2>
+                            <h2 className="text-xl font-black text-slate-200 text-center mb-6">ต้องการทำอะไร?</h2>
 
                             <button
                                 onClick={() => { setActionType('GIVE_AWAY'); setStep(2); }}
-                                className="w-full bg-orange-50 hover:bg-orange-100 border border-orange-100 p-6 rounded-2xl flex items-center gap-4 transition group"
+                                className="w-full bg-slate-950/40 hover:bg-indigo-950/30 border border-indigo-900/20 hover:border-indigo-500/30 p-6 rounded-2xl flex items-center gap-4 transition-all group text-left"
                             >
-                                <div className="bg-white p-3 rounded-full text-2xl shadow-sm group-hover:scale-110 transition">👋</div>
-                                <div className="text-left">
-                                    <h4 className="font-bold text-orange-800">ยกกะให้คนอื่น</h4>
-                                    <p className="text-xs text-orange-600/80">มอบกะนี้ให้เพื่อนร่วมงาน (หรือเข้าตลาดกลาง)</p>
+                                <div className="bg-indigo-500/10 border border-indigo-500/20 p-3 rounded-full text-2xl shadow-sm group-hover:scale-110 transition">👋</div>
+                                <div>
+                                    <h4 className="font-bold text-slate-200">ยกกะให้คนอื่น</h4>
+                                    <p className="text-xs text-slate-400 mt-1">มอบกะนี้ให้เพื่อนร่วมงาน (หรือเข้าตลาดกลาง)</p>
                                 </div>
                             </button>
 
                             <button
                                 onClick={() => { setActionType('TRADE'); setStep(2); }}
-                                className="w-full bg-blue-50 hover:bg-blue-100 border border-blue-100 p-6 rounded-2xl flex items-center gap-4 transition group"
+                                className="w-full bg-slate-950/40 hover:bg-indigo-950/30 border border-indigo-900/20 hover:border-indigo-500/30 p-6 rounded-2xl flex items-center gap-4 transition-all group text-left"
                             >
-                                <div className="bg-white p-3 rounded-full text-2xl shadow-sm group-hover:scale-110 transition">🔄</div>
-                                <div className="text-left">
-                                    <h4 className="font-bold text-blue-800">แลกกะ</h4>
-                                    <p className="text-xs text-blue-600/80">สลับวันทำงานกับเพื่อน</p>
+                                <div className="bg-indigo-500/10 border border-indigo-500/20 p-3 rounded-full text-2xl shadow-sm group-hover:scale-110 transition">🔄</div>
+                                <div>
+                                    <h4 className="font-bold text-slate-200">แลกกะ</h4>
+                                    <p className="text-xs text-slate-400 mt-1">สลับวันทำงานกับเพื่อน</p>
                                 </div>
                             </button>
                         </div>
@@ -166,7 +168,7 @@ export default function SwapRequestModal({ isOpen, onClose, currentUser, shiftDa
                     {/* STEP 2: WHO? */}
                     {step === 2 && (
                         <div className="space-y-4 animate-fade-in-up">
-                            <h2 className="text-xl font-bold text-slate-700 text-center">
+                            <h2 className="text-lg font-black text-slate-200 text-center">
                                 {actionType === 'GIVE_AWAY' ? 'ยกให้ใคร?' : 'แลกกับใคร?'}
                             </h2>
 
@@ -174,7 +176,11 @@ export default function SwapRequestModal({ isOpen, onClose, currentUser, shiftDa
                             {actionType === 'GIVE_AWAY' && (
                                 <button
                                     onClick={() => setSelectedPeer(null)}
-                                    className={`w-full p-4 rounded-xl border flex items-center justify-between transition ${selectedPeer === null ? 'bg-slate-800 text-white border-slate-800 shadow-lg' : 'bg-white border-slate-200 hover:border-slate-400'}`}
+                                    className={`w-full p-4 rounded-xl border flex items-center justify-between transition-all ${
+                                        selectedPeer === null 
+                                            ? 'bg-gradient-to-r from-indigo-500 to-indigo-650 text-white border-indigo-400/20 shadow-lg' 
+                                            : 'bg-slate-950/40 border-indigo-900/20 text-slate-300 hover:border-indigo-500/30'
+                                    }`}
                                 >
                                     <div className="flex items-center gap-3">
                                         <span className="text-xl">🌐</span>
@@ -189,28 +195,36 @@ export default function SwapRequestModal({ isOpen, onClose, currentUser, shiftDa
 
                             {/* Peer List */}
                             <div className="max-h-60 overflow-y-auto space-y-2 pr-1">
-                                <p className="text-xs font-bold text-slate-900 uppercase tracking-wider sticky top-0 bg-white py-1">เพื่อนที่ว่าง</p>
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest sticky top-0 bg-slate-900 py-2">เพื่อนที่ว่าง</p>
                                 {validPeers.map(peer => (
                                     <button
                                         key={peer.id}
                                         onClick={() => setSelectedPeer(peer)}
-                                        className={`w-full p-3 rounded-xl border flex items-center gap-3 transition ${selectedPeer?.id === peer.id ? 'bg-slate-800 text-white border-slate-800 shadow-md' : 'bg-white border-slate-100 hover:bg-slate-50'}`}
+                                        className={`w-full p-3.5 rounded-xl border flex items-center gap-3 transition-all ${
+                                            selectedPeer?.id === peer.id 
+                                                ? 'bg-gradient-to-r from-indigo-500 to-indigo-650 text-white border-indigo-400/20 shadow-md' 
+                                                : 'bg-slate-950/40 border-indigo-900/20 text-slate-300 hover:border-indigo-500/30'
+                                        }`}
                                     >
-                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${selectedPeer?.id === peer.id ? 'bg-white/20' : 'bg-slate-200 text-slate-500'}`}>
+                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold ${
+                                            selectedPeer?.id === peer.id 
+                                                ? 'bg-white/20' 
+                                                : 'bg-indigo-500/10 border border-indigo-500/20 text-indigo-400'
+                                        }`}>
                                             {peer.name.charAt(0)}
                                         </div>
-                                        <span className="font-bold text-sm">{peer.name}</span>
+                                        <span className="font-bold text-sm">{peer.name} {peer.nickname ? `(${peer.nickname})` : ''}</span>
                                     </button>
                                 ))}
-                                {validPeers.length === 0 && <p className="text-center text-xs text-slate-800 font-bold py-4">ไม่มีเพื่อนว่างในวันนี้</p>}
+                                {validPeers.length === 0 && <p className="text-center text-xs text-slate-500 font-bold py-6 bg-slate-950/20 rounded-xl border border-indigo-900/10">ไม่มีเพื่อนว่างในวันนี้</p>}
                             </div>
 
                             <div className="pt-4 flex gap-3">
-                                <button onClick={() => setStep(1)} className="px-4 py-2 text-slate-700 font-bold text-sm hover:text-slate-950">กลับ</button>
+                                <button onClick={() => setStep(1)} className="px-4 py-2 text-slate-400 font-bold text-sm hover:text-white">กลับ</button>
                                 <button
                                     onClick={() => setStep(3)}
                                     disabled={actionType === 'TRADE' && !selectedPeer}
-                                    className="flex-1 bg-slate-800 text-white rounded-xl font-bold py-3 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="flex-1 bg-gradient-to-r from-indigo-500 to-indigo-650 text-white rounded-xl font-black py-3 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
                                 >
                                     ถัดไป
                                 </button>
@@ -220,31 +234,35 @@ export default function SwapRequestModal({ isOpen, onClose, currentUser, shiftDa
 
                     {/* STEP 3: CONFIRM */}
                     {step === 3 && (
-                        <div className="space-y-6 animate-fade-in-up">
-                            <h2 className="text-xl font-bold text-slate-700 text-center">ยืนยันคำขอ</h2>
+                        <div className="space-y-5 animate-fade-in-up">
+                            <h2 className="text-lg font-black text-slate-200 text-center">ยืนยันคำขอ</h2>
 
-                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-3">
+                            <div className="bg-slate-950/40 p-5 rounded-2xl border border-indigo-900/20 space-y-4">
                                 <div className="flex justify-between items-center text-sm">
-                                    <span className="text-slate-900 font-bold">จาก</span>
-                                    <span className="font-bold text-slate-700">{currentUser.name} (คุณ)</span>
+                                    <span className="text-slate-400 font-medium">จาก</span>
+                                    <span className="font-bold text-slate-200">{currentUser.name} (คุณ)</span>
                                 </div>
-                                <div className="flex justify-center text-slate-400 transform rotate-90 sm:rotate-0">➜</div>
+                                <div className="flex justify-center text-slate-500 transform rotate-90 sm:rotate-0">➜</div>
                                 <div className="flex justify-between items-center text-sm">
-                                    <span className="text-slate-900 font-bold">ถึง</span>
-                                    <span className="font-bold text-slate-700">{selectedPeer ? selectedPeer.name : 'ตลาดกลาง (ทุกคน)'}</span>
+                                    <span className="text-slate-400 font-medium">ถึง</span>
+                                    <span className="font-bold text-slate-200">{selectedPeer ? selectedPeer.name : 'ตลาดกลาง (ทุกคน)'}</span>
                                 </div>
-                                <div className="border-t border-slate-200 pt-3 flex justify-between items-center text-sm">
-                                    <span className="text-slate-900 font-bold">การดำเนินการ</span>
-                                    <span className={`font-bold px-2 py-0.5 rounded text-xs ${actionType === 'GIVE_AWAY' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'}`}>
+                                <div className="border-t border-indigo-950/50 pt-3.5 flex justify-between items-center text-sm">
+                                    <span className="text-slate-400 font-medium">การดำเนินการ</span>
+                                    <span className={`font-black px-2.5 py-0.5 rounded-full text-[10px] border ${
+                                        actionType === 'GIVE_AWAY' 
+                                            ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' 
+                                            : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'
+                                    }`}>
                                         {actionType === 'GIVE_AWAY' ? 'ยกให้' : 'แลกเปลี่ยน'}
                                     </span>
                                 </div>
                             </div>
 
                             <div>
-                                <label className="block text-xs font-bold text-slate-900 mb-1">หมายเหตุ (ไม่บังคับ)</label>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">หมายเหตุ (ไม่บังคับ)</label>
                                 <textarea
-                                    className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:ring-2 focus:ring-slate-800"
+                                    className="w-full p-3.5 border border-indigo-900/30 rounded-2xl bg-slate-950/40 text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500/50 transition font-medium text-sm placeholder:text-slate-650"
                                     rows="2"
                                     placeholder="เช่น ไปหาหมอฟัน..."
                                     value={note}
@@ -253,11 +271,11 @@ export default function SwapRequestModal({ isOpen, onClose, currentUser, shiftDa
                             </div>
 
                             <div className="flex gap-3">
-                                <button onClick={() => setStep(2)} className="px-4 py-3 text-slate-700 font-bold text-sm hover:text-slate-950">กลับ</button>
+                                <button onClick={() => setStep(2)} className="px-4 py-3 text-slate-400 font-bold text-sm hover:text-white">กลับ</button>
                                 <button
                                     onClick={handleSubmit}
                                     disabled={isLoading}
-                                    className="flex-1 bg-slate-800 text-white rounded-xl font-bold py-3 shadow-lg hover:bg-slate-900 transition flex justify-center"
+                                    className="flex-1 bg-gradient-to-r from-indigo-500 to-indigo-650 text-white rounded-xl font-black py-3.5 shadow-lg shadow-indigo-500/20 hover:from-indigo-600 hover:to-indigo-700 transition flex justify-center"
                                 >
                                     {isLoading ? 'กำลังส่ง...' : 'ยืนยันคำขอ'}
                                 </button>

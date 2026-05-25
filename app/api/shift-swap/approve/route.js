@@ -62,6 +62,30 @@ export async function POST(req) {
                 .single();
 
             if (!fetchError && reqData) {
+                // B.1 Sync with Roster Transactions (Source of Truth for new Roster)
+                // 1. Mark Giver (Requester) as OFF
+                await supabase.from('roster_transactions').upsert({
+                    employee_id: reqData.requester_id,
+                    date: reqData.target_date,
+                    is_off: true,
+                    slot_type: 'MAIN',
+                    status: 'PUBLISHED'
+                }, { onConflict: 'employee_id, date, slot_type' });
+
+                // 2. Mark Receiver (Peer) as Working Giver's Shift
+                if (reqData.target_peer_id) {
+                    await supabase.from('roster_transactions').upsert({
+                        employee_id: reqData.target_peer_id,
+                        date: reqData.target_date,
+                        shift_id: reqData.old_shift_id,
+                        custom_start_time: reqData.shift?.start_time || null,
+                        custom_end_time: reqData.shift?.end_time || null,
+                        is_off: false,
+                        slot_type: 'MAIN',
+                        status: 'PUBLISHED'
+                    }, { onConflict: 'employee_id, date, slot_type' });
+                }
+
                 // C. Send LINE Notification
                 const message = {
                     type: 'flex',
