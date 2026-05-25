@@ -264,8 +264,9 @@ export async function POST(request) {
                 replyMsg += `\n\n📌 ยูซุจดเป็น Task ให้แล้ว ${result.tasks.length} รายการค่ะ เมี๊ยว~`;
               }
               
-              await client.replyMessage(event.replyToken, { type: 'text', text: replyMsg });
               handledLocally = true;
+              await client.replyMessage(event.replyToken, { type: 'text', text: replyMsg });
+              await saveMessage(groupId, null, 'model', replyMsg, 'text');
             }
           } catch (audioError) {
             console.error("Audio Processing Error:", audioError);
@@ -281,35 +282,6 @@ export async function POST(request) {
             for await (const chunk of stream) chunks.push(chunk);
             const buffer = Buffer.concat(chunks);
             const base64 = buffer.toString('base64');
-
-            // Prevent redundant vision analysis and replies if an espresso shot was reported recently by this user
-            const { supabase } = await import('../../../lib/supabaseClient');
-            const oneMinuteAgo = new Date(Date.now() - 60000).toISOString();
-            const { data: recentReports } = await supabase
-              .from('yuzu_chat_history')
-              .select('id')
-              .eq('user_id', userId)
-              .eq('message_type', 'espresso_report')
-              .gte('created_at', oneMinuteAgo)
-              .limit(1);
-
-            if (recentReports && recentReports.length > 0) {
-              console.log("Yuzu Image Redundancy Filter: Uploading espresso shot photo silently.");
-              const fileName = `shot_${Date.now()}_${userId}_${event.message.id}.jpg`;
-              const { error: uploadError } = await supabase.storage
-                .from('yuzu-slips')
-                .upload(fileName, buffer, { contentType: 'image/jpeg' });
-
-              let imageUrl = null;
-              if (!uploadError) {
-                const { data: linkData } = supabase.storage.from('yuzu-slips').getPublicUrl(fileName);
-                imageUrl = linkData?.publicUrl;
-              }
-
-              // Log photo in the history log with URL
-              await saveMessage(groupId, userId, 'user', `[ภาพประกอบช็อตกาแฟ] ${imageUrl || ''}`, 'image_description');
-              return NextResponse.json({ success: true, handler: 'espresso_image_silent' });
-            }
 
             const configs = await getYuzuConfigs();
             const isBoss = await checkIsBoss(userId);
@@ -349,16 +321,53 @@ export async function POST(request) {
 
             const context = await getIngredientPrices();
 
-            // Refined Vision Logic (passing friendlyName)
+            // 1. Analyze the image first to determine what it is
             const result = await classifyAndAnalyzeImage(base64, "image/jpeg", context, bossRole, positionInstruction, friendlyName);
 
-            await saveMessage(groupId, userId, 'user', result.shortDescription, 'image_description');
-
+            // 2. If it is a slip, handle it immediately (never bypass slips!)
             if (result.isSlip) {
-              handledLocally = await handleSlipImage(event, client, buffer, userId, groupId, result);
-            } else if (result.shouldReply) {
-              await client.replyMessage(event.replyToken, { type: 'text', text: result.analysis });
               handledLocally = true;
+              await handleSlipImage(event, client, buffer, userId, groupId, result);
+            } 
+            // 3. If it is not a slip, check the espresso shot filter
+            else {
+              const { supabase } = await import('../../../lib/supabaseClient');
+              const oneMinuteAgo = new Date(Date.now() - 60000).toISOString();
+              const { data: recentReports } = await supabase
+                .from('yuzu_chat_history')
+                .select('id')
+                .eq('user_id', userId)
+                .eq('message_type', 'espresso_report')
+                .gte('created_at', oneMinuteAgo)
+                .limit(1);
+
+              if (recentReports && recentReports.length > 0) {
+                console.log("Yuzu Image Redundancy Filter: Uploading espresso shot photo silently.");
+                const fileName = `shot_${Date.now()}_${userId}_${event.message.id}.jpg`;
+                const { error: uploadError } = await supabase.storage
+                  .from('yuzu-slips')
+                  .upload(fileName, buffer, { contentType: 'image/jpeg' });
+
+                let imageUrl = null;
+                if (!uploadError) {
+                  const { data: linkData } = supabase.storage.from('yuzu-slips').getPublicUrl(fileName);
+                  imageUrl = linkData?.publicUrl;
+                }
+
+                // Log photo in the history log with URL
+                await saveMessage(groupId, userId, 'user', `[ภาพประกอบช็อตกาแฟ] ${imageUrl || ''}`, 'image_description');
+                handledLocally = true;
+                continue;
+              }
+
+              // Save regular chat vision logs and reply
+              await saveMessage(groupId, userId, 'user', result.shortDescription, 'image_description');
+
+              if (result.shouldReply) {
+                handledLocally = true;
+                await client.replyMessage(event.replyToken, { type: 'text', text: result.analysis });
+                await saveMessage(groupId, null, 'model', result.analysis, 'text');
+              }
             }
           } catch (visionError) {
             console.error("Vision Processing Error:", visionError);
@@ -378,8 +387,8 @@ export async function POST(request) {
             await saveMessage(groupId, userId, 'user', `[Location Message] ${address || 'Coordinates'}`, 'location');
             await saveMessage(groupId, null, 'model', response, 'text');
             
-            await client.replyMessage(event.replyToken, { type: 'text', text: response });
             handledLocally = true;
+            await client.replyMessage(event.replyToken, { type: 'text', text: response });
           } catch (locationError) {
             console.error("Location Processing Error:", locationError);
           }
