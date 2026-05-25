@@ -115,19 +115,32 @@ export async function getChatHistory(groupId, limit = 100) {
  * Get all content for a specific group for today (for Summarization)
  * Now resolves LINE UIDs to real names for HR accuracy
  */
-export async function getDailyContent(groupId) {
+export async function getDailyContent(groupId, dateStr = null) {
     try {
         const client = getSupabase();
-        const startOfDay = new Date();
-        startOfDay.setHours(0, 0, 0, 0);
+        let startOfDay, endOfDay;
+        if (dateStr) {
+            startOfDay = new Date(`${dateStr}T00:00:00+07:00`);
+            endOfDay = new Date(`${dateStr}T23:59:59.999+07:00`);
+        } else {
+            // Default to today
+            const bangkokDateStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Bangkok' });
+            startOfDay = new Date(`${bangkokDateStr}T00:00:00+07:00`);
+            endOfDay = new Date(`${bangkokDateStr}T23:59:59.999+07:00`);
+        }
 
         // Fetch logs
-        const { data: logs, error: logsError } = await client
+        let query = client
             .from('yuzu_chat_history')
             .select('user_id, role, content, message_type, created_at')
             .eq('group_id', groupId)
-            .gte('created_at', startOfDay.toISOString())
-            .order('created_at', { ascending: true });
+            .gte('created_at', startOfDay.toISOString());
+
+        if (endOfDay) {
+            query = query.lte('created_at', endOfDay.toISOString());
+        }
+
+        const { data: logs, error: logsError } = await query.order('created_at', { ascending: true });
 
         if (logsError) throw logsError;
         if (!logs || logs.length === 0) return "";

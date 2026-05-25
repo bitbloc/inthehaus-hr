@@ -26,8 +26,10 @@ export default function YuzuKnowledgeManager() {
     const [isFlowVisible, setIsFlowVisible] = useState(true);
 
     // New States for AI Operations Dashboard
-    const [aiBrief, setAiBrief] = useState('');
+    const [selectedBriefDate, setSelectedBriefDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+    const [dailyBriefs, setDailyBriefs] = useState({});
     const [briefLoading, setBriefLoading] = useState(false);
+    const [pdfLoading, setPdfLoading] = useState(false);
     const [chatMessages, setChatMessages] = useState([
         { role: 'model', content: 'สวัสดีค่ะเจ้านาย! ยูซุ แมวส้มแสนรู้ประจำร้าน In The Haus พร้อมให้บริการแล้วค่ะ มีอะไรเกี่ยวกับข้อมูลร้าน กะงาน หรืออารมณ์ของพนักงานที่อยากคุยกับยูซุ แหลงมาได้เลยนะคะเมี๊ยว~ 🐱🍊' }
     ]);
@@ -41,20 +43,188 @@ export default function YuzuKnowledgeManager() {
     // Date filter for slips
     const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
 
-    async function handleGenerateBrief() {
+    // Calculate recent dates (Today + last 3 days)
+    const recentDates = React.useMemo(() => {
+        const dates = [];
+        for (let i = 0; i < 4; i++) {
+            const d = new Date();
+            d.setDate(d.getDate() - i);
+            dates.push(format(d, 'yyyy-MM-dd'));
+        }
+        return dates;
+    }, []);
+
+    async function handleGenerateBrief(dateStr = null) {
+        const targetDate = dateStr || selectedBriefDate;
         setBriefLoading(true);
         try {
-            const res = await fetch('/api/yuzu/brief');
+            const res = await fetch(`/api/yuzu/brief?date=${targetDate}`);
             const data = await res.json();
             if (data.success) {
-                setAiBrief(data.brief);
+                setDailyBriefs(prev => ({ ...prev, [targetDate]: data.brief }));
             } else {
-                setAiBrief('ไม่สามารถสรุปข้อมูลได้ในขณะนี้: ' + data.error);
+                setDailyBriefs(prev => ({ ...prev, [targetDate]: 'ไม่สามารถสรุปข้อมูลได้ในขณะนี้: ' + data.error }));
             }
         } catch (e) {
-            setAiBrief('เกิดข้อผิดพลาดในการดึงข้อมูลสรุป: ' + e.message);
+            setDailyBriefs(prev => ({ ...prev, [targetDate]: 'เกิดข้อผิดพลาดในการดึงข้อมูลสรุป: ' + e.message }));
         }
         setBriefLoading(false);
+    }
+
+    async function handleExportSingleBriefPDF(dateStr) {
+        const briefContent = dailyBriefs[dateStr];
+        if (!briefContent) return;
+
+        setPdfLoading(true);
+        try {
+            const html2canvas = (await import('html2canvas')).default;
+            const { jsPDF } = await import('jspdf');
+
+            const element = document.createElement('div');
+            element.style.width = '800px';
+            element.style.padding = '40px';
+            element.style.background = '#ffffff';
+            element.style.color = '#1e293b';
+            element.style.fontFamily = 'system-ui, -apple-system, sans-serif';
+            element.style.position = 'absolute';
+            element.style.left = '-9999px';
+            element.style.top = '-9999px';
+
+            element.innerHTML = `
+                <div style="border-bottom: 3px solid #f97316; padding-bottom: 20px; margin-bottom: 30px;">
+                    <div style="font-size: 24px; font-weight: 850; color: #1e293b; letter-spacing: -0.02em;">In The Haus - Daily Briefing Report</div>
+                    <div style="font-size: 14px; color: #64748b; margin-top: 5px;">รายงานสรุปผลการทำงานประจำวันโดยน้องยูซุ</div>
+                </div>
+                <div style="margin-bottom: 30px;">
+                    <div style="font-size: 18px; font-weight: 700; color: #f97316; border-left: 4px solid #f97316; padding-left: 12px; margin-bottom: 15px;">
+                        ประจำวันที่ ${new Date(dateStr).toLocaleDateString('th-TH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                    </div>
+                    <div style="background: #fffdfa; border: 1px solid #fed7aa; border-radius: 12px; padding: 25px; font-size: 14px; line-height: 1.65; color: #334155; white-space: pre-wrap;">
+                        ${briefContent}
+                    </div>
+                </div>
+                <div style="margin-top: 60px; border-top: 1px solid #e2e8f0; padding-top: 20px; text-align: center; font-size: 11px; color: #94a3b8;">
+                    รายงานนี้สร้างขึ้นอัตโนมัติโดยระบบ Yuzu AI - In The Haus ณ วันที่ ${new Date().toLocaleDateString('th-TH')} ${new Date().toLocaleTimeString('th-TH')}
+                </div>
+            `;
+            document.body.appendChild(element);
+
+            const canvas = await html2canvas(element, {
+                scale: 2,
+                useCORS: true,
+                logging: false,
+            });
+            document.body.removeChild(element);
+
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const imgWidth = 210;
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            
+            pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+            pdf.save(`yuzu-brief-${dateStr}.pdf`);
+        } catch (e) {
+            console.error("PDF Export Error:", e);
+            alert("เกิดข้อผิดพลาดในการสร้าง PDF: " + e.message);
+        } finally {
+            setPdfLoading(false);
+        }
+    }
+
+    async function handleExportThreeDayReportPDF() {
+        setPdfLoading(true);
+        try {
+            const html2canvas = (await import('html2canvas')).default;
+            const { jsPDF } = await import('jspdf');
+
+            const datesToFetch = recentDates.slice(0, 3);
+            const fetchedBriefs = { ...dailyBriefs };
+
+            for (const date of datesToFetch) {
+                if (!fetchedBriefs[date]) {
+                    const res = await fetch(`/api/yuzu/brief?date=${date}`);
+                    const data = await res.json();
+                    if (data.success) {
+                        fetchedBriefs[date] = data.brief;
+                    } else {
+                        fetchedBriefs[date] = 'ไม่มีข้อมูลสรุปสำหรับวันนี้';
+                    }
+                }
+            }
+
+            setDailyBriefs(fetchedBriefs);
+
+            const element = document.createElement('div');
+            element.style.width = '800px';
+            element.style.padding = '40px';
+            element.style.background = '#ffffff';
+            element.style.color = '#1e293b';
+            element.style.fontFamily = 'system-ui, -apple-system, sans-serif';
+            element.style.position = 'absolute';
+            element.style.left = '-9999px';
+            element.style.top = '-9999px';
+
+            let sectionsHtml = '';
+            for (const date of datesToFetch) {
+                sectionsHtml += `
+                    <div style="margin-bottom: 40px; page-break-inside: avoid;">
+                        <div style="font-size: 16px; font-weight: 700; color: #f97316; border-left: 4px solid #f97316; padding-left: 12px; margin-bottom: 12px;">
+                            รายงานประจำวัน${date === recentDates[0] ? 'นี้' : ''}: ${new Date(date).toLocaleDateString('th-TH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                        </div>
+                        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; font-size: 13px; line-height: 1.6; color: #334155; white-space: pre-wrap;">
+                            ${fetchedBriefs[date] || 'ไม่มีการสรุปข้อมูลสำหรับวันนี้'}
+                        </div>
+                    </div>
+                `;
+            }
+
+            element.innerHTML = `
+                <div style="border-bottom: 3px solid #f97316; padding-bottom: 20px; margin-bottom: 35px;">
+                    <div style="font-size: 26px; font-weight: 900; color: #1e293b; letter-spacing: -0.02em;">In The Haus - 3-Day History Briefing Report</div>
+                    <div style="font-size: 14px; color: #64748b; margin-top: 5px;">รายงานสรุปผลการปฏิบัติงานย้อนหลัง 3 วัน รวบรวมโดยระบบ AI น้องยูซุ</div>
+                </div>
+                <div>
+                    ${sectionsHtml}
+                </div>
+                <div style="margin-top: 60px; border-top: 1px solid #e2e8f0; padding-top: 20px; text-align: center; font-size: 11px; color: #94a3b8;">
+                    รายงานสรุปประวัติประเมินผลร้าน In The Haus นครพนม ณ วันที่ ${new Date().toLocaleDateString('th-TH')} ${new Date().toLocaleTimeString('th-TH')}
+                </div>
+            `;
+            document.body.appendChild(element);
+
+            const canvas = await html2canvas(element, {
+                scale: 2,
+                useCORS: true,
+                logging: false,
+            });
+            document.body.removeChild(element);
+
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const imgWidth = 210;
+            const pageHeight = 295;
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            
+            let heightLeft = imgHeight;
+            let position = 0;
+
+            pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+            heightLeft -= pageHeight;
+
+            while (heightLeft >= 0) {
+                position = heightLeft - imgHeight;
+                pdf.addPage();
+                pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                heightLeft -= pageHeight;
+            }
+
+            pdf.save(`yuzu-3day-brief-report.pdf`);
+        } catch (e) {
+            console.error("PDF Compilation Export Error:", e);
+            alert("เกิดข้อผิดพลาดในการสร้าง PDF: " + e.message);
+        } finally {
+            setPdfLoading(false);
+        }
     }
 
     async function handleSendConsoleChat() {
@@ -97,9 +267,11 @@ export default function YuzuKnowledgeManager() {
     useEffect(() => {
         fetchData();
         if (activeTab === 'insights') {
-            handleGenerateBrief();
+            if (!dailyBriefs[selectedBriefDate]) {
+                handleGenerateBrief(selectedBriefDate);
+            }
         }
-    }, [activeTab, selectedDate]);
+    }, [activeTab, selectedDate, selectedBriefDate]);
 
     async function fetchData() {
         if (activeTab === 'knowledge') {
@@ -589,7 +761,7 @@ export default function YuzuKnowledgeManager() {
                             <p className="text-orange-100 text-xs">วิเคราะห์พฤติกรรม สรุปงานรายวัน และแชทคุยเพื่อสั่งงานยูซุได้ทันที</p>
                         </div>
                         <button
-                            onClick={handleGenerateBrief}
+                            onClick={() => handleGenerateBrief(selectedBriefDate)}
                             disabled={briefLoading}
                             className="bg-white text-orange-600 hover:bg-orange-50 transition-all font-bold text-xs py-2.5 px-5 rounded-xl shadow-md disabled:opacity-50 active:scale-95 flex items-center gap-2"
                         >
@@ -598,7 +770,7 @@ export default function YuzuKnowledgeManager() {
                             ) : (
                                 <Icons.Yuzu size={14} />
                             )}
-                            สรุปภาพรวมร้านวันนี้
+                            สรุป/อัปเดตข้อมูลประจำวัน
                         </button>
                     </div>
 
@@ -608,31 +780,90 @@ export default function YuzuKnowledgeManager() {
                         {/* Left Column: AI Daily Briefing */}
                         <div className="space-y-6">
                             <Card className="p-6 space-y-4 border-t-4 border-t-orange-500">
-                                <div className="flex justify-between items-center">
+                                <div className="flex justify-between items-center pb-2 border-b border-slate-50">
                                     <h4 className="font-bold text-slate-800 flex items-center gap-2">
                                         <Icons.File size={18} className="text-orange-500" />
                                         AI Operations Briefing
                                     </h4>
-                                    <Badge color="orange">สรุปรายวัน</Badge>
+                                    <Badge color="orange">บันทึกสรุปย้อนหลัง 3 วัน</Badge>
                                 </div>
                                 
+                                {/* Date Selector Tabs */}
+                                <div className="flex border-b border-slate-100 pb-2 overflow-x-auto gap-1 no-scrollbar">
+                                    {recentDates.map((date, idx) => {
+                                        const isSelected = selectedBriefDate === date;
+                                        let dayLabel = "วันนี้";
+                                        if (idx === 1) dayLabel = "เมื่อวาน";
+                                        else if (idx === 2) dayLabel = "2 วันก่อน";
+                                        else if (idx === 3) dayLabel = "3 วันก่อน";
+                                        
+                                        const dateObj = new Date(date);
+                                        const formattedDate = dateObj.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
+                                        
+                                        return (
+                                            <button
+                                                key={date}
+                                                onClick={() => setSelectedBriefDate(date)}
+                                                className={`flex-1 py-1.5 px-2.5 text-center rounded-xl transition-all duration-200 whitespace-nowrap min-w-[70px] ${
+                                                    isSelected 
+                                                    ? 'bg-orange-500 text-white font-extrabold shadow-sm' 
+                                                    : 'text-slate-500 hover:bg-slate-50 font-bold'
+                                                }`}
+                                            >
+                                                <div className="text-[9px] uppercase tracking-wide opacity-80">{dayLabel}</div>
+                                                <div className="text-xs">{formattedDate}</div>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+
                                 {briefLoading ? (
                                     <div className="py-12 flex flex-col items-center justify-center space-y-3 text-slate-400">
                                         <span className="animate-spin rounded-full h-8 w-8 border-4 border-orange-500 border-t-transparent" />
                                         <p className="text-xs font-bold animate-pulse">ยูซุกำลังวิเคราะห์ข้อมูลกะงานและสรุปห้องแชท...</p>
                                     </div>
-                                ) : aiBrief ? (
+                                ) : dailyBriefs[selectedBriefDate] ? (
                                     <div className="bg-orange-50/50 p-4 rounded-xl border border-orange-100 text-slate-700 text-sm font-medium whitespace-pre-wrap leading-relaxed">
-                                        {aiBrief}
+                                        {dailyBriefs[selectedBriefDate]}
                                     </div>
                                 ) : (
                                     <div className="py-12 text-center text-slate-400 space-y-3">
                                         <p className="text-xs font-medium">ยังไม่มีการสร้างสรุปประจำวันนี้</p>
                                         <button 
-                                            onClick={handleGenerateBrief}
+                                            onClick={() => handleGenerateBrief(selectedBriefDate)}
                                             className="text-xs font-bold text-orange-500 hover:text-orange-600 underline"
                                         >
                                             กดเพื่อสร้างสรุปเมี๊ยว~
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* PDF Actions */}
+                                {dailyBriefs[selectedBriefDate] && !briefLoading && (
+                                    <div className="flex flex-col sm:flex-row gap-2 pt-3 border-t border-slate-100">
+                                        <button
+                                            onClick={() => handleExportSingleBriefPDF(selectedBriefDate)}
+                                            disabled={pdfLoading}
+                                            className="flex-1 py-2 px-3 bg-orange-50 border border-orange-200 text-orange-600 hover:bg-orange-100 transition-all font-bold text-xs rounded-xl flex items-center justify-center gap-2 disabled:opacity-50"
+                                        >
+                                            {pdfLoading ? (
+                                                <span className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-orange-600 border-t-transparent" />
+                                            ) : (
+                                                <Icons.File size={13} />
+                                            )}
+                                            ส่งออก PDF สรุปประจำวัน
+                                        </button>
+                                        <button
+                                            onClick={handleExportThreeDayReportPDF}
+                                            disabled={pdfLoading}
+                                            className="flex-1 py-2 px-3 bg-orange-600 text-white hover:bg-orange-700 transition-all font-bold text-xs rounded-xl flex items-center justify-center gap-2 shadow-md shadow-orange-100 disabled:opacity-50"
+                                        >
+                                            {pdfLoading ? (
+                                                <span className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-white border-t-transparent" />
+                                            ) : (
+                                                <Icons.File size={13} />
+                                            )}
+                                            ส่งออก PDF ย้อนหลัง 3 วัน
                                         </button>
                                     </div>
                                 )}

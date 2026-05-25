@@ -3,21 +3,34 @@ import { getDailySummary } from '../../../../utils/gemini';
 import { getDailyContent } from '../../../../utils/memory';
 import { createClient } from '@supabase/supabase-js';
 
-export async function GET() {
+export async function GET(request) {
     try {
+        const { searchParams } = new URL(request.url);
+        const dateStr = searchParams.get('date'); // 'YYYY-MM-DD'
+
         const supabase = createClient(
             process.env.NEXT_PUBLIC_SUPABASE_URL,
             process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
         );
 
-        const bangkokDateStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Bangkok' });
-        const startOfDay = new Date(`${bangkokDateStr}T00:00:00+07:00`);
+        let startOfDay, endOfDay;
+        let queryDateStr;
+        if (dateStr) {
+            queryDateStr = dateStr;
+            startOfDay = new Date(`${dateStr}T00:00:00+07:00`);
+            endOfDay = new Date(`${dateStr}T23:59:59.999+07:00`);
+        } else {
+            queryDateStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Bangkok' });
+            startOfDay = new Date(`${queryDateStr}T00:00:00+07:00`);
+            endOfDay = new Date(`${queryDateStr}T23:59:59.999+07:00`);
+        }
 
-        // 1. Fetch Today's Attendance Logs
+        // 1. Fetch Attendance Logs for the target day
         const { data: attendance, error: attError } = await supabase
             .from('attendance_logs')
             .select('timestamp, action_type, mood_status, mood_note, employees(name, nickname, position)')
             .gte('timestamp', startOfDay.toISOString())
+            .lte('timestamp', endOfDay.toISOString())
             .order('timestamp', { ascending: true });
 
         if (attError) throw attError;
@@ -51,7 +64,7 @@ export async function GET() {
 
             const groupId = latestChat?.group_id;
             if (groupId) {
-                const dailyLogs = await getDailyContent(groupId);
+                const dailyLogs = await getDailyContent(groupId, queryDateStr);
                 if (dailyLogs) {
                     chatStr += dailyLogs;
                 } else {
