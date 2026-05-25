@@ -48,8 +48,8 @@ export const getEffectiveDailyRoster = (employees, schedules, overrides, shifts,
                 employee: emp,
                 shift_id: override.shift_id,
                 shift_name: shiftDef ? shiftDef.name + ' (Sub)' : 'Extra Shift',
-                start_time: override.custom_start_time,
-                end_time: override.custom_end_time,
+                start_time: override.custom_start_time || shiftDef?.start_time || '',
+                end_time: override.custom_end_time || shiftDef?.end_time || '',
                 source: 'OVERRIDE',
                 original_override: override
             });

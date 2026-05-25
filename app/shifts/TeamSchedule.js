@@ -71,7 +71,7 @@ export default function TeamSchedule({ employees, schedules, overrides, shifts, 
                                                     // Scheduled to work
                                                     <div className={`rounded-lg p-1.5 text-xs font-bold border ${getShiftColorClass(shift.shift_name)}`}>
                                                         <div className="truncate max-w-[80px] mx-auto">{shift.shift_name}</div>
-                                                        <div className="text-[10px] font-mono font-bold mt-0.5">{shift.start_time.slice(0, 5)}-{shift.end_time.slice(0, 5)}</div>
+                                                        <div className="text-[10px] font-mono font-bold mt-0.5">{(shift.start_time || '').slice(0, 5)}-{(shift.end_time || '').slice(0, 5)}</div>
                                                         {empLeave && empLeave.status === 'pending' && (
                                                             <div className="text-[9px] text-amber-400 mt-1 font-black bg-amber-500/10 py-0.5 rounded border border-amber-500/20">
                                                                 ขอลา {empLeave.leave_type === 'sick' ? '😷' : empLeave.leave_type === 'business' ? '💼' : '🏖️'}

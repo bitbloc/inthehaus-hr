@@ -93,7 +93,7 @@ export default function MyShifts({ currentUser, employees, schedules, shifts, ov
                                                 )}
                                             </div>
                                             <div className="text-xs font-mono font-bold text-slate-400 mt-0.5">
-                                                {myShift.start_time.slice(0, 5)} - {myShift.end_time.slice(0, 5)}
+                                                {(myShift.start_time || '').slice(0, 5)} - {(myShift.end_time || '').slice(0, 5)}
                                             </div>
                                         </>
                                     ) : (
