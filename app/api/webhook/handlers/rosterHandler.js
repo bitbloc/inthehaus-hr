@@ -320,21 +320,22 @@ export async function handleRosterPostback(event, client, action, queryParams, u
     }
 
     const newStatus = action === 'approve_leave' ? 'approved' : 'rejected';
+    const ids = String(leaveId).split(',').map(Number);
 
     // 1. ดึงข้อมูลใบลา
-    const { data: req, error: fetchErr } = await supabase
+    const { data: leaves, error: fetchErr } = await supabase
       .from('leave_requests')
-      .select('*, employees(name, nickname, position)')
-      .eq('id', leaveId)
-      .single();
+      .select('*, employees!employee_id(name, nickname, position), replacement_employee:employees!replacement_employee_id(name, nickname, position)')
+      .in('id', ids);
 
-    if (fetchErr || !req) {
+    if (fetchErr || !leaves || leaves.length === 0) {
       await client.replyMessage(event.replyToken, { type: 'text', text: 'เมี๊ยว~ ไม่พบข้อมูลใบลาหยุดนี้ในระบบค่ะ' });
       return true;
     }
 
-    if (req.status !== 'pending') {
-      await client.replyMessage(event.replyToken, { type: 'text', text: `เมี๊ยว~ ใบลาหยุดนี้ได้รับการตัดสินไปแล้ว (สถานะปัจจุบัน: ${req.status})` });
+    const pendingLeaves = leaves.filter(l => l.status === 'pending');
+    if (pendingLeaves.length === 0) {
+      await client.replyMessage(event.replyToken, { type: 'text', text: 'เมี๊ยว~ ใบลาหยุดเหล่านี้ได้รับการดำเนินการไปก่อนหน้านี้แล้วค่ะ' });
       return true;
     }
 
@@ -342,18 +343,24 @@ export async function handleRosterPostback(event, client, action, queryParams, u
     const { error: updateErr } = await supabase
       .from('leave_requests')
       .update({ status: newStatus })
-      .eq('id', leaveId);
+      .in('id', pendingLeaves.map(l => l.id));
 
     if (updateErr) {
-      await client.replyMessage(event.replyToken, { type: 'text', text: `เเ๊! เกิดข้อผิดพลาดในการอัปเดตสถานะ: ${updateErr.message}` });
+      await client.replyMessage(event.replyToken, { type: 'text', text: `เแม๊! เกิดข้อผิดพลาดในการอัปเดตสถานะ: ${updateErr.message}` });
       return true;
     }
 
-    // 3. ถ้าอนุมัติ ให้ทำ roster_transactions
+    // 3. ถ้าอนุมัติ ให้ทำ roster_transactions และ roster_overrides
     if (newStatus === 'approved') {
-      const { error: overrideErr } = await supabase
-        .from('roster_transactions')
-        .upsert({
+      for (const req of pendingLeaves) {
+        // 3.1 Mark leaving employee as OFF
+        await supabase.from('roster_overrides').upsert({
+          employee_id: req.employee_id,
+          date: req.leave_date,
+          is_off: true
+        });
+
+        await supabase.from('roster_transactions').upsert({
           employee_id: req.employee_id,
           date: req.leave_date,
           is_off: true,
@@ -361,17 +368,89 @@ export async function handleRosterPostback(event, client, action, queryParams, u
           status: 'PUBLISHED'
         }, { onConflict: 'employee_id, date, slot_type' });
 
-      if (overrideErr) {
-        console.error("Override Error:", overrideErr);
+        // 3.2 If there is a replacement, assign the leaving employee's shift to them
+        if (req.replacement_employee_id) {
+          let originalShiftId = null;
+          let originalStart = null;
+          let originalEnd = null;
+
+          // Query original shift from roster_transactions
+          const { data: tx } = await supabase
+            .from('roster_transactions')
+            .select('shift_id, custom_start_time, custom_end_time')
+            .eq('employee_id', req.employee_id)
+            .eq('date', req.leave_date)
+            .eq('slot_type', 'MAIN')
+            .eq('status', 'PUBLISHED')
+            .eq('is_off', false)
+            .maybeSingle();
+
+          if (tx && tx.shift_id) {
+            originalShiftId = tx.shift_id;
+            originalStart = tx.custom_start_time;
+            originalEnd = tx.custom_end_time;
+          } else {
+            // Fallback: Check template schedule
+            const dayOfWeek = new Date(req.leave_date).getDay();
+            const { data: sched } = await supabase
+              .from('employee_schedules')
+              .select('shift_id')
+              .eq('employee_id', req.employee_id)
+              .eq('day_of_week', dayOfWeek)
+              .eq('is_off', false)
+              .maybeSingle();
+
+            if (sched && sched.shift_id) {
+              originalShiftId = sched.shift_id;
+              const { data: shiftObj } = await supabase
+                .from('shifts')
+                .select('start_time, end_time')
+                .eq('id', sched.shift_id)
+                .single();
+              if (shiftObj) {
+                originalStart = shiftObj.start_time;
+                originalEnd = shiftObj.end_time;
+              }
+            }
+          }
+
+          if (originalShiftId) {
+            await supabase.from('roster_overrides').upsert({
+              employee_id: req.replacement_employee_id,
+              date: req.leave_date,
+              shift_id: originalShiftId,
+              is_off: false,
+              custom_start_time: originalStart,
+              custom_end_time: originalEnd
+            });
+
+            await supabase.from('roster_transactions').upsert({
+              employee_id: req.replacement_employee_id,
+              date: req.leave_date,
+              shift_id: originalShiftId,
+              is_off: false,
+              custom_start_time: originalStart,
+              custom_end_time: originalEnd,
+              slot_type: 'MAIN',
+              status: 'PUBLISHED'
+            }, { onConflict: 'employee_id, date, slot_type' });
+          }
+        }
       }
     }
 
     // 4. ส่งข้อความอัปเดตและแจ้งเตือนเข้ากลุ่ม
-    const name = req.employees?.nickname || req.employees?.name || 'พนักงาน';
+    const sampleReq = pendingLeaves[0];
+    const name = sampleReq.employees?.nickname || sampleReq.employees?.name || 'พนักงาน';
     const isApproved = newStatus === 'approved';
     const color = isApproved ? '#06c755' : '#ff334b';
     const title = isApproved ? '✅ อนุมัติการลา (ผ่าน LINE)' : '❌ ไม่อนุมัติการลา (ผ่าน LINE)';
-    const typeText = req.leave_type === 'sick' ? 'ลาป่วย 😷' : req.leave_type === 'business' ? 'ลากิจ 💼' : 'พักร้อน 🏖️';
+    const typeText = sampleReq.leave_type === 'sick' ? 'ลาป่วย 😷' : sampleReq.leave_type === 'business' ? 'ลากิจ 💼' : 'พักร้อน 🏖️';
+    
+    // เรียงวันที่ทั้งหมดที่อนุมัติ/ปฏิเสธ
+    const datesStr = pendingLeaves.map(l => l.leave_date).join(', ');
+    const repEmp = sampleReq.replacement_employee;
+    const replacementName = repEmp ? `${repEmp.name} (${repEmp.nickname || "-"})` : "-";
 
     const message = {
       type: 'flex',
@@ -408,7 +487,7 @@ export async function handleRosterPostback(event, client, action, queryParams, u
                   type: 'box', layout: 'baseline',
                   contents: [
                     { type: 'text', text: 'วันที่:', color: '#555555', size: 'sm', flex: 2 },
-                    { type: 'text', text: req.leave_date, color: '#333333', size: 'sm', flex: 4 }
+                    { type: 'text', text: datesStr, color: '#333333', size: 'sm', flex: 4, wrap: true }
                   ]
                 },
                 {
@@ -421,8 +500,15 @@ export async function handleRosterPostback(event, client, action, queryParams, u
                 {
                   type: 'box', layout: 'baseline',
                   contents: [
+                    { type: 'text', text: 'คนแทน:', color: '#555555', size: 'sm', flex: 2 },
+                    { type: 'text', text: replacementName, color: '#333333', size: 'sm', flex: 4, wrap: true }
+                  ]
+                },
+                {
+                  type: 'box', layout: 'baseline',
+                  contents: [
                     { type: 'text', text: 'เหตุผล:', color: '#555555', size: 'sm', flex: 2 },
-                    { type: 'text', text: req.reason || '-', color: '#333333', size: 'sm', flex: 4, wrap: true }
+                    { type: 'text', text: sampleReq.reason || '-', color: '#333333', size: 'sm', flex: 4, wrap: true }
                   ]
                 }
               ]

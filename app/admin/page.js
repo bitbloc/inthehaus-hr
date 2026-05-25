@@ -95,7 +95,7 @@ export default function AdminDashboard() {
     const fetchData = async (table, keyInState, transform = null) => {
         let query = supabase.from(table).select("*");
         if (table === 'leave_requests') {
-            query = supabase.from(table).select("*, employees(name, position)");
+            query = supabase.from(table).select("*, employees!employee_id(name, position), replacement_employee:employees!replacement_employee_id(name, nickname, position)");
         }
         const { data: res } = await query.order("id");
         dispatch({ type: 'SET_DATA', payload: { [keyInState]: transform ? transform(res) : res || [] } });
@@ -377,16 +377,92 @@ export default function AdminDashboard() {
         const { error } = await supabase.from('leave_requests').update({ status: newStatus }).eq('id', req.id);
         if (!error) {
             if (newStatus === 'approved') {
-                const { error: overrideError } = await supabase.from('roster_overrides').upsert({
+                // 1. Mark leaving employee as OFF
+                await supabase.from('roster_overrides').upsert({
                     employee_id: req.employee_id,
                     date: req.leave_date,
                     is_off: true
                 });
-                if (overrideError) {
-                    console.error("Failed to create roster override:", overrideError);
+
+                await supabase.from('roster_transactions').upsert({
+                    employee_id: req.employee_id,
+                    date: req.leave_date,
+                    is_off: true,
+                    slot_type: 'MAIN',
+                    status: 'PUBLISHED'
+                }, { onConflict: 'employee_id, date, slot_type' });
+
+                // 2. If there is a replacement, assign the leaving employee's shift to them
+                if (req.replacement_employee_id) {
+                    let originalShiftId = null;
+                    let originalStart = null;
+                    let originalEnd = null;
+
+                    // Query original shift from roster_transactions
+                    const { data: tx } = await supabase
+                        .from('roster_transactions')
+                        .select('shift_id, custom_start_time, custom_end_time')
+                        .eq('employee_id', req.employee_id)
+                        .eq('date', req.leave_date)
+                        .eq('slot_type', 'MAIN')
+                        .eq('status', 'PUBLISHED')
+                        .eq('is_off', false)
+                        .maybeSingle();
+
+                    if (tx && tx.shift_id) {
+                        originalShiftId = tx.shift_id;
+                        originalStart = tx.custom_start_time;
+                        originalEnd = tx.custom_end_time;
+                    } else {
+                        // Fallback: Check template schedule
+                        const dayOfWeek = new Date(req.leave_date).getDay();
+                        const { data: sched } = await supabase
+                            .from('employee_schedules')
+                            .select('shift_id')
+                            .eq('employee_id', req.employee_id)
+                            .eq('day_of_week', dayOfWeek)
+                            .eq('is_off', false)
+                            .maybeSingle();
+
+                        if (sched && sched.shift_id) {
+                            originalShiftId = sched.shift_id;
+                            const { data: shiftObj } = await supabase
+                                .from('shifts')
+                                .select('start_time, end_time')
+                                .eq('id', sched.shift_id)
+                                .single();
+                            if (shiftObj) {
+                                originalStart = shiftObj.start_time;
+                                originalEnd = shiftObj.end_time;
+                            }
+                        }
+                    }
+
+                    if (originalShiftId) {
+                        await supabase.from('roster_overrides').upsert({
+                            employee_id: req.replacement_employee_id,
+                            date: req.leave_date,
+                            shift_id: originalShiftId,
+                            is_off: false,
+                            custom_start_time: originalStart,
+                            custom_end_time: originalEnd
+                        });
+
+                        await supabase.from('roster_transactions').upsert({
+                            employee_id: req.replacement_employee_id,
+                            date: req.leave_date,
+                            shift_id: originalShiftId,
+                            is_off: false,
+                            custom_start_time: originalStart,
+                            custom_end_time: originalEnd,
+                            slot_type: 'MAIN',
+                            status: 'PUBLISHED'
+                        }, { onConflict: 'employee_id, date, slot_type' });
+                    }
                 }
             }
             try {
+                const repName = req.replacement_employee?.nickname || req.replacement_employee?.name || "";
                 const notifyRes = await fetch('/api/notify-leave-status', {
                     method: 'POST',
                     body: JSON.stringify({
@@ -394,7 +470,8 @@ export default function AdminDashboard() {
                         date: req.leave_date,
                         type: req.leave_type,
                         reason: req.reason,
-                        status: newStatus
+                        status: newStatus,
+                        replacementName: repName
                     }),
                     headers: { 'Content-Type': 'application/json' }
                 });
@@ -1167,6 +1244,11 @@ export default function AdminDashboard() {
                                                             <div className="text-xs text-slate-800">
                                                                 <span className="font-extrabold text-slate-900">{req.employees?.name}</span> ขอลาหยุดประเภท <span className="font-bold text-indigo-600">{req.leave_type}</span>
                                                                 <p className="mt-1 font-medium text-slate-600 font-semibold">เหตุผล: "{req.reason || '-'}"</p>
+                                                                {req.replacement_employee && (
+                                                                    <p className="mt-1 text-xs font-bold text-slate-700">
+                                                                        👤 คนทำงานแทน: <span className="text-indigo-650 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded-md">{req.replacement_employee.name} {req.replacement_employee.nickname ? `(${req.replacement_employee.nickname})` : ""}</span>
+                                                                    </p>
+                                                                )}
                                                             </div>
                                                             <div className="flex gap-2 justify-end pt-1">
                                                                 <button 
@@ -1516,7 +1598,7 @@ export default function AdminDashboard() {
                             <Card className="p-0 overflow-hidden">
                                 <table className="w-full text-sm text-left">
                                     <thead className="bg-slate-50 text-slate-500 font-extrabold text-xs uppercase">
-                                        <tr><th className="p-4">Name</th><th className="p-4">Date</th><th className="p-4">Type</th><th className="p-4">Reason</th><th className="p-4">Status</th><th className="p-4 text-right">Action</th></tr>
+                                        <tr><th className="p-4">Name</th><th className="p-4">Date</th><th className="p-4">Type</th><th className="p-4">Reason</th><th className="p-4">Replacement</th><th className="p-4">Status</th><th className="p-4 text-right">Action</th></tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
                                         {data.leaveRequests.map(req => (
@@ -1525,6 +1607,12 @@ export default function AdminDashboard() {
                                                 <td className="p-4 font-mono text-slate-900 font-black">{formatDate(req.leave_date)}</td>
                                                 <td className="p-4"><Badge color="blue">{req.leave_type}</Badge></td>
                                                 <td className="p-4 text-slate-800 font-semibold">{req.reason}</td>
+                                                <td className="p-4 text-slate-850 font-bold">
+                                                    {req.replacement_employee 
+                                                        ? `${req.replacement_employee.name} ${req.replacement_employee.nickname ? `(${req.replacement_employee.nickname})` : ""}`
+                                                        : "-"
+                                                    }
+                                                </td>
                                                 <td className="p-4"><Badge color={req.status === 'approved' ? 'emerald' : req.status === 'rejected' ? 'rose' : 'amber'}>{req.status}</Badge></td>
                                                 <td className="p-4 text-right gap-2 flex justify-end">
                                                     {req.status === 'pending' ? (
