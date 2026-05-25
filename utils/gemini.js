@@ -415,3 +415,76 @@ export async function extractReservationFromText(text) {
         return null;
     }
 }
+
+/**
+ * Analyze espresso shot report from text
+ */
+export async function analyzeEspressoShot(text, employeeName = "พี่ทีมงาน") {
+    try {
+        const instance = getGenAI();
+        const model = instance.getGenerativeModel({ model: "gemini-3.5-flash" });
+
+        const prompt = `คุณคือ "ยูซุ" แมวส้มผู้เชี่ยวชาญบาริสต้าประจำร้าน In The Haus นครพนม
+        หน้าที่ของคุณคือวิเคราะห์ข้อมูลการสกัดช็อตกาแฟ (Espresso Extraction) จากรายงานของพนักงาน
+
+        นี่คือเกณฑ์มาตรฐานสำหรับเมล็ดกาแฟคั่วกลาง (Medium Roast) ของร้าน:
+        - ปริมาณผงกาแฟ (Dose): 18.0g - 20.0g (ต่ำกว่า 18.0g ถือว่าน้อยไป/LOW, เกิน 20.0g ถือว่าเยอะไป/HIGH)
+        - ปริมาณน้ำกาแฟ (Yield): 36.0ml - 40.0ml (หรือประมาณ 35.0ml - 40.0ml ถือว่ายอมรับได้/OK)
+        - หยดแรกที่ไหล (First Drop): วินาทีที่ 5 - 8 (ต่ำกว่า 5 วินาทีถือว่าไหลเร็วไป/FAST, เกิน 8 วินาทีถือว่าช้าไป/SLOW)
+        - เวลาสกัดรวม (Total Time): 25 - 30 วินาที (ต่ำกว่า 22 วินาทีถือว่าไหลเร็ว/FAST (Under-extracted), เกิน 30 วินาทีถือว่าไหลช้า/SLOW (Over-extracted))
+        - อัตราส่วน Dose ต่อ Yield ในอุดมคติคือประมาณ 1:2
+
+        กรุณาช่วยวิเคราะห์ข้อความต่อไปนี้:
+        "${text}"
+
+        ดึงข้อมูลพารามิเตอร์ วิเคราะห์เปรียบเทียบกับมาตรฐานของร้าน และให้คำแนะนำทางเทคนิค (เช่น การปรับเบอร์บด ปรับแรงแทมป์) โดยสไตล์การตอบต้องน่ารัก กวนๆ เป็นกันเองแบบแมวส้ม ยูซุ และเรียกคนส่งว่า "${employeeName}" อย่างสุภาพสนิทสนม (ห้ามเรียก "น้อง" หรือ "คุณ" นำหน้าชื่อเล่นพนักงานเด็ดขาด ให้ใช้ "พี่" เสมอ เช่น พี่แคสเปอร์)
+
+        และตอบกลับเป็น JSON ในรูปแบบนี้เท่านั้น (ห้ามใส่ Markdown block):
+        {
+          "dose": {
+            "value": 18.0,
+            "unit": "g",
+            "status": "OK", 
+            "comment": "วิเคราะห์ผงกาแฟสั้นๆ"
+          },
+          "yield": {
+            "value": 35.0,
+            "unit": "ml",
+            "status": "OK",
+            "comment": "วิเคราะห์น้ำกาแฟสั้นๆ"
+          },
+          "firstDrop": {
+            "value": 6.0,
+            "unit": "s",
+            "status": "OK",
+            "comment": "วิเคราะห์หยดแรกสั้นๆ"
+          },
+          "totalTime": {
+            "value": 36.0,
+            "unit": "s",
+            "status": "SLOW",
+            "comment": "วิเคราะห์เวลารวมสั้นๆ"
+          },
+          "grindAdjustment": "ปรับหยาบเพิ่ม 1 คลิก",
+          "isGrindAdjustmentCorrect": true,
+          "tasteProfile": "ขมไหม้ ฝาดแห้ง หรือเปรี้ยวสว่างมีบอดี้",
+          "recommendation": "คำแนะนำทางเทคนิคจากยูซุสำหรับช็อตนี้อย่างชัดเจนและนำไปปฏิบัติงานจริงได้ พร้อมให้กำลังใจหรือแซวเล็กน้อย"
+        }
+
+        หมายเหตุสำหรับฟิลด์ status: ให้ตอบเป็น "OK", "LOW", "HIGH", "FAST", "SLOW" หรือ "NOT_SPECIFIED" เท่านั้น ตามความเหมาะสม
+        หมายเหตุสำหรับฟิลด์ grindAdjustment: ให้สกัดจากข้อความที่พนักงานพิมพ์มา เช่น "ปรับละเอียดขึ้น 1 คลิก" หรือ "ปรับหยาบขึ้น 1 คลิก" หรือระบุ null หากในข้อความไม่มีการพูดถึงการปรับแต่งเบอร์บดเลย
+        หมายเหตุสำหรับฟิลด์ isGrindAdjustmentCorrect: 
+        - หากเวลารวมช้ากว่ามาตรฐาน (SLOW) และพนักงานแจ้งว่าปรับหยาบขึ้น (Coarse/หยาบ) -> ตอบ true (ถูกต้อง)
+        - หากเวลารวมเร็วกว่ามาตรฐาน (FAST) และพนักงานแจ้งว่าปรับละเอียดขึ้น (Fine/ละเอียด) -> ตอบ true (ถูกต้อง)
+        - หากพฤติกรรมการปรับเบอร์บดตรงกันข้าม หรือไม่ช่วยแก้ปัญหาการไหล -> ตอบ false (ไม่ถูกต้อง)
+        - หากพนักงานไม่ได้ระบุเรื่องการปรับบด หรือเวลาปกติปกติอยู่แล้ว -> ตอบ null`;
+
+        const result = await model.generateContent(prompt);
+        const textResponse = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
+        return JSON.parse(textResponse);
+    } catch (error) {
+        console.error("Espresso Analysis Error:", error);
+        return null;
+    }
+}
+

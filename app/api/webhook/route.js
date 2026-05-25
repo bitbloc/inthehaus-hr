@@ -9,6 +9,7 @@ import { handleStockPostback } from './handlers/stockHandler';
 import { handleSlipImage } from './handlers/slipHandler';
 import { handleOrderAndReservationDetection, handleOrderAndReservationPostback } from './handlers/orderHandler';
 import { handleChatCommand, handleChatPostback } from './handlers/chatHandler';
+import { isEspressoShotReport, handleEspressoShotAnalysis } from './handlers/espressoHandler';
 
 export const maxDuration = 60;
 
@@ -207,6 +208,13 @@ export async function POST(request) {
             handledLocally = true;
           } 
           
+          // 2.5 Espresso Shot Auto-Detection
+          else if (isEspressoShotReport(rawText)) {
+            if (await handleEspressoShotAnalysis(event, client, rawText, userId, groupId)) {
+              handledLocally = true;
+            }
+          }
+          
           // 3. Delegate Roster Commands
           else if (await handleRosterCommand(event, client, text, rawText, userId)) {
             handledLocally = true;
@@ -273,6 +281,35 @@ export async function POST(request) {
             for await (const chunk of stream) chunks.push(chunk);
             const buffer = Buffer.concat(chunks);
             const base64 = buffer.toString('base64');
+
+            // Prevent redundant vision analysis and replies if an espresso shot was reported recently by this user
+            const { supabase } = await import('../../../lib/supabaseClient');
+            const oneMinuteAgo = new Date(Date.now() - 60000).toISOString();
+            const { data: recentReports } = await supabase
+              .from('yuzu_chat_history')
+              .select('id')
+              .eq('user_id', userId)
+              .eq('message_type', 'espresso_report')
+              .gte('created_at', oneMinuteAgo)
+              .limit(1);
+
+            if (recentReports && recentReports.length > 0) {
+              console.log("Yuzu Image Redundancy Filter: Uploading espresso shot photo silently.");
+              const fileName = `shot_${Date.now()}_${userId}_${event.message.id}.jpg`;
+              const { error: uploadError } = await supabase.storage
+                .from('yuzu-slips')
+                .upload(fileName, buffer, { contentType: 'image/jpeg' });
+
+              let imageUrl = null;
+              if (!uploadError) {
+                const { data: linkData } = supabase.storage.from('yuzu-slips').getPublicUrl(fileName);
+                imageUrl = linkData?.publicUrl;
+              }
+
+              // Log photo in the history log with URL
+              await saveMessage(groupId, userId, 'user', `[ภาพประกอบช็อตกาแฟ] ${imageUrl || ''}`, 'image_description');
+              return NextResponse.json({ success: true, handler: 'espresso_image_silent' });
+            }
 
             const configs = await getYuzuConfigs();
             const isBoss = await checkIsBoss(userId);
