@@ -21,6 +21,8 @@ export default function YuzuKnowledgeManager() {
     const [editingImageUrl, setEditingImageUrl] = useState('');
     const [loading, setLoading] = useState(false);
     const [slipLoading, setSlipLoading] = useState(false);
+    const [espressoLoading, setEspressoLoading] = useState(false);
+    const [espressoReports, setEspressoReports] = useState([]);
     const [message, setMessage] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
     const [isFlowVisible, setIsFlowVisible] = useState(true);
@@ -346,6 +348,72 @@ export default function YuzuKnowledgeManager() {
                 setMessage('Error: ' + error.message);
             }
             setSlipLoading(false);
+        } else if (activeTab === 'espresso') {
+            setEspressoLoading(true);
+            
+            if (employees.length === 0) {
+                const { data: empData } = await supabase
+                    .from('employees')
+                    .select('id, name, nickname, line_bot_id, line_user_id')
+                    .eq('is_active', true);
+                if (empData) setEmployees(empData);
+            }
+
+            const start = new Date(selectedDate + 'T00:00:00+07:00').toISOString();
+            const end = new Date(selectedDate + 'T23:59:59.999+07:00').toISOString();
+
+            const { data: chatData, error } = await supabase
+                .from('yuzu_chat_history')
+                .select('id, created_at, user_id, role, content, message_type')
+                .gte('created_at', start)
+                .lte('created_at', end)
+                .order('created_at', { ascending: true });
+
+            if (!error && chatData) {
+                const rawReports = chatData.filter(m => m.message_type === 'espresso_report');
+                const photos = chatData.filter(m => m.message_type === 'image_description' && m.content.includes('[ภาพประกอบช็อตกาแฟ]'));
+                const analyses = chatData.filter(m => m.role === 'model' && m.content.includes('[Espresso Analysis]'));
+
+                const matchedReports = rawReports.map(report => {
+                    const reportTime = new Date(report.created_at);
+
+                    const matchingPhotos = photos.filter(p => {
+                        const pTime = new Date(p.created_at);
+                        const diffMin = Math.abs(pTime - reportTime) / 60000;
+                        return p.user_id === report.user_id && diffMin <= 5;
+                    });
+
+                    const photoUrls = matchingPhotos.map(p => {
+                        const match = p.content.match(/\[ภาพประกอบช็อตกาแฟ\] (https?:\/\/[^\s]+)/);
+                        return match ? match[1] : null;
+                    }).filter(Boolean);
+
+                    const analysis = analyses.find(a => {
+                        const aTime = new Date(a.created_at);
+                        const diffMin = (aTime - reportTime) / 60000;
+                        return diffMin >= 0 && diffMin <= 2;
+                    });
+
+                    const recommendation = analysis 
+                        ? analysis.content.replace('[Espresso Analysis]', '').trim() 
+                        : 'ไม่มีบทวิเคราะห์ช็อตกาแฟ';
+
+                    return {
+                        id: report.id,
+                        timestamp: report.created_at,
+                        userId: report.user_id,
+                        rawText: report.content,
+                        photos: photoUrls,
+                        recommendation
+                    };
+                });
+
+                setEspressoReports(matchedReports);
+            } else if (error) {
+                console.error("Espresso fetch error:", error);
+                setMessage('Error: ' + error.message);
+            }
+            setEspressoLoading(false);
         }
     }
 
@@ -583,7 +651,8 @@ export default function YuzuKnowledgeManager() {
                         { id: 'insights', label: 'AI Dashboard', icon: Icons.Yuzu },
                         { id: 'config', label: 'System Config', icon: Icons.Settings },
                         { id: 'employees', label: 'Staff Roles', icon: Icons.Staff },
-                        { id: 'slips', label: 'Transfer Slips', icon: Icons.Money }
+                        { id: 'slips', label: 'Transfer Slips', icon: Icons.Money },
+                        { id: 'espresso', label: 'Espresso Log', icon: Icons.Coffee }
                     ].map(tab => (
                         <button
                             key={tab.id}
@@ -1473,6 +1542,101 @@ export default function YuzuKnowledgeManager() {
                 </div>
             )}
 
+            {/* TAB: ESPRESSO */}
+            {activeTab === 'espresso' && (
+                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        <div className="flex items-center gap-4 bg-white p-2 px-4 rounded-2xl shadow-sm border border-slate-100 w-fit">
+                            <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">เลือกวันที่:</span>
+                            <input 
+                                type="date" 
+                                value={selectedDate}
+                                onChange={(e) => setSelectedDate(e.target.value)}
+                                className="bg-transparent font-bold text-slate-800 outline-none text-sm cursor-pointer"
+                            />
+                        </div>
+                        
+                        <a 
+                            href={`/admin/report/espresso?date=${selectedDate}`} 
+                            target="_blank"
+                            className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold text-[10px] tracking-[0.2em] uppercase shadow-xl hover:bg-black transition-all flex items-center gap-2"
+                        >
+                            <Icons.File size={14} /> PDF REPORT
+                        </a>
+                    </div>
+
+                    <Card className="p-0 overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm text-left">
+                                <thead className="bg-slate-50 text-slate-400 font-bold text-[10px] uppercase tracking-wider">
+                                    <tr>
+                                        <th className="px-6 py-4">Time</th>
+                                        <th className="px-6 py-4">Barista</th>
+                                        <th className="px-6 py-4">Parameters (Raw Log)</th>
+                                        <th className="px-6 py-4">Yuzu Recommendation</th>
+                                        <th className="px-6 py-4">Photos</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-50">
+                                    {espressoLoading ? (
+                                        <tr>
+                                            <td colSpan="5" className="p-12 text-center text-slate-400 italic">กำลังดึงข้อมูลรายงานช็อตกาแฟ...</td>
+                                        </tr>
+                                    ) : espressoReports.length === 0 ? (
+                                        <tr>
+                                            <td colSpan="5" className="p-20 text-center">
+                                                <p className="text-slate-300 font-bold uppercase tracking-widest mb-1">No Espresso Reports</p>
+                                                <p className="text-slate-400 text-[10px]">ไม่พบรายงานการสกัดช็อตกาแฟในวันที่เลือก</p>
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        espressoReports.map((report) => (
+                                            <tr key={report.id} className="hover:bg-slate-50 transition-colors">
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <div className="font-bold text-slate-700">{format(new Date(report.timestamp), 'HH:mm:ss')}</div>
+                                                    <div className="text-[10px] text-slate-400 uppercase font-mono">{format(new Date(report.timestamp), 'dd MMM yyyy')}</div>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <div className="font-bold text-slate-700">
+                                                        {getEmployeeName(report.userId, '-')}
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="font-medium text-slate-600 max-w-xs overflow-hidden text-ellipsis whitespace-nowrap" title={report.rawText}>
+                                                        {report.rawText}
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="text-slate-500 max-w-sm overflow-hidden text-ellipsis whitespace-nowrap italic" title={report.recommendation}>
+                                                        {report.recommendation}
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    {report.photos.length > 0 ? (
+                                                        <div className="flex gap-1.5 items-center">
+                                                            <span className="text-[10px] font-black bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full">
+                                                                {report.photos.length} Photo(s)
+                                                            </span>
+                                                            <div className="flex gap-1">
+                                                                {report.photos.map((url, i) => (
+                                                                    <a key={i} href={url} target="_blank" rel="noreferrer" className="w-6 h-6 rounded border border-slate-100 overflow-hidden block">
+                                                                        <img src={url} className="w-full h-full object-cover" />
+                                                                    </a>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    ) : <span className="text-slate-300">-</span>}
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </Card>
+                </div>
+            )}
+
             {message && !loading && (
                  <div className="fixed bottom-8 right-8 z-[100] bg-slate-900 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-right-10 duration-300">
                     <span className="w-2 h-2 rounded-full bg-orange-500 animate-ping" />
@@ -1510,6 +1674,19 @@ if (!Icons.Alert) {
             <circle cx="12" cy="12" r="10"></circle>
             <line x1="12" y1="8" x2="12" y2="12"></line>
             <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+    );
+}
+
+// Minimal Coffee icon
+if (!Icons.Coffee) {
+    Icons.Coffee = ({ size }) => (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M18 8h1a4 4 0 0 1 0 8h-1"></path>
+            <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path>
+            <line x1="6" y1="1" x2="6" y2="4"></line>
+            <line x1="10" y1="1" x2="10" y2="4"></line>
+            <line x1="14" y1="1" x2="14" y2="4"></line>
         </svg>
     );
 }
