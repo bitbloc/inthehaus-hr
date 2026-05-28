@@ -1,5 +1,3 @@
-
-const API_KEY = 'HHgiMMzP47XhYsmXzWHaFQxHeaBuoMSw'; // In production use process.env
 const SHOP_LAT = 17.390110564180162;
 const SHOP_LONG = 104.79292673153263;
 
@@ -14,7 +12,7 @@ const weatherCodes = {
     1001: "มีเมฆมาก ☁️",
     2000: "หมอก 🌫️",
     2100: "หมอกบาง 🌫️",
-    4000: "ฝนปรอยๆ 🌧️",
+    4000: "ฝนตกปรอยๆ 🌧️",
     4001: "ฝนตก 🌧️",
     4200: "ฝนตกเล็กน้อย 🌦️",
     4201: "ฝนตกหนัก ⛈️",
@@ -23,31 +21,159 @@ const weatherCodes = {
 
 const getThaiCondition = (code) => weatherCodes[code] || "ไม่ทราบสถานะ";
 
+// Map WMO codes (OpenMeteo) to Tomorrow.io codes
+const mapWmoToTomorrow = (wmo) => {
+    if (wmo === 0) return 1000;
+    if (wmo === 1) return 1100;
+    if (wmo === 2) return 1101;
+    if (wmo === 3) return 1001;
+    if (wmo === 45 || wmo === 48) return 1001;
+    if (wmo >= 51 && wmo <= 57) return 4000;
+    if (wmo === 61 || wmo === 80) return 4200;
+    if (wmo >= 63 && wmo <= 67) return 4001;
+    if (wmo >= 81 && wmo <= 82) return 4001;
+    if (wmo >= 95) return 8000;
+    return 1000; // Default
+};
+
 export async function getSchemaWeather(lat = SHOP_LAT, lon = SHOP_LONG) {
     try {
-        const url = `https://api.tomorrow.io/v4/weather/forecast?location=${lat},${lon}&apikey=${API_KEY}`;
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&hourly=temperature_2m,precipitation_probability,precipitation,weather_code&wind_speed_unit=ms&past_days=1&timezone=Asia/Bangkok`;
         const res = await fetch(url);
-        if (!res.ok) throw new Error("Weather API Error");
+        if (!res.ok) throw new Error("OpenMeteo Weather API Error");
         const data = await res.json();
 
-        const current = data.timelines?.minutely?.[0]?.values;
-        const daily = data.timelines?.daily?.[0]?.values; // Forecast for today/tomorrow
+        const current = data.current;
+        const hourly = data.hourly;
 
-        if (!current || !daily) return null;
+        if (!current) return null;
+
+        const conditionCode = mapWmoToTomorrow(current.weather_code);
+
+        let tempDiff = 0;
+        let tempComparisonStatus = 'similar';
+        let tempDiffText = 'ใกล้เคียงกับเมื่อวาน';
+        let rainBlocksText = [];
+        let heavyRainBlocks = [];
+        let lightRainBlocks = [];
+        let hasRain = false;
+        let employeeAdvice = '';
+
+        if (hourly && hourly.temperature_2m && hourly.precipitation && hourly.precipitation_probability) {
+            // Index 0..23 is yesterday, 24..47 is today (due to past_days=1 and timezone=Asia/Bangkok)
+            const tempYesterday = hourly.temperature_2m.slice(0, 24);
+            const tempToday = hourly.temperature_2m.slice(24, 48);
+            
+            if (tempYesterday.length > 0 && tempToday.length > 0) {
+                const avgTempYesterday = tempYesterday.reduce((a, b) => a + b, 0) / tempYesterday.length;
+                const avgTempToday = tempToday.reduce((a, b) => a + b, 0) / tempToday.length;
+                
+                tempDiff = avgTempToday - avgTempYesterday;
+                if (tempDiff > 0.5) {
+                    tempComparisonStatus = 'hotter';
+                    tempDiffText = `ร้อนกว่าเมื่อวานประมาณ ${tempDiff.toFixed(1)}°C`;
+                } else if (tempDiff < -0.5) {
+                    tempComparisonStatus = 'colder';
+                    tempDiffText = `เย็นกว่าเมื่อวานประมาณ ${Math.abs(tempDiff).toFixed(1)}°C`;
+                }
+            }
+
+            const precToday = hourly.precipitation.slice(24, 48);
+            const probToday = hourly.precipitation_probability.slice(24, 48);
+            
+            const heavyRainHours = [];
+            const lightRainHours = [];
+            
+            for (let i = 0; i < 24; i++) {
+                const isHeavy = precToday[i] >= 0.5;
+                const isLight = !isHeavy && (precToday[i] > 0.1 || probToday[i] >= 40);
+                
+                if (isHeavy) {
+                    heavyRainHours.push(i);
+                } else if (isLight) {
+                    lightRainHours.push(i);
+                }
+            }
+
+            const groupHours = (hours) => {
+                const blocks = [];
+                if (hours.length > 0) {
+                    let start = hours[0];
+                    let prev = hours[0];
+                    for (let i = 1; i < hours.length; i++) {
+                        const curr = hours[i];
+                        if (curr === prev + 1) {
+                            prev = curr;
+                        } else {
+                            blocks.push({ start, end: prev });
+                            start = curr;
+                            prev = curr;
+                        }
+                    }
+                    blocks.push({ start, end: prev });
+                }
+                return blocks.map(b => {
+                    const startStr = b.start.toString().padStart(2, '0') + ':00';
+                    const endStr = (b.end + 1).toString().padStart(2, '0') + ':00';
+                    return `${startStr} - ${endStr} น.`;
+                });
+            };
+
+            heavyRainBlocks = groupHours(heavyRainHours);
+            lightRainBlocks = groupHours(lightRainHours);
+            hasRain = heavyRainBlocks.length > 0 || lightRainBlocks.length > 0;
+
+            if (heavyRainBlocks.length > 0) {
+                rainBlocksText.push(...heavyRainBlocks.map(b => `🌧️ ตกหนัก: ${b}`));
+            }
+            if (lightRainBlocks.length > 0) {
+                rainBlocksText.push(...lightRainBlocks.map(b => `🌦️ ตกปรอยๆ: ${b}`));
+            }
+
+            if (heavyRainBlocks.length > 0 && lightRainBlocks.length > 0) {
+                employeeAdvice = `วันนี้ระวังฝนตกหนักช่วง ${heavyRainBlocks.join(' และ ')} และอาจมีฝนตกปรอยๆ ช่วง ${lightRainBlocks.join(' และ ')} อย่าลืมเตรียมร่ม/เสื้อกันฝนหนาๆ และเผื่อเวลาเดินทางด้วยนะครับ ⛈️`;
+            } else if (heavyRainBlocks.length > 0) {
+                employeeAdvice = `วันนี้คาดว่าจะมีฝนตกหนักช่วง ${heavyRainBlocks.join(' และ ')} พกร่มหรือเสื้อกันฝนแบบหนา และวางแผนเผื่อเวลาในการเดินทางเข้า/เลิกงานด้วยนะ 🌧️`;
+            } else if (lightRainBlocks.length > 0) {
+                employeeAdvice = `วันนี้คาดว่าจะมีฝนตกปรอยๆ/มีละอองฝนช่วง ${lightRainBlocks.join(' และ ')} พกร่มหรือเสื้อกันฝนติดตัวไว้กันเหนียวด้วยนะครับ 🌦️`;
+            } else {
+                employeeAdvice = `วันนี้ไม่มีฝนตก ท้องฟ้าค่อนข้างแจ่มใส ☀️`;
+            }
+
+            if (employeeAdvice.includes('ฝน')) {
+                if (tempComparisonStatus === 'hotter') {
+                    employeeAdvice += ` แถมอากาศจะอบอ้าวขึ้นด้วย ระวังเหนียวตัวและรักษาสุขภาพนะครับ`;
+                } else if (tempComparisonStatus === 'colder') {
+                    employeeAdvice += ` อากาศจะเย็นลงร่วมด้วย ระวังเป็นหวัดนะครับ`;
+                } else {
+                    employeeAdvice += ` ดูแลตัวเองดีๆ ด้วยความห่วงใยจาก Yuzu ครับ`;
+                }
+            } else {
+                if (tempComparisonStatus === 'hotter') {
+                    employeeAdvice += ` แต่อากาศจะร้อนกว่าเมื่อวาน หลีกเลี่ยงแดดจัดและดื่มน้ำบ่อยๆ นะครับ`;
+                } else if (tempComparisonStatus === 'colder') {
+                    employeeAdvice += ` และอากาศเย็นสบายกว่าเมื่อวานเล็กน้อย สบายตัวเลย ทำงานอย่างมีความสุขนะครับ!`;
+                } else {
+                    employeeAdvice += ` อุณหภูมิใกล้เคียงกับเมื่อวานเลย อากาศกำลังดีครับ`;
+                }
+            }
+        }
 
         return {
             current: {
-                temp: Math.round(current.temperature),
-                humidity: current.humidity,
-                condition: getThaiCondition(current.weatherCode),
-                wind: current.windSpeed
+                temp: Math.round(current.temperature_2m),
+                humidity: current.relative_humidity_2m,
+                condition: getThaiCondition(conditionCode),
+                wind: current.wind_speed_10m,
+                conditionCode: conditionCode
             },
-            forecast: {
-                tempMax: Math.round(daily.temperatureMax),
-                tempMin: Math.round(daily.temperatureMin),
-                chanceOfRain: daily.precipitationProbabilityMax !== undefined ? daily.precipitationProbabilityMax : (daily.precipitationProbabilityAvg !== undefined ? daily.precipitationProbabilityAvg : 0),
-                condition: getThaiCondition(daily.weatherCodeMax || daily.weatherCodeMin) // Simplified
-            }
+            tempDiffText,
+            tempComparisonStatus,
+            rainBlocks: rainBlocksText,
+            heavyRainBlocks,
+            lightRainBlocks,
+            hasRain,
+            employeeAdvice
         };
 
     } catch (error) {
@@ -59,6 +185,8 @@ export async function getSchemaWeather(lat = SHOP_LAT, lon = SHOP_LONG) {
 export function formatWeatherMessage(weather) {
     if (!weather) return "ไม่สามารถดึงข้อมูลสภาพอากาศได้ในขณะนี้";
 
+    const rainStr = weather.hasRain ? weather.rainBlocks.join(', ') : "ไม่มีฝนตกวันนี้ ☀️";
+
     return `🌤️ รายงานสภาพอากาศ (In The Haus)
 
 🌡️ ปัจจุบัน: ${weather.current.temp}°C
@@ -66,18 +194,21 @@ export function formatWeatherMessage(weather) {
 ความชื้น: ${weather.current.humidity}%
 ลม: ${weather.current.wind} m/s
 
-🔮 พยากรณ์วันนี้
-สูงสุด: ${weather.forecast.tempMax}°C | ต่ำสุด: ${weather.forecast.tempMin}°C
-โอกาสฝนตก: ${weather.forecast.chanceOfRain}%
-สภาพการณ์โดยรวม: ${weather.forecast.condition}`;
+📊 เปรียบเทียบเมื่อวาน: ${weather.tempDiffText}
+🌧️ ช่วงเวลาพยากรณ์ฝน: ${rainStr}
+🐾 คำแนะนำจาก Yuzu: ${weather.employeeAdvice}`;
 }
 
 export function formatWeatherFlex(weather) {
     if (!weather) return null;
 
+    const isRainy = weather.hasRain;
+    const accentColor = isRainy ? "#38bdf8" : "#bef264"; // Sky blue for rain, Lime for clear
+    const titleEmoji = isRainy ? "⛈️" : "🌤️";
+
     return {
         type: "flex",
-        altText: `🌤️ รายงานสภาพอากาศ: ปัจจุบัน ${weather.current.temp}°C - ${weather.current.condition}`,
+        altText: `${titleEmoji} รายงานสภาพอากาศ: ปัจจุบัน ${weather.current.temp}°C - ${weather.current.condition}`,
         contents: {
             type: "bubble",
             size: "mega",
@@ -95,14 +226,14 @@ export function formatWeatherFlex(weather) {
                 contents: [
                     {
                         type: "text",
-                        text: "🌤️ รายงานสภาพอากาศ (In The Haus)",
+                        text: `${titleEmoji} รายงานสภาพอากาศ (In The Haus)`,
                         weight: "bold",
                         color: "#ffffff",
                         size: "md"
                     },
                     {
                         type: "text",
-                        text: "ข้อมูลเรียลไทม์จากระบบพยากรณ์อากาศ",
+                        text: "ข้อมูลเรียลไทม์วิเคราะห์โดย Yuzu AI",
                         color: "#94a3b8",
                         size: "xs",
                         margin: "xs"
@@ -112,8 +243,9 @@ export function formatWeatherFlex(weather) {
             body: {
                 type: "box",
                 layout: "vertical",
-                spacing: "md",
+                spacing: "lg",
                 contents: [
+                    // Main Temp display
                     {
                         type: "box",
                         layout: "horizontal",
@@ -141,7 +273,7 @@ export function formatWeatherFlex(weather) {
                                         type: "text",
                                         text: weather.current.condition,
                                         size: "sm",
-                                        color: "#38bdf8",
+                                        color: accentColor,
                                         weight: "bold",
                                         margin: "xs"
                                     }
@@ -203,86 +335,85 @@ export function formatWeatherFlex(weather) {
                     },
                     {
                         type: "separator",
-                        color: "#334155",
-                        margin: "md"
+                        color: "#334155"
                     },
+                    // Grid info
                     {
                         type: "box",
                         layout: "vertical",
                         spacing: "sm",
                         contents: [
                             {
+                                type: "box",
+                                layout: "horizontal",
+                                contents: [
+                                    {
+                                        type: "text",
+                                        text: "📊 เทียบเมื่อวาน",
+                                        size: "xs",
+                                        color: "#94a3b8",
+                                        flex: 2
+                                    },
+                                    {
+                                        type: "text",
+                                        text: weather.tempDiffText,
+                                        size: "xs",
+                                        color: "#ffffff",
+                                        align: "end",
+                                        weight: "bold",
+                                        flex: 3
+                                    }
+                                ]
+                            },
+                            {
+                                type: "box",
+                                layout: "horizontal",
+                                contents: [
+                                    {
+                                        type: "text",
+                                        text: "🌧️ พยากรณ์ฝน",
+                                        size: "xs",
+                                        color: "#94a3b8",
+                                        flex: 2
+                                    },
+                                    {
+                                        type: "text",
+                                        text: weather.hasRain ? weather.rainBlocks.join('\n') : "ไม่มีฝนตกวันนี้",
+                                        size: "xs",
+                                        color: weather.hasRain ? "#f59e0b" : "#10b981",
+                                        align: "end",
+                                        weight: "bold",
+                                        flex: 3,
+                                        wrap: true
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        type: "separator",
+                        color: "#334155"
+                    },
+                    // Yuzu Tip Section
+                    {
+                        type: "box",
+                        layout: "vertical",
+                        spacing: "xs",
+                        contents: [
+                            {
                                 type: "text",
-                                text: "🔮 พยากรณ์วันนี้",
+                                text: "🐾 คำแนะนำจาก Yuzu",
                                 weight: "bold",
-                                size: "sm",
-                                color: "#f1f5f9"
+                                size: "xs",
+                                color: "#f97316"
                             },
                             {
-                                type: "box",
-                                layout: "horizontal",
-                                contents: [
-                                    {
-                                        type: "text",
-                                        text: "สูงสุด / ต่ำสุด",
-                                        size: "xs",
-                                        color: "#94a3b8",
-                                        flex: 2
-                                    },
-                                    {
-                                        type: "text",
-                                        text: `${weather.forecast.tempMax}°C / ${weather.forecast.tempMin}°C`,
-                                        size: "xs",
-                                        color: "#ffffff",
-                                        align: "end",
-                                        weight: "bold",
-                                        flex: 2
-                                    }
-                                ]
-                            },
-                            {
-                                type: "box",
-                                layout: "horizontal",
-                                contents: [
-                                    {
-                                        type: "text",
-                                        text: "โอกาสฝนตก",
-                                        size: "xs",
-                                        color: "#94a3b8",
-                                        flex: 2
-                                    },
-                                    {
-                                        type: "text",
-                                        text: `${weather.forecast.chanceOfRain}%`,
-                                        size: "xs",
-                                        color: "#38bdf8",
-                                        align: "end",
-                                        weight: "bold",
-                                        flex: 2
-                                    }
-                                ]
-                            },
-                            {
-                                type: "box",
-                                layout: "horizontal",
-                                contents: [
-                                    {
-                                        type: "text",
-                                        text: "สภาพการณ์โดยรวม",
-                                        size: "xs",
-                                        color: "#94a3b8",
-                                        flex: 2
-                                    },
-                                    {
-                                        type: "text",
-                                        text: weather.forecast.condition,
-                                        size: "xs",
-                                        color: "#ffffff",
-                                        align: "end",
-                                        weight: "bold",
-                                        flex: 2
-                                    }
-                                ]
+                                type: "text",
+                                text: weather.employeeAdvice,
+                                size: "xs",
+                                color: "#cbd5e1",
+                                wrap: true,
+                                margin: "xs"
                             }
                         ]
                     }
@@ -292,11 +423,6 @@ export function formatWeatherFlex(weather) {
     };
 }
 
-
-/**
- * Get compact weather string for Yuzu context injection (cached 30 min)
- * Returns a short one-liner like: "[WEATHER: 35°C ร้อนจัด โอกาสฝน 20%]"
- */
 export async function getCompactWeather() {
     try {
         const now = Date.now();
@@ -307,7 +433,8 @@ export async function getCompactWeather() {
         const weather = await getSchemaWeather();
         if (!weather) return "";
 
-        const compact = `[WEATHER: ${weather.current.temp}°C ${weather.current.condition} โอกาสฝน${weather.forecast.chanceOfRain}%]`;
+        const rainStr = weather.hasRain ? weather.rainBlocks.join(', ') : "ไม่มีฝนตก";
+        const compact = `[WEATHER: ปัจจุบัน ${weather.current.temp}°C อากาศ${weather.current.condition} | เทียบเมื่อวาน: ${weather.tempDiffText} | ฝนตกวันนี้: ${rainStr} | คำแนะนำ Yuzu: ${weather.employeeAdvice}]`;
         weatherCache = { data: compact, expiry: now + CACHE_DURATION };
         return compact;
     } catch (e) {
