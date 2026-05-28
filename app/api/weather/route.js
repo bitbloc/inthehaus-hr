@@ -56,6 +56,8 @@ export async function GET(request) {
         let tempComparisonStatus = 'similar';
         let tempDiffText = 'ใกล้เคียงกับเมื่อวาน';
         let rainBlocksText = [];
+        let heavyRainBlocks = [];
+        let lightRainBlocks = [];
         let hasRain = false;
         let employeeAdvice = '';
 
@@ -81,59 +83,82 @@ export async function GET(request) {
             const precToday = hourly.precipitation.slice(24, 48);
             const probToday = hourly.precipitation_probability.slice(24, 48);
             
-            const rainyHours = [];
+            const heavyRainHours = [];
+            const lightRainHours = [];
+            
             for (let i = 0; i < 24; i++) {
-                const isRaining = precToday[i] > 0.1 || probToday[i] >= 30;
-                if (isRaining) {
-                    rainyHours.push(i);
+                const isHeavy = precToday[i] >= 0.5;
+                const isLight = !isHeavy && (precToday[i] > 0.1 || probToday[i] >= 40);
+                
+                if (isHeavy) {
+                    heavyRainHours.push(i);
+                } else if (isLight) {
+                    lightRainHours.push(i);
                 }
             }
 
-            // Group contiguous hours
-            const blocks = [];
-            if (rainyHours.length > 0) {
-                let start = rainyHours[0];
-                let prev = rainyHours[0];
-                for (let i = 1; i < rainyHours.length; i++) {
-                    const curr = rainyHours[i];
-                    if (curr === prev + 1) {
-                        prev = curr;
-                    } else {
-                        blocks.push({ start, end: prev });
-                        start = curr;
-                        prev = curr;
+            const groupHours = (hours) => {
+                const blocks = [];
+                if (hours.length > 0) {
+                    let start = hours[0];
+                    let prev = hours[0];
+                    for (let i = 1; i < hours.length; i++) {
+                        const curr = hours[i];
+                        if (curr === prev + 1) {
+                            prev = curr;
+                        } else {
+                            blocks.push({ start, end: prev });
+                            start = curr;
+                            prev = curr;
+                        }
                     }
+                    blocks.push({ start, end: prev });
                 }
-                blocks.push({ start, end: prev });
+                return blocks.map(b => {
+                    const startStr = b.start.toString().padStart(2, '0') + ':00';
+                    const endStr = (b.end + 1).toString().padStart(2, '0') + ':00';
+                    return `${startStr} - ${endStr} น.`;
+                });
+            };
+
+            heavyRainBlocks = groupHours(heavyRainHours);
+            lightRainBlocks = groupHours(lightRainHours);
+            hasRain = heavyRainBlocks.length > 0 || lightRainBlocks.length > 0;
+
+            // Combine into backward compatible rainBlocksText
+            if (heavyRainBlocks.length > 0) {
+                rainBlocksText.push(...heavyRainBlocks.map(b => `🌧️ ตกหนัก: ${b}`));
             }
-
-            rainBlocksText = blocks.map(b => {
-                const startStr = b.start.toString().padStart(2, '0') + ':00';
-                const endStr = (b.end + 1).toString().padStart(2, '0') + ':00';
-                return `${startStr} - ${endStr} น.`;
-            });
-
-            hasRain = rainBlocksText.length > 0;
+            if (lightRainBlocks.length > 0) {
+                rainBlocksText.push(...lightRainBlocks.map(b => `🌦️ ตกปรอยๆ: ${b}`));
+            }
 
             // Build employee advice
-            if (hasRain) {
-                const times = rainBlocksText.join(' และ ');
-                employeeAdvice = `วันนี้คาดว่าจะมีฝนตกช่วง ${times} อย่าลืมพกร่มหรือเสื้อกันฝนติดตัวไว้ด้วยนะ 🌧️`;
+            if (heavyRainBlocks.length > 0 && lightRainBlocks.length > 0) {
+                employeeAdvice = `วันนี้ระวังฝนตกหนักช่วง ${heavyRainBlocks.join(' และ ')} และอาจมีฝนตกปรอยๆ ช่วง ${lightRainBlocks.join(' และ ')} อย่าลืมเตรียมร่ม/เสื้อกันฝนหนาๆ และเผื่อเวลาเดินทางด้วยนะครับ ⛈️`;
+            } else if (heavyRainBlocks.length > 0) {
+                employeeAdvice = `วันนี้คาดว่าจะมีฝนตกหนักช่วง ${heavyRainBlocks.join(' และ ')} พกร่มหรือเสื้อกันฝนแบบหนา และวางแผนเผื่อเวลาในการเดินทางเข้า/เลิกงานด้วยนะ 🌧️`;
+            } else if (lightRainBlocks.length > 0) {
+                employeeAdvice = `วันนี้คาดว่าจะมีฝนตกปรอยๆ/มีละอองฝนช่วง ${lightRainBlocks.join(' และ ')} พกร่มหรือเสื้อกันฝนติดตัวไว้กันเหนียวด้วยนะครับ 🌦️`;
+            } else {
+                employeeAdvice = `วันนี้ไม่มีฝนตก ท้องฟ้าค่อนข้างแจ่มใส ☀️`;
+            }
+
+            if (employeeAdvice.includes('ฝน')) {
                 if (tempComparisonStatus === 'hotter') {
-                    employeeAdvice += ` แถมอากาศอบอ้าวระอุขึ้นด้วย ระวังอับชื้นและไม่สบายนะครับ`;
+                    employeeAdvice += ` แถมอากาศจะอบอ้าวขึ้นด้วย ระวังเหนียวตัวและรักษาสุขภาพนะครับ`;
                 } else if (tempComparisonStatus === 'colder') {
-                    employeeAdvice += ` และอากาศจะเย็นลงร่วมด้วย รักษาสุขภาพดีๆ นะครับ`;
+                    employeeAdvice += ` อากาศจะเย็นลงร่วมด้วย ระวังเป็นหวัดนะครับ`;
                 } else {
                     employeeAdvice += ` ดูแลตัวเองดีๆ ด้วยความห่วงใยจาก Yuzu ครับ`;
                 }
             } else {
-                employeeAdvice = `วันนี้ไม่มีฝนตก ท้องฟ้าค่อนข้างแจ่มใส ☀️`;
                 if (tempComparisonStatus === 'hotter') {
                     employeeAdvice += ` แต่อากาศจะร้อนกว่าเมื่อวาน หลีกเลี่ยงแดดจัดและดื่มน้ำบ่อยๆ นะครับ`;
                 } else if (tempComparisonStatus === 'colder') {
-                    employeeAdvice += ` อากาศเย็นลงกว่าเมื่อวานเล็กน้อย สบายตัวเลย ทำงานอย่างมีความสุขนะครับ!`;
+                    employeeAdvice += ` และอากาศเย็นสบายกว่าเมื่อวานเล็กน้อย สบายตัวเลย ทำงานอย่างมีความสุขนะครับ!`;
                 } else {
-                    employeeAdvice += ` อุณหภูมิใกล้เคียงกับเมื่อวานเลย อากาศกำลังดีลุยงานได้สบายครับ`;
+                    employeeAdvice += ` อุณหภูมิใกล้เคียงกับเมื่อวานเลย อากาศกำลังดีครับ`;
                 }
             }
         }
@@ -170,6 +195,8 @@ export async function GET(request) {
             tempComparisonStatus,
             tempDiffText,
             rainBlocks: rainBlocksText,
+            heavyRainBlocks,
+            lightRainBlocks,
             hasRain,
             employeeAdvice
         });
