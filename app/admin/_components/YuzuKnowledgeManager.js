@@ -25,6 +25,8 @@ export default function YuzuKnowledgeManager() {
     const [espressoReports, setEspressoReports] = useState([]);
     const [message, setMessage] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
+    const [showCleanupConfirm, setShowCleanupConfirm] = useState(false);
+    const [cleanupLoading, setCleanupLoading] = useState(false);
     const [isFlowVisible, setIsFlowVisible] = useState(true);
 
     // New States for AI Operations Dashboard
@@ -629,6 +631,79 @@ export default function YuzuKnowledgeManager() {
         } finally {
             setAiLoadingEmpId(null);
             setTimeout(() => setMessage(''), 4000);
+        }
+    }
+
+    async function handleExecuteCleanup(days = 30, shouldBackup = true) {
+        if (!shouldBackup) {
+            const confirmed = window.confirm("⚠️ ยืนยันการลบไฟล์โดยไม่สำรองข้อมูล? ไฟล์ที่ถูกลบไปแล้วจะไม่สามารถกู้คืนได้!");
+            if (!confirmed) return;
+        }
+
+        setCleanupLoading(true);
+        setMessage(shouldBackup ? 'กำลังสำรองข้อมูลและล้างพื้นที่...' : 'กำลังล้างพื้นที่จัดเก็บ...');
+
+        try {
+            if (shouldBackup) {
+                // 1. Fetch data to backup
+                const cutoffDate = new Date();
+                cutoffDate.setDate(cutoffDate.getDate() - days);
+                const cutoffISO = cutoffDate.toISOString();
+
+                // Fetch slips
+                const { data: slipsToBackup } = await supabase
+                    .from('slip_transactions')
+                    .select('id, amount, slip_url, timestamp, sender_name, user_id, bank_name, date')
+                    .not('slip_url', 'is', null)
+                    .lt('timestamp', cutoffISO);
+
+                // Fetch coffee shot reports and descriptions
+                const { data: chatsToBackup } = await supabase
+                    .from('yuzu_chat_history')
+                    .select('id, created_at, user_id, role, content, message_type')
+                    .eq('message_type', 'image_description')
+                    .like('content', '%[ภาพประกอบช็อตกาแฟ]%')
+                    .lt('created_at', cutoffISO);
+
+                const backupData = {
+                    backup_date: new Date().toISOString(),
+                    retention_days: days,
+                    slips: slipsToBackup || [],
+                    espresso_photos: chatsToBackup || []
+                };
+
+                // Trigger browser JSON download
+                const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `yuzu-storage-backup-${new Date().toISOString().split('T')[0]}.json`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            }
+
+            // 2. Call the cleanup API
+            const res = await fetch('/api/yuzu/cleanup-uploads', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ days })
+            });
+
+            const result = await res.json();
+            if (result.success) {
+                setMessage(`ล้างข้อมูลสำเร็จ! ลบสลิป ${result.yuzu_slips_deleted} รูป, รูปวาด ${result.yuzu_images_deleted} รูป ✨`);
+                setShowCleanupConfirm(false);
+            } else {
+                setMessage('เกิดข้อผิดพลาด: ' + (result.error || 'ไม่ทราบสาเหตุ'));
+            }
+        } catch (err) {
+            console.error("Cleanup execution error:", err);
+            setMessage('เกิดข้อผิดพลาดในการล้างข้อมูล: ' + err.message);
+        } finally {
+            setCleanupLoading(false);
+            setTimeout(() => setMessage(''), 5000);
         }
     }
 
@@ -1273,6 +1348,64 @@ export default function YuzuKnowledgeManager() {
                                 </div>
                             ))}
                         </div>
+                    </Card>
+
+                    <Card className="space-y-6 border border-amber-200 bg-amber-50/20">
+                        <div className="flex items-center gap-2 text-slate-800">
+                            <Icons.Trash size={18} className="text-amber-600" />
+                            <h3 className="font-bold">Storage Cleanup & Backup (ล้างข้อมูลรูปภาพเก่าเพื่อประหยัดพื้นที่)</h3>
+                        </div>
+                        <p className="text-xs text-slate-500 leading-relaxed">
+                            คุณสามารถเคลียร์พื้นที่จัดเก็บข้อมูล (Supabase Storage) โดยการลบไฟล์รูปภาพสลิปและรูปภาพประกอบการชงกาแฟที่เก่ากว่า 30 วัน 
+                            ระบบจะลบเฉพาะไฟล์รูปภาพออกไปอย่างถาวร แต่จะยังคงเก็บข้อมูลสรุปตัวเลขและประวัติแชทเอาไว้ (ไม่ส่งผลกระทบต่อหน้ารายงาน PDF นอกจากการไม่แสดงรูปประกอบที่ถูกลบไปแล้ว)
+                        </p>
+                        
+                        {!showCleanupConfirm ? (
+                            <button
+                                onClick={() => setShowCleanupConfirm(true)}
+                                disabled={cleanupLoading}
+                                className="px-6 py-3 bg-amber-600 text-white rounded-xl font-bold text-xs tracking-wider uppercase hover:bg-amber-700 transition-all flex items-center gap-2 w-fit disabled:opacity-50"
+                            >
+                                {cleanupLoading ? <span className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-white border-t-transparent" /> : <Icons.Trash size={14} />}
+                                เริ่มต้นล้างข้อมูลภาพประกอบ (Delete Old Uploads)
+                            </button>
+                        ) : (
+                            <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 space-y-4 animate-in fade-in duration-200">
+                                <div className="space-y-1">
+                                    <p className="text-xs text-amber-800 font-bold">
+                                        ⚠️ แจ้งเตือน: ระบบจะค้นหาและลบรูปภาพสลิป / ภาพกาแฟในระบบที่อายุเกิน 30 วันทั้งหมดออกอย่างถาวร
+                                    </p>
+                                    <p className="text-[11px] text-slate-500">
+                                        แนะนำให้ดาวน์โหลดข้อมูลสำรอง (Backup) ไว้ก่อนลบ เพื่อเก็บข้อมูลสลิปและรูปกาแฟเป็นไฟล์ไว้ในเครื่องของคุณ
+                                    </p>
+                                </div>
+                                <div className="flex flex-wrap gap-2 pt-2">
+                                    <button 
+                                        onClick={() => handleExecuteCleanup(30, true)} 
+                                        disabled={cleanupLoading}
+                                        className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2.5 px-4 rounded-xl transition-all flex items-center gap-1.5 disabled:opacity-50"
+                                    >
+                                        {cleanupLoading ? <span className="animate-spin rounded-full h-3 w-3 border-2 border-white border-t-transparent" /> : null}
+                                        ดาวน์โหลดข้อมูลสำรอง + ลบไฟล์ (แนะนำ)
+                                    </button>
+                                    <button 
+                                        onClick={() => handleExecuteCleanup(30, false)} 
+                                        disabled={cleanupLoading}
+                                        className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold py-2.5 px-4 rounded-xl transition-all flex items-center gap-1.5 disabled:opacity-50"
+                                    >
+                                        {cleanupLoading ? <span className="animate-spin rounded-full h-3 w-3 border-2 border-white border-t-transparent" /> : null}
+                                        ลบไฟล์ทันที (ไม่สำรอง)
+                                    </button>
+                                    <button 
+                                        onClick={() => setShowCleanupConfirm(false)} 
+                                        disabled={cleanupLoading}
+                                        className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold py-2.5 px-4 rounded-xl transition-all disabled:opacity-50"
+                                    >
+                                        ยกเลิก
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </Card>
                 </div>
             )}
