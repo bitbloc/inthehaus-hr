@@ -17,7 +17,8 @@ export default function AdminRosterPage() {
         leave_type: 'sick',
         reason: '',
         replacement_employee_id: '',
-        leave_date: ''
+        startDate: '',
+        endDate: ''
     });
     
     // Modal State
@@ -450,26 +451,72 @@ export default function AdminRosterPage() {
             leave_type: req.leave_type,
             reason: req.reason || '',
             replacement_employee_id: req.replacement_employee_id || '',
-            leave_date: req.leave_date
+            startDate: req.leave_date,
+            endDate: req.leave_date
         });
     };
 
     const saveLeaveEdit = async (id) => {
-        if (!leaveForm.leave_date) return alert("กรุณาระบุวันที่ลา");
+        if (!leaveForm.startDate || !leaveForm.endDate) return alert("กรุณาระบุวันที่เริ่มและสิ้นสุด");
         setLoading(true);
         try {
-            const { error } = await supabase
+            // Find original request
+            const req = leaveRequests.find(l => l.id === id);
+            if (!req) throw new Error("ไม่พบข้อมูลคำขอลา");
+
+            // Generate list of dates in range
+            const dateList = [];
+            let current = new Date(leaveForm.startDate);
+            const last = new Date(leaveForm.endDate);
+            while (current <= last) {
+                dateList.push(format(current, 'yyyy-MM-dd'));
+                current.setDate(current.getDate() + 1);
+            }
+
+            if (dateList.length === 0) throw new Error("ช่วงวันที่ระบุไม่ถูกต้อง");
+
+            // 1. Update the original request with the first date of the range
+            const { error: updateError } = await supabase
                 .from('leave_requests')
                 .update({
+                    leave_date: dateList[0],
                     leave_type: leaveForm.leave_type,
                     reason: leaveForm.reason,
                     replacement_employee_id: leaveForm.replacement_employee_id ? parseInt(leaveForm.replacement_employee_id) : null,
-                    leave_date: leaveForm.leave_date
                 })
                 .eq('id', id);
 
-            if (error) throw error;
-            alert("อัปเดตข้อมูลการลาเรียบร้อยแล้ว");
+            if (updateError) throw updateError;
+
+            // 2. If multiple dates, check and insert them
+            if (dateList.length > 1) {
+                const extraDates = dateList.slice(1);
+                for (const date of extraDates) {
+                    const { data: existing } = await supabase
+                        .from('leave_requests')
+                        .select('id')
+                        .eq('employee_id', req.employee_id)
+                        .eq('leave_date', date)
+                        .maybeSingle();
+
+                    const payload = {
+                        employee_id: req.employee_id,
+                        leave_date: date,
+                        leave_type: leaveForm.leave_type,
+                        reason: leaveForm.reason,
+                        replacement_employee_id: leaveForm.replacement_employee_id ? parseInt(leaveForm.replacement_employee_id) : null,
+                        status: req.status // Preserve original status
+                    };
+
+                    if (existing) {
+                        await supabase.from('leave_requests').update(payload).eq('id', existing.id);
+                    } else {
+                        await supabase.from('leave_requests').insert(payload);
+                    }
+                }
+            }
+
+            alert("อัปเดตช่วงวันลาเรียบร้อยแล้ว");
             setEditingLeaveId(null);
             await fetchData();
         } catch (e) {
@@ -662,14 +709,30 @@ export default function AdminRosterPage() {
                                     <div className="p-4 flex-1 space-y-3 text-xs text-gray-700">
                                         {isEditing ? (
                                             <div className="space-y-3">
-                                                <div>
-                                                    <label className="block text-[10px] font-bold text-gray-500 mb-1">วันที่ลา</label>
-                                                    <input 
-                                                        type="date"
-                                                        value={leaveForm.leave_date}
-                                                        onChange={e => setLeaveForm({ ...leaveForm, leave_date: e.target.value })}
-                                                        className="w-full border border-gray-300 rounded-lg p-2 text-xs text-gray-900 bg-white outline-none focus:ring-2 focus:ring-blue-500"
-                                                    />
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <div>
+                                                        <label className="block text-[10px] font-bold text-gray-500 mb-1">วันที่เริ่มลา</label>
+                                                        <input 
+                                                            type="date"
+                                                            value={leaveForm.startDate}
+                                                            onChange={e => setLeaveForm({ 
+                                                                ...leaveForm, 
+                                                                startDate: e.target.value,
+                                                                endDate: leaveForm.endDate < e.target.value ? e.target.value : leaveForm.endDate 
+                                                            })}
+                                                            className="w-full border border-gray-300 rounded-lg p-2 text-xs text-gray-900 bg-white outline-none focus:ring-2 focus:ring-blue-500"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-[10px] font-bold text-gray-500 mb-1">วันสิ้นสุด</label>
+                                                        <input 
+                                                            type="date"
+                                                            value={leaveForm.endDate}
+                                                            onChange={e => setLeaveForm({ ...leaveForm, endDate: e.target.value })}
+                                                            className="w-full border border-gray-300 rounded-lg p-2 text-xs text-gray-900 bg-white outline-none focus:ring-2 focus:ring-blue-500"
+                                                            min={leaveForm.startDate}
+                                                        />
+                                                    </div>
                                                 </div>
                                                 <div>
                                                     <label className="block text-[10px] font-bold text-gray-500 mb-1">ประเภท</label>
