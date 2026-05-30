@@ -25,9 +25,10 @@ export default function CheckIn() {
   const [status, setStatus] = useState("Checking...");
   const [activeAnnouncement, setActiveAnnouncement] = useState(null);
   const [announcements, setAnnouncements] = useState([]);
-  const [todayLeaves, setTodayLeaves] = useState([]);
+  const [approvedLeaves, setApprovedLeaves] = useState([]);
   const [myPendingLeaves, setMyPendingLeaves] = useState([]);
   const [weeklySchedule, setWeeklySchedule] = useState([]);
+  const [selectedDaySchedule, setSelectedDaySchedule] = useState(null);
   const [dismissedIds, setDismissedIds] = useState([]);
   const [recentCheckins, setRecentCheckins] = useState([]);
   const [lastAction, setLastAction] = useState(null);
@@ -119,13 +120,15 @@ export default function CheckIn() {
     try {
       const todayStr = format(new Date(), 'yyyy-MM-dd');
       
-      // 1. Fetch Today's Leaves (approved)
+      // 1. Fetch Approved Leaves (Today and Upcoming)
       const { data: leaves } = await supabase
         .from('leave_requests')
-        .select('leave_date, leave_type, employees!employee_id(name, nickname)')
+        .select('id, leave_date, leave_type, reason, employees!employee_id(name, nickname, photo_url)')
         .eq('status', 'approved')
-        .eq('leave_date', todayStr);
-      setTodayLeaves(leaves || []);
+        .gte('leave_date', todayStr)
+        .order('leave_date', { ascending: true })
+        .limit(5);
+      setApprovedLeaves(leaves || []);
 
       // 2. Fetch My Pending Leaves
       const { data: myPending } = await supabase
@@ -142,12 +145,11 @@ export default function CheckIn() {
       const monStr = format(mon, 'yyyy-MM-dd');
       const sunStr = format(sun, 'yyyy-MM-dd');
 
-      // Fetch transactions (published)
+      // Fetch transactions (both draft and published)
       const { data: txs } = await supabase
         .from('roster_transactions')
         .select('date, shift_id, is_off, custom_start_time, custom_end_time, shifts(*)')
         .eq('employee_id', empId)
-        .eq('status', 'PUBLISHED')
         .gte('date', monStr)
         .lte('date', sunStr);
 
@@ -248,6 +250,12 @@ export default function CheckIn() {
         });
       }
       setWeeklySchedule(calculatedWeekly);
+      const todaySched = calculatedWeekly.find(day => day.isToday);
+      if (todaySched) {
+        setSelectedDaySchedule(todaySched);
+      } else if (calculatedWeekly.length > 0) {
+        setSelectedDaySchedule(calculatedWeekly[0]);
+      }
 
     } catch (e) {
       console.error("Error fetching dashboard data:", e);
@@ -337,6 +345,34 @@ export default function CheckIn() {
       const dateStr = format(today, 'yyyy-MM-dd');
       const dayOfWeek = today.getDay(); // 0 is Sunday, which matches our schedule logic usually (or 1=Mon?)
       // Let's assume 0=Sunday, 1=Monday. roster_weekly_schedules usually uses 0-6.
+
+      // 1. Check Roster Transactions (highest priority, including DRAFT/PUBLISHED)
+      const { data: tx } = await supabase.from('roster_transactions')
+        .select('*, shifts(*)')
+        .eq('employee_id', emp.id)
+        .eq('date', dateStr)
+        .maybeSingle();
+
+      if (tx) {
+        if (tx.is_off) {
+          setShiftContext(null);
+          return;
+        }
+
+        const sDef = tx.shifts;
+        const startVal = tx.custom_start_time || sDef?.start_time;
+        const endVal = tx.custom_end_time || sDef?.end_time;
+
+        if (startVal && endVal) {
+          setShiftContext({
+            start: startVal,
+            end: endVal,
+            getType: 'Roster',
+            isLate: checkIsLate(startVal)
+          });
+          return;
+        }
+      }
 
       // 2. Check Overrides
       const { data: override } = await supabase.from('roster_overrides')
@@ -781,37 +817,69 @@ export default function CheckIn() {
                 })}
               </AnimatePresence>
 
-              {/* Today's Leaves & My Pending Requests */}
-              {(todayLeaves.length > 0 || myPendingLeaves.length > 0) && (
+              {/* Approved Leaves & My Pending Requests */}
+              {(approvedLeaves.length > 0 || myPendingLeaves.length > 0) && (
                 <div className="w-full bg-white/70 backdrop-blur-md rounded-3xl border border-white/60 p-4 shadow-[0_4px_24px_0_rgba(0,0,0,0.02)] flex flex-col gap-3">
                   <div className="flex items-center justify-between pb-2 border-b border-slate-100/80">
                     <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest">ข้อมูลการลาหยุด</span>
                     <span className="text-[9px] font-bold text-slate-400">{format(currentTime || new Date(), "dd MMMM yyyy", { locale: th })}</span>
                   </div>
 
-                  {/* Today Leaves */}
-                  <div className="flex items-start gap-2.5 min-w-0">
-                    <span className="text-sm shrink-0">🏖️</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">พนักงานที่ลาวันนี้</p>
-                      <div className="text-xs font-bold text-slate-700 mt-0.5">
-                        {todayLeaves.length > 0 ? (
-                          <div className="flex flex-wrap gap-1 mt-0.5">
-                            {todayLeaves.map((l, idx) => {
-                              const empName = l.employees?.nickname || l.employees?.name?.split(' ')[0] || 'Staff';
-                              const typeLabel = l.leave_type === 'sick' ? 'ป่วย' : l.leave_type === 'business' ? 'กิจ' : 'พักร้อน';
-                              return (
-                                <span key={idx} className="inline-block bg-slate-100 border border-slate-200/50 px-2 py-0.5 rounded-md text-[10px] font-bold text-slate-600">
-                                  {empName} ({typeLabel})
+                  {/* Approved Leaves List (Sleek Avatar Cards) */}
+                  <div className="flex flex-col gap-2">
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">รายชื่อลางานล่าสุด</p>
+                    {approvedLeaves.length > 0 ? (
+                      <div className="flex flex-col gap-2">
+                        {approvedLeaves.map((l) => {
+                          const empName = l.employees?.nickname || l.employees?.name?.split(' ')[0] || 'Staff';
+                          const typeLabel = l.leave_type === 'sick' ? 'ลาป่วย 😷' : l.leave_type === 'business' ? 'ลากิจ 💼' : 'พักร้อน 🏖️';
+                          const badgeColor = l.leave_type === 'sick' 
+                            ? 'bg-rose-50 border-rose-100 text-rose-600' 
+                            : l.leave_type === 'business' 
+                              ? 'bg-amber-50 border-amber-100 text-amber-600' 
+                              : 'bg-sky-50 border-sky-100 text-sky-600';
+                          
+                          const isTodayLeave = l.leave_date === format(new Date(), 'yyyy-MM-dd');
+                          const dateObj = new Date(l.leave_date);
+                          const dateStrFormatted = format(dateObj, 'd MMM', { locale: th });
+
+                          return (
+                            <div key={l.id} className="flex items-center justify-between p-2 bg-slate-50/40 rounded-2xl border border-slate-100/30">
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                {/* Employee Avatar */}
+                                {l.employees?.photo_url ? (
+                                  <img src={l.employees.photo_url} alt={empName} className="w-8 h-8 rounded-full object-cover border border-white shadow-sm shrink-0" />
+                                ) : (
+                                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-100 to-slate-100 flex items-center justify-center text-[10px] font-extrabold text-indigo-500 border border-white shadow-sm shrink-0">
+                                    {empName.slice(0, 2).toUpperCase()}
+                                  </div>
+                                )}
+                                <div className="flex flex-col min-w-0">
+                                  <span className="text-xs font-black text-slate-800 truncate leading-none mb-0.5">{empName}</span>
+                                  <span className="text-[9px] font-bold text-slate-400 truncate leading-none">{l.reason || 'ทำธุระส่วนตัว'}</span>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-md border ${badgeColor}`}>
+                                  {typeLabel}
                                 </span>
-                              );
-                            })}
-                          </div>
-                        ) : (
-                          <span className="text-slate-400 font-semibold italic text-[11px] block mt-0.5">วันนี้ไม่มีคนลาหยุด ☀️</span>
-                        )}
+                                <span className={cn(
+                                  "text-[9px] font-extrabold px-1.5 py-0.5 rounded-md border",
+                                  isTodayLeave 
+                                    ? "bg-rose-500 border-rose-600 text-white animate-pulse" 
+                                    : "bg-slate-100 border-slate-200 text-slate-500"
+                                )}>
+                                  {isTodayLeave ? 'วันนี้' : dateStrFormatted}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
-                    </div>
+                    ) : (
+                      <span className="text-slate-400 font-semibold italic text-[11px] block mt-0.5">ช่วงนี้ไม่มีคนลาหยุด ☀️</span>
+                    )}
                   </div>
 
                   {/* My Pending Leaves */}
@@ -864,14 +932,19 @@ export default function CheckIn() {
                         statusBg = 'bg-indigo-50 border-indigo-100/60 text-indigo-650';
                       }
 
+                      const isSelected = selectedDaySchedule?.dateStr === day.dateStr;
+
                       return (
                         <div 
                           key={idx}
+                          onClick={() => setSelectedDaySchedule(day)}
                           className={cn(
-                            "flex flex-col items-center p-1 rounded-xl border text-center transition-all duration-200 min-w-0",
+                            "flex flex-col items-center p-1 rounded-xl border text-center transition-all duration-200 min-w-0 cursor-pointer hover:scale-[1.03] active:scale-[0.97]",
                             day.isToday 
-                              ? "bg-slate-900 border-slate-950 text-white shadow-md scale-105" 
-                              : statusBg
+                              ? "bg-slate-900 border-slate-950 text-white shadow-md" 
+                              : isSelected
+                                ? "bg-indigo-50 border-indigo-400 text-indigo-750 shadow-sm"
+                                : statusBg
                           )}
                         >
                           <span className={cn("text-[9px] font-bold", day.isToday ? "text-slate-300" : "text-slate-400")}>
@@ -892,6 +965,53 @@ export default function CheckIn() {
                       );
                     })}
                   </div>
+
+                  {/* Selected Day Shift Detail */}
+                  {selectedDaySchedule && (
+                    <motion.div 
+                      key={selectedDaySchedule.dateStr}
+                      initial={{ opacity: 0, y: 5 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="mt-2 p-3 bg-slate-50/70 backdrop-blur-sm rounded-2xl border border-slate-100/50 flex items-center justify-between transition-all duration-300"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={cn(
+                          "w-10 h-10 rounded-xl flex items-center justify-center text-lg shadow-sm border",
+                          selectedDaySchedule.isLeave 
+                            ? "bg-rose-50 text-rose-500 border-rose-100" 
+                            : selectedDaySchedule.isOff 
+                              ? "bg-slate-100 text-slate-400 border-slate-200/50" 
+                              : "bg-indigo-50 text-indigo-500 border-indigo-100/60"
+                        )}>
+                          {selectedDaySchedule.isLeave 
+                            ? (selectedDaySchedule.leaveType === 'sick' ? '🤢' : selectedDaySchedule.leaveType === 'business' ? '💼' : '🏖️') 
+                            : selectedDaySchedule.isOff 
+                              ? '😴' 
+                              : (selectedDaySchedule.shiftName.includes('ค่ำ') || selectedDaySchedule.shiftName.includes('เย็น') || selectedDaySchedule.shiftTime.startsWith('18') || selectedDaySchedule.shiftTime.startsWith('17') || selectedDaySchedule.shiftTime.startsWith('16') ? '🌙' : '☀️')}
+                        </div>
+                        <div>
+                          <h5 className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest leading-none mb-1">
+                            {format(selectedDaySchedule.date, 'EEEE d MMMM yyyy', { locale: th })} {selectedDaySchedule.isToday && '(วันนี้)'}
+                          </h5>
+                          <p className="text-xs font-black text-slate-800 leading-none">
+                            {selectedDaySchedule.isLeave 
+                              ? `ลากุน (${selectedDaySchedule.leaveType === 'sick' ? 'ลาป่วย 😷' : selectedDaySchedule.leaveType === 'business' ? 'ลากิจ 💼' : 'พักร้อน 🏖️'})` 
+                              : selectedDaySchedule.isOff 
+                                ? 'วันหยุด (OFF)' 
+                                : selectedDaySchedule.shiftName || 'กะงาน'}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      {!selectedDaySchedule.isOff && !selectedDaySchedule.isLeave && selectedDaySchedule.shiftTime && (
+                        <div className="text-right">
+                          <span className="text-[11px] font-black text-indigo-650 bg-indigo-100/60 border border-indigo-200/50 px-2.5 py-1 rounded-lg">
+                            {selectedDaySchedule.shiftTime}
+                          </span>
+                        </div>
+                      )}
+                    </motion.div>
+                  )}
                 </div>
               )}
             </div>

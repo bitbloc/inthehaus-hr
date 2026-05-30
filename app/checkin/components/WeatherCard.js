@@ -118,15 +118,15 @@ export default function WeatherCard({ latitude, longitude, locationName = "Curre
 
                             {/* Info on the Right & Radar Trigger */}
                             <div className="flex items-center gap-3 shrink-0 ml-2">
-                                <div className="flex flex-col items-end text-right text-[9px] font-bold text-slate-500 leading-snug">
+                                <div className="flex flex-col items-end text-right text-[10px] font-bold text-slate-500 leading-tight">
                                     <span>
                                         {weather?.tempDiffText 
-                                            ? `🌡️ ${weather.tempDiffText.replace('เมื่อเทียบกับเมื่อวาน ', '').replace('องศา', '°C')}` 
-                                            : '🌡️ ใกล้เคียงเมื่อวาน'}
+                                            ? `🌡️ ${weather.tempDiffText.replace('ประมาณ ', '').replace('เมื่อเทียบกับเมื่อวาน ', '').replace('องศา', '°C').trim()}` 
+                                            : '🌡️ เท่าเมื่อวาน'}
                                     </span>
                                     <span>
                                         {weather?.hasRain 
-                                            ? `🌧️ ฝน: ${weather.rainBlocks.join(', ')}` 
+                                            ? '🌧️ มีโอกาสฝนตก' 
                                             : '☀️ ไม่มีฝนวันนี้'}
                                     </span>
                                 </div>

@@ -35,7 +35,6 @@ export default function ShiftsPage() {
         const { data: ovData } = await supabase
             .from('roster_transactions')
             .select('*')
-            .eq('status', 'PUBLISHED')
             .eq('slot_type', 'MAIN');
 
         const { data: reqData } = await supabase.from('shift_swap_requests').select(
