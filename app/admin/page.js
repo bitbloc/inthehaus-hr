@@ -91,6 +91,19 @@ export default function AdminDashboard() {
     const [announcementPriority, setAnnouncementPriority] = useState(1);
     const [showAllLogs, setShowAllLogs] = useState(false);
 
+    // Admin Leave Creation State
+    const [showAdminLeaveModal, setShowAdminLeaveModal] = useState(false);
+    const [adminLeaveForm, setAdminLeaveForm] = useState({
+        empId: "",
+        startDate: format(new Date(), "yyyy-MM-dd"),
+        endDate: format(new Date(), "yyyy-MM-dd"),
+        type: "sick",
+        reason: "",
+        replacementId: "",
+        status: "approved"
+    });
+    const [adminLeaveLoading, setAdminLeaveLoading] = useState(false);
+
     // Manual Entry State
     const [showManualModal, setShowManualModal] = useState(false);
     const [manualForm, setManualForm] = useState({
@@ -576,6 +589,121 @@ export default function AdminDashboard() {
             fetchTransactions();
         } catch (e) {
             alert("เกิดข้อผิดพลาดในการลบใบลา: " + e.message);
+        }
+    };
+
+    // Admin Create Leave Request
+    const handleAdminCreateLeave = async () => {
+        if (!adminLeaveForm.empId) return alert("กรุณาเลือกพนักงานที่ต้องการลา");
+        if (!adminLeaveForm.startDate || !adminLeaveForm.endDate) return alert("กรุณาระบุวันที่ลา");
+        if (!adminLeaveForm.reason) return alert("กรุณาระบุเหตุผลการลา");
+
+        setAdminLeaveLoading(true);
+        try {
+            // Generate date range
+            const dates = [];
+            let current = new Date(adminLeaveForm.startDate);
+            const end = new Date(adminLeaveForm.endDate);
+            while (current <= end) {
+                const y = current.getFullYear();
+                const m = String(current.getMonth() + 1).padStart(2, '0');
+                const d = String(current.getDate()).padStart(2, '0');
+                dates.push(`${y}-${m}-${d}`);
+                current.setDate(current.getDate() + 1);
+            }
+
+            if (dates.length === 0) return alert("ช่วงวันที่ไม่ถูกต้อง");
+
+            const rowsToInsert = dates.map(date => ({
+                employee_id: parseInt(adminLeaveForm.empId, 10),
+                leave_date: date,
+                leave_type: adminLeaveForm.type,
+                reason: `[Admin] ${adminLeaveForm.reason}`,
+                replacement_employee_id: adminLeaveForm.replacementId ? parseInt(adminLeaveForm.replacementId, 10) : null,
+                status: adminLeaveForm.status
+            }));
+
+            const { data: insertedData, error } = await supabase
+                .from('leave_requests')
+                .insert(rowsToInsert)
+                .select();
+
+            if (error) throw error;
+
+            // If auto-approved, sync to roster
+            if (adminLeaveForm.status === 'approved' && insertedData) {
+                for (const req of insertedData) {
+                    // Mark leaving employee as OFF
+                    await supabase.from('roster_overrides').upsert({
+                        employee_id: req.employee_id,
+                        date: req.leave_date,
+                        is_off: true
+                    });
+
+                    await supabase.from('roster_transactions').upsert({
+                        employee_id: req.employee_id,
+                        date: req.leave_date,
+                        is_off: true,
+                        slot_type: 'MAIN',
+                        status: 'PUBLISHED'
+                    }, { onConflict: 'employee_id, date, slot_type' });
+
+                    // If replacement, assign shift
+                    if (req.replacement_employee_id) {
+                        const dayOfWeek = (new Date(req.leave_date).getDay() + 6) % 7;
+                        const { data: sched } = await supabase
+                            .from('employee_schedules')
+                            .select('shift_id')
+                            .eq('employee_id', req.employee_id)
+                            .eq('day_of_week', dayOfWeek)
+                            .eq('is_off', false)
+                            .maybeSingle();
+
+                        if (sched?.shift_id) {
+                            const { data: shiftObj } = await supabase
+                                .from('shifts')
+                                .select('start_time, end_time')
+                                .eq('id', sched.shift_id)
+                                .single();
+
+                            if (shiftObj) {
+                                await supabase.from('roster_overrides').upsert({
+                                    employee_id: req.replacement_employee_id,
+                                    date: req.leave_date,
+                                    shift_id: sched.shift_id,
+                                    is_off: false,
+                                    custom_start_time: shiftObj.start_time,
+                                    custom_end_time: shiftObj.end_time
+                                });
+
+                                await supabase.from('roster_transactions').upsert({
+                                    employee_id: req.replacement_employee_id,
+                                    date: req.leave_date,
+                                    shift_id: sched.shift_id,
+                                    is_off: false,
+                                    custom_start_time: shiftObj.start_time,
+                                    custom_end_time: shiftObj.end_time,
+                                    slot_type: 'MAIN',
+                                    status: 'PUBLISHED'
+                                }, { onConflict: 'employee_id, date, slot_type' });
+                            }
+                        }
+                    }
+                }
+            }
+
+            alert(`✅ เพิ่มใบลาจำนวน ${dates.length} วัน สำเร็จ! (สถานะ: ${adminLeaveForm.status === 'approved' ? 'อนุมัติแล้ว + Sync Roster' : adminLeaveForm.status === 'pending' ? 'รออนุมัติ' : 'ปฏิเสธ'})`);
+            setShowAdminLeaveModal(false);
+            setAdminLeaveForm({
+                empId: "", startDate: format(new Date(), "yyyy-MM-dd"), endDate: format(new Date(), "yyyy-MM-dd"),
+                type: "sick", reason: "", replacementId: "", status: "approved"
+            });
+            fetchData('leave_requests', 'leaveRequests');
+            fetchTransactions();
+        } catch (e) {
+            alert("เกิดข้อผิดพลาด: " + e.message);
+        } finally {
+            setAdminLeaveLoading(false);
         }
     };
 
@@ -1855,6 +1983,13 @@ export default function AdminDashboard() {
                                         >
                                             {leaveShowAllMonths ? '📅 แสดงเฉพาะวันลาปัจจุบัน/อนาคต' : '🌐 แสดงประวัติทั้งหมด'}
                                         </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowAdminLeaveModal(true)}
+                                            className="px-4 py-2 rounded-xl text-xs font-bold transition-all border shadow-sm bg-indigo-600 text-white border-indigo-700 hover:bg-indigo-700 active:scale-95"
+                                        >
+                                            ➕ เพิ่มใบลา (Admin)
+                                        </button>
                                     </div>
                                 </div>
 
@@ -2070,6 +2205,183 @@ export default function AdminDashboard() {
                             </div>
                         );
                     })()}
+
+                    {/* Admin Leave Creation Modal */}
+                    {showAdminLeaveModal && (
+                        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowAdminLeaveModal(false)}>
+                            <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                                {/* Modal Header */}
+                                <div className="bg-gradient-to-r from-indigo-600 to-indigo-800 text-white p-6 rounded-t-3xl">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <h3 className="text-lg font-extrabold">➕ เพิ่มใบลาหยุด (Admin)</h3>
+                                            <p className="text-indigo-200 text-xs mt-1 font-medium">สร้างใบลาให้พนักงานโดย Admin พร้อม Sync Roster อัตโนมัติ</p>
+                                        </div>
+                                        <button onClick={() => setShowAdminLeaveModal(false)} className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 transition-colors text-sm font-bold">✕</button>
+                                    </div>
+                                </div>
+
+                                {/* Modal Body */}
+                                <div className="p-6 space-y-5">
+                                    {/* Employee Selection */}
+                                    <div>
+                                        <label className="block text-[10px] font-extrabold text-indigo-600 uppercase tracking-widest mb-1.5">👤 เลือกพนักงาน</label>
+                                        <select
+                                            value={adminLeaveForm.empId}
+                                            onChange={e => setAdminLeaveForm(prev => ({ ...prev, empId: e.target.value, replacementId: "" }))}
+                                            className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 text-slate-900 font-bold text-sm outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition"
+                                        >
+                                            <option value="">-- เลือกพนักงาน --</option>
+                                            {data.employees.map(emp => (
+                                                <option key={emp.id} value={emp.id}>
+                                                    {emp.name} {emp.nickname ? `(${emp.nickname})` : ""} — {emp.position || "ทั่วไป"}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    {/* Date Range */}
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block text-[10px] font-extrabold text-indigo-600 uppercase tracking-widest mb-1.5">📅 เริ่มวันที่</label>
+                                            <input
+                                                type="date"
+                                                value={adminLeaveForm.startDate}
+                                                onChange={e => {
+                                                    const v = e.target.value;
+                                                    setAdminLeaveForm(prev => ({
+                                                        ...prev,
+                                                        startDate: v,
+                                                        endDate: !prev.endDate || prev.endDate < v ? v : prev.endDate
+                                                    }));
+                                                }}
+                                                className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 text-slate-900 font-bold text-sm outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-extrabold text-indigo-600 uppercase tracking-widest mb-1.5">📅 ถึงวันที่</label>
+                                            <input
+                                                type="date"
+                                                value={adminLeaveForm.endDate}
+                                                min={adminLeaveForm.startDate}
+                                                onChange={e => setAdminLeaveForm(prev => ({ ...prev, endDate: e.target.value }))}
+                                                className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 text-slate-900 font-bold text-sm outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Days Summary */}
+                                    {adminLeaveForm.startDate && adminLeaveForm.endDate && (() => {
+                                        const s = new Date(adminLeaveForm.startDate);
+                                        const e = new Date(adminLeaveForm.endDate);
+                                        const totalDays = Math.max(0, Math.floor((e - s) / (1000 * 60 * 60 * 24)) + 1);
+                                        return (
+                                            <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3 flex items-center justify-between">
+                                                <span className="text-xs font-bold text-indigo-700">📊 จำนวนวันที่เลือก</span>
+                                                <span className="text-lg font-extrabold text-indigo-700">{totalDays} วัน</span>
+                                            </div>
+                                        );
+                                    })()}
+
+                                    {/* Leave Type */}
+                                    <div>
+                                        <label className="block text-[10px] font-extrabold text-indigo-600 uppercase tracking-widest mb-1.5">📋 ประเภทการลา</label>
+                                        <select
+                                            value={adminLeaveForm.type}
+                                            onChange={e => setAdminLeaveForm(prev => ({ ...prev, type: e.target.value }))}
+                                            className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 text-slate-900 font-bold text-sm outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition cursor-pointer"
+                                        >
+                                            <option value="sick">😷 ลาป่วย (Sick Leave)</option>
+                                            <option value="business">💼 ลากิจ (Business Leave)</option>
+                                            <option value="vacation">🏖️ พักร้อน (Vacation)</option>
+                                        </select>
+                                    </div>
+
+                                    {/* Reason */}
+                                    <div>
+                                        <label className="block text-[10px] font-extrabold text-indigo-600 uppercase tracking-widest mb-1.5">📝 เหตุผล</label>
+                                        <textarea
+                                            value={adminLeaveForm.reason}
+                                            onChange={e => setAdminLeaveForm(prev => ({ ...prev, reason: e.target.value }))}
+                                            rows={2}
+                                            placeholder="ระบุเหตุผลการลา..."
+                                            className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 text-slate-900 font-medium text-sm outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition resize-none placeholder:text-slate-400"
+                                        />
+                                    </div>
+
+                                    {/* Replacement Employee */}
+                                    <div>
+                                        <label className="block text-[10px] font-extrabold text-indigo-600 uppercase tracking-widest mb-1.5">👥 พนักงานทำงานแทน (ไม่บังคับ)</label>
+                                        <select
+                                            value={adminLeaveForm.replacementId}
+                                            onChange={e => setAdminLeaveForm(prev => ({ ...prev, replacementId: e.target.value }))}
+                                            className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 text-slate-900 font-bold text-sm outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition cursor-pointer"
+                                        >
+                                            <option value="">-- ไม่ระบุ --</option>
+                                            {data.employees
+                                                .filter(emp => String(emp.id) !== String(adminLeaveForm.empId))
+                                                .map(emp => (
+                                                    <option key={emp.id} value={emp.id}>
+                                                        {emp.name} {emp.nickname ? `(${emp.nickname})` : ""} — {emp.position || "ทั่วไป"}
+                                                    </option>
+                                                ))
+                                            }
+                                        </select>
+                                    </div>
+
+                                    {/* Status */}
+                                    <div>
+                                        <label className="block text-[10px] font-extrabold text-indigo-600 uppercase tracking-widest mb-1.5">📌 สถานะใบลา</label>
+                                        <div className="flex gap-2">
+                                            {[
+                                                { id: 'approved', label: '✅ อนุมัติทันที', desc: 'Sync ลง Roster อัตโนมัติ' },
+                                                { id: 'pending', label: '⏳ รออนุมัติ', desc: 'ยังไม่ Sync Roster' },
+                                            ].map(s => (
+                                                <button
+                                                    key={s.id}
+                                                    type="button"
+                                                    onClick={() => setAdminLeaveForm(prev => ({ ...prev, status: s.id }))}
+                                                    className={`flex-1 p-3 rounded-xl text-xs font-bold border-2 transition-all ${
+                                                        adminLeaveForm.status === s.id
+                                                            ? s.id === 'approved'
+                                                                ? 'bg-emerald-50 border-emerald-400 text-emerald-700 ring-2 ring-emerald-200'
+                                                                : 'bg-amber-50 border-amber-400 text-amber-700 ring-2 ring-amber-200'
+                                                            : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'
+                                                    }`}
+                                                >
+                                                    <div>{s.label}</div>
+                                                    <div className="text-[9px] mt-0.5 font-medium opacity-70">{s.desc}</div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Modal Footer */}
+                                <div className="p-6 pt-0 flex gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowAdminLeaveModal(false)}
+                                        className="flex-1 py-3 rounded-xl font-bold text-sm bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200 transition-all"
+                                    >
+                                        ยกเลิก
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleAdminCreateLeave}
+                                        disabled={adminLeaveLoading}
+                                        className={`flex-1 py-3 rounded-xl font-extrabold text-sm transition-all shadow-md ${
+                                            adminLeaveLoading
+                                                ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                                                : 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white hover:from-indigo-700 hover:to-indigo-800 active:scale-[0.98] shadow-indigo-500/20'
+                                        }`}
+                                    >
+                                        {adminLeaveLoading ? '⏳ กำลังบันทึก...' : '💾 บันทึกใบลา'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     {/* --- HIRING (APPLICATIONS) --- */}
                     {activeTab === 'applications' && (
