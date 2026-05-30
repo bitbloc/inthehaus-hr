@@ -21,6 +21,190 @@ function getShiftColorHex(shiftName, isOff, isCustomOrExtra) {
   return '#ca8a04'; // Yellow
 }
 
+function formatLeaveRequestBubble(l, isHistory = false) {
+  const empName = l.employees?.nickname || l.employees?.name || 'พนักงาน';
+  const empPosition = l.employees?.position || 'ทั่วไป';
+  const dateStr = l.leave_date ? format(parseISO(l.leave_date), 'dd/MM/yyyy') : '-';
+  
+  let typeText = 'ลาหยุด 📋';
+  if (l.leave_type === 'sick') typeText = 'ลาป่วย 😷';
+  else if (l.leave_type === 'business') typeText = 'ลากิจ 💼';
+  else if (l.leave_type === 'vacation') typeText = 'พักร้อน 🏖️';
+
+  const repEmp = l.replacement_employee;
+  const replacementName = repEmp ? `${repEmp.name} (${repEmp.nickname || "-"})` : '-';
+  const reasonText = l.reason || '-';
+
+  // Status style config
+  let statusLabel = '⏳ รออนุมัติ';
+  let statusColor = '#b45309';
+  let statusBg = '#fef3c7';
+  if (l.status === 'approved') {
+    statusLabel = '✅ อนุมัติแล้ว';
+    statusColor = '#047857';
+    statusBg = '#d1fae5';
+  } else if (l.status === 'rejected') {
+    statusLabel = '❌ ปฏิเสธแล้ว';
+    statusColor = '#b91c1c';
+    statusBg = '#fee2e2';
+  }
+
+  const bubble = {
+    type: 'bubble',
+    size: 'mega',
+    body: {
+      type: 'box',
+      layout: 'vertical',
+      paddingAll: '20px',
+      contents: [
+        // Header info with status badge
+        {
+          type: 'box',
+          layout: 'horizontal',
+          contents: [
+            {
+              type: 'box',
+              layout: 'vertical',
+              flex: 1,
+              contents: [
+                {
+                  type: 'text',
+                  text: isHistory ? '📋 ประวัติการลาหยุด' : '📋 คำขออนุมัติลางาน',
+                  weight: 'bold',
+                  size: 'sm',
+                  color: '#9ca3af'
+                },
+                {
+                  type: 'text',
+                  text: empName,
+                  weight: 'bold',
+                  size: 'xl',
+                  color: '#1f2937',
+                  margin: 'xs'
+                },
+                {
+                  type: 'text',
+                  text: empPosition,
+                  size: 'xs',
+                  color: '#6b7280'
+                }
+              ]
+            },
+            {
+              type: 'box',
+              layout: 'vertical',
+              flex: 0,
+              contents: [
+                {
+                  type: 'box',
+                  layout: 'vertical',
+                  backgroundColor: statusBg,
+                  cornerRadius: 'md',
+                  paddingStart: '8px',
+                  paddingEnd: '8px',
+                  paddingTop: '4px',
+                  paddingBottom: '4px',
+                  contents: [
+                    {
+                      type: 'text',
+                      text: statusLabel,
+                      color: statusColor,
+                      weight: 'bold',
+                      size: 'xxs'
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          type: 'separator',
+          margin: 'md'
+        },
+        // Details list
+        {
+          type: 'box',
+          layout: 'vertical',
+          margin: 'md',
+          spacing: 'sm',
+          contents: [
+            {
+              type: 'box',
+              layout: 'baseline',
+              spacing: 'sm',
+              contents: [
+                { type: 'text', text: 'วันที่ลา:', color: '#9ca3af', size: 'xs', flex: 2 },
+                { type: 'text', text: dateStr, color: '#374151', size: 'sm', flex: 5, weight: 'bold' }
+              ]
+            },
+            {
+              type: 'box',
+              layout: 'baseline',
+              spacing: 'sm',
+              contents: [
+                { type: 'text', text: 'ประเภท:', color: '#9ca3af', size: 'xs', flex: 2 },
+                { type: 'text', text: typeText, color: '#374151', size: 'sm', flex: 5, weight: 'medium' }
+              ]
+            },
+            {
+              type: 'box',
+              layout: 'baseline',
+              spacing: 'sm',
+              contents: [
+                { type: 'text', text: 'คนปฏิบัติแทน:', color: '#9ca3af', size: 'xs', flex: 2 },
+                { type: 'text', text: replacementName, color: '#374151', size: 'sm', flex: 5, wrap: true }
+              ]
+            },
+            {
+              type: 'box',
+              layout: 'baseline',
+              spacing: 'sm',
+              contents: [
+                { type: 'text', text: 'เหตุผล:', color: '#9ca3af', size: 'xs', flex: 2 },
+                { type: 'text', text: reasonText, color: '#4b5563', size: 'sm', flex: 5, wrap: true, style: 'italic' }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  };
+
+  // Add footer buttons only if status is pending (so it can be approved/rejected)
+  if (l.status === 'pending') {
+    bubble.footer = {
+      type: 'box',
+      layout: 'horizontal',
+      spacing: 'sm',
+      contents: [
+        {
+          type: 'button',
+          style: 'primary',
+          color: '#10b981',
+          action: {
+            type: 'postback',
+            label: '✅ อนุมัติ',
+            data: `action=approve_leave&id=${l.id}`
+          }
+        },
+        {
+          type: 'button',
+          style: 'secondary',
+          color: '#ef4444',
+          action: {
+            type: 'postback',
+            label: '❌ ปฏิเสธ',
+            data: `action=reject_leave&id=${l.id}`
+          }
+        }
+      ]
+    };
+  }
+
+  return bubble;
+}
+
 export async function handleRosterCommand(event, client, text, rawText, userId) {
   if (text === 'stcalendar' || text === 'ตารางทั้งสัปดาห์' || text === 'วีคนี้' || text.includes('calendar')) {
     const today = addHours(new Date(), 7);
@@ -157,7 +341,7 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
   if (text === 'ลางาน') {
     const { data: leaves, error } = await supabase
       .from('leave_requests')
-      .select('*, employees!employee_id(name, position)')
+      .select('*, employees!employee_id(name, nickname, position), replacement_employee:employees!replacement_employee_id(name, nickname, position)')
       .eq('status', 'pending')
       .order('leave_date', { ascending: true });
 
@@ -166,19 +350,126 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
       return true;
     }
 
-    let msg = `📋 รายการรออนุมัติลางาน\n`;
-    if (leaves?.length > 0) {
-      leaves.forEach(l => {
-        const dateStr = l.leave_date ? format(parseISO(l.leave_date), 'dd/MM/yyyy') : '-';
-        msg += `\n👤 ${l.employees?.name} (${l.employees?.position})\n   วันที่: ${dateStr}\n   ประเภท: ${l.leave_type}\n   เหตุผล: ${l.reason || '-'}\n`;
-      });
-      msg += `\n📌 รวมรออนุมัติ: ${leaves.length} รายการ`;
+    if (leaves && leaves.length > 0) {
+      const bubbles = leaves.map(l => formatLeaveRequestBubble(l, false));
+      const flexMsg = {
+        type: 'flex',
+        altText: '📋 รายการรออนุมัติลางาน',
+        contents: bubbles.length === 1 ? bubbles[0] : { type: 'carousel', contents: bubbles }
+      };
+      await client.replyMessage(event.replyToken, flexMsg);
     } else {
-      msg += "\n✅ ไม่มีรายการขอลาหยุดที่รออนุมัติ";
+      const noPendingBubble = {
+        type: 'bubble',
+        size: 'mega',
+        body: {
+          type: 'box',
+          layout: 'vertical',
+          paddingAll: '20px',
+          contents: [
+            {
+              type: 'text',
+              text: '📋 รายการรออนุมัติลางาน',
+              weight: 'bold',
+              size: 'md',
+              color: '#9ca3af'
+            },
+            {
+              type: 'box',
+              layout: 'vertical',
+              margin: 'lg',
+              paddingAll: '15px',
+              backgroundColor: '#f0fdf4',
+              cornerRadius: 'md',
+              contents: [
+                {
+                  type: 'text',
+                  text: '✅ ไม่มีรายการขอลาหยุดที่รออนุมัติ',
+                  color: '#15803d',
+                  weight: 'bold',
+                  size: 'sm',
+                  align: 'center'
+                }
+              ]
+            }
+          ]
+        }
+      };
+      await client.replyMessage(event.replyToken, {
+        type: 'flex',
+        altText: '📋 รายการรออนุมัติลางาน',
+        contents: noPendingBubble
+      });
     }
-    await client.replyMessage(event.replyToken, { type: 'text', text: msg });
     return true;
   }
+
+  if (text === 'ลางานล่าสุด' || text === 'ประวัติลางาน' || text.includes('ลางานล่าสุด') || text.includes('ประวัติลางาน')) {
+    const { data: leaves, error } = await supabase
+      .from('leave_requests')
+      .select('*, employees!employee_id(name, nickname, position), replacement_employee:employees!replacement_employee_id(name, nickname, position)')
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    if (error) {
+      await client.replyMessage(event.replyToken, { type: 'text', text: 'Error fetching data: ' + error.message });
+      return true;
+    }
+
+    if (leaves && leaves.length > 0) {
+      const bubbles = leaves.map(l => formatLeaveRequestBubble(l, true));
+      const flexMsg = {
+        type: 'flex',
+        altText: '📋 ประวัติการลาหยุดล่าสุด',
+        contents: bubbles.length === 1 ? bubbles[0] : { type: 'carousel', contents: bubbles }
+      };
+      await client.replyMessage(event.replyToken, flexMsg);
+    } else {
+      const noHistoryBubble = {
+        type: 'bubble',
+        size: 'mega',
+        body: {
+          type: 'box',
+          layout: 'vertical',
+          paddingAll: '20px',
+          contents: [
+            {
+              type: 'text',
+              text: '📋 ประวัติการลาหยุดล่าสุด',
+              weight: 'bold',
+              size: 'md',
+              color: '#9ca3af'
+            },
+            {
+              type: 'box',
+              layout: 'vertical',
+              margin: 'lg',
+              paddingAll: '15px',
+              backgroundColor: '#f8fafc',
+              cornerRadius: 'md',
+              contents: [
+                {
+                  type: 'text',
+                  text: '❌ ยังไม่มีประวัติการขอลาหยุดในระบบ',
+                  color: '#64748b',
+                  weight: 'bold',
+                  size: 'sm',
+                  align: 'center'
+                }
+              ]
+            }
+          ]
+        }
+      };
+      await client.replyMessage(event.replyToken, {
+        type: 'flex',
+        altText: '📋 ประวัติการลาหยุดล่าสุด',
+        contents: noHistoryBubble
+      });
+    }
+    return true;
+  }
+
 
   return false;
 }
