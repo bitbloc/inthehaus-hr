@@ -144,7 +144,7 @@ function formatLeaveRequestBubble(l, isHistory = false) {
               spacing: 'sm',
               contents: [
                 { type: 'text', text: 'ประเภท:', color: '#9ca3af', size: 'xs', flex: 2 },
-                { type: 'text', text: typeText, color: '#374151', size: 'sm', flex: 5, weight: 'medium' }
+                { type: 'text', text: typeText, color: '#374151', size: 'sm', flex: 5 }
               ]
             },
             {
