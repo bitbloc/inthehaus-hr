@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useMemo, useReducer } from "react";
+import React, { useEffect, useState, useMemo, useReducer } from "react";
 import { supabase } from "../../lib/supabaseClient";
 import { format, parseISO, startOfMonth, endOfMonth, differenceInMinutes, startOfWeek, addDays } from "date-fns";
 import * as XLSX from 'xlsx';
@@ -73,6 +73,10 @@ export default function AdminDashboard() {
 
 
     // UI Local State
+    const [leaveStatusFilter, setLeaveStatusFilter] = useState("all");
+    const [leaveShowAllMonths, setLeaveShowAllMonths] = useState(false);
+    const [leaveSearchQuery, setLeaveSearchQuery] = useState("");
+
     const [showStaffModal, setShowStaffModal] = useState(false);
     const [editingStaff, setEditingStaff] = useState(null);
     const [selectedEmpId, setSelectedEmpId] = useState("ALL");
@@ -100,7 +104,7 @@ export default function AdminDashboard() {
     const fetchData = async (table, keyInState, transform = null) => {
         let query = supabase.from(table).select("*");
         if (table === 'leave_requests') {
-            query = supabase.from(table).select("*, employees!employee_id(name, position), replacement_employee:employees!replacement_employee_id(name, nickname, position)");
+            query = supabase.from(table).select("*, employees!employee_id(name, nickname, position, photo_url), replacement_employee:employees!replacement_employee_id(name, nickname, position, photo_url)");
         }
         const { data: res } = await query.order("id");
         dispatch({ type: 'SET_DATA', payload: { [keyInState]: transform ? transform(res) : res || [] } });
@@ -420,7 +424,7 @@ export default function AdminDashboard() {
                         originalEnd = tx.custom_end_time;
                     } else {
                         // Fallback: Check template schedule
-                        const dayOfWeek = new Date(req.leave_date).getDay();
+                        const dayOfWeek = (new Date(req.leave_date).getDay() + 6) % 7; // Map JS getDay() (0=Sun, 1=Mon) to DB day_of_week (0=Mon, 6=Sun)
                         const { data: sched } = await supabase
                             .from('employee_schedules')
                             .select('shift_id')
@@ -1327,7 +1331,7 @@ export default function AdminDashboard() {
                                                             </div>
                                                             <div className="text-xs text-slate-800">
                                                                 <span className="font-extrabold text-slate-900">{req.employees?.name}</span> ขอลาหยุดประเภท <span className="font-bold text-indigo-600">{req.leave_type}</span>
-                                                                <p className="mt-1 font-medium text-slate-600 font-semibold">เหตุผล: "{req.reason || '-'}"</p>
+                                                                <p className="mt-1 font-medium text-slate-600 font-semibold">เหตุผล: &quot;{req.reason || '-'}&quot;</p>
                                                                 {req.replacement_employee && (
                                                                     <p className="mt-1 text-xs font-bold text-slate-700">
                                                                         👤 คนทำงานแทน: <span className="text-indigo-650 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded-md">{req.replacement_employee.name} {req.replacement_employee.nickname ? `(${req.replacement_employee.nickname})` : ""}</span>
@@ -1360,7 +1364,7 @@ export default function AdminDashboard() {
                                                             </div>
                                                             <div className="text-xs text-slate-800">
                                                                 <span className="font-extrabold text-slate-900">{req.requester?.name}</span> ขอสลับกะกับ <span className="font-bold text-slate-900">{req.peer?.name || 'Open Pool'}</span>
-                                                                <p className="mt-1 font-medium text-slate-600 font-semibold">โน้ต: "{req.notes || '-'}"</p>
+                                                                <p className="mt-1 font-medium text-slate-600 font-semibold">โน้ต: &quot;{req.notes || '-'}&quot;</p>
                                                             </div>
                                                             <div className="flex gap-2 justify-end pt-1">
                                                                 <button 
@@ -1676,44 +1680,286 @@ export default function AdminDashboard() {
                     )}
 
                     {/* --- LEAVE REQUESTS --- */}
-                    {activeTab === 'requests' && (
-                        <div className="space-y-6">
-                            <h3 className="font-extrabold text-slate-800">Leave Requests</h3>
-                            <Card className="p-0 overflow-hidden">
-                                <table className="w-full text-sm text-left">
-                                    <thead className="bg-slate-50 text-slate-500 font-extrabold text-xs uppercase">
-                                        <tr><th className="p-4">Name</th><th className="p-4">Date</th><th className="p-4">Type</th><th className="p-4">Reason</th><th className="p-4">Replacement</th><th className="p-4">Status</th><th className="p-4 text-right">Action</th></tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {data.leaveRequests.map(req => (
-                                            <tr key={req.id} className="hover:bg-slate-50">
-                                                <td className="p-4 font-black text-slate-900">{req.employees?.name}</td>
-                                                <td className="p-4 font-mono text-slate-900 font-black">{formatDate(req.leave_date)}</td>
-                                                <td className="p-4"><Badge color="blue">{req.leave_type}</Badge></td>
-                                                <td className="p-4 text-slate-800 font-semibold">{req.reason}</td>
-                                                <td className="p-4 text-slate-850 font-bold">
-                                                    {req.replacement_employee 
-                                                        ? `${req.replacement_employee.name} ${req.replacement_employee.nickname ? `(${req.replacement_employee.nickname})` : ""}`
-                                                        : "-"
-                                                    }
-                                                </td>
-                                                <td className="p-4"><Badge color={req.status === 'approved' ? 'emerald' : req.status === 'rejected' ? 'rose' : 'amber'}>{req.status}</Badge></td>
-                                                <td className="p-4 text-right gap-2 flex justify-end">
-                                                    {req.status === 'pending' ? (
-                                                        <>
-                                                            <button onClick={() => handleLeaveAction(req, 'approved')} className="text-emerald-600 font-bold text-xs bg-emerald-50 px-2 py-1 rounded border border-emerald-100">✓ Approved</button>
-                                                            <button onClick={() => handleLeaveAction(req, 'rejected')} className="text-rose-600 font-bold text-xs bg-rose-50 px-2 py-1 rounded border border-rose-100">✕ Reject</button>
-                                                        </>
-                                                    ) : <span className="text-slate-400 font-bold">-</span>}
-                                                </td>
-                                            </tr>
+                    {activeTab === 'requests' && (() => {
+                        // 1. Calculate stats for the selected month
+                        const monthRequests = data.leaveRequests.filter(req => req.leave_date && req.leave_date.startsWith(selectedMonth));
+                        const stats = {
+                            pending: monthRequests.filter(r => r.status === 'pending').length,
+                            approved: monthRequests.filter(r => r.status === 'approved').length,
+                            rejected: monthRequests.filter(r => r.status === 'rejected').length,
+                            total: monthRequests.length
+                        };
+
+                        // 2. Filter requests based on state
+                        const filteredLeaveRequests = data.leaveRequests.filter(req => {
+                            // Month filter
+                            if (!leaveShowAllMonths && req.leave_date) {
+                                if (!req.leave_date.startsWith(selectedMonth)) return false;
+                            }
+                            // Status filter
+                            if (leaveStatusFilter !== "all" && req.status !== leaveStatusFilter) return false;
+                            // Search query
+                            if (leaveSearchQuery) {
+                                const query = leaveSearchQuery.toLowerCase();
+                                const empName = (req.employees?.name || "").toLowerCase();
+                                const empNickname = (req.employees?.nickname || "").toLowerCase();
+                                const repName = (req.replacement_employee?.name || "").toLowerCase();
+                                const repNickname = (req.replacement_employee?.nickname || "").toLowerCase();
+                                const reason = (req.reason || "").toLowerCase();
+                                if (!empName.includes(query) && 
+                                    !empNickname.includes(query) && 
+                                    !repName.includes(query) && 
+                                    !repNickname.includes(query) &&
+                                    !reason.includes(query)) {
+                                    return false;
+                                }
+                            }
+                            return true;
+                        });
+
+                        const formatThaiLeaveDate = (dateStr) => {
+                            if (!dateStr) return "-";
+                            try {
+                                const days = ["วันอาทิตย์", "วันจันทร์", "วันอังคาร", "วันพุธ", "วันพฤหัสบดี", "วันศุกร์", "วันเสาร์"];
+                                const months = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+                                const dateObj = new Date(dateStr);
+                                const dayName = days[dateObj.getDay()];
+                                const dayNum = dateObj.getDate();
+                                const monthName = months[dateObj.getMonth()];
+                                const year = dateObj.getFullYear();
+                                return `${dayName}ที่ ${dayNum} ${monthName} ${year}`;
+                            } catch (e) {
+                                return dateStr;
+                            }
+                        };
+
+                        return (
+                            <div className="space-y-6">
+                                {/* Header Title */}
+                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                    <div>
+                                        <h3 className="font-extrabold text-slate-800 text-2xl">Leave Requests (คำขอลาหยุดพนักงาน)</h3>
+                                        <p className="text-slate-500 text-xs mt-1 font-medium font-bold">จัดการใบลา อนุมัติ และตรวจสอบการทำงานแทนกันในระบบ</p>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setLeaveShowAllMonths(prev => !prev)}
+                                            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border shadow-sm ${
+                                                leaveShowAllMonths
+                                                    ? 'bg-slate-900 text-white border-slate-950 hover:bg-black'
+                                                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                                            }`}
+                                        >
+                                            {leaveShowAllMonths ? '📅 แสดงเฉพาะเดือนนี้' : '🌐 แสดงประวัติทั้งหมด'}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Stat Cards */}
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                    <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm flex items-center gap-4">
+                                        <div className="w-12 h-12 bg-slate-55 text-slate-600 rounded-xl flex items-center justify-center text-lg select-none">📋</div>
+                                        <div>
+                                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">ทั้งหมด (เดือนนี้)</div>
+                                            <div className="text-xl font-extrabold text-slate-850">{stats.total} รายการ</div>
+                                        </div>
+                                    </div>
+                                    <div className="bg-amber-50/50 border border-amber-200 rounded-2xl p-4 shadow-sm flex items-center gap-4">
+                                        <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center text-lg select-none">⏳</div>
+                                        <div>
+                                            <div className="text-[10px] font-bold text-amber-500 uppercase tracking-wider">รออนุมัติ</div>
+                                            <div className="text-xl font-extrabold text-amber-700">{stats.pending} รายการ</div>
+                                        </div>
+                                    </div>
+                                    <div className="bg-emerald-50/50 border border-emerald-250 rounded-2xl p-4 shadow-sm flex items-center gap-4">
+                                        <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center text-lg select-none">✅</div>
+                                        <div>
+                                            <div className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider">อนุมัติแล้ว</div>
+                                            <div className="text-xl font-extrabold text-emerald-700">{stats.approved} รายการ</div>
+                                        </div>
+                                    </div>
+                                    <div className="bg-rose-50/50 border border-rose-250 rounded-2xl p-4 shadow-sm flex items-center gap-4">
+                                        <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-xl flex items-center justify-center text-lg select-none">❌</div>
+                                        <div>
+                                            <div className="text-[10px] font-bold text-rose-500 uppercase tracking-wider">ปฏิเสธแล้ว</div>
+                                            <div className="text-xl font-extrabold text-rose-700">{stats.rejected} รายการ</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Filters and Search Row */}
+                                <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4">
+                                    {/* Tabs */}
+                                    <div className="flex bg-slate-100 p-1 rounded-xl gap-1">
+                                        {[
+                                            { id: 'all', label: 'ทั้งหมด' },
+                                            { id: 'pending', label: 'รออนุมัติ ⏳' },
+                                            { id: 'approved', label: 'อนุมัติแล้ว ✅' },
+                                            { id: 'rejected', label: 'ปฏิเสธแล้ว ❌' }
+                                        ].map(tab => (
+                                            <button
+                                                key={tab.id}
+                                                type="button"
+                                                onClick={() => setLeaveStatusFilter(tab.id)}
+                                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                                    leaveStatusFilter === tab.id
+                                                        ? 'bg-white text-slate-800 shadow-sm'
+                                                        : 'text-slate-500 hover:text-slate-800'
+                                                }`}
+                                            >
+                                                {tab.label}
+                                            </button>
                                         ))}
-                                    </tbody>
-                                </table>
-                                {data.leaveRequests.length === 0 && <div className="p-8 text-center text-slate-400">No requests</div>}
-                            </Card>
-                        </div>
-                    )}
+                                    </div>
+
+                                    {/* Search Input */}
+                                    <div className="relative flex-1 max-w-md">
+                                        <input
+                                            type="text"
+                                            value={leaveSearchQuery}
+                                            onChange={e => setLeaveSearchQuery(e.target.value)}
+                                            placeholder="ค้นหาตามชื่อพนักงาน, คนปฏิบัติแทน หรือเหตุผล..."
+                                            className="w-full bg-slate-55 border border-slate-200 rounded-xl pl-4 pr-10 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-200 transition-all placeholder:text-slate-400 font-bold"
+                                        />
+                                        <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 select-none text-xs">🔍</span>
+                                    </div>
+                                </div>
+
+                                {/* Table Card */}
+                                <Card className="p-0 overflow-hidden border border-slate-200/80">
+                                    <table className="w-full text-sm text-left">
+                                        <thead className="bg-slate-50 text-slate-500 font-extrabold text-xs uppercase tracking-wider border-b border-slate-100">
+                                            <tr>
+                                                <th className="p-4">พนักงาน</th>
+                                                <th className="p-4">วันที่ขอลา</th>
+                                                <th className="p-4">ประเภท</th>
+                                                <th className="p-4">เหตุผลการลา</th>
+                                                <th className="p-4">ปฏิบัติแทนโดย</th>
+                                                <th className="p-4 text-center">สถานะ</th>
+                                                <th className="p-4 text-right">การจัดการ</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {filteredLeaveRequests.map(req => {
+                                                const leaveTypeMap = {
+                                                    sick: { label: 'ลาป่วย 😷', color: 'bg-rose-50 text-rose-700 border-rose-200' },
+                                                    business: { label: 'ลากิจ 💼', color: 'bg-blue-50 text-blue-700 border-blue-200' },
+                                                    vacation: { label: 'พักร้อน 🏖️', color: 'bg-emerald-50 text-emerald-700 border-emerald-250' }
+                                                };
+                                                const currentType = leaveTypeMap[req.leave_type] || { label: req.leave_type, color: 'bg-slate-100 text-slate-700 border-slate-200' };
+
+                                                return (
+                                                    <tr key={req.id} className="hover:bg-slate-50/50 transition-colors">
+                                                        {/* Employee Name & Profile */}
+                                                        <td className="p-4">
+                                                            <div className="flex items-center gap-3">
+                                                                {req.employees?.photo_url ? (
+                                                                    <img src={req.employees.photo_url} alt="" className="w-9 h-9 rounded-xl object-cover border border-slate-200 shadow-sm" />
+                                                                ) : (
+                                                                    <div className="w-9 h-9 rounded-xl bg-slate-100 border border-slate-200 text-slate-600 flex items-center justify-center font-bold text-xs">
+                                                                        {req.employees?.name?.slice(0, 2)}
+                                                                    </div>
+                                                                )}
+                                                                <div>
+                                                                    <div className="font-extrabold text-slate-900">{req.employees?.nickname || req.employees?.name}</div>
+                                                                    <div className="text-[10px] text-slate-400 font-bold tracking-wide uppercase">{req.employees?.position || 'Staff'}</div>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+
+                                                        {/* Date */}
+                                                        <td className="p-4 font-bold text-slate-700 text-xs">
+                                                            {formatThaiLeaveDate(req.leave_date)}
+                                                        </td>
+
+                                                        {/* Leave Type */}
+                                                        <td className="p-4">
+                                                            <span className={`px-2.5 py-1.5 rounded-lg text-xs font-bold border ${currentType.color} inline-block`}>
+                                                                {currentType.label}
+                                                            </span>
+                                                        </td>
+
+                                                        {/* Reason */}
+                                                        <td className="p-4 text-xs font-medium text-slate-600 italic max-w-[200px] truncate" title={req.reason}>
+                                                            &ldquo;{req.reason || '-'}&rdquo;
+                                                        </td>
+
+                                                        {/* Replacement Employee */}
+                                                        <td className="p-4">
+                                                            {req.replacement_employee ? (
+                                                                <div className="flex items-center gap-2">
+                                                                    {req.replacement_employee.photo_url ? (
+                                                                        <img src={req.replacement_employee.photo_url} alt="" className="w-6 h-6 rounded-lg object-cover border border-slate-200" />
+                                                                    ) : (
+                                                                        <div className="w-6 h-6 rounded-lg bg-slate-50 text-slate-650 flex items-center justify-center font-bold text-[9px] border">
+                                                                            {req.replacement_employee.nickname?.slice(0, 2) || req.replacement_employee.name?.slice(0, 2)}
+                                                                        </div>
+                                                                    )}
+                                                                    <span className="font-bold text-slate-800 text-xs">
+                                                                        {req.replacement_employee.nickname || req.replacement_employee.name}
+                                                                    </span>
+                                                                </div>
+                                                            ) : (
+                                                                <span className="text-slate-400 text-xs font-semibold">-</span>
+                                                            )}
+                                                        </td>
+
+                                                        {/* Status Badge */}
+                                                        <td className="p-4 text-center">
+                                                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-black tracking-wide uppercase border ${
+                                                                req.status === 'approved' 
+                                                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-250' 
+                                                                    : req.status === 'rejected' 
+                                                                        ? 'bg-rose-50 text-rose-700 border-rose-250' 
+                                                                        : 'bg-amber-50 text-amber-700 border-amber-250 animate-pulse'
+                                                            }`}>
+                                                                {req.status === 'approved' ? 'อนุมัติแล้ว' : req.status === 'rejected' ? 'ปฏิเสธแล้ว' : 'รออนุมัติ'}
+                                                            </span>
+                                                        </td>
+
+                                                        {/* Actions */}
+                                                        <td className="p-4 text-right">
+                                                            <div className="flex justify-end gap-1.5">
+                                                                {req.status === 'pending' ? (
+                                                                    <>
+                                                                        <button 
+                                                                            onClick={() => handleLeaveAction(req, 'approved')} 
+                                                                            className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] rounded-lg transition-colors shadow-sm flex items-center gap-1"
+                                                                        >
+                                                                            <span>✓</span> อนุมัติ & ซิงค์
+                                                                        </button>
+                                                                        <button 
+                                                                            onClick={() => handleLeaveAction(req, 'rejected')} 
+                                                                            className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-[10px] rounded-lg transition-colors shadow-sm flex items-center gap-1"
+                                                                        >
+                                                                            <span>✕</span> ปฏิเสธคำขอ
+                                                                        </button>
+                                                                    </>
+                                                                ) : (
+                                                                    <button 
+                                                                        onClick={() => handleLeaveAction(req, 'pending')}
+                                                                        className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-650 border border-slate-200 font-bold text-[10px] rounded-lg transition-colors"
+                                                                    >
+                                                                        🔄 เปลี่ยนเป็นรออนุมัติ
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                    {filteredLeaveRequests.length === 0 && (
+                                        <div className="p-12 text-center text-slate-400 font-bold bg-slate-50/50">
+                                            ไม่พบรายการคำขอลาหยุดในเงื่อนไขการกรองนี้
+                                        </div>
+                                    )}
+                                </Card>
+                            </div>
+                        );
+                    })()}
 
                     {/* --- HIRING (APPLICATIONS) --- */}
                     {activeTab === 'applications' && (
@@ -2375,7 +2621,7 @@ export default function AdminDashboard() {
                                         <Card key={req.id} className="space-y-3 border border-slate-100">
                                             <div className="flex justify-between"><Badge color="blue">{req.type}</Badge><span className="text-xs font-black text-slate-900">{req.target_date}</span></div>
                                             <div className="flex items-center gap-2 text-sm text-slate-800 font-black"><span>{req.requester?.name}</span><span>➜</span><span>{req.peer?.name || 'Open Pool'}</span></div>
-                                            <div className="text-xs text-slate-600 font-bold">"{req.notes}"</div>
+                                            <div className="text-xs text-slate-600 font-bold">&quot;{req.notes}&quot;</div>
                                             <div className="grid grid-cols-2 gap-2">
                                                 <button onClick={() => handleSwapDecision(req.id, 'APPROVE')} className="bg-slate-850 hover:bg-slate-900 text-white py-2 rounded-lg text-xs font-bold shadow-sm">Approve</button>
                                                 <button onClick={() => handleSwapDecision(req.id, 'REJECT')} className="bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 rounded-lg text-xs font-bold">Reject</button>

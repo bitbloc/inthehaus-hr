@@ -578,10 +578,18 @@ export default function AdminRosterPage() {
                                                             const matchedPreset = (!s.shift_id && s.custom_start_time && s.custom_end_time)
                                                                 ? customPresets.find(p => (p.start || '').slice(0, 5) === s.custom_start_time.slice(0, 5) && (p.end || '').slice(0, 5) === s.custom_end_time.slice(0, 5))
                                                                 : null;
-                                                            const bgColor = matchedPreset
-                                                                ? `${getPresetColor(matchedPreset.color).bg} ${getPresetColor(matchedPreset.color).border} ${getPresetColor(matchedPreset.color).text}`
-                                                                : getShiftColorClass(s, shiftObj);
-                                                            const cellLabel = s.is_off ? 'OFF (วันหยุด)' : (matchedPreset ? `${matchedPreset.icon || '⏰'} ${matchedPreset.name}` : (shiftObj?.name || 'Custom'));
+                                                            const approvedLeave = empLeaves.find(l => l.status === 'approved');
+                                                            const isLeaveOff = s.is_off && approvedLeave;
+                                                            const bgColor = isLeaveOff
+                                                                ? 'bg-amber-50 border-amber-300 text-amber-900 font-extrabold border-2 border-dashed shadow-sm'
+                                                                : (matchedPreset
+                                                                    ? `${getPresetColor(matchedPreset.color).bg} ${getPresetColor(matchedPreset.color).border} ${getPresetColor(matchedPreset.color).text}`
+                                                                    : getShiftColorClass(s, shiftObj));
+                                                            const cellLabel = s.is_off
+                                                                ? (approvedLeave
+                                                                    ? `OFF (ลา${approvedLeave.leave_type === 'sick' ? 'ป่วย 😷' : approvedLeave.leave_type === 'business' ? 'กิจ 💼' : 'พักร้อน 🏖️'})`
+                                                                    : 'OFF (วันหยุด)')
+                                                                : (matchedPreset ? `${matchedPreset.icon || '⏰'} ${matchedPreset.name}` : (shiftObj?.name || 'Custom'));
 
                                                             return (
                                                                     <div key={idx} className={`p-1.5 rounded text-xs border ${bgColor} ${s.status === 'DRAFT' ? 'border-dashed border-2' : ''}`}>
@@ -725,6 +733,26 @@ export default function AdminRosterPage() {
                                                     <span className="text-gray-500 block mb-0.5">เหตุผลการลา:</span>
                                                     <span className="text-gray-700 italic block font-medium">&ldquo;{req.reason || '-'}&rdquo;</span>
                                                 </div>
+                                                {req.status === 'approved' && (() => {
+                                                    const isRequesterOff = transactions.some(t => t.employee_id === req.employee_id && t.date === req.leave_date && t.is_off);
+                                                    const isReplacementScheduled = req.replacement_employee_id 
+                                                        ? transactions.some(t => t.employee_id === req.replacement_employee_id && t.date === req.leave_date && !t.is_off)
+                                                        : false;
+                                                    return (
+                                                        <div className="mt-2 p-2 bg-emerald-50 rounded-lg border border-emerald-100 flex flex-col gap-1 text-[10px] text-emerald-800 font-bold">
+                                                            <div className="flex items-center gap-1">
+                                                                <span>{isRequesterOff ? '✅' : '❌'}</span>
+                                                                <span>พนักงานลาหยุด: {isRequesterOff ? 'บันทึกวันหยุด (OFF) แล้ว' : 'ยังไม่ได้บันทึกวันหยุด'}</span>
+                                                            </div>
+                                                            {req.replacement_employee_id && (
+                                                                <div className="flex items-center gap-1">
+                                                                    <span>{isReplacementScheduled ? '✅' : '❌'}</span>
+                                                                    <span>พนักงานแทน: {isReplacementScheduled ? 'ลงตารางกะแทนแล้ว' : 'ยังไม่ได้ลงตารางกะแทน'}</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })()}
                                             </div>
                                         )}
                                     </div>
