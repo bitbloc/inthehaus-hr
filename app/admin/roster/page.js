@@ -365,6 +365,94 @@ export default function AdminRosterPage() {
         }
     };
 
+    const handleDeleteLeaveRequest = async (req) => {
+        const isConfirmed = confirm(`คุณต้องการลบใบลาของคุณ ${req.employees?.nickname || req.employees?.name || 'พนักงาน'} วันที่ ${req.leave_date} ใช่หรือไม่?`);
+        if (!isConfirmed) return;
+
+        setLoading(true);
+        try {
+            // Find siblings
+            let query = supabase.from('leave_requests')
+                .select('id, leave_date, employee_id, replacement_employee_id')
+                .eq('employee_id', req.employee_id)
+                .eq('leave_type', req.leave_type);
+
+            if (req.reason) {
+                query = query.eq('reason', req.reason);
+            } else {
+                query = query.or('reason.is.null,reason.eq.');
+            }
+
+            const { data: siblings, error: fetchErr } = await query;
+            if (fetchErr) throw fetchErr;
+
+            let idsToDelete = [req.id];
+            let datesToDelete = [req.leave_date];
+            let replacementIds = req.replacement_employee_id ? [req.replacement_employee_id] : [];
+
+            if (siblings && siblings.length > 1) {
+                const dateStrList = siblings.map(s => s.leave_date).sort().join(', ');
+                const confirmBulk = confirm(
+                    `พบใบลาที่อยู่ในกลุ่มเดียวกัน (เหตุผล/ประเภทเดียวกัน) ทั้งหมด ${siblings.length} รายการ:\n` +
+                    `วันที่: ${dateStrList}\n\n` +
+                    `ต้องการลบใบลา "ทั้งหมด" ในกลุ่มนี้พร้อมกันเลยหรือไม่?\n` +
+                    `- กด "ตกลง (OK)" เพื่อลบทั้งหมด\n` +
+                    `- กด "ยกเลิก (Cancel)" เพื่อลบเฉพาะของวันที่ ${req.leave_date} เท่านั้น`
+                );
+
+                if (confirmBulk) {
+                    idsToDelete = siblings.map(s => s.id);
+                    datesToDelete = siblings.map(s => s.leave_date);
+                    replacementIds = Array.from(new Set(siblings.map(s => s.replacement_employee_id).filter(Boolean)));
+                }
+            }
+
+            // 1. Delete leave requests
+            const { error: delErr } = await supabase
+                .from('leave_requests')
+                .delete()
+                .in('id', idsToDelete);
+            if (delErr) throw delErr;
+
+            // 2. Clean up roster overrides
+            await supabase
+                .from('roster_overrides')
+                .delete()
+                .eq('employee_id', req.employee_id)
+                .in('date', datesToDelete);
+
+            // 3. Clean up roster transactions
+            await supabase
+                .from('roster_transactions')
+                .delete()
+                .eq('employee_id', req.employee_id)
+                .in('date', datesToDelete);
+
+            // 4. Clean up replacements roster overrides & transactions
+            for (const repId of replacementIds) {
+                await supabase
+                    .from('roster_overrides')
+                    .delete()
+                    .eq('employee_id', repId)
+                    .in('date', datesToDelete);
+
+                await supabase
+                    .from('roster_transactions')
+                    .delete()
+                    .eq('employee_id', repId)
+                    .in('date', datesToDelete);
+            }
+
+            alert("ลบข้อมูลใบลาและเคลียร์ตาราง Roster เรียบร้อยแล้ว!");
+            await fetchData();
+        } catch (e) {
+            alert("เกิดข้อผิดพลาดในการลบใบลา: " + e.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+
     const syncAllApprovedLeaves = async () => {
         setLoading(true);
         const approvedLeaves = leaveRequests.filter(l => l.status === 'approved');
@@ -848,6 +936,14 @@ export default function AdminRosterPage() {
                                                 >
                                                     แก้ไขข้อมูล
                                                 </button>
+                                                <button 
+                                                    type="button"
+                                                    onClick={() => handleDeleteLeaveRequest(req)}
+                                                    className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-bold rounded-lg text-[10px] transition-colors flex items-center gap-1 shadow-sm"
+                                                    title="ลบคำขอลาหยุด"
+                                                >
+                                                    🗑️ ลบใบลา
+                                                </button>
                                                 {req.status === 'pending' && (
                                                     <>
                                                         <button 
@@ -956,6 +1052,16 @@ export default function AdminRosterPage() {
                                                             ยกเลิกการอนุมัติ (กลับเป็นรออนุมัติ)
                                                         </button>
                                                     )}
+                                                    <button 
+                                                        type="button"
+                                                        onClick={async () => {
+                                                            await handleDeleteLeaveRequest(l);
+                                                            setEditingCell(null);
+                                                        }}
+                                                        className="px-3 py-1.5 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-lg font-bold text-[11px] transition-colors shadow-sm"
+                                                    >
+                                                        🗑️ ลบใบลา
+                                                    </button>
                                                 </div>
                                             </div>
                                         ))}

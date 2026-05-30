@@ -492,6 +492,94 @@ export default function AdminDashboard() {
         }
     };
 
+    const handleDeleteLeaveRequest = async (req) => {
+        const isConfirmed = confirm(`คุณต้องการลบใบลาของคุณ ${req.employees?.nickname || req.employees?.name || 'พนักงาน'} วันที่ ${req.leave_date} ใช่หรือไม่?`);
+        if (!isConfirmed) return;
+
+        try {
+            // Find siblings
+            let query = supabase.from('leave_requests')
+                .select('id, leave_date, employee_id, replacement_employee_id')
+                .eq('employee_id', req.employee_id)
+                .eq('leave_type', req.leave_type);
+
+            if (req.reason) {
+                query = query.eq('reason', req.reason);
+            } else {
+                query = query.or('reason.is.null,reason.eq.');
+            }
+
+            const { data: siblings, error: fetchErr } = await query;
+            if (fetchErr) throw fetchErr;
+
+            let idsToDelete = [req.id];
+            let datesToDelete = [req.leave_date];
+            let replacementIds = req.replacement_employee_id ? [req.replacement_employee_id] : [];
+
+            if (siblings && siblings.length > 1) {
+                const dateStrList = siblings.map(s => s.leave_date).sort().join(', ');
+                const confirmBulk = confirm(
+                    `พบใบลาที่อยู่ในกลุ่มเดียวกัน (เหตุผล/ประเภทเดียวกัน) ทั้งหมด ${siblings.length} รายการ:\n` +
+                    `วันที่: ${dateStrList}\n\n` +
+                    `ต้องการลบใบลา "ทั้งหมด" ในกลุ่มนี้พร้อมกันเลยหรือไม่?\n` +
+                    `- กด "ตกลง (OK)" เพื่อลบทั้งหมด\n` +
+                    `- กด "ยกเลิก (Cancel)" เพื่อลบเฉพาะของวันที่ ${req.leave_date} เท่านั้น`
+                );
+
+                if (confirmBulk) {
+                    idsToDelete = siblings.map(s => s.id);
+                    datesToDelete = siblings.map(s => s.leave_date);
+                    replacementIds = Array.from(new Set(siblings.map(s => s.replacement_employee_id).filter(Boolean)));
+                }
+            }
+
+            // 1. Delete leave requests
+            const { error: delErr } = await supabase
+                .from('leave_requests')
+                .delete()
+                .in('id', idsToDelete);
+            if (delErr) throw delErr;
+
+            // 2. Clean up roster overrides
+            await supabase
+                .from('roster_overrides')
+                .delete()
+                .eq('employee_id', req.employee_id)
+                .in('date', datesToDelete);
+
+            // 3. Clean up roster transactions
+            await supabase
+                .from('roster_transactions')
+                .delete()
+                .eq('employee_id', req.employee_id)
+                .in('date', datesToDelete);
+
+            // 4. Clean up replacements roster overrides & transactions
+            for (const repId of replacementIds) {
+                await supabase
+                    .from('roster_overrides')
+                    .delete()
+                    .eq('employee_id', repId)
+                    .in('date', datesToDelete);
+
+                await supabase
+                    .from('roster_transactions')
+                    .delete()
+                    .eq('employee_id', repId)
+                    .in('date', datesToDelete);
+            }
+
+            alert("ลบข้อมูลใบลาและเคลียร์ตาราง Roster เรียบร้อยแล้ว!");
+            
+            // Refresh
+            fetchData('leave_requests', 'leaveRequests');
+            fetchTransactions();
+        } catch (e) {
+            alert("เกิดข้อผิดพลาดในการลบใบลา: " + e.message);
+        }
+    };
+
+
     // Announcement Action
     const applyPresetExpiresAt = (preset, isEdit = false) => {
         const now = new Date();
@@ -1691,10 +1779,11 @@ export default function AdminDashboard() {
                         };
 
                         // 2. Filter requests based on state
-                        const filteredLeaveRequests = data.leaveRequests.filter(req => {
-                            // Month filter
+                        const todayStr = format(new Date(), 'yyyy-MM-dd');
+                        let filteredLeaveRequests = data.leaveRequests.filter(req => {
+                            // By default, only show current and future leave dates
                             if (!leaveShowAllMonths && req.leave_date) {
-                                if (!req.leave_date.startsWith(selectedMonth)) return false;
+                                if (req.leave_date < todayStr) return false;
                             }
                             // Status filter
                             if (leaveStatusFilter !== "all" && req.status !== leaveStatusFilter) return false;
@@ -1715,6 +1804,19 @@ export default function AdminDashboard() {
                                 }
                             }
                             return true;
+                        });
+
+                        // Sort the requests by leave_date
+                        filteredLeaveRequests = [...filteredLeaveRequests].sort((a, b) => {
+                            const dateA = a.leave_date || '';
+                            const dateB = b.leave_date || '';
+                            if (leaveShowAllMonths) {
+                                // History view: sort descending (newest/most recent first)
+                                return dateB.localeCompare(dateA);
+                            } else {
+                                // Default view (upcoming/active): sort ascending (soonest first)
+                                return dateA.localeCompare(dateB);
+                            }
                         });
 
                         const formatThaiLeaveDate = (dateStr) => {
@@ -1751,10 +1853,11 @@ export default function AdminDashboard() {
                                                     : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
                                             }`}
                                         >
-                                            {leaveShowAllMonths ? '📅 แสดงเฉพาะเดือนนี้' : '🌐 แสดงประวัติทั้งหมด'}
+                                            {leaveShowAllMonths ? '📅 แสดงเฉพาะวันลาปัจจุบัน/อนาคต' : '🌐 แสดงประวัติทั้งหมด'}
                                         </button>
                                     </div>
                                 </div>
+
 
                                 {/* Stat Cards */}
                                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -1944,6 +2047,13 @@ export default function AdminDashboard() {
                                                                         🔄 เปลี่ยนเป็นรออนุมัติ
                                                                     </button>
                                                                 )}
+                                                                <button 
+                                                                    onClick={() => handleDeleteLeaveRequest(req)}
+                                                                    className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-bold text-[10px] rounded-lg transition-colors flex items-center gap-1 shadow-sm"
+                                                                    title="ลบใบลาหยุด"
+                                                                >
+                                                                    <span>🗑️</span> ลบใบลา
+                                                                </button>
                                                             </div>
                                                         </td>
                                                     </tr>
