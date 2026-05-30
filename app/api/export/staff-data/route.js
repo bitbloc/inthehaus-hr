@@ -60,7 +60,7 @@ export async function GET(request) {
                 reason,
                 status,
                 created_at,
-                employees (
+                employees!employee_id (
                     name,
                     position
                 )

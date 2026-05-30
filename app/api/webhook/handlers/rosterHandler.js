@@ -157,7 +157,7 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
   if (text === 'ลางาน') {
     const { data: leaves, error } = await supabase
       .from('leave_requests')
-      .select('*, employees(name, position)')
+      .select('*, employees!employee_id(name, position)')
       .eq('status', 'pending')
       .order('leave_date', { ascending: true });
 
