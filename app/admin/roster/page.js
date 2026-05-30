@@ -11,6 +11,14 @@ export default function AdminRosterPage() {
     const [shifts, setShifts] = useState([]);
     const [transactions, setTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [leaveRequests, setLeaveRequests] = useState([]);
+    const [editingLeaveId, setEditingLeaveId] = useState(null);
+    const [leaveForm, setLeaveForm] = useState({
+        leave_type: 'sick',
+        reason: '',
+        replacement_employee_id: '',
+        leave_date: ''
+    });
     
     // Modal State
     const [editingCell, setEditingCell] = useState(null); // { employee, date, slots: [] }
@@ -80,17 +88,22 @@ export default function AdminRosterPage() {
 
     async function fetchData() {
         setLoading(true);
-        const [empRes, shiftRes, transRes] = await Promise.all([
+        const [empRes, shiftRes, transRes, leaveRes] = await Promise.all([
             supabase.from('employees').select('*').order('id'),
             supabase.from('shifts').select('*').order('start_time'),
             supabase.from('roster_transactions')
                 .select('*')
                 .gte('date', format(weekStart, 'yyyy-MM-dd'))
-                .lte('date', format(weekEnd, 'yyyy-MM-dd'))
+                .lte('date', format(weekEnd, 'yyyy-MM-dd')),
+            supabase.from('leave_requests')
+                .select('*, employees!employee_id(name, nickname, position), replacement_employee:employees!replacement_employee_id(name, nickname, position)')
+                .gte('leave_date', format(weekStart, 'yyyy-MM-dd'))
+                .lte('leave_date', format(weekEnd, 'yyyy-MM-dd'))
         ]);
         if (empRes.data) setEmployees(empRes.data);
         if (shiftRes.data) setShifts(shiftRes.data);
         if (transRes.data) setTransactions(transRes.data);
+        if (leaveRes.data) setLeaveRequests(leaveRes.data);
         setLoading(false);
     }
 
@@ -242,6 +255,230 @@ export default function AdminRosterPage() {
         }
     };
 
+    const handleApproveAndSyncLeave = async (req) => {
+        setLoading(true);
+        try {
+            // 1. Update status to approved
+            await supabase.from('leave_requests')
+                .update({ status: 'approved' })
+                .eq('id', req.id);
+
+            const dateStr = req.leave_date;
+
+            // 2. Mark leaving employee as OFF
+            await supabase.from('roster_transactions')
+                .delete()
+                .match({ employee_id: req.employee_id, date: dateStr });
+            
+            await supabase.from('roster_transactions')
+                .insert({
+                    employee_id: req.employee_id,
+                    date: dateStr,
+                    is_off: true,
+                    slot_type: 'MAIN',
+                    status: 'PUBLISHED'
+                });
+
+            // 3. If replacement employee exists, assign shift
+            if (req.replacement_employee_id) {
+                const dayOfWeek = (new Date(dateStr).getDay() + 6) % 7; // Map JS getDay() (0=Sun, 1=Mon) to DB day_of_week (0=Mon, 6=Sun)
+                const { data: sched } = await supabase
+                    .from('employee_schedules')
+                    .select('shift_id')
+                    .eq('employee_id', req.employee_id)
+                    .eq('day_of_week', dayOfWeek)
+                    .eq('is_off', false)
+                    .maybeSingle();
+
+                let originalShiftId = sched?.shift_id;
+                let originalStart = null;
+                let originalEnd = null;
+
+                if (originalShiftId) {
+                    const { data: shiftObj } = await supabase
+                        .from('shifts')
+                        .select('start_time, end_time')
+                        .eq('id', originalShiftId)
+                        .single();
+                    if (shiftObj) {
+                        originalStart = shiftObj.start_time;
+                        originalEnd = shiftObj.end_time;
+                    }
+                }
+
+                await supabase.from('roster_transactions')
+                    .delete()
+                    .match({ employee_id: req.replacement_employee_id, date: dateStr });
+
+                await supabase.from('roster_transactions')
+                    .insert({
+                        employee_id: req.replacement_employee_id,
+                        date: dateStr,
+                        shift_id: originalShiftId || null,
+                        custom_start_time: originalStart || null,
+                        custom_end_time: originalEnd || null,
+                        is_off: false,
+                        slot_type: 'MAIN',
+                        status: 'PUBLISHED'
+                    });
+            }
+
+            alert("อนุมัติและปรับตาราง Roster เรียบร้อยแล้ว!");
+            await fetchData();
+        } catch (e) {
+            alert("เกิดข้อผิดพลาด: " + e.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleRejectLeave = async (req) => {
+        if (!confirm("ต้องการปฏิเสธคำขอลาหยุดนี้ใช่หรือไม่?")) return;
+        setLoading(true);
+        try {
+            await supabase.from('leave_requests')
+                .update({ status: 'rejected' })
+                .eq('id', req.id);
+            alert("ปฏิเสธคำขอลาหยุดเรียบร้อยแล้ว");
+            await fetchData();
+        } catch (e) {
+            alert("เกิดข้อผิดพลาด: " + e.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleResetLeaveStatus = async (req) => {
+        if (!confirm("ต้องการยกเลิกการตัดสินใจ และเปลี่ยนสถานะกลับเป็นรออนุมัติใช่หรือไม่? (การตั้งค่าในตารางเวรจะไม่ถูกลบโดยอัตโนมัติ บอสสามารถปรับแก้เองเพิ่มเติมได้)")) return;
+        setLoading(true);
+        try {
+            await supabase.from('leave_requests')
+                .update({ status: 'pending' })
+                .eq('id', req.id);
+            alert("เปลี่ยนสถานะคำขอลาหยุดกลับเป็นรออนุมัติเรียบร้อยแล้ว");
+            await fetchData();
+        } catch (e) {
+            alert("เกิดข้อผิดพลาด: " + e.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const syncAllApprovedLeaves = async () => {
+        setLoading(true);
+        const approvedLeaves = leaveRequests.filter(l => l.status === 'approved');
+        if (approvedLeaves.length === 0) {
+            alert("ไม่มีใบลาที่อนุมัติแล้วในสัปดาห์นี้ให้ซิงค์");
+            setLoading(false);
+            return;
+        }
+
+        try {
+            let count = 0;
+            for (const req of approvedLeaves) {
+                const dateStr = req.leave_date;
+                
+                await supabase.from('roster_transactions')
+                    .delete()
+                    .match({ employee_id: req.employee_id, date: dateStr });
+                
+                await supabase.from('roster_transactions')
+                    .insert({
+                        employee_id: req.employee_id,
+                        date: dateStr,
+                        is_off: true,
+                        slot_type: 'MAIN',
+                        status: 'PUBLISHED'
+                    });
+                
+                if (req.replacement_employee_id) {
+                    const dayOfWeek = (new Date(dateStr).getDay() + 6) % 7; // Map JS getDay() (0=Sun, 1=Mon) to DB day_of_week (0=Mon, 6=Sun)
+                    const { data: sched } = await supabase
+                        .from('employee_schedules')
+                        .select('shift_id')
+                        .eq('employee_id', req.employee_id)
+                        .eq('day_of_week', dayOfWeek)
+                        .eq('is_off', false)
+                        .maybeSingle();
+
+                    let originalShiftId = sched?.shift_id;
+                    let originalStart = null;
+                    let originalEnd = null;
+
+                    if (originalShiftId) {
+                        const { data: shiftObj } = await supabase
+                            .from('shifts')
+                            .select('start_time, end_time')
+                            .eq('id', originalShiftId)
+                            .single();
+                        if (shiftObj) {
+                            originalStart = shiftObj.start_time;
+                            originalEnd = shiftObj.end_time;
+                        }
+                    }
+
+                    await supabase.from('roster_transactions')
+                        .delete()
+                        .match({ employee_id: req.replacement_employee_id, date: dateStr });
+
+                    await supabase.from('roster_transactions')
+                        .insert({
+                            employee_id: req.replacement_employee_id,
+                            date: dateStr,
+                            shift_id: originalShiftId || null,
+                            custom_start_time: originalStart || null,
+                            custom_end_time: originalEnd || null,
+                            is_off: false,
+                            slot_type: 'MAIN',
+                            status: 'PUBLISHED'
+                        });
+                }
+                count++;
+            }
+            alert(`ซิงค์ข้อมูลใบลาอนุมัติสำเร็จ ${count} รายการเข้าสู่ตารางเวร!`);
+            await fetchData();
+        } catch (e) {
+            alert("เกิดข้อผิดพลาดในการซิงค์: " + e.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const startEditLeave = (req) => {
+        setEditingLeaveId(req.id);
+        setLeaveForm({
+            leave_type: req.leave_type,
+            reason: req.reason || '',
+            replacement_employee_id: req.replacement_employee_id || '',
+            leave_date: req.leave_date
+        });
+    };
+
+    const saveLeaveEdit = async (id) => {
+        if (!leaveForm.leave_date) return alert("กรุณาระบุวันที่ลา");
+        setLoading(true);
+        try {
+            const { error } = await supabase
+                .from('leave_requests')
+                .update({
+                    leave_type: leaveForm.leave_type,
+                    reason: leaveForm.reason,
+                    replacement_employee_id: leaveForm.replacement_employee_id ? parseInt(leaveForm.replacement_employee_id) : null,
+                    leave_date: leaveForm.leave_date
+                })
+                .eq('id', id);
+
+            if (error) throw error;
+            alert("อัปเดตข้อมูลการลาเรียบร้อยแล้ว");
+            setEditingLeaveId(null);
+            await fetchData();
+        } catch (e) {
+            alert("เกิดข้อผิดพลาด: " + e.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <div className="p-6 max-w-7xl mx-auto space-y-6">
             <div className="mb-2">
@@ -306,13 +543,33 @@ export default function AdminRosterPage() {
                                         </td>
                                         {dates.map((date, i) => {
                                             const slots = getCellSlots(emp.id, date);
+                                            const dateStr = format(date, 'yyyy-MM-dd');
+                                            const empLeaves = leaveRequests.filter(l => l.employee_id === emp.id && l.leave_date === dateStr);
                                             return (
                                                 <td key={i} className="px-2 py-2 border-l border-gray-100 align-top">
                                                     <div 
                                                         className="h-full min-h-[60px] w-full rounded-md border border-dashed border-gray-200 hover:border-blue-400 hover:bg-blue-50 cursor-pointer p-1 space-y-1 transition-colors flex flex-col"
                                                         onClick={() => openCellModal(emp, date)}
                                                     >
-                                                        {slots.length === 0 && <span className="text-gray-300 text-xs m-auto block text-center">+</span>}
+                                                        {slots.length === 0 && empLeaves.length === 0 && <span className="text-gray-300 text-xs m-auto block text-center">+</span>}
+                                                        
+                                                        {/* Leave Request Badges */}
+                                                        {empLeaves.map((l, idx) => {
+                                                            let badgeColor = 'bg-amber-50 border-amber-250 text-amber-800';
+                                                            let label = `⏳ ขอลา${l.leave_type === 'sick' ? 'ป่วย' : l.leave_type === 'business' ? 'กิจ' : 'พักร้อน'}`;
+                                                            if (l.status === 'approved') {
+                                                                badgeColor = 'bg-green-50 border-green-250 text-green-800';
+                                                                label = `✅ ลา${l.leave_type === 'sick' ? 'ป่วย' : l.leave_type === 'business' ? 'กิจ' : 'พักร้อน'}`;
+                                                            } else if (l.status === 'rejected') {
+                                                                badgeColor = 'bg-rose-50 border-rose-250 text-rose-800';
+                                                                label = `❌ ปฏิเสธลา${l.leave_type === 'sick' ? 'ป่วย' : l.leave_type === 'business' ? 'กิจ' : 'พักร้อน'}`;
+                                                            }
+                                                            return (
+                                                                <div key={`leave-${idx}`} className={`p-1 rounded text-[10px] font-bold border ${badgeColor} text-center`}>
+                                                                    {label}
+                                                                </div>
+                                                            );
+                                                        })}
                                                         {slots.map((s, idx) => {
                                                             const shiftObj = shifts.find(sh => sh.id === s.shift_id);
                                                             const timeStr = s.custom_start_time ? `${s.custom_start_time.slice(0,5)}-${s.custom_end_time?.slice(0,5)}` : (shiftObj ? `${shiftObj.start_time.slice(0,5)}-${shiftObj.end_time.slice(0,5)}` : '');
@@ -346,6 +603,197 @@ export default function AdminRosterPage() {
                 </div>
             </div>
 
+            {/* Section: Leave Requests of the Week */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div>
+                        <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                            <span>📝</span> ข้อมูลการลาหยุดสัปดาห์นี้ ({leaveRequests.length} รายการ)
+                        </h2>
+                        <p className="text-xs text-gray-500 font-medium">จัดการ อนุมัติ ปรับรายละเอียดการลา และซิงค์เข้าสู่ตารางเวร roster โดยตรง</p>
+                    </div>
+                    {leaveRequests.filter(l => l.status === 'approved').length > 0 && (
+                        <button 
+                            type="button"
+                            onClick={syncAllApprovedLeaves}
+                            className="flex items-center gap-2 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 hover:text-blue-800 border border-blue-200 rounded-lg text-xs font-bold transition-all shadow-sm"
+                        >
+                            🔄 ซิงค์ใบลาที่อนุมัติแล้วทั้งหมดเข้าตาราง
+                        </button>
+                    )}
+                </div>
+                
+                {leaveRequests.length === 0 ? (
+                    <div className="text-center py-8 text-gray-400 text-sm font-medium bg-gray-50/50 rounded-xl border border-dashed border-gray-200">
+                        ไม่มีคำขอลาหยุดในสัปดาห์นี้
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {leaveRequests.map((req) => {
+                            const isEditing = editingLeaveId === req.id;
+                            return (
+                                <div key={req.id} className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden flex flex-col transition-all hover:shadow-md">
+                                    {/* Card Header */}
+                                    <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+                                        <div>
+                                            <div className="font-bold text-gray-800">{req.employees?.nickname || req.employees?.name}</div>
+                                            <div className="text-[10px] text-gray-500 font-bold">{req.employees?.position || 'พนักงาน'}</div>
+                                        </div>
+                                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-black tracking-wide uppercase border ${
+                                            req.status === 'approved' 
+                                                ? 'bg-emerald-50 text-emerald-700 border-emerald-250' 
+                                                : req.status === 'rejected' 
+                                                    ? 'bg-rose-50 text-rose-700 border-rose-250' 
+                                                    : 'bg-amber-50 text-amber-700 border-amber-250'
+                                        }`}>
+                                            {req.status === 'approved' ? 'อนุมัติแล้ว' : req.status === 'rejected' ? 'ปฏิเสธแล้ว' : 'รออนุมัติ'}
+                                        </span>
+                                    </div>
+                                    
+                                    {/* Card Body */}
+                                    <div className="p-4 flex-1 space-y-3 text-xs text-gray-700">
+                                        {isEditing ? (
+                                            <div className="space-y-3">
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-gray-500 mb-1">วันที่ลา</label>
+                                                    <input 
+                                                        type="date"
+                                                        value={leaveForm.leave_date}
+                                                        onChange={e => setLeaveForm({ ...leaveForm, leave_date: e.target.value })}
+                                                        className="w-full border border-gray-300 rounded-lg p-2 text-xs text-gray-900 bg-white outline-none focus:ring-2 focus:ring-blue-500"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-gray-500 mb-1">ประเภท</label>
+                                                    <select
+                                                        value={leaveForm.leave_type}
+                                                        onChange={e => setLeaveForm({ ...leaveForm, leave_type: e.target.value })}
+                                                        className="w-full border border-gray-300 rounded-lg p-2 text-xs text-gray-900 bg-white outline-none focus:ring-2 focus:ring-blue-500"
+                                                    >
+                                                        <option value="sick">ลาป่วย 😷</option>
+                                                        <option value="business">ลากิจ 💼</option>
+                                                        <option value="vacation">พักร้อน 🏖️</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-gray-500 mb-1">คนแทน</label>
+                                                    <select
+                                                        value={leaveForm.replacement_employee_id}
+                                                        onChange={e => setLeaveForm({ ...leaveForm, replacement_employee_id: e.target.value })}
+                                                        className="w-full border border-gray-300 rounded-lg p-2 text-xs text-gray-900 bg-white outline-none focus:ring-2 focus:ring-blue-500"
+                                                    >
+                                                        <option value="">-- เลือกผู้ปฏิบัติหน้าที่แทน --</option>
+                                                        {employees.filter(e => e.id !== req.employee_id).map(emp => (
+                                                            <option key={emp.id} value={emp.id}>
+                                                                {emp.name} {emp.nickname ? `(${emp.nickname})` : ""} - {emp.position || "ทั่วไป"}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-gray-500 mb-1">เหตุผล</label>
+                                                    <input 
+                                                        type="text"
+                                                        value={leaveForm.reason}
+                                                        onChange={e => setLeaveForm({ ...leaveForm, reason: e.target.value })}
+                                                        className="w-full border border-gray-300 rounded-lg p-2 text-xs text-gray-900 bg-white outline-none focus:ring-2 focus:ring-blue-500"
+                                                        placeholder="ระบุเหตุผล"
+                                                    />
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-500">วันที่ลา:</span>
+                                                    <span className="font-bold text-gray-900">
+                                                        {req.leave_date ? format(parseISO(req.leave_date), 'dd/MM/yyyy') : '-'}
+                                                    </span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-500">ประเภท:</span>
+                                                    <span className="font-semibold text-gray-900">
+                                                        {req.leave_type === 'sick' ? 'ลาป่วย 😷' : req.leave_type === 'business' ? 'ลากิจ 💼' : 'พักร้อน 🏖️'}
+                                                    </span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-500">ปฏิบัติงานแทนโดย:</span>
+                                                    <span className="font-medium text-gray-800">
+                                                        {req.replacement_employee ? `${req.replacement_employee.name} (${req.replacement_employee.nickname || "-"})` : '-'}
+                                                    </span>
+                                                </div>
+                                                <div className="pt-1 border-t border-gray-100 mt-1">
+                                                    <span className="text-gray-500 block mb-0.5">เหตุผลการลา:</span>
+                                                    <span className="text-gray-700 italic block font-medium">&ldquo;{req.reason || '-'}&rdquo;</span>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                    
+                                    {/* Card Footer Actions */}
+                                    <div className="px-4 py-3 bg-gray-50 border-t border-gray-100 flex justify-end gap-2">
+                                        {isEditing ? (
+                                            <>
+                                                <button 
+                                                    type="button"
+                                                    onClick={() => setEditingLeaveId(null)}
+                                                    className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold rounded-lg text-[10px] transition-colors"
+                                                >
+                                                    ยกเลิก
+                                                </button>
+                                                <button 
+                                                    type="button"
+                                                    onClick={() => saveLeaveEdit(req.id)}
+                                                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-[10px] transition-colors"
+                                                >
+                                                    บันทึก
+                                                </button>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <button 
+                                                    type="button"
+                                                    onClick={() => startEditLeave(req)}
+                                                    className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold rounded-lg text-[10px] transition-colors"
+                                                >
+                                                    แก้ไขข้อมูล
+                                                </button>
+                                                {req.status === 'pending' && (
+                                                    <>
+                                                        <button 
+                                                            type="button"
+                                                            onClick={() => handleApproveAndSyncLeave(req)}
+                                                            className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg text-[10px] transition-colors shadow-sm"
+                                                        >
+                                                            อนุมัติ & ซิงค์ตาราง
+                                                        </button>
+                                                        <button 
+                                                            type="button"
+                                                            onClick={() => handleRejectLeave(req)}
+                                                            className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg text-[10px] transition-colors shadow-sm"
+                                                        >
+                                                            ปฏิเสธคำขอ
+                                                        </button>
+                                                    </>
+                                                )}
+                                                {req.status === 'approved' && (
+                                                    <button 
+                                                        type="button"
+                                                        onClick={() => handleResetLeaveStatus(req)}
+                                                        className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-[10px] transition-colors shadow-sm"
+                                                    >
+                                                        ยกเลิกการอนุมัติ
+                                                    </button>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
+
             {/* Edit Cell Modal */}
             {editingCell && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -358,6 +806,71 @@ export default function AdminRosterPage() {
                         </div>
                         
                         <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto bg-gray-50">
+                            {(() => {
+                                const dateStr = format(editingCell.date, 'yyyy-MM-dd');
+                                const cellLeaves = leaveRequests.filter(l => l.employee_id === editingCell.employee.id && l.leave_date === dateStr);
+                                if (cellLeaves.length === 0) return null;
+                                return (
+                                    <div className="space-y-3 mb-2">
+                                        {cellLeaves.map((l, idx) => (
+                                            <div key={idx} className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-2 text-xs text-amber-900 shadow-sm">
+                                                <div className="font-bold flex justify-between items-center text-sm">
+                                                    <span className="flex items-center gap-1">📌 ข้อมูลการลาหยุดวันนี้</span>
+                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                                        l.status === 'approved' ? 'bg-green-100 text-green-800' : l.status === 'rejected' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'
+                                                    }`}>
+                                                        {l.status === 'approved' ? 'อนุมัติแล้ว' : l.status === 'rejected' ? 'ปฏิเสธแล้ว' : 'รออนุมัติ'}
+                                                    </span>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-2 mt-1">
+                                                    <div><strong>ประเภท:</strong> {l.leave_type === 'sick' ? 'ลาป่วย 😷' : l.leave_type === 'business' ? 'ลากิจ 💼' : 'พักร้อน 🏖️'}</div>
+                                                    <div><strong>คนปฏิบัติแทน:</strong> {l.replacement_employee ? (l.replacement_employee.nickname || l.replacement_employee.name) : '-'}</div>
+                                                </div>
+                                                <div className="mt-1 font-medium"><strong>เหตุผล:</strong> {l.reason || '-'}</div>
+                                                
+                                                <div className="flex gap-2 pt-1 border-t border-amber-200/50 mt-2">
+                                                    {l.status === 'pending' && (
+                                                        <>
+                                                            <button 
+                                                                type="button"
+                                                                onClick={async () => {
+                                                                    await handleApproveAndSyncLeave(l);
+                                                                    setEditingCell(null);
+                                                                }}
+                                                                className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold text-[11px] transition-colors shadow-sm"
+                                                            >
+                                                                อนุมัติและปรับตารางเวร
+                                                            </button>
+                                                            <button 
+                                                                type="button"
+                                                                onClick={async () => {
+                                                                    await handleRejectLeave(l);
+                                                                    setEditingCell(null);
+                                                                }}
+                                                                className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold text-[11px] transition-colors shadow-sm"
+                                                            >
+                                                                ปฏิเสธคำขอลา
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                    {l.status === 'approved' && (
+                                                        <button 
+                                                            type="button"
+                                                            onClick={async () => {
+                                                                await handleResetLeaveStatus(l);
+                                                                setEditingCell(null);
+                                                            }}
+                                                            className="px-3 py-1.5 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-bold text-[11px] transition-colors shadow-sm"
+                                                        >
+                                                            ยกเลิกการอนุมัติ (กลับเป็นรออนุมัติ)
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                );
+                            })()}
                             {editingCell.slots.map((slot, index) => (
                                 <div key={index} className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm space-y-3 relative">
                                     <div className="flex justify-between items-center mb-2">

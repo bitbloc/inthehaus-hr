@@ -302,7 +302,7 @@ export default function CheckIn() {
         setLastCheckInTime(null);
       }
 
-      if (log.action_type === 'check_in' && !isToday && today.getHours() >= 1) {
+      if (log.action_type === 'check_in' && !isToday && today.getHours() >= 2) {
         alert("คุณลืมลงชื่อออกเมื่อวาน ระบบจะเริ่มนับวันใหม่ให้");
         setLastAction('check_out'); // UI shows Check In
       } else {
