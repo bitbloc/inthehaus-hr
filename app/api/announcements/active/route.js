@@ -11,19 +11,20 @@ export async function GET() {
     try {
         const { data, error } = await supabase
             .from('announcements')
-            .select('message, created_at, priority, expires_at')
+            .select('id, message, created_at, priority, expires_at')
             .eq('is_active', true)
             .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
             .order('priority', { ascending: false })
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single();
+            .order('created_at', { ascending: false });
 
-        if (error && error.code !== 'PGRST116') { // PGRST116 is no rows returned, which is fine
+        if (error) {
             throw error;
         }
 
-        return NextResponse.json({ announcement: data || null });
+        return NextResponse.json({
+            announcement: data && data.length > 0 ? data[0] : null,
+            announcements: data || []
+        });
     } catch (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }

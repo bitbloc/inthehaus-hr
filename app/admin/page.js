@@ -80,6 +80,11 @@ export default function AdminDashboard() {
     const [showDeductModal, setShowDeductModal] = useState(false);
     const [deductForm, setDeductForm] = useState({ empId: "", amount: "", isPercent: false, reason: "" });
     const [newAnnouncement, setNewAnnouncement] = useState("");
+    const [announcementType, setAnnouncementType] = useState("fixed"); // fixed or temporary
+    const [expiresAt, setExpiresAt] = useState("");
+    const [announcementFilter, setAnnouncementFilter] = useState("active");
+    const [editingAnnouncement, setEditingAnnouncement] = useState(null); // for edit modal
+    const [announcementPriority, setAnnouncementPriority] = useState(1);
     const [showAllLogs, setShowAllLogs] = useState(false);
 
     // Manual Entry State
@@ -484,18 +489,97 @@ export default function AdminDashboard() {
     };
 
     // Announcement Action
-    const handleAddAnnouncement = async (e) => {
-        e.preventDefault();
-        const priority = e.target.priority.value || 1;
-        const { error } = await supabase.from('announcements').insert({ message: newAnnouncement, is_active: true, priority });
-        if (!error) { setNewAnnouncement(""); fetchData('announcements', 'announcements'); }
+    const applyPresetExpiresAt = (preset, isEdit = false) => {
+        const now = new Date();
+        let targetDate = new Date();
+
+        if (preset === '1h') {
+            targetDate.setHours(now.getHours() + 1);
+        } else if (preset === 'today') {
+            targetDate.setHours(23, 59, 59, 999);
+        } else if (preset === 'tomorrow') {
+            targetDate.setDate(now.getDate() + 1);
+            targetDate.setHours(23, 59, 59, 999);
+        } else if (preset === '3d') {
+            targetDate.setDate(now.getDate() + 3);
+        } else if (preset === '1w') {
+            targetDate.setDate(now.getDate() + 7);
+        }
+
+        const formatted = format(targetDate, "yyyy-MM-dd'T'HH:mm");
+        if (isEdit) {
+            setEditingAnnouncement(prev => ({ ...prev, expires_at_formatted: formatted }));
+        } else {
+            setExpiresAt(formatted);
+        }
     };
+
+    const handleAddAnnouncement = async (e) => {
+        if (e) e.preventDefault();
+        if (!newAnnouncement.trim()) return alert("กรุณาพิมพ์ข้อความประกาศ");
+        
+        const payload = {
+            message: newAnnouncement,
+            is_active: true,
+            priority: Number(announcementPriority),
+            expires_at: announcementType === 'temporary' && expiresAt ? new Date(expiresAt).toISOString() : null
+        };
+
+        const { error } = await supabase.from('announcements').insert(payload);
+        if (!error) {
+            setNewAnnouncement("");
+            setExpiresAt("");
+            setAnnouncementPriority(1);
+            setAnnouncementType("fixed");
+            fetchData('announcements', 'announcements');
+        } else {
+            alert("เกิดข้อผิดพลาด: " + error.message);
+        }
+    };
+
     const handleToggleAnnouncement = async (id, status) => {
         await supabase.from('announcements').update({ is_active: !status }).eq('id', id);
         fetchData('announcements', 'announcements');
     };
+
     const handleDeleteAnnouncement = async (id) => {
-        if (confirm("Delete?")) { await supabase.from('announcements').delete().eq('id', id); fetchData('announcements', 'announcements'); }
+        if (confirm("ต้องการลบประกาศนี้ใช่หรือไม่?")) {
+            await supabase.from('announcements').delete().eq('id', id);
+            fetchData('announcements', 'announcements');
+        }
+    };
+
+    const handleEditAnnouncement = (announcement) => {
+        setEditingAnnouncement({
+            ...announcement,
+            type: announcement.expires_at ? "temporary" : "fixed",
+            expires_at_formatted: announcement.expires_at ? format(new Date(announcement.expires_at), "yyyy-MM-dd'T'HH:mm") : ""
+        });
+    };
+
+    const handleSaveEditAnnouncement = async () => {
+        if (!editingAnnouncement || !editingAnnouncement.message.trim()) return alert("กรุณากรอกข้อความประกาศ");
+
+        const payload = {
+            message: editingAnnouncement.message,
+            priority: Number(editingAnnouncement.priority),
+            expires_at: editingAnnouncement.type === 'temporary' && editingAnnouncement.expires_at_formatted
+                ? new Date(editingAnnouncement.expires_at_formatted).toISOString()
+                : null
+        };
+
+        const { error } = await supabase
+            .from('announcements')
+            .update(payload)
+            .eq('id', editingAnnouncement.id);
+
+        if (!error) {
+            setEditingAnnouncement(null);
+            fetchData('announcements', 'announcements');
+            alert("แก้ไขประกาศสำเร็จ!");
+        } else {
+            alert("เกิดข้อผิดพลาด: " + error.message);
+        }
     };
 
     // Application Action
@@ -1664,28 +1748,457 @@ export default function AdminDashboard() {
                     {/* --- NEWS/ANNOUNCEMENTS --- */}
                     {activeTab === 'announcements' && (
                         <div className="space-y-6">
-                            <Card>
-                                <h3 className="font-extrabold text-slate-800 mb-4">Post Announcement</h3>
-                                <form onSubmit={handleAddAnnouncement} className="flex gap-4">
-                                    <input className="flex-1 p-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 font-bold" placeholder="Message..." value={newAnnouncement} onChange={e => setNewAnnouncement(e.target.value)} />
-                                    <select name="priority" className="p-3 rounded-xl border bg-slate-50 font-bold outline-none"><option value="1">Normal</option><option value="2">High</option></select>
-                                    <button type="submit" className="bg-slate-850 text-white px-6 rounded-xl font-extrabold shadow hover:bg-slate-900">Post</button>
-                                </form>
-                            </Card>
-                            <div className="space-y-4">
-                                {data.announcements.map(a => (
-                                    <Card key={a.id} className="flex justify-between items-center">
-                                        <div className="flex gap-4 items-center">
-                                            {a.priority > 1 && <Badge color="rose">High</Badge>}
-                                            <span className="font-black text-slate-900">{a.message}</span>
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                {/* Creation Form */}
+                                <div className="lg:col-span-2">
+                                    <Card className="p-6">
+                                        <h3 className="font-extrabold text-slate-800 text-lg mb-4 flex items-center gap-2">
+                                            <span>📢</span> โพสต์ประกาศใหม่
+                                        </h3>
+                                        <form onSubmit={handleAddAnnouncement} className="space-y-4">
+                                            {/* Type Selection */}
+                                            <div>
+                                                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">ประเภทประกาศ</label>
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setAnnouncementType("fixed")}
+                                                        className={`flex-1 py-3 px-4 rounded-xl border text-xs font-bold transition-all duration-200 ${
+                                                            announcementType === "fixed"
+                                                                ? "bg-slate-900 text-white border-slate-950 shadow-sm"
+                                                                : "bg-slate-50 border-slate-200 text-slate-650 hover:bg-slate-100"
+                                                        }`}
+                                                    >
+                                                        📌 ปักหมุด (ถาวร)
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setAnnouncementType("temporary")}
+                                                        className={`flex-1 py-3 px-4 rounded-xl border text-xs font-bold transition-all duration-200 ${
+                                                            announcementType === "temporary"
+                                                                ? "bg-slate-900 text-white border-slate-950 shadow-sm"
+                                                                : "bg-slate-50 border-slate-200 text-slate-650 hover:bg-slate-100"
+                                                        }`}
+                                                    >
+                                                        ⏰ ชั่วคราว (กำหนดวันหมดอายุ)
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {/* Message Input */}
+                                            <div>
+                                                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1.5">ข้อความประกาศ</label>
+                                                <textarea
+                                                    rows="3"
+                                                    value={newAnnouncement}
+                                                    onChange={e => setNewAnnouncement(e.target.value)}
+                                                    placeholder="พิมพ์ข้อความประกาศหรือระเบียบการที่นี่..."
+                                                    className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-805 outline-none focus:ring-2 focus:ring-slate-300 transition-all placeholder:text-slate-400 placeholder:font-medium resize-none"
+                                                />
+                                            </div>
+
+                                            {/* Expiration Settings (Only for temporary) */}
+                                            {announcementType === "temporary" && (
+                                                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-3 animate-in fade-in duration-200">
+                                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">ตั้งเวลาหมดอายุ</label>
+                                                    <input
+                                                        type="datetime-local"
+                                                        value={expiresAt}
+                                                        onChange={e => setExpiresAt(e.target.value)}
+                                                        className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:ring-2"
+                                                    />
+                                                    {/* Presets */}
+                                                    <div className="flex flex-wrap gap-1.5 pt-1">
+                                                        <button type="button" onClick={() => applyPresetExpiresAt('1h')} className="px-2.5 py-1.5 bg-white border border-slate-200 hover:border-slate-300 text-[10px] font-bold text-slate-600 rounded-lg shadow-sm">
+                                                            +1 ชม.
+                                                        </button>
+                                                        <button type="button" onClick={() => applyPresetExpiresAt('today')} className="px-2.5 py-1.5 bg-white border border-slate-200 hover:border-slate-300 text-[10px] font-bold text-slate-600 rounded-lg shadow-sm">
+                                                            สิ้นสุดวันนี้ (23:59)
+                                                        </button>
+                                                        <button type="button" onClick={() => applyPresetExpiresAt('tomorrow')} className="px-2.5 py-1.5 bg-white border border-slate-200 hover:border-slate-300 text-[10px] font-bold text-slate-600 rounded-lg shadow-sm">
+                                                            สิ้นสุดพรุ่งนี้ (23:59)
+                                                        </button>
+                                                        <button type="button" onClick={() => applyPresetExpiresAt('3d')} className="px-2.5 py-1.5 bg-white border border-slate-200 hover:border-slate-300 text-[10px] font-bold text-slate-600 rounded-lg shadow-sm">
+                                                            +3 วัน
+                                                        </button>
+                                                        <button type="button" onClick={() => applyPresetExpiresAt('1w')} className="px-2.5 py-1.5 bg-white border border-slate-200 hover:border-slate-300 text-[10px] font-bold text-slate-600 rounded-lg shadow-sm">
+                                                            +1 สัปดาห์
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Priority Settings */}
+                                            <div>
+                                                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">ระดับความสำคัญ</label>
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setAnnouncementPriority(1)}
+                                                        className={`flex-1 py-2 px-4 rounded-xl border text-xs font-bold transition-all duration-200 ${
+                                                            announcementPriority === 1
+                                                                ? "bg-slate-100 border-slate-300 text-slate-800 font-extrabold shadow-inner"
+                                                                : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100"
+                                                        }`}
+                                                    >
+                                                        ปกติ (Normal)
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setAnnouncementPriority(2)}
+                                                        className={`flex-1 py-2 px-4 rounded-xl border text-xs font-bold transition-all duration-200 ${
+                                                            announcementPriority === 2
+                                                                ? "bg-rose-50 border-rose-250 text-rose-700 font-extrabold shadow-inner"
+                                                                : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100"
+                                                        }`}
+                                                    >
+                                                        🚨 สำคัญ/ด่วน (High)
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {/* Submit Button */}
+                                            <button
+                                                type="submit"
+                                                className="w-full py-4 bg-slate-900 hover:bg-slate-850 active:scale-[0.99] text-white rounded-xl text-sm font-black shadow-lg shadow-slate-900/10 transition-all flex items-center justify-center gap-2"
+                                            >
+                                                <span>Publish</span> เผยแพร่ประกาศใช้งาน
+                                            </button>
+                                        </form>
+                                    </Card>
+                                </div>
+
+                                {/* Live Preview Frame */}
+                                <div>
+                                    <Card className="p-6 h-full flex flex-col justify-between bg-slate-50/50 border-dashed border-slate-200">
+                                        <div>
+                                            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-1.5">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                                Live Mobile Preview (ตัวอย่างบนจอมือถือ)
+                                            </h4>
+                                            <div className="bg-[#F2F2F2] rounded-[2.5rem] p-4 pt-8 pb-12 border-4 border-slate-300 shadow-inner relative max-w-sm mx-auto overflow-hidden">
+                                                {/* Phone speaker mimic */}
+                                                <div className="absolute top-3 left-1/2 -translate-x-1/2 w-16 h-4 bg-slate-300 rounded-full flex items-center justify-center">
+                                                    <span className="w-8 h-1 bg-slate-400 rounded-full"></span>
+                                                </div>
+
+                                                {/* Weather Card Compact Mockup */}
+                                                <div className="bg-white/80 border border-white/80 rounded-3xl p-3 shadow-sm mb-4 text-[9px] font-bold text-slate-500 flex items-center justify-between">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="text-xl">🌤️</span>
+                                                        <span className="text-slate-805 text-xs font-black">32°C • แจ่มใส</span>
+                                                    </div>
+                                                    <span>In The Haus 🏡</span>
+                                                </div>
+
+                                                {/* Simulated Announcement Display */}
+                                                <div className="space-y-3">
+                                                    {announcementType === "fixed" ? (
+                                                        <div className="w-full bg-white border border-white rounded-3xl p-3.5 shadow-sm flex items-start gap-2 relative overflow-hidden">
+                                                            <div className="absolute top-0 left-0 w-1 h-full bg-blue-500" />
+                                                            <span className="text-sm shrink-0">📌</span>
+                                                            <div>
+                                                                <div className="flex gap-1 mb-1">
+                                                                    <span className="text-[8px] font-extrabold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 uppercase tracking-wider">Pinned</span>
+                                                                    {announcementPriority === 2 && <span className="text-[8px] font-extrabold text-red-655 bg-red-50 px-1.5 py-0.5 rounded border border-red-100 uppercase tracking-wider animate-pulse">Urgent</span>}
+                                                                </div>
+                                                                <p className="text-[11px] font-bold text-neutral-800 leading-normal break-words">{newAnnouncement || "พิมพ์ข้อความในแบบฟอร์มเพื่อดูตัวอย่าง..."}</p>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div className={`w-full ${announcementPriority === 2 ? 'bg-gradient-to-br from-orange-50 to-white border-orange-200' : 'bg-white border-white'} border rounded-3xl p-3.5 shadow-sm flex items-start gap-2 relative overflow-hidden`}>
+                                                            <div className={`absolute top-0 left-0 w-1 h-full ${announcementPriority === 2 ? 'bg-orange-500' : 'bg-amber-500'}`} />
+                                                            <span className="text-sm shrink-0">{announcementPriority === 2 ? '🚨' : '📢'}</span>
+                                                            <div className="pr-4">
+                                                                <div className="flex items-center gap-1 mb-1 flex-wrap">
+                                                                    <span className={`text-[8px] font-extrabold ${announcementPriority === 2 ? 'text-orange-600 bg-orange-50 border-orange-100' : 'text-amber-600 bg-amber-50 border-amber-100'} px-1.5 py-0.5 rounded border uppercase tracking-wider`}>
+                                                                        {announcementPriority === 2 ? 'Important' : 'News'}
+                                                                    </span>
+                                                                    <span className="text-[8px] font-bold text-neutral-400">⏰ {expiresAt ? "หมดใน " + format(new Date(expiresAt), "HH:mm") : "สิ้นสุดวันนี้"}</span>
+                                                                </div>
+                                                                <p className="text-[11px] font-semibold text-neutral-800 leading-normal break-words">{newAnnouncement || "พิมพ์ข้อความในแบบฟอร์มเพื่อดูตัวอย่าง..."}</p>
+                                                            </div>
+                                                            <span className="absolute top-2 right-2 text-[9px] text-slate-350">✕</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div className="flex gap-2">
-                                            <button onClick={() => handleToggleAnnouncement(a.id, a.is_active)} className="text-xs font-black text-blue-600">{a.is_active ? 'Active' : 'Hidden'}</button>
-                                            <button onClick={() => handleDeleteAnnouncement(a.id)} className="text-rose-500 hover:text-rose-700">🗑️</button>
+                                        <p className="text-[10px] text-slate-400 font-bold text-center mt-4">
+                                            *ตัวอย่างเสมือนจริงบนสเกลของเครื่องจริงหน้างาน
+                                        </p>
+                                    </Card>
+                                </div>
+                            </div>
+
+                            {/* Announcements List Manager */}
+                            <Card className="p-0 overflow-hidden">
+                                {/* Tab filters */}
+                                <div className="flex border-b border-slate-100 p-2 bg-slate-50 gap-1 flex-wrap">
+                                    {['active', 'expired', 'hidden', 'all'].map((f) => {
+                                        const labelMap = { active: 'กำลังแสดงผล', expired: 'หมดอายุการใช้งาน', hidden: 'ปิดแสดงผล (Hidden)', all: 'ทั้งหมด' };
+                                        const count = data.announcements.filter(a => {
+                                            const isExpired = a.expires_at && new Date(a.expires_at) <= new Date();
+                                            if (f === 'active') return a.is_active && !isExpired;
+                                            if (f === 'expired') return a.expires_at && isExpired;
+                                            if (f === 'hidden') return !a.is_active;
+                                            return true;
+                                        }).length;
+                                        return (
+                                            <button
+                                                key={f}
+                                                type="button"
+                                                onClick={() => setAnnouncementFilter(f)}
+                                                className={`py-2 px-4 rounded-xl text-xs font-black transition-all ${
+                                                    announcementFilter === f
+                                                        ? 'bg-slate-900 text-white shadow-sm'
+                                                        : 'text-slate-500 hover:bg-slate-200/50 hover:text-slate-800'
+                                                }`}
+                                            >
+                                                {labelMap[f]} ({count})
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+
+                                {/* Table layout */}
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm text-left">
+                                        <thead className="bg-slate-50 text-slate-500 font-extrabold text-[10px] uppercase tracking-wider border-b border-slate-100">
+                                            <tr>
+                                                <th className="px-6 py-4">ข้อมูลประกาศ</th>
+                                                <th className="px-6 py-4">ระดับ</th>
+                                                <th className="px-6 py-4">ประเภท</th>
+                                                <th className="px-6 py-4">วันหมดอายุ / สถานะเวลา</th>
+                                                <th className="px-6 py-4">วันที่สร้าง</th>
+                                                <th className="px-6 py-4 text-right">การจัดการ</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {data.announcements
+                                                .filter(a => {
+                                                    const isExpired = a.expires_at && new Date(a.expires_at) <= new Date();
+                                                    if (announcementFilter === 'active') return a.is_active && !isExpired;
+                                                    if (announcementFilter === 'expired') return a.expires_at && isExpired;
+                                                    if (announcementFilter === 'hidden') return !a.is_active;
+                                                    return true;
+                                                })
+                                                .map(a => {
+                                                    const isExpired = a.expires_at && new Date(a.expires_at) <= new Date();
+                                                    const isFixed = a.expires_at === null;
+                                                    
+                                                    // Time remaining calculation
+                                                    let timeStatus = "";
+                                                    if (isFixed) {
+                                                        timeStatus = "ปักหมุดถาวร";
+                                                    } else {
+                                                        const diffMs = new Date(a.expires_at) - new Date();
+                                                        if (diffMs > 0) {
+                                                            const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
+                                                            const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                                                            if (diffHrs > 0) {
+                                                                timeStatus = `เหลือเวลาอีก ${diffHrs} ชม.`;
+                                                            } else {
+                                                                timeStatus = `เหลือเวลาอีก ${diffMins} นาที`;
+                                                            }
+                                                        } else {
+                                                            timeStatus = "หมดอายุการใช้งานแล้ว";
+                                                        }
+                                                    }
+
+                                                    return (
+                                                        <tr key={a.id} className="hover:bg-slate-50/50">
+                                                            <td className="px-6 py-4">
+                                                                <div className="font-extrabold text-slate-800 max-w-sm truncate" title={a.message}>
+                                                                    {a.message}
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-6 py-4">
+                                                                <Badge color={a.priority > 1 ? 'rose' : 'slate'}>
+                                                                    {a.priority > 1 ? 'ด่วน 🚨' : 'ปกติ'}
+                                                                </Badge>
+                                                            </td>
+                                                            <td className="px-6 py-4">
+                                                                <Badge color={isFixed ? 'blue' : 'amber'}>
+                                                                    {isFixed ? '📌 Fixed' : '⏰ Temporary'}
+                                                                </Badge>
+                                                            </td>
+                                                            <td className="px-6 py-4">
+                                                                <div className="font-bold text-slate-805 text-xs">
+                                                                    {!isFixed && format(new Date(a.expires_at), "dd MMM yyyy, HH:mm")}
+                                                                </div>
+                                                                <div className={`text-[10px] font-extrabold ${isExpired ? 'text-red-500' : isFixed ? 'text-blue-500' : 'text-emerald-600'} mt-0.5`}>
+                                                                    {timeStatus}
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-6 py-4 font-bold text-xs text-slate-500">
+                                                                {format(new Date(a.created_at), "dd/MM/yyyy HH:mm")}
+                                                            </td>
+                                                            <td className="px-6 py-4 text-right space-x-2">
+                                                                <button
+                                                                    onClick={() => handleToggleAnnouncement(a.id, a.is_active)}
+                                                                    className={`px-2 py-1 rounded text-xs font-black border transition-all ${
+                                                                        a.is_active
+                                                                            ? "bg-slate-900/5 hover:bg-slate-900/10 border-slate-200 text-slate-650"
+                                                                            : "bg-emerald-50 hover:bg-emerald-100 border-emerald-100 text-emerald-700"
+                                                                    }`}
+                                                                    title={a.is_active ? "คลิกเพื่อซ่อน" : "คลิกเพื่อเปิดใช้งาน"}
+                                                                >
+                                                                    {a.is_active ? 'แสดงผลอยู่' : 'ปิดการแสดงผล'}
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleEditAnnouncement(a)}
+                                                                    className="px-2 py-1 bg-indigo-50 border border-indigo-100 text-indigo-700 hover:bg-indigo-100 text-xs font-black rounded transition-all"
+                                                                >
+                                                                    แก้ไข
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleDeleteAnnouncement(a.id)}
+                                                                    className="p-1 hover:bg-rose-50 text-rose-500 hover:text-rose-700 rounded transition-all"
+                                                                >
+                                                                    🗑️
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                        </tbody>
+                                    </table>
+                                    {data.announcements.length === 0 && (
+                                        <div className="p-12 text-center text-slate-400 font-bold">ไม่มีข้อมูลประกาศบันทึกอยู่</div>
+                                    )}
+                                </div>
+                            </Card>
+
+                            {/* Edit Announcement Modal */}
+                            {editingAnnouncement && (
+                                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                                    <Card className="w-full max-w-lg bg-white p-6 shadow-2xl rounded-3xl relative animate-in zoom-in-95 duration-150">
+                                        <h3 className="text-lg font-extrabold text-slate-800 mb-4 flex items-center gap-1.5">
+                                            ✏️ แก้ไขข้อมูลประกาศ
+                                        </h3>
+                                        
+                                        <div className="space-y-4">
+                                            {/* Type */}
+                                            <div>
+                                                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">ประเภทประกาศ</label>
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setEditingAnnouncement(prev => ({ ...prev, type: "fixed" }))}
+                                                        className={`flex-1 py-2.5 px-4 rounded-xl border text-xs font-bold transition-all duration-200 ${
+                                                            editingAnnouncement.type === "fixed"
+                                                                ? "bg-slate-900 text-white border-slate-950 shadow-sm"
+                                                                : "bg-slate-50 border-slate-200 text-slate-650 hover:bg-slate-100"
+                                                        }`}
+                                                    >
+                                                        📌 ปักหมุด (ถาวร)
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setEditingAnnouncement(prev => ({ ...prev, type: "temporary" }))}
+                                                        className={`flex-1 py-2.5 px-4 rounded-xl border text-xs font-bold transition-all duration-200 ${
+                                                            editingAnnouncement.type === "temporary"
+                                                                ? "bg-slate-900 text-white border-slate-950 shadow-sm"
+                                                                : "bg-slate-50 border-slate-200 text-slate-650 hover:bg-slate-100"
+                                                        }`}
+                                                    >
+                                                        ⏰ ชั่วคราว (กำหนดวันหมดอายุ)
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {/* Message */}
+                                            <div>
+                                                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1.5">ข้อความประกาศ</label>
+                                                <textarea
+                                                    rows="3"
+                                                    value={editingAnnouncement.message}
+                                                    onChange={e => setEditingAnnouncement(prev => ({ ...prev, message: e.target.value }))}
+                                                    className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-805 outline-none focus:ring-2 focus:ring-slate-300 transition-all resize-none"
+                                                />
+                                            </div>
+
+                                            {/* Expiration Settings (Only for temporary) */}
+                                            {editingAnnouncement.type === "temporary" && (
+                                                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-3">
+                                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">ตั้งเวลาหมดอายุ</label>
+                                                    <input
+                                                        type="datetime-local"
+                                                        value={editingAnnouncement.expires_at_formatted}
+                                                        onChange={e => setEditingAnnouncement(prev => ({ ...prev, expires_at_formatted: e.target.value }))}
+                                                        className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:ring-2"
+                                                    />
+                                                    {/* Presets for edit */}
+                                                    <div className="flex flex-wrap gap-1.5 pt-1">
+                                                        <button type="button" onClick={() => applyPresetExpiresAt('1h', true)} className="px-2 py-1 bg-white border border-slate-200 hover:border-slate-300 text-[10px] font-bold text-slate-600 rounded-lg shadow-sm">
+                                                            +1 ชม.
+                                                        </button>
+                                                        <button type="button" onClick={() => applyPresetExpiresAt('today', true)} className="px-2 py-1 bg-white border border-slate-200 hover:border-slate-300 text-[10px] font-bold text-slate-600 rounded-lg shadow-sm">
+                                                            สิ้นสุดวันนี้
+                                                        </button>
+                                                        <button type="button" onClick={() => applyPresetExpiresAt('tomorrow', true)} className="px-2 py-1 bg-white border border-slate-200 hover:border-slate-300 text-[10px] font-bold text-slate-600 rounded-lg shadow-sm">
+                                                            สิ้นสุดพรุ่งนี้
+                                                        </button>
+                                                        <button type="button" onClick={() => applyPresetExpiresAt('3d', true)} className="px-2 py-1 bg-white border border-slate-200 hover:border-slate-300 text-[10px] font-bold text-slate-600 rounded-lg shadow-sm">
+                                                            +3 วัน
+                                                        </button>
+                                                        <button type="button" onClick={() => applyPresetExpiresAt('1w', true)} className="px-2 py-1 bg-white border border-slate-200 hover:border-slate-300 text-[10px] font-bold text-slate-600 rounded-lg shadow-sm">
+                                                            +1 สัปดาห์
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Priority Settings */}
+                                            <div>
+                                                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">ระดับความสำคัญ</label>
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setEditingAnnouncement(prev => ({ ...prev, priority: 1 }))}
+                                                        className={`flex-1 py-2 px-4 rounded-xl border text-xs font-bold transition-all duration-200 ${
+                                                            Number(editingAnnouncement.priority) === 1
+                                                                ? "bg-slate-100 border-slate-300 text-slate-800 font-extrabold"
+                                                                : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100"
+                                                        }`}
+                                                    >
+                                                        ปกติ (Normal)
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setEditingAnnouncement(prev => ({ ...prev, priority: 2 }))}
+                                                        className={`flex-1 py-2 px-4 rounded-xl border text-xs font-bold transition-all duration-200 ${
+                                                            Number(editingAnnouncement.priority) === 2
+                                                                ? "bg-rose-50 border-rose-250 text-rose-700 font-extrabold"
+                                                                : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100"
+                                                        }`}
+                                                    >
+                                                        🚨 สำคัญ/ด่วน (High)
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex gap-3 mt-6">
+                                            <button
+                                                type="button"
+                                                onClick={() => setEditingAnnouncement(null)}
+                                                className="flex-1 py-3 border border-slate-200 text-slate-500 hover:bg-slate-50 rounded-xl text-sm font-bold transition-colors"
+                                            >
+                                                ยกเลิก
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={handleSaveEditAnnouncement}
+                                                className="flex-1 py-3 bg-slate-900 hover:bg-slate-850 text-white rounded-xl text-sm font-black transition-colors"
+                                            >
+                                                บันทึกการแก้ไข
+                                            </button>
                                         </div>
                                     </Card>
-                                ))}
-                            </div>
+                                </div>
+                            )}
                         </div>
                     )}
 

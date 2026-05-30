@@ -4,7 +4,8 @@ import liff from "@line/liff";
 import { supabase } from "../../lib/supabaseClient";
 import { resizeImage } from "../../utils/imageResizer";
 import Link from "next/link";
-import { format, isSameDay } from "date-fns";
+import { format, isSameDay, startOfWeek, addDays } from "date-fns";
+import { th } from "date-fns/locale";
 import { motion, AnimatePresence } from "framer-motion";
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -23,6 +24,11 @@ export default function CheckIn() {
   const [profile, setProfile] = useState(null);
   const [status, setStatus] = useState("Checking...");
   const [activeAnnouncement, setActiveAnnouncement] = useState(null);
+  const [announcements, setAnnouncements] = useState([]);
+  const [todayLeaves, setTodayLeaves] = useState([]);
+  const [myPendingLeaves, setMyPendingLeaves] = useState([]);
+  const [weeklySchedule, setWeeklySchedule] = useState([]);
+  const [dismissedIds, setDismissedIds] = useState([]);
   const [recentCheckins, setRecentCheckins] = useState([]);
   const [lastAction, setLastAction] = useState(null);
   const [currentTime, setCurrentTime] = useState(null);
@@ -49,6 +55,14 @@ export default function CheckIn() {
   const SHOP_LAT = 17.39009845004315;
   const SHOP_LONG = 104.7929558480443;
   const ALLOWED_RADIUS_KM = 0.05;
+
+  // Load Acknowledged Announcements
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("acknowledged_announcements");
+      if (saved) setDismissedIds(JSON.parse(saved));
+    }
+  }, []);
 
   // --- Init ---
   useEffect(() => {
@@ -90,8 +104,154 @@ export default function CheckIn() {
     try {
       const res = await fetch('/api/announcements/active');
       const json = await res.json();
+      if (json.announcements) setAnnouncements(json.announcements);
       if (json.announcement) setActiveAnnouncement(json.announcement);
     } catch (e) { console.error(e); }
+  };
+
+  const handleDismissAnnouncement = (id) => {
+    const updated = [...dismissedIds, id];
+    setDismissedIds(updated);
+    localStorage.setItem("acknowledged_announcements", JSON.stringify(updated));
+  };
+
+  const fetchDashboardData = async (empId) => {
+    try {
+      const todayStr = format(new Date(), 'yyyy-MM-dd');
+      
+      // 1. Fetch Today's Leaves (approved)
+      const { data: leaves } = await supabase
+        .from('leave_requests')
+        .select('leave_date, leave_type, employees!employee_id(name, nickname)')
+        .eq('status', 'approved')
+        .eq('leave_date', todayStr);
+      setTodayLeaves(leaves || []);
+
+      // 2. Fetch My Pending Leaves
+      const { data: myPending } = await supabase
+        .from('leave_requests')
+        .select('leave_date, leave_type, status')
+        .eq('employee_id', empId)
+        .eq('status', 'pending')
+        .order('leave_date', { ascending: true });
+      setMyPendingLeaves(myPending || []);
+
+      // 3. Fetch Weekly Schedule Data
+      const mon = startOfWeek(new Date(), { weekStartsOn: 1 });
+      const sun = addDays(mon, 6);
+      const monStr = format(mon, 'yyyy-MM-dd');
+      const sunStr = format(sun, 'yyyy-MM-dd');
+
+      // Fetch transactions (published)
+      const { data: txs } = await supabase
+        .from('roster_transactions')
+        .select('date, shift_id, is_off, custom_start_time, custom_end_time, shifts(*)')
+        .eq('employee_id', empId)
+        .eq('status', 'PUBLISHED')
+        .gte('date', monStr)
+        .lte('date', sunStr);
+
+      // Fetch overrides
+      const { data: overrides } = await supabase
+        .from('roster_overrides')
+        .select('date, shift_id, is_off, custom_start_time, custom_end_time')
+        .eq('employee_id', empId)
+        .gte('date', monStr)
+        .lte('date', sunStr);
+
+      // Fetch templates
+      const { data: templates } = await supabase
+        .from('employee_schedules')
+        .select('day_of_week, is_off, shift_id, shifts(*)')
+        .eq('employee_id', empId);
+
+      // Fetch leaves for this week to show in weekly schedule
+      const { data: weekLeaves } = await supabase
+        .from('leave_requests')
+        .select('leave_date, leave_type, status')
+        .eq('employee_id', empId)
+        .eq('status', 'approved')
+        .gte('leave_date', monStr)
+        .lte('leave_date', sunStr);
+
+      // Map template schedules
+      const templateMap = {};
+      templates?.forEach(t => {
+        templateMap[t.day_of_week] = t;
+      });
+
+      // Map week leaves
+      const leaveMap = new Map();
+      weekLeaves?.forEach(l => {
+        leaveMap.set(l.leave_date, l);
+      });
+
+      // Fetch all shifts
+      const { data: allShifts } = await supabase.from('shifts').select('*');
+
+      // Compute weekly roster
+      const calculatedWeekly = [];
+      for (let i = 0; i < 7; i++) {
+        const day = addDays(mon, i);
+        const dateStr = format(day, 'yyyy-MM-dd');
+        const dayOfWeekIndex = (day.getDay() + 6) % 7; // 0 = Mon, 6 = Sun
+
+        let shiftName = '';
+        let shiftTime = '';
+        let isOff = false;
+        let isLeave = leaveMap.has(dateStr);
+        let leaveType = leaveMap.get(dateStr)?.leave_type || '';
+
+        const tx = txs?.find(t => t.date === dateStr);
+        const ov = overrides?.find(o => o.date === dateStr);
+        const tmpl = templateMap[dayOfWeekIndex];
+
+        if (tx) {
+          if (tx.is_off) {
+            isOff = true;
+          } else {
+            const sDef = tx.shifts || allShifts?.find(s => s.id === tx.shift_id);
+            shiftName = sDef ? sDef.name : 'กะงาน';
+            shiftTime = `${(tx.custom_start_time || sDef?.start_time || '').slice(0, 5)}-${(tx.custom_end_time || sDef?.end_time || '').slice(0, 5)}`;
+          }
+        } else if (ov) {
+          if (ov.is_off) {
+            isOff = true;
+          } else {
+            const sDef = allShifts?.find(s => s.id === ov.shift_id);
+            shiftName = sDef ? sDef.name + ' (Sub)' : 'กะพิเศษ';
+            shiftTime = `${(ov.custom_start_time || sDef?.start_time || '').slice(0, 5)}-${(ov.custom_end_time || sDef?.end_time || '').slice(0, 5)}`;
+          }
+        } else if (tmpl) {
+          if (tmpl.is_off || !tmpl.shift_id) {
+            isOff = true;
+          } else {
+            const sDef = tmpl.shifts || allShifts?.find(s => s.id === tmpl.shift_id);
+            shiftName = sDef ? sDef.name : 'กะงาน';
+            shiftTime = `${(sDef?.start_time || '').slice(0, 5)}-${(sDef?.end_time || '').slice(0, 5)}`;
+          }
+        } else {
+          isOff = true;
+        }
+
+        calculatedWeekly.push({
+          date: day,
+          dateStr,
+          dayName: format(day, 'EEE'),
+          dateNum: format(day, 'd'),
+          isToday: isSameDay(day, new Date()),
+          isOff: isOff && !isLeave,
+          isLeave,
+          leaveType,
+          shiftName,
+          shiftTime
+        });
+      }
+      setWeeklySchedule(calculatedWeekly);
+
+    } catch (e) {
+      console.error("Error fetching dashboard data:", e);
+    }
   };
 
   const fetchRecents = async () => {
@@ -119,6 +279,7 @@ export default function CheckIn() {
     }
 
     setEmployeeData(emp);
+    fetchDashboardData(emp.id);
 
     const { data: log } = await supabase.from('attendance_logs').select('action_type, timestamp').eq('employee_id', emp.id).order('timestamp', { ascending: false }).limit(1).maybeSingle();
 
@@ -524,23 +685,218 @@ export default function CheckIn() {
           )}
         </motion.div>
 
-        {/* Moved Announcement Card */}
-        <AnimatePresence>
-          {activeAnnouncement && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className="mb-8 mx-6 w-full max-w-sm bg-white/80 backdrop-blur-md rounded-3xl p-5 shadow-lg border border-white/50 flex items-start gap-4 z-30 relative"
-            >
-              <div className={`mt-1.5 w-2 h-2 rounded-full ring-4 ${activeAnnouncement.priority > 1 ? 'bg-red-500 ring-red-100' : 'bg-primary ring-lime-100'}`}></div>
-              <div>
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5">Announcement</p>
-                <p className="text-sm font-medium text-neutral-800 leading-relaxed">{activeAnnouncement.message}</p>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* Daily Bulletin & Dashboard */}
+        {(() => {
+          const allAnnouncements = announcements.length > 0 ? announcements : (activeAnnouncement ? [activeAnnouncement] : []);
+          const fixedAnnouncements = allAnnouncements.filter(a => a.expires_at === null);
+          const temporaryAnnouncements = allAnnouncements.filter(a => a.expires_at !== null && !dismissedIds.includes(a.id));
+
+          return (
+            <div className="w-full max-w-sm px-6 mb-6 z-30 flex flex-col gap-4">
+              {/* Fixed Announcements */}
+              <AnimatePresence>
+                {fixedAnnouncements.map((a) => (
+                  <motion.div
+                    key={`fixed-${a.id}`}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="w-full bg-white/80 backdrop-blur-md rounded-3xl p-4 shadow-sm border border-white/60 flex items-start gap-3.5 relative overflow-hidden"
+                  >
+                    <div className="absolute top-0 left-0 w-1 h-full bg-blue-500" />
+                    <div className="text-lg shrink-0 mt-0.5 select-none">📌</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <span className="text-[9px] font-extrabold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100 uppercase tracking-widest">Pinned</span>
+                        {a.priority > 1 && (
+                          <span className="text-[9px] font-extrabold text-red-655 bg-red-50 px-2 py-0.5 rounded-md border border-red-100 uppercase tracking-widest animate-pulse">Urgent</span>
+                        )}
+                      </div>
+                      <p className="text-xs font-bold text-neutral-800 leading-relaxed break-words">{a.message}</p>
+                    </div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+
+              {/* Temporary Announcements */}
+              <AnimatePresence>
+                {temporaryAnnouncements.map((a) => {
+                  let expLabel = '';
+                  if (a.expires_at) {
+                    const diffMs = new Date(a.expires_at) - new Date();
+                    if (diffMs > 0) {
+                      const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
+                      const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                      if (diffHrs > 0) {
+                        expLabel = `หมดเวลาใน ${diffHrs} ชม.`;
+                      } else {
+                        expLabel = `หมดเวลาใน ${diffMins} นาที`;
+                      }
+                    } else {
+                      expLabel = 'หมดเวลาแล้ว';
+                    }
+                  }
+                  const isUrgent = a.priority > 1;
+                  const accentColor = isUrgent ? 'bg-orange-500' : 'bg-amber-500';
+                  const cardBg = isUrgent 
+                    ? 'bg-gradient-to-br from-orange-50/90 to-white/90 border-orange-200/50 shadow-orange-100/10'
+                    : 'bg-white/80 border-white/60';
+
+                  return (
+                    <motion.div
+                      key={`temp-${a.id}`}
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.95, height: 0, marginBottom: 0, padding: 0 }}
+                      className={`w-full ${cardBg} backdrop-blur-md rounded-3xl p-4 shadow-sm border flex items-start gap-3.5 relative overflow-hidden transition-all duration-200`}
+                    >
+                      <div className={`absolute top-0 left-0 w-1 h-full ${accentColor}`} />
+                      <div className="text-lg shrink-0 mt-0.5 select-none">{isUrgent ? '🚨' : '📢'}</div>
+                      <div className="flex-1 min-w-0 pr-6">
+                        <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                          <span className={`text-[9px] font-extrabold ${isUrgent ? 'text-orange-600 bg-orange-50 border-orange-100' : 'text-amber-600 bg-amber-50 border-amber-100'} px-2 py-0.5 rounded-md border uppercase tracking-widest`}>
+                            {isUrgent ? 'Important' : 'News'}
+                          </span>
+                          {expLabel && (
+                            <span className="text-[9px] font-bold text-neutral-400 flex items-center gap-0.5">
+                              ⏰ {expLabel}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs font-semibold text-neutral-800 leading-relaxed break-words">{a.message}</p>
+                        <button
+                          onClick={() => handleDismissAnnouncement(a.id)}
+                          className="mt-2 py-1 px-3 bg-neutral-900/5 hover:bg-neutral-900/10 active:scale-95 text-[10px] font-extrabold text-neutral-600 rounded-lg transition-all"
+                        >
+                          รับทราบ
+                        </button>
+                      </div>
+                      <button 
+                        onClick={() => handleDismissAnnouncement(a.id)}
+                        className="absolute top-3.5 right-3.5 w-6 h-6 rounded-full flex items-center justify-center text-neutral-400 hover:text-neutral-700 hover:bg-neutral-900/5 transition-all text-xs font-bold"
+                      >
+                        ✕
+                      </button>
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
+
+              {/* Today's Leaves & My Pending Requests */}
+              {(todayLeaves.length > 0 || myPendingLeaves.length > 0) && (
+                <div className="w-full bg-white/70 backdrop-blur-md rounded-3xl border border-white/60 p-4 shadow-[0_4px_24px_0_rgba(0,0,0,0.02)] flex flex-col gap-3">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-100/80">
+                    <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest">ข้อมูลการลาหยุด</span>
+                    <span className="text-[9px] font-bold text-slate-400">{format(currentTime || new Date(), "dd MMMM yyyy", { locale: th })}</span>
+                  </div>
+
+                  {/* Today Leaves */}
+                  <div className="flex items-start gap-2.5 min-w-0">
+                    <span className="text-sm shrink-0">🏖️</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">พนักงานที่ลาวันนี้</p>
+                      <div className="text-xs font-bold text-slate-700 mt-0.5">
+                        {todayLeaves.length > 0 ? (
+                          <div className="flex flex-wrap gap-1 mt-0.5">
+                            {todayLeaves.map((l, idx) => {
+                              const empName = l.employees?.nickname || l.employees?.name?.split(' ')[0] || 'Staff';
+                              const typeLabel = l.leave_type === 'sick' ? 'ป่วย' : l.leave_type === 'business' ? 'กิจ' : 'พักร้อน';
+                              return (
+                                <span key={idx} className="inline-block bg-slate-100 border border-slate-200/50 px-2 py-0.5 rounded-md text-[10px] font-bold text-slate-600">
+                                  {empName} ({typeLabel})
+                                </span>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 font-semibold italic text-[11px] block mt-0.5">วันนี้ไม่มีคนลาหยุด ☀️</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* My Pending Leaves */}
+                  {myPendingLeaves.length > 0 && (
+                    <div className="flex items-start gap-2.5 min-w-0 pt-2 border-t border-slate-100/50">
+                      <span className="text-sm shrink-0">⏳</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">คำขอลาของคุณที่ค้างอยู่</p>
+                        <div className="flex flex-col gap-1 mt-1">
+                          {myPendingLeaves.slice(0, 2).map((l, idx) => {
+                            const dateFormatted = format(new Date(l.leave_date), 'dd/MM');
+                            const typeLabel = l.leave_type === 'sick' ? 'ลาป่วย' : l.leave_type === 'business' ? 'ลากิจ' : 'ลาพักร้อน';
+                            return (
+                              <div key={idx} className="flex items-center gap-1.5 text-[10px] font-bold text-amber-600">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0"></span>
+                                <span>{typeLabel} วันที่ {dateFormatted} (รออนุมัติ)</span>
+                              </div>
+                            );
+                          })}
+                          {myPendingLeaves.length > 2 && (
+                            <span className="text-[9px] font-bold text-slate-400 pl-3">และรายการอื่นอีก {myPendingLeaves.length - 2} รายการ</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Weekly Schedule Row */}
+              {weeklySchedule.length > 0 && (
+                <div className="w-full bg-white/70 backdrop-blur-md rounded-3xl border border-white/60 p-4 shadow-[0_4px_24px_0_rgba(0,0,0,0.02)] flex flex-col gap-2.5">
+                  <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest pb-1 border-b border-slate-100/80">ตารางงานสัปดาห์นี้</span>
+                  <div className="grid grid-cols-7 gap-1">
+                    {weeklySchedule.map((day, idx) => {
+                      const dayInitialsMap = { Mon: 'จ', Tue: 'อ', Wed: 'พ', Thu: 'พฤ', Fri: 'ศ', Sat: 'ส', Sun: 'อา' };
+                      const thaiInitial = dayInitialsMap[day.dayName] || day.dayName;
+
+                      let timeDisplay = '';
+                      let statusBg = 'bg-slate-50 border-slate-100 text-slate-600';
+                      
+                      if (day.isLeave) {
+                        timeDisplay = 'ลา';
+                        statusBg = 'bg-rose-50 border-rose-100/60 text-rose-500';
+                      } else if (day.isOff) {
+                        timeDisplay = 'หยุด';
+                        statusBg = 'bg-slate-100 border-slate-200/50 text-slate-400';
+                      } else {
+                        timeDisplay = day.shiftTime ? day.shiftTime.split('-')[0] : 'งาน';
+                        statusBg = 'bg-indigo-50 border-indigo-100/60 text-indigo-650';
+                      }
+
+                      return (
+                        <div 
+                          key={idx}
+                          className={cn(
+                            "flex flex-col items-center p-1 rounded-xl border text-center transition-all duration-200 min-w-0",
+                            day.isToday 
+                              ? "bg-slate-900 border-slate-950 text-white shadow-md scale-105" 
+                              : statusBg
+                          )}
+                        >
+                          <span className={cn("text-[9px] font-bold", day.isToday ? "text-slate-300" : "text-slate-400")}>
+                            {thaiInitial}
+                          </span>
+                          <span className="text-xs font-black tracking-tight mt-0.5">
+                            {day.dateNum}
+                          </span>
+                          <span className={cn(
+                            "text-[8px] font-bold mt-1 px-1 rounded-md max-w-full truncate block text-center", 
+                            day.isToday 
+                              ? (day.isLeave ? "bg-rose-500 text-white" : day.isOff ? "bg-slate-800 text-slate-400" : "bg-indigo-500 text-white")
+                              : (day.isLeave ? "bg-rose-100 text-rose-600" : day.isOff ? "bg-slate-200 text-slate-400" : "bg-indigo-100 text-indigo-600")
+                          )}>
+                            {timeDisplay}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {!status.includes('Checking') && (
           <motion.button
