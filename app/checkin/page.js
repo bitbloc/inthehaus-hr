@@ -680,26 +680,26 @@ export default function CheckIn() {
 
 
 
-      {/* 3. Hero Clock */}
-      <div className="flex-1 flex flex-col items-center justify-center w-full z-10 mt-4">
+      {/* 3. Hero Clock & Main Action */}
+      <div className="flex-1 flex flex-col items-center justify-start w-full z-10 mt-4">
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="text-center mb-10"
+          className="text-center mb-6 w-full max-w-sm px-6"
         >
           {/* Dieter Rams Typography: Big, Tight, Clean */}
-          <h2 className="text-[6rem] leading-none font-light tracking-tighter text-neutral-900">
+          <h2 className="text-[5.5rem] leading-none font-light tracking-tighter text-neutral-900 font-bold">
             {currentTime ? format(currentTime, "HH:mm") : "--:--"}
           </h2>
-          <p className="text-sm font-medium text-neutral-400 mt-2 tracking-widest uppercase">
-            {currentTime ? format(currentTime, "EEEE, dd MMMM") : "Loading..."}
+          <p className="text-xs font-semibold text-neutral-450 mt-1 tracking-widest uppercase">
+            {currentTime ? format(currentTime, "EEEEที่ d MMMM yyyy", { locale: th }) : "Loading..."}
           </p>
 
           <motion.div
-            animate={{ scale: status.includes('Ready') ? [1, 1.05, 1] : 1 }}
+            animate={{ scale: status.includes('Ready') ? [1, 1.03, 1] : 1 }}
             transition={{ repeat: Infinity, duration: 2 }}
             className={cn(
-              "mt-8 inline-flex items-center gap-2 px-4 py-2 rounded-full text-[10px] font-bold tracking-wide transition-colors border backdrop-blur-sm",
+              "mt-4 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[10px] font-bold tracking-wide transition-colors border backdrop-blur-sm",
               status.includes('Ready')
                 ? 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20'
                 : 'bg-rose-500/10 text-rose-500 border-rose-500/20'
@@ -711,15 +711,42 @@ export default function CheckIn() {
           
           {/* Gamification: Early Bird Badge */}
           {lastAction !== 'check_in' && shiftContext && !isLate && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mt-4 px-4 py-2 bg-gradient-to-r from-orange-100 to-amber-100 text-amber-700 rounded-full text-xs font-bold flex items-center gap-2 shadow-sm border border-amber-200"
-            >
-              🔥 มาเช้าจัง เยี่ยมไปเลย!
-            </motion.div>
+            <div className="mt-3 flex justify-center">
+              <motion.div
+                initial={{ opacity: 0, y: 5 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="px-3.5 py-1.5 bg-gradient-to-r from-orange-100 to-amber-100 text-amber-700 rounded-full text-[10px] font-bold flex items-center gap-1.5 shadow-sm border border-amber-200"
+              >
+                🔥 มาเช้าจัง เยี่ยมไปเลย!
+              </motion.div>
+            </div>
           )}
         </motion.div>
+
+        {/* Check-In / Check-Out Button (moved here, directly under GPS status) */}
+        {!status.includes('Checking') && (
+          <motion.button
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={handleStartCheckIn}
+            className="w-full max-w-sm px-6 mb-6 z-30 transition-all duration-300"
+          >
+            <div className={cn(
+              "w-full py-4 rounded-[2rem] flex flex-col items-center justify-center transition-all duration-300 border-b-4 shadow-sm",
+              mainButtonConfig.color
+            )}>
+              <span className="text-3xl mb-1">{mainButtonConfig.icon}</span>
+              <span className="text-lg font-black tracking-tight">
+                {mainButtonConfig.label}
+              </span>
+              <span className="text-[9px] opacity-70 mt-0.5 font-bold uppercase tracking-wider">
+                {mainButtonConfig.sub}
+              </span>
+            </div>
+          </motion.button>
+        )}
 
         {/* Daily Bulletin & Dashboard */}
         {(() => {
@@ -846,15 +873,31 @@ export default function CheckIn() {
                           return (
                             <div key={l.id} className="flex items-center justify-between p-2 bg-slate-50/40 rounded-2xl border border-slate-100/30">
                               <div className="flex items-center gap-2.5 min-w-0">
-                                {/* Employee Avatar */}
-                                {l.employees?.photo_url ? (
-                                  <img src={l.employees.photo_url} alt={empName} className="w-8 h-8 rounded-full object-cover border border-white shadow-sm shrink-0" />
-                                ) : (
-                                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-100 to-slate-100 flex items-center justify-center text-[10px] font-extrabold text-indigo-500 border border-white shadow-sm shrink-0">
-                                    {empName.slice(0, 2).toUpperCase()}
-                                  </div>
-                                )}
-                                <div className="flex flex-col min-w-0">
+                                {/* Employee Avatar with Fallback */}
+                                <div className="relative w-8 h-8 shrink-0">
+                                  {l.employees?.photo_url ? (
+                                    <>
+                                      <img 
+                                        src={l.employees.photo_url} 
+                                        alt={empName} 
+                                        onError={(e) => {
+                                          e.currentTarget.style.display = 'none';
+                                          const fallback = e.currentTarget.parentElement?.querySelector('.avatar-fallback');
+                                          if (fallback) fallback.classList.remove('hidden');
+                                        }}
+                                        className="w-8 h-8 rounded-full object-cover border border-white shadow-sm" 
+                                      />
+                                      <div className="avatar-fallback hidden w-8 h-8 rounded-full bg-gradient-to-br from-indigo-100 to-slate-100 flex items-center justify-center text-[10px] font-extrabold text-indigo-500 border border-white shadow-sm absolute inset-0">
+                                        {empName.slice(0, 2).toUpperCase()}
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-100 to-slate-100 flex items-center justify-center text-[10px] font-extrabold text-indigo-500 border border-white shadow-sm">
+                                      {empName.slice(0, 2).toUpperCase()}
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="flex flex-col min-w-0 ml-1">
                                   <span className="text-xs font-black text-slate-800 truncate leading-none mb-0.5">{empName}</span>
                                   <span className="text-[9px] font-bold text-slate-400 truncate leading-none">{l.reason || 'ทำธุระส่วนตัว'}</span>
                                 </div>
@@ -954,7 +997,7 @@ export default function CheckIn() {
                             {day.dateNum}
                           </span>
                           <span className={cn(
-                            "text-[8px] font-bold mt-1 px-1 rounded-md max-w-full truncate block text-center", 
+                            "text-[7.5px] font-extrabold mt-1 px-0.5 py-0.5 rounded-md text-center tracking-tighter whitespace-nowrap", 
                             day.isToday 
                               ? (day.isLeave ? "bg-rose-500 text-white" : day.isOff ? "bg-slate-800 text-slate-400" : "bg-indigo-500 text-white")
                               : (day.isLeave ? "bg-rose-100 text-rose-600" : day.isOff ? "bg-slate-200 text-slate-400" : "bg-indigo-100 text-indigo-600")
@@ -974,9 +1017,9 @@ export default function CheckIn() {
                       animate={{ opacity: 1, y: 0 }}
                       className="mt-2 p-3 bg-slate-50/70 backdrop-blur-sm rounded-2xl border border-slate-100/50 flex items-center justify-between transition-all duration-300"
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
                         <div className={cn(
-                          "w-10 h-10 rounded-xl flex items-center justify-center text-lg shadow-sm border",
+                          "w-10 h-10 rounded-xl flex items-center justify-center text-lg shadow-sm border shrink-0",
                           selectedDaySchedule.isLeave 
                             ? "bg-rose-50 text-rose-500 border-rose-100" 
                             : selectedDaySchedule.isOff 
@@ -987,13 +1030,13 @@ export default function CheckIn() {
                             ? (selectedDaySchedule.leaveType === 'sick' ? '🤢' : selectedDaySchedule.leaveType === 'business' ? '💼' : '🏖️') 
                             : selectedDaySchedule.isOff 
                               ? '😴' 
-                              : (selectedDaySchedule.shiftName.includes('ค่ำ') || selectedDaySchedule.shiftName.includes('เย็น') || selectedDaySchedule.shiftTime.startsWith('18') || selectedDaySchedule.shiftTime.startsWith('17') || selectedDaySchedule.shiftTime.startsWith('16') ? '🌙' : '☀️')}
+                              : (((selectedDaySchedule.shiftName || '').includes('ค่ำ') || (selectedDaySchedule.shiftName || '').includes('เย็น') || (selectedDaySchedule.shiftTime || '').startsWith('18') || (selectedDaySchedule.shiftTime || '').startsWith('17') || (selectedDaySchedule.shiftTime || '').startsWith('16')) ? '🌙' : '☀️')}
                         </div>
-                        <div>
-                          <h5 className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest leading-none mb-1">
+                        <div className="min-w-0">
+                          <h5 className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest leading-none mb-1.5 truncate">
                             {format(selectedDaySchedule.date, 'EEEE d MMMM yyyy', { locale: th })} {selectedDaySchedule.isToday && '(วันนี้)'}
                           </h5>
-                          <p className="text-xs font-black text-slate-800 leading-none">
+                          <p className="text-xs font-black text-slate-800 leading-none truncate">
                             {selectedDaySchedule.isLeave 
                               ? `ลากุน (${selectedDaySchedule.leaveType === 'sick' ? 'ลาป่วย 😷' : selectedDaySchedule.leaveType === 'business' ? 'ลากิจ 💼' : 'พักร้อน 🏖️'})` 
                               : selectedDaySchedule.isOff 
@@ -1004,8 +1047,8 @@ export default function CheckIn() {
                       </div>
                       
                       {!selectedDaySchedule.isOff && !selectedDaySchedule.isLeave && selectedDaySchedule.shiftTime && (
-                        <div className="text-right">
-                          <span className="text-[11px] font-black text-indigo-650 bg-indigo-100/60 border border-indigo-200/50 px-2.5 py-1 rounded-lg">
+                        <div className="text-right shrink-0 ml-3">
+                          <span className="text-[11px] font-black text-indigo-650 bg-indigo-100/60 border border-indigo-200/50 px-2.5 py-1.5 rounded-lg whitespace-nowrap">
                             {selectedDaySchedule.shiftTime}
                           </span>
                         </div>
@@ -1018,30 +1061,6 @@ export default function CheckIn() {
           );
         })()}
 
-        {!status.includes('Checking') && (
-          <motion.button
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={handleStartCheckIn}
-            className="group relative flex items-center justify-center p-4 transition-all duration-500"
-          >
-            {/* Squircle Button */}
-            <div className={cn(
-              "relative z-10 w-48 h-48 rounded-[2.5rem] flex flex-col items-center justify-center transition-all duration-300 border-b-4",
-              mainButtonConfig.color
-            )}>
-              <span className="text-4xl mb-2">{mainButtonConfig.icon}</span>
-              <span className="text-xl font-bold tracking-tight">
-                {mainButtonConfig.label}
-              </span>
-              <span className="text-[10px] opacity-60 mt-1 font-medium">
-                {mainButtonConfig.sub}
-              </span>
-            </div>
-          </motion.button>
-        )}
       </div>
 
       {/* 4. Recent Checkins (Glass Cards) */}
@@ -1059,26 +1078,43 @@ export default function CheckIn() {
         <h3 className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-4 pl-2">Recent Activity</h3>
         <div className="flex flex-col gap-2">
           <AnimatePresence>
-            {recentCheckins.slice(0, 3).map((log, i) => (
-              <motion.div
-                key={log.id}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="flex items-center justify-between p-3 bg-white/40 backdrop-blur-md rounded-2xl border border-white/40 shadow-sm"
-              >
-                <div className="flex items-center gap-3">
-                  <img src={log.employees?.photo_url || log.photo_url} className="w-10 h-10 rounded-full object-cover bg-slate-200 border border-white" />
-                  <div>
-                    <p className="text-xs font-bold text-neutral-800">{log.employees?.name?.split(' ')[0]}</p>
-                    <p className="text-[10px] text-neutral-500 font-medium">{log.action_type === 'check_in' ? 'Checked In' : 'Checked Out'}</p>
+            {recentCheckins.slice(0, 3).map((log, i) => {
+              const namePart = log.employees?.nickname || log.employees?.name?.split(' ')[0] || 'Staff';
+              return (
+                <motion.div
+                  key={log.id}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  className="flex items-center justify-between p-3 bg-white/40 backdrop-blur-md rounded-2xl border border-white/40 shadow-sm"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="relative w-10 h-10 shrink-0">
+                      <img 
+                        src={log.employees?.photo_url || log.photo_url} 
+                        alt=""
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          const fallback = e.currentTarget.parentElement?.querySelector('.avatar-fallback');
+                          if (fallback) fallback.classList.remove('hidden');
+                        }}
+                        className="w-10 h-10 rounded-full object-cover bg-slate-200 border border-white" 
+                      />
+                      <div className="avatar-fallback hidden w-10 h-10 rounded-full bg-gradient-to-br from-indigo-100 to-slate-100 flex items-center justify-center text-xs font-extrabold text-indigo-500 border border-white shadow-sm absolute inset-0">
+                        {namePart.slice(0, 2).toUpperCase()}
+                      </div>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-neutral-800 truncate">{namePart}</p>
+                      <p className="text-[10px] text-neutral-500 font-medium truncate">{log.action_type === 'check_in' ? 'Checked In' : 'Checked Out'}</p>
+                    </div>
                   </div>
-                </div>
-                <div className="flex flex-col items-end">
-                  <span className="text-xs font-bold text-neutral-700 font-mono">{format(new Date(log.timestamp), "HH:mm")}</span>
-                  <span className="text-sm">{log.mood_status || ''}</span>
-                </div>
-              </motion.div>
-            ))}
+                  <div className="flex flex-col items-end shrink-0 ml-3">
+                    <span className="text-xs font-bold text-neutral-700 font-mono">{format(new Date(log.timestamp), "HH:mm")}</span>
+                    <span className="text-sm">{log.mood_status || ''}</span>
+                  </div>
+                </motion.div>
+              );
+            })}
           </AnimatePresence>
         </div>
       </div>
