@@ -1885,8 +1885,8 @@ export default function AdminDashboard() {
                                                 {data.pendingEmployees.map(emp => (
                                                     <tr key={emp.id} className="hover:bg-amber-50/50">
                                                         <td className="p-4 font-black text-slate-800 flex items-center gap-3">
-                                                            <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden">
-                                                                {emp.photo_url ? <img src={emp.photo_url} className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : <div className="w-full h-full flex items-center justify-center text-xs text-slate-500 font-bold">{emp.name?.charAt(0)}</div>}
+                                                            <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden flex items-center justify-center">
+                                                                <EmployeeAvatar employee={emp} className="w-full h-full rounded-full" textClassName="text-xs font-bold" />
                                                             </div>
                                                             <div>
                                                                 {emp.name}
@@ -2171,13 +2171,7 @@ export default function AdminDashboard() {
                                                         {/* Employee Name & Profile */}
                                                         <td className="p-4">
                                                             <div className="flex items-center gap-3">
-                                                                {req.employees?.photo_url ? (
-                                                                    <img src={req.employees.photo_url} alt="" className="w-9 h-9 rounded-xl object-cover border border-slate-200 shadow-sm" />
-                                                                ) : (
-                                                                    <div className="w-9 h-9 rounded-xl bg-slate-100 border border-slate-200 text-slate-600 flex items-center justify-center font-bold text-xs">
-                                                                        {req.employees?.name?.slice(0, 2)}
-                                                                    </div>
-                                                                )}
+                                                                <EmployeeAvatar employee={req.employees} className="w-9 h-9 rounded-xl" textClassName="text-xs font-bold" />
                                                                 <div>
                                                                     <div className="font-extrabold text-slate-900">{req.employees?.nickname || req.employees?.name}</div>
                                                                     <div className="text-[10px] text-slate-400 font-bold tracking-wide uppercase">{req.employees?.position || 'Staff'}</div>
@@ -2206,13 +2200,7 @@ export default function AdminDashboard() {
                                                         <td className="p-4">
                                                             {req.replacement_employee ? (
                                                                 <div className="flex items-center gap-2">
-                                                                    {req.replacement_employee.photo_url ? (
-                                                                        <img src={req.replacement_employee.photo_url} alt="" className="w-6 h-6 rounded-lg object-cover border border-slate-200" />
-                                                                    ) : (
-                                                                        <div className="w-6 h-6 rounded-lg bg-slate-50 text-slate-650 flex items-center justify-center font-bold text-[9px] border">
-                                                                            {req.replacement_employee.nickname?.slice(0, 2) || req.replacement_employee.name?.slice(0, 2)}
-                                                                        </div>
-                                                                    )}
+                                                                    <EmployeeAvatar employee={req.replacement_employee} className="w-6 h-6 rounded-lg" textClassName="text-[9px] font-bold" />
                                                                     <span className="font-bold text-slate-800 text-xs">
                                                                         {req.replacement_employee.nickname || req.replacement_employee.name}
                                                                     </span>
@@ -3150,3 +3138,29 @@ export default function AdminDashboard() {
         </div>
     );
 }
+
+// A reusable component to handle profile image loading errors gracefully.
+// It falls back to a text-based initial avatar if the image fails to load.
+const EmployeeAvatar = ({ employee, className = "w-9 h-9 rounded-xl", textClassName = "text-xs font-bold" }) => {
+    const [imgError, setImgError] = useState(false);
+
+    if (employee?.photo_url && !imgError) {
+        return (
+            <img
+                src={employee.photo_url}
+                alt={employee.nickname || employee.name || ""}
+                onError={() => setImgError(true)}
+                className={`${className} object-cover border border-slate-200 shadow-sm`}
+                referrerPolicy="no-referrer"
+            />
+        );
+    }
+
+    const name = employee?.nickname || employee?.name || "??";
+    const initials = name.slice(0, 2);
+    return (
+        <div className={`${className} bg-slate-100 border border-slate-200 text-slate-600 flex items-center justify-center ${textClassName}`}>
+            {initials}
+        </div>
+    );
+};
