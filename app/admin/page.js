@@ -76,6 +76,7 @@ export default function AdminDashboard() {
     const [leaveStatusFilter, setLeaveStatusFilter] = useState("all");
     const [leaveShowAllMonths, setLeaveShowAllMonths] = useState(false);
     const [leaveSearchQuery, setLeaveSearchQuery] = useState("");
+    const [selectedLeaveIds, setSelectedLeaveIds] = useState([]);
 
     const [showStaffModal, setShowStaffModal] = useState(false);
     const [editingStaff, setEditingStaff] = useState(null);
@@ -211,6 +212,7 @@ export default function AdminDashboard() {
     }, []);
 
     useEffect(() => {
+        setSelectedLeaveIds([]);
         if (activeTab === 'dashboard') {
             fetchLogs();
             fetchTransactions();
@@ -510,41 +512,9 @@ export default function AdminDashboard() {
         if (!isConfirmed) return;
 
         try {
-            // Find siblings
-            let query = supabase.from('leave_requests')
-                .select('id, leave_date, employee_id, replacement_employee_id')
-                .eq('employee_id', req.employee_id)
-                .eq('leave_type', req.leave_type);
-
-            if (req.reason) {
-                query = query.eq('reason', req.reason);
-            } else {
-                query = query.or('reason.is.null,reason.eq.');
-            }
-
-            const { data: siblings, error: fetchErr } = await query;
-            if (fetchErr) throw fetchErr;
-
-            let idsToDelete = [req.id];
-            let datesToDelete = [req.leave_date];
-            let replacementIds = req.replacement_employee_id ? [req.replacement_employee_id] : [];
-
-            if (siblings && siblings.length > 1) {
-                const dateStrList = siblings.map(s => s.leave_date).sort().join(', ');
-                const confirmBulk = confirm(
-                    `พบใบลาที่อยู่ในกลุ่มเดียวกัน (เหตุผล/ประเภทเดียวกัน) ทั้งหมด ${siblings.length} รายการ:\n` +
-                    `วันที่: ${dateStrList}\n\n` +
-                    `ต้องการลบใบลา "ทั้งหมด" ในกลุ่มนี้พร้อมกันเลยหรือไม่?\n` +
-                    `- กด "ตกลง (OK)" เพื่อลบทั้งหมด\n` +
-                    `- กด "ยกเลิก (Cancel)" เพื่อลบเฉพาะของวันที่ ${req.leave_date} เท่านั้น`
-                );
-
-                if (confirmBulk) {
-                    idsToDelete = siblings.map(s => s.id);
-                    datesToDelete = siblings.map(s => s.leave_date);
-                    replacementIds = Array.from(new Set(siblings.map(s => s.replacement_employee_id).filter(Boolean)));
-                }
-            }
+            const idsToDelete = [req.id];
+            const datesToDelete = [req.leave_date];
+            const replacementIds = req.replacement_employee_id ? [req.replacement_employee_id] : [];
 
             // 1. Delete leave requests
             const { error: delErr } = await supabase
@@ -583,6 +553,76 @@ export default function AdminDashboard() {
             }
 
             alert("ลบข้อมูลใบลาและเคลียร์ตาราง Roster เรียบร้อยแล้ว!");
+            setSelectedLeaveIds(prev => prev.filter(id => id !== req.id));
+            
+            // Refresh
+            fetchData('leave_requests', 'leaveRequests');
+            fetchTransactions();
+        } catch (e) {
+            alert("เกิดข้อผิดพลาดในการลบใบลา: " + e.message);
+        }
+    };
+
+    const handleDeleteMultipleLeaves = async () => {
+        const count = selectedLeaveIds.length;
+        if (count === 0) return;
+        
+        const isConfirmed = confirm(`คุณต้องการลบใบลาที่เลือกทั้งหมด ${count} รายการใช่หรือไม่?`);
+        if (!isConfirmed) return;
+
+        try {
+            // Find all leave requests matching the selected IDs
+            const { data: leaves, error: fetchErr } = await supabase
+                .from('leave_requests')
+                .select('id, employee_id, leave_date, replacement_employee_id')
+                .in('id', selectedLeaveIds);
+            
+            if (fetchErr) throw fetchErr;
+            if (!leaves || leaves.length === 0) return;
+
+            const idsToDelete = leaves.map(l => l.id);
+
+            // 1. Delete leave requests
+            const { error: delErr } = await supabase
+                .from('leave_requests')
+                .delete()
+                .in('id', idsToDelete);
+            if (delErr) throw delErr;
+
+            // 2. Clean up roster overrides and transactions for each leave
+            for (const req of leaves) {
+                const datesToDelete = [req.leave_date];
+                const replacementIds = req.replacement_employee_id ? [req.replacement_employee_id] : [];
+
+                await supabase
+                    .from('roster_overrides')
+                    .delete()
+                    .eq('employee_id', req.employee_id)
+                    .in('date', datesToDelete);
+
+                await supabase
+                    .from('roster_transactions')
+                    .delete()
+                    .eq('employee_id', req.employee_id)
+                    .in('date', datesToDelete);
+
+                for (const repId of replacementIds) {
+                    await supabase
+                        .from('roster_overrides')
+                        .delete()
+                        .eq('employee_id', repId)
+                        .in('date', datesToDelete);
+
+                    await supabase
+                        .from('roster_transactions')
+                        .delete()
+                        .eq('employee_id', repId)
+                        .in('date', datesToDelete);
+                }
+            }
+
+            alert(`ลบใบลาสำเร็จ ${idsToDelete.length} รายการ และเคลียร์ตาราง Roster เรียบร้อยแล้ว!`);
+            setSelectedLeaveIds([]);
             
             // Refresh
             fetchData('leave_requests', 'leaveRequests');
@@ -1909,9 +1949,11 @@ export default function AdminDashboard() {
                         // 2. Filter requests based on state
                         const todayStr = format(new Date(), 'yyyy-MM-dd');
                         let filteredLeaveRequests = data.leaveRequests.filter(req => {
-                            // By default, only show current and future leave dates
-                            if (!leaveShowAllMonths && req.leave_date) {
-                                if (req.leave_date < todayStr) return false;
+                            // By default, only show leaves in the selected month
+                            if (!leaveShowAllMonths) {
+                                if (!req.leave_date || !req.leave_date.startsWith(selectedMonth)) {
+                                    return false;
+                                }
                             }
                             // Status filter
                             if (leaveStatusFilter !== "all" && req.status !== leaveStatusFilter) return false;
@@ -1972,6 +2014,15 @@ export default function AdminDashboard() {
                                         <p className="text-slate-500 text-xs mt-1 font-medium font-bold">จัดการใบลา อนุมัติ และตรวจสอบการทำงานแทนกันในระบบ</p>
                                     </div>
                                     <div className="flex items-center gap-2">
+                                        {selectedLeaveIds.length > 0 && (
+                                            <button
+                                                type="button"
+                                                onClick={handleDeleteMultipleLeaves}
+                                                className="px-4 py-2 rounded-xl text-xs font-bold transition-all border shadow-sm bg-rose-600 text-white border-rose-700 hover:bg-rose-700 active:scale-95"
+                                            >
+                                                🗑️ ลบใบลาที่เลือก ({selectedLeaveIds.length})
+                                            </button>
+                                        )}
                                         <button
                                             type="button"
                                             onClick={() => setLeaveShowAllMonths(prev => !prev)}
@@ -1981,7 +2032,7 @@ export default function AdminDashboard() {
                                                     : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
                                             }`}
                                         >
-                                            {leaveShowAllMonths ? '📅 แสดงเฉพาะวันลาปัจจุบัน/อนาคต' : '🌐 แสดงประวัติทั้งหมด'}
+                                            {leaveShowAllMonths ? '📅 แสดงเฉพาะเดือนที่เลือก' : '🌐 แสดงประวัติทั้งหมด'}
                                         </button>
                                         <button
                                             type="button"
@@ -2069,6 +2120,20 @@ export default function AdminDashboard() {
                                     <table className="w-full text-sm text-left">
                                         <thead className="bg-slate-50 text-slate-500 font-extrabold text-xs uppercase tracking-wider border-b border-slate-100">
                                             <tr>
+                                                <th className="p-4 w-10">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={filteredLeaveRequests.length > 0 && selectedLeaveIds.length === filteredLeaveRequests.length}
+                                                        onChange={(e) => {
+                                                            if (e.target.checked) {
+                                                                setSelectedLeaveIds(filteredLeaveRequests.map(r => r.id));
+                                                            } else {
+                                                                setSelectedLeaveIds([]);
+                                                            }
+                                                        }}
+                                                        className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 cursor-pointer"
+                                                    />
+                                                </th>
                                                 <th className="p-4">พนักงาน</th>
                                                 <th className="p-4">วันที่ขอลา</th>
                                                 <th className="p-4">ประเภท</th>
@@ -2089,6 +2154,20 @@ export default function AdminDashboard() {
 
                                                 return (
                                                     <tr key={req.id} className="hover:bg-slate-50/50 transition-colors">
+                                                        <td className="p-4 w-10">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={selectedLeaveIds.includes(req.id)}
+                                                                onChange={(e) => {
+                                                                    if (e.target.checked) {
+                                                                        setSelectedLeaveIds([...selectedLeaveIds, req.id]);
+                                                                    } else {
+                                                                        setSelectedLeaveIds(selectedLeaveIds.filter(id => id !== req.id));
+                                                                    }
+                                                                }}
+                                                                className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 cursor-pointer"
+                                                            />
+                                                        </td>
                                                         {/* Employee Name & Profile */}
                                                         <td className="p-4">
                                                             <div className="flex items-center gap-3">

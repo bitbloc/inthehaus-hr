@@ -13,6 +13,7 @@ export default function AdminRosterPage() {
     const [loading, setLoading] = useState(true);
     const [leaveRequests, setLeaveRequests] = useState([]);
     const [editingLeaveId, setEditingLeaveId] = useState(null);
+    const [selectedLeaveIds, setSelectedLeaveIds] = useState([]);
     const [leaveForm, setLeaveForm] = useState({
         leave_type: 'sick',
         reason: '',
@@ -89,6 +90,7 @@ export default function AdminRosterPage() {
 
     async function fetchData() {
         setLoading(true);
+        setSelectedLeaveIds([]);
         const [empRes, shiftRes, transRes, leaveRes] = await Promise.all([
             supabase.from('employees').select('*').order('id'),
             supabase.from('shifts').select('*').order('start_time'),
@@ -371,41 +373,9 @@ export default function AdminRosterPage() {
 
         setLoading(true);
         try {
-            // Find siblings
-            let query = supabase.from('leave_requests')
-                .select('id, leave_date, employee_id, replacement_employee_id')
-                .eq('employee_id', req.employee_id)
-                .eq('leave_type', req.leave_type);
-
-            if (req.reason) {
-                query = query.eq('reason', req.reason);
-            } else {
-                query = query.or('reason.is.null,reason.eq.');
-            }
-
-            const { data: siblings, error: fetchErr } = await query;
-            if (fetchErr) throw fetchErr;
-
-            let idsToDelete = [req.id];
-            let datesToDelete = [req.leave_date];
-            let replacementIds = req.replacement_employee_id ? [req.replacement_employee_id] : [];
-
-            if (siblings && siblings.length > 1) {
-                const dateStrList = siblings.map(s => s.leave_date).sort().join(', ');
-                const confirmBulk = confirm(
-                    `พบใบลาที่อยู่ในกลุ่มเดียวกัน (เหตุผล/ประเภทเดียวกัน) ทั้งหมด ${siblings.length} รายการ:\n` +
-                    `วันที่: ${dateStrList}\n\n` +
-                    `ต้องการลบใบลา "ทั้งหมด" ในกลุ่มนี้พร้อมกันเลยหรือไม่?\n` +
-                    `- กด "ตกลง (OK)" เพื่อลบทั้งหมด\n` +
-                    `- กด "ยกเลิก (Cancel)" เพื่อลบเฉพาะของวันที่ ${req.leave_date} เท่านั้น`
-                );
-
-                if (confirmBulk) {
-                    idsToDelete = siblings.map(s => s.id);
-                    datesToDelete = siblings.map(s => s.leave_date);
-                    replacementIds = Array.from(new Set(siblings.map(s => s.replacement_employee_id).filter(Boolean)));
-                }
-            }
+            const idsToDelete = [req.id];
+            const datesToDelete = [req.leave_date];
+            const replacementIds = req.replacement_employee_id ? [req.replacement_employee_id] : [];
 
             // 1. Delete leave requests
             const { error: delErr } = await supabase
@@ -444,6 +414,76 @@ export default function AdminRosterPage() {
             }
 
             alert("ลบข้อมูลใบลาและเคลียร์ตาราง Roster เรียบร้อยแล้ว!");
+            setSelectedLeaveIds(prev => prev.filter(id => id !== req.id));
+            await fetchData();
+        } catch (e) {
+            alert("เกิดข้อผิดพลาดในการลบใบลา: " + e.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleDeleteMultipleLeaves = async () => {
+        const count = selectedLeaveIds.length;
+        if (count === 0) return;
+        
+        const isConfirmed = confirm(`คุณต้องการลบใบลาที่เลือกทั้งหมด ${count} รายการใช่หรือไม่?`);
+        if (!isConfirmed) return;
+
+        setLoading(true);
+        try {
+            // Find all leave requests matching the selected IDs
+            const { data: leaves, error: fetchErr } = await supabase
+                .from('leave_requests')
+                .select('id, employee_id, leave_date, replacement_employee_id')
+                .in('id', selectedLeaveIds);
+            
+            if (fetchErr) throw fetchErr;
+            if (!leaves || leaves.length === 0) return;
+
+            const idsToDelete = leaves.map(l => l.id);
+
+            // 1. Delete leave requests
+            const { error: delErr } = await supabase
+                .from('leave_requests')
+                .delete()
+                .in('id', idsToDelete);
+            if (delErr) throw delErr;
+
+            // 2. Clean up roster overrides and transactions for each leave
+            for (const req of leaves) {
+                const datesToDelete = [req.leave_date];
+                const replacementIds = req.replacement_employee_id ? [req.replacement_employee_id] : [];
+
+                await supabase
+                    .from('roster_overrides')
+                    .delete()
+                    .eq('employee_id', req.employee_id)
+                    .in('date', datesToDelete);
+
+                await supabase
+                    .from('roster_transactions')
+                    .delete()
+                    .eq('employee_id', req.employee_id)
+                    .in('date', datesToDelete);
+
+                for (const repId of replacementIds) {
+                    await supabase
+                        .from('roster_overrides')
+                        .delete()
+                        .eq('employee_id', repId)
+                        .in('date', datesToDelete);
+
+                    await supabase
+                        .from('roster_transactions')
+                        .delete()
+                        .eq('employee_id', repId)
+                        .in('date', datesToDelete);
+                }
+            }
+
+            alert(`ลบใบลาสำเร็จ ${idsToDelete.length} รายการ และเคลียร์ตาราง Roster เรียบร้อยแล้ว!`);
+            setSelectedLeaveIds([]);
             await fetchData();
         } catch (e) {
             alert("เกิดข้อผิดพลาดในการลบใบลา: " + e.message);
@@ -755,15 +795,43 @@ export default function AdminRosterPage() {
                         </h2>
                         <p className="text-xs text-gray-500 font-medium">จัดการ อนุมัติ ปรับรายละเอียดการลา และซิงค์เข้าสู่ตารางเวร roster โดยตรง</p>
                     </div>
-                    {leaveRequests.filter(l => l.status === 'approved').length > 0 && (
-                        <button 
-                            type="button"
-                            onClick={syncAllApprovedLeaves}
-                            className="flex items-center gap-2 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 hover:text-blue-800 border border-blue-200 rounded-lg text-xs font-bold transition-all shadow-sm"
-                        >
-                            🔄 ซิงค์ใบลาที่อนุมัติแล้วทั้งหมดเข้าตาราง
-                        </button>
-                    )}
+                    <div className="flex flex-wrap items-center gap-2">
+                        {selectedLeaveIds.length > 0 && (
+                            <button
+                                type="button"
+                                onClick={handleDeleteMultipleLeaves}
+                                className="flex items-center gap-2 px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-800 border border-rose-200 rounded-lg text-xs font-bold transition-all shadow-sm"
+                            >
+                                🗑️ ลบใบลาที่เลือก ({selectedLeaveIds.length})
+                            </button>
+                        )}
+                        {leaveRequests.length > 0 && (
+                            <label className="flex items-center gap-1.5 px-3 py-2 bg-gray-50 hover:bg-gray-100 border border-gray-250 rounded-lg text-xs font-bold transition-all shadow-sm cursor-pointer select-none">
+                                <input
+                                    type="checkbox"
+                                    checked={leaveRequests.length > 0 && selectedLeaveIds.length === leaveRequests.length}
+                                    onChange={(e) => {
+                                        if (e.target.checked) {
+                                            setSelectedLeaveIds(leaveRequests.map(r => r.id));
+                                        } else {
+                                            setSelectedLeaveIds([]);
+                                        }
+                                    }}
+                                    className="w-3.5 h-3.5 rounded text-blue-600 focus:ring-blue-500 border-gray-300"
+                                />
+                                เลือกทั้งหมด
+                            </label>
+                        )}
+                        {leaveRequests.filter(l => l.status === 'approved').length > 0 && (
+                            <button 
+                                type="button"
+                                onClick={syncAllApprovedLeaves}
+                                className="flex items-center gap-2 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 hover:text-blue-800 border border-blue-200 rounded-lg text-xs font-bold transition-all shadow-sm"
+                            >
+                                🔄 ซิงค์ใบลาที่อนุมัติแล้วทั้งหมดเข้าตาราง
+                            </button>
+                        )}
+                    </div>
                 </div>
                 
                 {leaveRequests.length === 0 ? (
@@ -778,9 +846,23 @@ export default function AdminRosterPage() {
                                 <div key={req.id} className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden flex flex-col transition-all hover:shadow-md">
                                     {/* Card Header */}
                                     <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
-                                        <div>
-                                            <div className="font-bold text-gray-800">{req.employees?.nickname || req.employees?.name}</div>
-                                            <div className="text-[10px] text-gray-500 font-bold">{req.employees?.position || 'พนักงาน'}</div>
+                                        <div className="flex items-center gap-2.5">
+                                            <input 
+                                                type="checkbox"
+                                                checked={selectedLeaveIds.includes(req.id)}
+                                                onChange={(e) => {
+                                                    if (e.target.checked) {
+                                                        setSelectedLeaveIds([...selectedLeaveIds, req.id]);
+                                                    } else {
+                                                        setSelectedLeaveIds(selectedLeaveIds.filter(id => id !== req.id));
+                                                    }
+                                                }}
+                                                className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-gray-300 cursor-pointer"
+                                            />
+                                            <div>
+                                                <div className="font-bold text-gray-800">{req.employees?.nickname || req.employees?.name}</div>
+                                                <div className="text-[10px] text-gray-500 font-bold">{req.employees?.position || 'พนักงาน'}</div>
+                                            </div>
                                         </div>
                                         <span className={`px-2.5 py-1 rounded-full text-[10px] font-black tracking-wide uppercase border ${
                                             req.status === 'approved' 
