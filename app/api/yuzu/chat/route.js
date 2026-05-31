@@ -126,6 +126,11 @@ export async function POST(request) {
             .split('[YUZU_MEME]')[0]
             .trim();
 
+        // Strip FLEX tags for web client readability
+        cleanedResponse = cleanedResponse
+            .replace(/\[\/?FLEX_[A-Z]+\]/g, '')
+            .trim();
+
         // Optional metadata parsing for UI features
         let actionMetadata = {};
         if (response.includes('[YUZU_LEARNING]')) {

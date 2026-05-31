@@ -209,24 +209,45 @@ export async function handleChatCommand(event, client, text, rawText, userId, gr
 
     const dailyLogs = await getDailyContent(groupId);
     if (dailyLogs) context += `\nเหตุการณ์ที่เกิดขึ้นในแชทกลุ่มวันนี้ (ใช้สำหรับอ้างอิงหรือแซวทีมงาน):\n${dailyLogs}\n`;
-    if (text.includes('ทอง')) context += await getGoldPrice() + "\n";
-    if (text.includes('น้ำมัน')) context += await getOilPrice() + "\n";
-    if (text.includes('ไฟ')) context += await getElectricityPrice() + "\n";
-    
-    const ingredientKeywords = ['วัตถุดิบ', 'ราคาอาหาร', 'หมู', 'ไก่', 'เนื้อ', 'ปลา', 'ไข่', 'ผัก', 'ผลไม้', 'ข้าว'];
-    if (ingredientKeywords.some(kw => text.includes(kw))) {
-       if (text.includes('ขึ้น') || text.includes('ลง') || text.includes('ไหม') || text.includes('เปรียบเทียบ')) {
-          context += await getPriceComparison() + "\n";
-       } else {
-          context += await getIngredientPrices() + "\n";
-       }
-    }
-    if (text.includes('อากาศ')) context += formatWeatherMessage(await getSchemaWeather()) + "\n";
     
     const newsKeywords = ['ข่าว', 'อัปเดต', 'สรุป', 'ส่อง', 'ติดตาม', 'สถานการณ์'];
-    if (newsKeywords.some(kw => text.includes(kw))) {
-      console.log("Yuzu: Injecting Latest News Context");
+    const costKeywords = ['น้ำมัน', 'ไฟ', 'ต้นทุน', 'ราคาอาหาร', 'วัตถุดิบ'];
+    const isNewsOrCostRequest = newsKeywords.some(kw => text.includes(kw)) || costKeywords.some(kw => text.includes(kw));
+
+    if (isNewsOrCostRequest) {
+      console.log("Yuzu: Injecting Latest News & Operating Costs Context for casual dining bistro");
       context += await getAccurateNews() + "\n";
+      context += await getOilPrice() + "\n";
+      context += await getElectricityPrice() + "\n";
+      context += await getIngredientPrices() + "\n";
+      
+      context += `\n[INSTRUCTION: คุณกำลังสรุปข่าวเด่นและข้อมูลต้นทุนที่จำเป็นสำหรับร้านอาหารประเภท Casual Dining Bistro (In The Haus นครพนม) 
+      กรุณาตอบกลับโดยใช้ภาษาพูดที่แสนกวนประสาทแต่ขี้อ้อนและขยันสไตล์แมวยูซุ โดยคุณต้องแบ่งข้อมูลออกเป็นหัวข้อหลักๆ และใช้ Tag ครอบไว้ทั้งหมดเพื่อระบบจะนำไปจัดข้อมูลแบบ Flex Message
+      **ห้ามใส่ markdown สัญลักษณ์หนาเตอะอย่างพวกลูกสตาร์สองตัว (**) ใน Tag เป็นอันขาด**
+      
+      โปรดตอบกลับตามโครงสร้างนี้อย่างเคร่งครัด:
+      [FLEX_TITLE]หัวข้อรายงานสรุปจากยูซุ เช่น 🐱 สรุปข่าวสารและต้นทุนรายวันโดยน้องยูซุ[/FLEX_TITLE]
+      [FLEX_SUBTITLE]รายงานเพื่อช่วยในการดำเนินงานสำหรับเจ้านายและพี่ๆ ทีมงาน[/FLEX_SUBTITLE]
+      [FLEX_NEWS]สรุปข่าวเด่นนครพนมและภาคอีสานที่เกิดขึ้นช่วงนี้ (สั้นๆ กระชับ 2-3 บรรทัด)[/FLEX_NEWS]
+      [FLEX_INDUSTRY]สรุปข่าวสาร/เทรนด์ธุรกิจและการแข่งขันในวงการร้านอาหารของไทยและแถบอีสาน (2-3 บรรทัด)[/FLEX_INDUSTRY]
+      [FLEX_COSTS]สรุปสถานการณ์ต้นทุนปัจจุบัน: ราคาน้ำมัน (อ้างอิงค่ากลางและสถานีในนครพนม), ค่าไฟฟ้า (หน่วยละ 4.18 บาท), ราคาวัตถุดิบหลัก (ไข่ ไก่ หมู ข้าว) ที่ร้านอาหารต้องประเมิน (2-3 บรรทัด)[/FLEX_COSTS]
+      [FLEX_ADVICE]คำแนะนำจากน้องยูซุถึงร้าน In The Haus (เช่น การประหยัดไฟ การคำนวณวัตถุดิบ หรือการวางแผนขนส่ง)[/FLEX_ADVICE]
+      
+      ระวัง: ห้ามพิมพ์คำพูดใดๆ นอก Tag เหล่านี้เด็ดขาด เริ่มต้นที่ [FLEX_TITLE] และจบที่ [/FLEX_ADVICE] เสมอ]\n`;
+    } else {
+      if (text.includes('ทอง')) context += await getGoldPrice() + "\n";
+      if (text.includes('น้ำมัน')) context += await getOilPrice() + "\n";
+      if (text.includes('ไฟ')) context += await getElectricityPrice() + "\n";
+      
+      const ingredientKeywords = ['วัตถุดิบ', 'ราคาอาหาร', 'หมู', 'ไก่', 'เนื้อ', 'ปลา', 'ไข่', 'ผัก', 'ผลไม้', 'ข้าว'];
+      if (ingredientKeywords.some(kw => text.includes(kw))) {
+         if (text.includes('ขึ้น') || text.includes('ลง') || text.includes('ไหม') || text.includes('เปรียบเทียบ')) {
+            context += await getPriceComparison() + "\n";
+         } else {
+            context += await getIngredientPrices() + "\n";
+         }
+      }
+      if (text.includes('อากาศ')) context += formatWeatherMessage(await getSchemaWeather()) + "\n";
     }
 
     let response = await getGeminiResponse(query, context, history, userId);
@@ -238,7 +259,14 @@ export async function handleChatCommand(event, client, text, rawText, userId, gr
       .split('[YUZU_MEME]')[0]
       .trim();
 
-    const replyMessages = [{ type: 'text', text: cleanedResponse }];
+    const replyMessages = [];
+    if (isNewsOrCostRequest) {
+      const parsedData = parseFlexResponse(cleanedResponse);
+      const flexMsg = formatNewsFlex(parsedData, cleanedResponse);
+      replyMessages.push(flexMsg);
+    } else {
+      replyMessages.push({ type: 'text', text: cleanedResponse });
+    }
 
     // 1. Meme generation check
     if (response.includes('[YUZU_MEME]')) {
@@ -410,4 +438,164 @@ export async function handleChatPostback(event, client, action, queryParams, use
   }
 
   return false;
+}
+
+function parseFlexResponse(response) {
+  const extract = (tag) => {
+    const regex = new RegExp(`\\[${tag}\\]([\\s\\S]*?)\\[\\/${tag}\\]`);
+    const match = response.match(regex);
+    return match ? match[1].trim() : null;
+  };
+
+  return {
+    title: extract('FLEX_TITLE'),
+    subtitle: extract('FLEX_SUBTITLE'),
+    news: extract('FLEX_NEWS'),
+    industry: extract('FLEX_INDUSTRY'),
+    costs: extract('FLEX_COSTS'),
+    advice: extract('FLEX_ADVICE')
+  };
+}
+
+function formatNewsFlex(data, rawFallbackText) {
+  const isStructured = data && (data.news || data.costs || data.industry);
+
+  if (isStructured) {
+    const contents = {
+      type: "bubble",
+      size: "mega",
+      styles: {
+        header: { backgroundColor: "#1e293b" },
+        body: { backgroundColor: "#0f172a" }
+      },
+      header: {
+        type: "box",
+        layout: "vertical",
+        contents: [
+          {
+            type: "text",
+            text: data.title || "🐱 สรุปข่าวสาร & ต้นทุนรายวันโดย Yuzu",
+            weight: "bold",
+            color: "#ffffff",
+            size: "md"
+          },
+          {
+            type: "text",
+            text: data.subtitle || "ข้อมูลอัปเดตล่าสุดสำหรับร้าน In The Haus",
+            color: "#94a3b8",
+            size: "xs",
+            margin: "xs"
+          }
+        ]
+      },
+      body: {
+        type: "box",
+        layout: "vertical",
+        spacing: "md",
+        contents: []
+      }
+    };
+
+    if (data.news) {
+      contents.body.contents.push({
+        type: "box",
+        layout: "vertical",
+        spacing: "xs",
+        contents: [
+          { type: "text", text: "📍 ข่าวเด่นนครพนม & อีสาน", weight: "bold", size: "xs", color: "#38bdf8" },
+          { type: "text", text: data.news, size: "xs", color: "#cbd5e1", wrap: true }
+        ]
+      });
+    }
+
+    if (data.industry) {
+      if (contents.body.contents.length > 0) {
+        contents.body.contents.push({ type: "separator", color: "#334155" });
+      }
+      contents.body.contents.push({
+        type: "box",
+        layout: "vertical",
+        spacing: "xs",
+        contents: [
+          { type: "text", text: "🍽️ วงการร้านอาหารในไทย/อีสาน", weight: "bold", size: "xs", color: "#bef264" },
+          { type: "text", text: data.industry, size: "xs", color: "#cbd5e1", wrap: true }
+        ]
+      });
+    }
+
+    if (data.costs) {
+      if (contents.body.contents.length > 0) {
+        contents.body.contents.push({ type: "separator", color: "#334155" });
+      }
+      contents.body.contents.push({
+        type: "box",
+        layout: "vertical",
+        spacing: "xs",
+        contents: [
+          { type: "text", text: "⛽ สรุปต้นทุนน้ำมัน & ค่าไฟ & วัตถุดิบ", weight: "bold", size: "xs", color: "#f59e0b" },
+          { type: "text", text: data.costs, size: "xs", color: "#cbd5e1", wrap: true }
+        ]
+      });
+    }
+
+    if (data.advice) {
+      if (contents.body.contents.length > 0) {
+        contents.body.contents.push({ type: "separator", color: "#334155" });
+      }
+      contents.body.contents.push({
+        type: "box",
+        layout: "vertical",
+        spacing: "xs",
+        contents: [
+          { type: "text", text: "🐾 คำแนะนำจาก Yuzu", weight: "bold", size: "xs", color: "#f97316" },
+          { type: "text", text: data.advice, size: "xs", color: "#cbd5e1", wrap: true }
+        ]
+      });
+    }
+
+    return {
+      type: "flex",
+      altText: `🐱 สรุปข่าวสาร & ต้นทุนโดย Yuzu`,
+      contents: contents
+    };
+  } else {
+    return {
+      type: "flex",
+      altText: `🐱 สรุปข่าวสาร & ต้นทุนโดย Yuzu`,
+      contents: {
+        type: "bubble",
+        size: "mega",
+        styles: {
+          header: { backgroundColor: "#1e293b" },
+          body: { backgroundColor: "#0f172a" }
+        },
+        header: {
+          type: "box",
+          layout: "vertical",
+          contents: [
+            {
+              type: "text",
+              text: "🐱 สรุปข่าวสาร & ต้นทุนโดย Yuzu",
+              weight: "bold",
+              color: "#ffffff",
+              size: "md"
+            }
+          ]
+        },
+        body: {
+          type: "box",
+          layout: "vertical",
+          contents: [
+            {
+              type: "text",
+              text: rawFallbackText,
+              size: "xs",
+              color: "#cbd5e1",
+              wrap: true
+            }
+          ]
+        }
+      }
+    };
+  }
 }

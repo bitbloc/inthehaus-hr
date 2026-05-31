@@ -36,8 +36,182 @@ const mapWmoToTomorrow = (wmo) => {
     return 1000; // Default
 };
 
+// Map WeatherAPI.com codes to Tomorrow.io codes
+const mapWeatherApiToTomorrow = (code) => {
+    if (code === 1000) return 1000;
+    if (code === 1003) return 1101;
+    if (code === 1006 || code === 1009) return 1001;
+    if (code === 1030 || code === 1135 || code === 1147) return 2000;
+    if (code === 1063 || code === 1180 || code === 1183) return 4200;
+    if (code === 1072 || code === 1150 || code === 1153) return 4000;
+    if (code === 1186 || code === 1189 || code === 1240) return 4001;
+    if (code === 1192 || code === 1195 || code === 1243 || code === 1246) return 4201;
+    if (code === 1087 || code === 1273 || code === 1276) return 8000;
+    return 1000;
+};
+
 export async function getSchemaWeather(lat = SHOP_LAT, lon = SHOP_LONG) {
+    const apiKey = process.env.WEATHERAPI_KEY || process.env.WEATHER_API_KEY;
+    
+    if (apiKey) {
+        try {
+            console.log(`Fetching weather from WeatherAPI.com for lat=${lat}, lon=${lon}...`);
+            const forecastUrl = `http://api.weatherapi.com/v1/forecast.json?key=${apiKey}&q=${lat},${lon}&days=2&aqi=no&alerts=no&lang=th`;
+            const res = await fetch(forecastUrl);
+            if (!res.ok) throw new Error(`WeatherAPI.com Forecast Error: HTTP ${res.status}`);
+            const data = await res.json();
+            
+            // Fetch yesterday's history for comparison
+            const bkkTime = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Bangkok" }));
+            const yesterday = new Date(bkkTime);
+            yesterday.setDate(yesterday.getDate() - 1);
+            const yesterdayStr = yesterday.toISOString().split('T')[0];
+            
+            const historyUrl = `http://api.weatherapi.com/v1/history.json?key=${apiKey}&q=${lat},${lon}&dt=${yesterdayStr}&lang=th`;
+            const histRes = await fetch(historyUrl);
+            let histData = null;
+            if (histRes.ok) {
+                histData = await histRes.json();
+            }
+            
+            const currentObj = data.current;
+            const forecastDayToday = data.forecast?.forecastday?.[0];
+            const historyDay = histData?.forecast?.forecastday?.[0];
+            
+            if (!currentObj) throw new Error("No current weather data in WeatherAPI.com response");
+            
+            const conditionCode = mapWeatherApiToTomorrow(currentObj.condition?.code);
+            const conditionLabel = currentObj.condition?.text || getThaiCondition(conditionCode);
+            
+            let tempDiff = 0;
+            let tempComparisonStatus = 'similar';
+            let tempDiffText = 'ใกล้เคียงกับเมื่อวาน';
+            
+            if (forecastDayToday?.hour && historyDay?.hour) {
+                const tempsToday = forecastDayToday.hour.map(h => h.temp_c);
+                const tempsYesterday = historyDay.hour.map(h => h.temp_c);
+                
+                const avgToday = tempsToday.reduce((a, b) => a + b, 0) / tempsToday.length;
+                const avgYesterday = tempsYesterday.reduce((a, b) => a + b, 0) / tempsYesterday.length;
+                
+                tempDiff = avgToday - avgYesterday;
+                if (tempDiff > 0.5) {
+                    tempComparisonStatus = 'hotter';
+                    tempDiffText = `ร้อนกว่าเมื่อวานประมาณ ${tempDiff.toFixed(1)}°C`;
+                } else if (tempDiff < -0.5) {
+                    tempComparisonStatus = 'colder';
+                    tempDiffText = `เย็นกว่าเมื่อวานประมาณ ${Math.abs(tempDiff).toFixed(1)}°C`;
+                }
+            }
+            
+            let rainBlocksText = [];
+            let heavyRainBlocks = [];
+            let lightRainBlocks = [];
+            let hasRain = false;
+            let employeeAdvice = '';
+            
+            if (forecastDayToday?.hour) {
+                const heavyRainHours = [];
+                const lightRainHours = [];
+                
+                forecastDayToday.hour.forEach((h, idx) => {
+                    const isHeavy = h.precip_mm >= 0.5;
+                    const isLight = !isHeavy && (h.precip_mm > 0.1 || h.chance_of_rain >= 40);
+                    
+                    if (isHeavy) {
+                        heavyRainHours.push(idx);
+                    } else if (isLight) {
+                        lightRainHours.push(idx);
+                    }
+                });
+                
+                const groupHours = (hours) => {
+                    const blocks = [];
+                    if (hours.length > 0) {
+                        let start = hours[0];
+                        let prev = hours[0];
+                        for (let i = 1; i < hours.length; i++) {
+                            const curr = hours[i];
+                            if (curr === prev + 1) {
+                                prev = curr;
+                            } else {
+                                blocks.push({ start, end: prev });
+                                start = curr;
+                                prev = curr;
+                            }
+                        }
+                        blocks.push({ start, end: prev });
+                    }
+                    return blocks.map(b => {
+                        const startStr = b.start.toString().padStart(2, '0') + ':00';
+                        const endStr = (b.end + 1).toString().padStart(2, '0') + ':00';
+                        return `${startStr} - ${endStr} น.`;
+                    });
+                };
+                
+                heavyRainBlocks = groupHours(heavyRainHours);
+                lightRainBlocks = groupHours(lightRainHours);
+                hasRain = heavyRainBlocks.length > 0 || lightRainBlocks.length > 0;
+                
+                if (heavyRainBlocks.length > 0) {
+                    rainBlocksText.push(...heavyRainBlocks.map(b => `🌧️ ตกหนัก: ${b}`));
+                }
+                if (lightRainBlocks.length > 0) {
+                    rainBlocksText.push(...lightRainBlocks.map(b => `🌦️ ตกปรอยๆ: ${b}`));
+                }
+                
+                if (heavyRainBlocks.length > 0 && lightRainBlocks.length > 0) {
+                    employeeAdvice = `วันนี้ระวังฝนตกหนักช่วง ${heavyRainBlocks.join(' และ ')} และอาจมีฝนตกปรอยๆ ช่วง ${lightRainBlocks.join(' และ ')} อย่าลืมเตรียมร่ม/เสื้อกันฝนหนาๆ และเผื่อเวลาเดินทางด้วยนะครับ ⛈️`;
+                } else if (heavyRainBlocks.length > 0) {
+                    employeeAdvice = `วันนี้คาดว่าจะมีฝนตกหนักช่วง ${heavyRainBlocks.join(' และ ')} พกร่มหรือเสื้อกันฝนแบบหนา และวางแผนเผื่อเวลาในการเดินทางเข้า/เลิกงานด้วยนะ 🌧️`;
+                } else if (lightRainBlocks.length > 0) {
+                    employeeAdvice = `วันนี้คาดว่าจะมีฝนตกปรอยๆ/มีละอองฝนช่วง ${lightRainBlocks.join(' และ ')} พกร่มหรือเสื้อกันฝนติดตัวไว้กันเหนียวด้วยนะครับ 🌦️`;
+                } else {
+                    employeeAdvice = `วันนี้ไม่มีฝนตก ท้องฟ้าค่อนข้างแจ่มใส ☀️`;
+                }
+                
+                if (employeeAdvice.includes('ฝน')) {
+                    if (tempComparisonStatus === 'hotter') {
+                        employeeAdvice += ` แถมอากาศจะอบอ้าวขึ้นด้วย ระวังเหนียวตัวและรักษาสุขภาพนะครับ`;
+                    } else if (tempComparisonStatus === 'colder') {
+                        employeeAdvice += ` อากาศจะเย็นลงร่วมด้วย ระวังเป็นหวัดนะครับ`;
+                    } else {
+                        employeeAdvice += ` ดูแลตัวเองดีๆ ด้วยความห่วงใยจาก Yuzu ครับ`;
+                    }
+                } else {
+                    if (tempComparisonStatus === 'hotter') {
+                        employeeAdvice += ` แต่อากาศจะร้อนกว่าเมื่อวาน หลีกเลี่ยงแดดจัดและดื่มน้ำบ่อยๆ นะครับ`;
+                    } else if (tempComparisonStatus === 'colder') {
+                        employeeAdvice += ` และอากาศเย็นสบายกว่าเมื่อวานเล็กน้อย สบายตัวเลย ทำงานอย่างมีความสุขนะครับ!`;
+                    } else {
+                        employeeAdvice += ` อุณหภูมิใกล้เคียงกับเมื่อวานเลย อากาศกำลังดีครับ`;
+                    }
+                }
+            }
+            
+            return {
+                current: {
+                    temp: Math.round(currentObj.temp_c),
+                    humidity: currentObj.humidity,
+                    condition: conditionLabel,
+                    wind: Number((currentObj.wind_kph / 3.6).toFixed(1)), // Convert to m/s
+                    conditionCode: conditionCode
+                },
+                tempDiffText,
+                tempComparisonStatus,
+                rainBlocks: rainBlocksText,
+                heavyRainBlocks,
+                lightRainBlocks,
+                hasRain,
+                employeeAdvice
+            };
+        } catch (err) {
+            console.error("WeatherAPI.com Error, falling back to Open-Meteo:", err);
+        }
+    }
+
     try {
+        console.log(`Fetching weather from OpenMeteo for lat=${lat}, lon=${lon}...`);
         const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&hourly=temperature_2m,precipitation_probability,precipitation,weather_code&wind_speed_unit=ms&past_days=1&timezone=Asia/Bangkok`;
         const res = await fetch(url);
         if (!res.ok) throw new Error("OpenMeteo Weather API Error");
