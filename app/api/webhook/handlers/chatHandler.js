@@ -167,54 +167,53 @@ export async function handleChatCommand(event, client, text, rawText, userId, gr
       }
       
       const reportPrompt = `ช่วยสรุปรายงานพฤติกรรมและการทำงานของพนักงานจากข้อมูลที่มีหน่อยค่ะ ยึดตามรายชื่อพนักงานที่มีในระบบต่อไปนี้:\n${contextContent}\nและนี่คือประวัติการแชท/ทำงานของวันนี้:\n${dailyLogs || "(วันนี้ยังไม่มีประวัติการแชทให้วิเคราะห์)"}\n\nโปรดเน้นวิเคราะห์แต่ละคนตามรายชื่อที่มี และรายงานความพร้อมให้เจ้านายฟัง (ถ้าประวัติแชทว่างก็บอกสถานะของรายชื่อบุคคลไปก่อน)`;
-      const report = await getGeminiResponse(reportPrompt, "คุณกำลังทำรายงานประเมินผลพนักงานให้เจ้าของร้าน โปรดวิเคราะห์อย่างละเอียดและเป็นกลาง (แต่ยังคงสไตล์ยูซุปากแซ่บ)", [], userId);
-      await client.replyMessage(event.replyToken, { type: 'text', text: report });
+      const reportResponse = await getGeminiResponse(reportPrompt, "", [], userId);
+      await client.replyMessage(event.replyToken, { type: 'text', text: reportResponse });
       return true;
     }
 
-    // 3. Standard Yuzu Chat with Memory
-    const history = await getChatHistory(groupId, 100);
-    let context = "";
-    
-    // Injected dynamic context:
-    const allEmployees = await getAllEmployeesData();
-    if (allEmployees && allEmployees.length > 0) {
-      context += `[OFFICIAL_STAFF_ROSTER_START - ยึดถือข้อมูลนี้เป็นความจริงสูงสุด ห้ามเดาหรือเปลี่ยนตำแหน่งเอง]\n`;
-      allEmployees.forEach(emp => {
-        const displayName = emp.nickname || emp.name;
-        const altName = (emp.nickname && emp.name && emp.nickname !== emp.name) ? ` (ชื่อจริง: ${emp.name})` : '';
-        const position = emp.position || 'ทีมงาน';
-        const lineId = emp.line_bot_id || emp.line_user_id || 'unlinked';
-        
-        context += `- พนักงาน: ${displayName}${altName} | ตำแหน่ง: ${position} | LINE_UID: ${lineId}\n`;
-      });
-      context += `[OFFICIAL_STAFF_ROSTER_END]\n\n`;
-    }
-
-    const employee = await getEmployeeByLineId(userId);
-    const isBoss = await checkIsBoss(userId);
-    
-    if (isBoss) {
-      context += `คุณกำลังคุยกับ: เจ้านาย (${employee?.nickname || employee?.name || 'Owner'})\n`;
-      context += `สถานะ: เจ้าของร้าน (Owner)\n`;
-    } else if (employee) {
-      context += `คุณกำลังคุยกับ: ${employee.nickname || employee.name} (${employee.position})\n`;
-      context += `สถานะพนักงาน: ${employee.employment_status || 'Fulltime'}\n`;
-    } else {
-      context += `(ไม่พบข้อมูลพนักงานในระบบสำหรับ LINE ID นี้: ${userId})\n`;
-    }
-
-    const compactWeather = await getCompactWeather();
-    if (compactWeather) context += `${compactWeather}\n`;
-
-    const dailyLogs = await getDailyContent(groupId);
-    if (dailyLogs) context += `\nเหตุการณ์ที่เกิดขึ้นในแชทกลุ่มวันนี้ (ใช้สำหรับอ้างอิงหรือแซวทีมงาน):\n${dailyLogs}\n`;
-    
     const newsKeywords = ['ข่าว', 'อัปเดต', 'สรุป', 'ส่อง', 'ติดตาม', 'สถานการณ์'];
     const costKeywords = ['น้ำมัน', 'ไฟ', 'ต้นทุน', 'ราคาอาหาร', 'วัตถุดิบ'];
-    const isNewsOrCostRequest = newsKeywords.some(kw => text.includes(kw)) || costKeywords.some(kw => text.includes(kw));
+    
+    const hasNewsKeyword = newsKeywords.some(kw => text.includes(kw));
+    const hasCostKeyword = costKeywords.some(kw => text.includes(kw));
+    
+    const isNewsOrCostRequest = hasNewsKeyword || hasCostKeyword;
+    const isNewsOnlyRequest = hasNewsKeyword && !hasCostKeyword;
 
-    if (isNewsOrCostRequest) {
+    const dailyLogs = await getDailyContent(groupId);
+    const history = await getChatHistory(groupId);
+
+    let context = `คุณคือ ยูซุ (Yuzu) ผู้ช่วย AI ประจำร้าน In The Haus นครพนม ทำงานเป็นผู้ช่วยเจ้านายและพนักงาน ข้อมูลแวดล้อม:
+- เวลาปัจจุบัน: ${format(addHours(new Date(), 7), 'yyyy-MM-dd HH:mm:ss')} (เวลาไทย)
+ประเด็นเหตุการณ์ที่เกิดขึ้นในแชทกลุ่มวันนี้ (ใช้สำหรับอ้างอิงหรือแซวทีมงาน):
+${dailyLogs || 'ไม่มีความเคลื่อนไหว'}
+`;
+
+    if (isNewsOnlyRequest) {
+      console.log("Yuzu: Injecting News-Only Context (Minimal Feed)");
+      context += await getAccurateNews() + "\n";
+      
+      context += `\n[INSTRUCTION: คุณกำลังสรุปข่าวเด่นประจำวันแบบ Minimal ที่สุดเพื่อรายงานเจ้านาย
+      กรุณาตอบกลับโดยลิสต์รายการข่าวสารเด่นๆ ที่เกิดขึ้นในรอบ 24 ชั่วโมงจาก [CRITICAL_CONTEXT_DATA] เป็นข้อๆ ทีละบรรทัดอย่างกระชับที่สุด (ห้ามเกริ่นนำ ห้ามพูดคุยเวิ่นเว้อ ห้ามสรุปเป็นย่อหน้ายาวๆ และห้ามใส่เรื่องราคาน้ำมัน ค่าไฟ หรือวัตถุดิบเด็ดขาด)
+      ใส่ Hashtag ที่น่าสนใจท้ายข่าวแต่ละหัวข้อด้วยภาษาพูดสไตล์แมวยูซุสั้นๆ กวนๆ เล็กน้อย
+      
+      **กฎเหล็กเรื่องความสดใหม่ของข่าว:**
+      - ห้ามเอาข่าวเก่าในประวัติการแชท (เช่น พายุลูกเห็บถล่มเรณูนคร, จับยาเสพติดล็อตใหญ่) มาสรุปซ้ำเด็ดขาด!
+      - ให้ใช้ข่าวใหม่ของวันนี้ที่อยู่ภายใน [CRITICAL_CONTEXT_DATA] เท่านั้น
+      - หากไม่พบข่าวใหม่ในพื้นที่ ให้สรุปเฉพาะข่าวระดับประเทศล่าสุดจาก THE STANDARD ของวันนี้แทน ห้ามมโนข่าวเก่าขึ้นมา
+      
+      โปรดตอบกลับตามโครงสร้างนี้อย่างเคร่งครัด:
+      [FLEX_TITLE]📰 ข่าวเด่นวันนี้โดยน้องยูซุ[/FLEX_TITLE]
+      [FLEX_SUBTITLE]ด่วน/สรุปหัวข้อข่าวสารรอบวันเพื่อบอส[/FLEX_SUBTITLE]
+      [FLEX_NEWS]
+      • ข่าวสั้นที่ 1 #Hashtag
+      • ข่าวสั้นที่ 2 #Hashtag
+      • ข่าวสั้นที่ 3 #Hashtag
+      [/FLEX_NEWS]
+      
+      ระวัง: ห้ามใส่ Tag FLEX_INDUSTRY, FLEX_COSTS หรือ FLEX_ADVICE ใดๆ เข้ามา และห้ามพิมพ์คำพูดใดๆ นอก Tag FLEX_TITLE, FLEX_SUBTITLE, FLEX_NEWS เด็ดขาด]`;
+    } else if (isNewsOrCostRequest) {
       console.log("Yuzu: Injecting Latest News, Weather & Operating Costs Context for casual dining bistro");
       context += formatWeatherMessage(await getSchemaWeather()) + "\n";
       context += await getAccurateNews() + "\n";
@@ -511,12 +510,13 @@ function formatNewsFlex(data, rawFallbackText) {
     };
 
     if (data.news) {
+      const titleText = data.costs ? "📍 ข่าวเด่นนครพนม & อีสาน" : "📰 สรุปข่าวรอบวัน";
       contents.body.contents.push({
         type: "box",
         layout: "vertical",
         spacing: "xs",
         contents: [
-          { type: "text", text: "📍 ข่าวเด่นนครพนม & อีสาน", weight: "bold", size: "xs", color: "#38bdf8" },
+          { type: "text", text: titleText, weight: "bold", size: "xs", color: "#38bdf8" },
           { type: "text", text: data.news, size: "xs", color: "#cbd5e1", wrap: true }
         ]
       });
