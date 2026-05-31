@@ -2,7 +2,7 @@
  * News Fetcher Utility for THE STANDARD
  */
 
-export async function getAccurateNews(categories = ['nakhon-phanom', 'nakhon-phanom-matichon', 'nakhon-phanom-pptv', 'nakhon-phanom-fb', 'restaurant-th', 'restaurant-biz', 'isan-news-matichon']) {
+export async function getAccurateNews(categories = ['latest', 'thailand', 'nakhon-phanom', 'nakhon-phanom-matichon', 'nakhon-phanom-pptv', 'nakhon-phanom-fb', 'restaurant-th', 'restaurant-biz', 'isan-news-matichon']) {
     console.log("Yuzu News Fetcher: Starting for categories:", categories);
     
     const now = new Date();
@@ -57,6 +57,8 @@ export async function getAccurateNews(categories = ['nakhon-phanom', 'nakhon-pha
                 url = `https://brandinside.asia/category/business/retail-restaurant/feed/?t=${Date.now()}`;
             } else if (cat === 'isan-news-matichon') {
                 url = `https://www.matichon.co.th/tag/%E0%B8%A0%E0%B8%B2%E0%B8%84%E0%B8%AD%E0%B8%B5%E0%B8%AA%E0%B8%B2%E0%B8%99/feed?t=${Date.now()}`;
+            } else if (cat === 'latest') {
+                url = `https://thestandard.co/latest/?t=${Date.now()}`;
             } else {
                 url = `https://thestandard.co/category/news/${cat}/?t=${Date.now()}`;
             }
@@ -177,6 +179,8 @@ export async function getAccurateNews(categories = ['nakhon-phanom', 'nakhon-pha
                 case 'restaurant-th': catName = 'วงการร้านอาหารในไทย (ประชาชาติธุรกิจ)'; break;
                 case 'restaurant-biz': catName = 'ธุรกิจร้านอาหาร & ค้าปลีก (Brand Inside)'; break;
                 case 'isan-news-matichon': catName = 'ข่าวทั่วไปภาคอีสาน (มติชนออนไลน์)'; break;
+                case 'latest': catName = 'ข่าวเด่นล่าสุด (THE STANDARD)'; break;
+                case 'thailand': catName = 'ข่าวเด่นในประเทศ (THE STANDARD)'; break;
                 default: catName = res.category;
             }
             context += `🚨 หมวดหมู่ ${catName}:\n`;
