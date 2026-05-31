@@ -1,9 +1,9 @@
 const SHOP_LAT = 17.390110564180162;
 const SHOP_LONG = 104.79292673153263;
 
-// In-memory cache (30 minutes)
+// In-memory cache (5 minutes)
 let weatherCache = { data: null, expiry: 0 };
-const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 const weatherCodes = {
     1000: "ท้องฟ้าแจ่มใส ☀️",

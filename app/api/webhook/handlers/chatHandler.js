@@ -215,7 +215,8 @@ export async function handleChatCommand(event, client, text, rawText, userId, gr
     const isNewsOrCostRequest = newsKeywords.some(kw => text.includes(kw)) || costKeywords.some(kw => text.includes(kw));
 
     if (isNewsOrCostRequest) {
-      console.log("Yuzu: Injecting Latest News & Operating Costs Context for casual dining bistro");
+      console.log("Yuzu: Injecting Latest News, Weather & Operating Costs Context for casual dining bistro");
+      context += formatWeatherMessage(await getSchemaWeather()) + "\n";
       context += await getAccurateNews() + "\n";
       context += await getOilPrice() + "\n";
       context += await getElectricityPrice() + "\n";
