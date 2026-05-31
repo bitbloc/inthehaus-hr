@@ -221,10 +221,15 @@ export async function handleChatCommand(event, client, text, rawText, userId, gr
       context += await getOilPrice() + "\n";
       context += await getElectricityPrice() + "\n";
       context += await getIngredientPrices() + "\n";
-      
+            
       context += `\n[INSTRUCTION: คุณกำลังสรุปข่าวเด่นและข้อมูลต้นทุนที่จำเป็นสำหรับร้านอาหารประเภท Casual Dining Bistro (In The Haus นครพนม) 
       กรุณาตอบกลับโดยใช้ภาษาพูดที่แสนกวนประสาทแต่ขี้อ้อนและขยันสไตล์แมวยูซุ โดยคุณต้องแบ่งข้อมูลออกเป็นหัวข้อหลักๆ และใช้ Tag ครอบไว้ทั้งหมดเพื่อระบบจะนำไปจัดข้อมูลแบบ Flex Message
       **ห้ามใส่ markdown สัญลักษณ์หนาเตอะอย่างพวกลูกสตาร์สองตัว (**) ใน Tag เป็นอันขาด**
+      
+      **กฎเหล็กเรื่องความสดใหม่ของข่าว:**
+      - ห้ามเอาข่าวเก่าในประวัติการแชท (เช่น พายุลูกเห็บถล่มเรณูนคร, จับยาเสพติดล็อตใหญ่) มาสรุปซ้ำเด็ดขาด!
+      - ให้ใช้ข่าวใหม่ของวันนี้ที่อยู่ภายใน [CRITICAL_CONTEXT_DATA] เท่านั้น
+      - หากในข่าวหมวดหมู่ใดระบุว่า "ไม่พบข่าวล่าสุด" หรือไม่มีข่าวใหม่ของวันนี้ ให้แจ้งตรงๆ ว่า "ไม่มีข่าวอัปเดตในพื้นที่นครพนมวันนี้เมี๊ยว~" หรือสลับไปดึงเฉพาะข่าวเด่นระดับประเทศล่าสุดจาก THE STANDARD ของวันนี้แทน ห้ามมโนข่าวเก่าขึ้นมาเป็นอันขาด
       
       โปรดตอบกลับตามโครงสร้างนี้อย่างเคร่งครัด:
       [FLEX_TITLE]หัวข้อรายงานสรุปจากยูซุ เช่น 🐱 สรุปข่าวสารและต้นทุนรายวันโดยน้องยูซุ[/FLEX_TITLE]
@@ -251,7 +256,15 @@ export async function handleChatCommand(event, client, text, rawText, userId, gr
       if (text.includes('อากาศ')) context += formatWeatherMessage(await getSchemaWeather()) + "\n";
     }
 
-    let response = await getGeminiResponse(query, context, history, userId);
+    let filteredHistory = history;
+    if (isNewsOrCostRequest) {
+      filteredHistory = history.filter(msg => {
+        const msgText = msg.parts?.[0]?.text || "";
+        return !msgText.includes('[FLEX_TITLE]') && !msgText.includes('FLEX_NEWS') && !msgText.includes('สรุปข่าวและต้นทุน');
+      });
+    }
+
+    let response = await getGeminiResponse(query, context, filteredHistory, userId);
     let cleanedResponse = response
       .split('[YUZU_LEARNING]')[0]
       .split('[ROSTER_ACTION]')[0]

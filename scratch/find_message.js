@@ -11,14 +11,28 @@ async function test() {
     const { data: messages, error } = await supabase
       .from('yuzu_chat_history')
       .select('*')
-      .ilike('content', '%ชามะลิ%')
+      .ilike('content', '%พายุลูกเห็บ%')
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    console.log("Found messages with 'ชามะลิ':", messages.length);
+    console.log("Found messages with 'พายุลูกเห็บ':", messages.length);
     messages.forEach(msg => {
-      console.log(`[${msg.created_at}] [Role: ${msg.role}] [Type: ${msg.message_type}] [User: ${msg.user_id}]`);
+      console.log(`[${msg.created_at}] [Role: ${msg.role}] [Type: ${msg.message_type}]`);
       console.log(`Content: "${msg.content}"`);
+      console.log("-".repeat(40));
+    });
+
+    console.log("\n=== LATEST 10 CHAT MESSAGES ===");
+    const { data: latest, error: err2 } = await supabase
+      .from('yuzu_chat_history')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(10);
+    
+    if (err2) throw err2;
+    latest.forEach(msg => {
+      console.log(`[${msg.created_at}] [Role: ${msg.role}] [Type: ${msg.message_type}]`);
+      console.log(`Content: "${msg.content.slice(0, 150)}..."`);
       console.log("-".repeat(40));
     });
   } catch (err) {
