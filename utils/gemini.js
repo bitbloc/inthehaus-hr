@@ -253,25 +253,57 @@ export async function classifyAndAnalyzeImage(imageBase64, mimeType = "image/jpe
  */
 export async function getDailySummary(content) {
     if (!content) return "วันนี้ยังไม่มีข้อมูลครับ";
-    try {
-        const instance = getGenAI();
-        const model = instance.getGenerativeModel({ 
-            model: "gemini-3.5-flash",
-            systemInstruction: `คุณคือ "ยูซุ" แมวส้มสรุปงานประจำวันให้ทีม In The Haus
+    
+    const instance = getGenAI();
+    if (!instance) {
+        return "ขออภัยครับ เกิดข้อผิดพลาดในการเชื่อมต่อกับ AI (getGenAI failed)";
+    }
+
+    const models = ["gemini-3.5-flash", "gemini-2.5-flash", "gemini-2.5-pro", "gemini-3-flash-preview"];
+    let lastError = null;
+
+    for (const modelName of models) {
+        let retries = 3;
+        let delay = 1000;
+        
+        while (retries > 0) {
+            try {
+                const model = instance.getGenerativeModel({ 
+                    model: modelName,
+                    systemInstruction: `คุณคือ "ยูซุ" แมวส้มสรุปงานประจำวันให้ทีม In The Haus
 พิมพ์เหมือนคุยกับเพื่อน สั้นกระชับ กวนๆ บ่นๆ ห้ามเป็นทางการ
 ใช้ emoji ที่หลากหลายและเหมาะสมกับบริบท (เช่น ☕️, ✨, 👏, 📝, 🐾, 💖) ไม่จำเป็นต้องใช้หรือแจกปลาทู 🐟 ตลอดเวลา
 ตัวอย่างโทนที่ต้องการ:
 "วันนี้พี่เจมส์มาสาย 15 นาทีอีกแล้ว ยูซุจดไว้หมดนะ 📝 ส่วนพี่มิ้นท์เก่งมาก เข้าตรงเวลาทุกวัน ยูซุรักคักๆ เลยค่ะ ✨ อ้อ แล้ววันนี้ร้อน 36 องศา แต่ลูกค้ายังมาเยอะเลย ขายดีค่ะ เมี๊ยว~"` 
-        });
+                });
 
-        const prompt = `สรุป Log นี้ทีค่ะ:\n\n${content}`;
-        const result = await model.generateContent(prompt);
-        return result.response.text();
-    } catch (error) {
-        console.error("Summary Error:", error);
-        return "ขออภัยครับ สรุปไม่ได้ครับ";
+                const prompt = `สรุป Log นี้ทีค่ะ:\n\n${content}`;
+                const result = await model.generateContent(prompt);
+                return result.response.text();
+            } catch (error) {
+                lastError = error;
+                console.warn(`Summary Error with model ${modelName} (${retries} retries left):`, error);
+                
+                // If it is a 503 (Service Unavailable) or 429 (Too Many Requests), retry after a short delay
+                if (error.status === 503 || error.status === 429) {
+                    retries--;
+                    if (retries > 0) {
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        delay *= 2; // Exponential backoff
+                        continue;
+                    }
+                }
+                
+                // For other errors or if retries run out, move to the next model
+                break;
+            }
+        }
     }
+
+    console.error("All models and retries failed for Daily Summary. Last Error:", lastError);
+    return "ขออภัยครับ สรุปไม่ได้ครับ";
 }
+
 
 /**
  * Generate image and upload to Supabase Storage
