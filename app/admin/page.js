@@ -178,12 +178,8 @@ export default function AdminDashboard() {
             if (l.action_type === 'absent') absent++;
             else if (l.action_type === 'check_in') {
                 workDaysSet.add(l.timestamp.split('T')[0]);
-                const s = data.schedules[selectedEmpId]?.[new Date(l.timestamp).getDay()];
-                if (s?.shifts) {
-                    const [h, m] = s.shifts.start_time.split(':');
-                    const start = new Date(l.timestamp); start.setHours(h, m, 0);
-                    if (differenceInMinutes(new Date(l.timestamp), start) > 15) late++;
-                }
+                const status = getShiftStatus(l);
+                if (status.label.includes('Late')) late++;
             }
         });
         dispatch({ type: 'SET_DATA', payload: { individualStats: { work_days: workDaysSet.size, late, absent } } });
@@ -232,7 +228,10 @@ export default function AdminDashboard() {
         }
         if (activeTab === 'announcements') fetchData('announcements', 'announcements');
         if (activeTab === 'applications') fetchData('job_applications', 'jobApplications');
-        if (activeTab === 'history') fetchIndividualLogs();
+        if (activeTab === 'history') {
+            fetchTransactions();
+            fetchIndividualLogs();
+        }
         if (activeTab === 'orders') fetchOrders();
         if (activeTab === 'reservations') fetchReservations();
     }, [activeTab, selectedMonth]);
@@ -950,11 +949,10 @@ export default function AdminDashboard() {
         const date = new Date(log.timestamp);
         const logDateLocalStr = format(date, 'yyyy-MM-dd');
         
-        // 1. Check roster transaction override first (must be PUBLISHED)
+        // 1. Check roster transaction override first (draft or published)
         const tx = data.transactions?.find(t => 
             String(t.employee_id) === String(log.employee_id) && 
-            t.date === logDateLocalStr &&
-            t.status === 'PUBLISHED'
+            t.date === logDateLocalStr
         );
 
         if (tx) {
