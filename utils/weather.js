@@ -145,7 +145,7 @@ export async function getSchemaWeather(lat = SHOP_LAT, lon = SHOP_LONG) {
                     return blocks.map(b => {
                         const startStr = b.start.toString().padStart(2, '0') + ':00';
                         const endStr = (b.end + 1).toString().padStart(2, '0') + ':00';
-                        return `${startStr} - ${endStr} น.`;
+                        return `${startStr}-${endStr}`;
                     });
                 };
                 
@@ -154,18 +154,18 @@ export async function getSchemaWeather(lat = SHOP_LAT, lon = SHOP_LONG) {
                 hasRain = heavyRainBlocks.length > 0 || lightRainBlocks.length > 0;
                 
                 if (heavyRainBlocks.length > 0) {
-                    rainBlocksText.push(...heavyRainBlocks.map(b => `🌧️ ตกหนัก: ${b}`));
+                    rainBlocksText.push(`🌧️ ตกหนัก: ${heavyRainBlocks.join(', ')} น.`);
                 }
                 if (lightRainBlocks.length > 0) {
-                    rainBlocksText.push(...lightRainBlocks.map(b => `🌦️ ตกปรอยๆ: ${b}`));
+                    rainBlocksText.push(`🌦️ ตกปรอยๆ: ${lightRainBlocks.join(', ')} น.`);
                 }
                 
                 if (heavyRainBlocks.length > 0 && lightRainBlocks.length > 0) {
-                    employeeAdvice = `วันนี้ระวังฝนตกหนักช่วง ${heavyRainBlocks.join(' และ ')} และอาจมีฝนตกปรอยๆ ช่วง ${lightRainBlocks.join(' และ ')} อย่าลืมเตรียมร่ม/เสื้อกันฝนหนาๆ และเผื่อเวลาเดินทางด้วยนะครับ ⛈️`;
+                    employeeAdvice = `วันนี้ระวังฝนตกหนักและตกปรอยๆ ในบางช่วง อย่าลืมเตรียมร่ม/เสื้อกันฝน และเผื่อเวลาเดินทางด้วยนะครับ ⛈️`;
                 } else if (heavyRainBlocks.length > 0) {
-                    employeeAdvice = `วันนี้คาดว่าจะมีฝนตกหนักช่วง ${heavyRainBlocks.join(' และ ')} พกร่มหรือเสื้อกันฝนแบบหนา และวางแผนเผื่อเวลาในการเดินทางเข้า/เลิกงานด้วยนะ 🌧️`;
+                    employeeAdvice = `วันนี้คาดว่าจะมีฝนตกหนักในบางช่วง พกร่มหรือเสื้อกันฝนแบบหนา และวางแผนเผื่อเวลาในการเดินทางด้วยนะ 🌧️`;
                 } else if (lightRainBlocks.length > 0) {
-                    employeeAdvice = `วันนี้คาดว่าจะมีฝนตกปรอยๆ/มีละอองฝนช่วง ${lightRainBlocks.join(' และ ')} พกร่มหรือเสื้อกันฝนติดตัวไว้กันเหนียวด้วยนะครับ 🌦️`;
+                    employeeAdvice = `วันนี้คาดว่าจะมีฝนตกปรอยๆ/มีละอองฝนในบางช่วง พกร่มหรือเสื้อกันฝนติดตัวไว้ด้วยนะครับ 🌦️`;
                 } else {
                     employeeAdvice = `วันนี้ไม่มีฝนตก ท้องฟ้าค่อนข้างแจ่มใส ☀️`;
                 }
@@ -289,7 +289,7 @@ export async function getSchemaWeather(lat = SHOP_LAT, lon = SHOP_LONG) {
                 return blocks.map(b => {
                     const startStr = b.start.toString().padStart(2, '0') + ':00';
                     const endStr = (b.end + 1).toString().padStart(2, '0') + ':00';
-                    return `${startStr} - ${endStr} น.`;
+                    return `${startStr}-${endStr}`;
                 });
             };
 
@@ -298,18 +298,18 @@ export async function getSchemaWeather(lat = SHOP_LAT, lon = SHOP_LONG) {
             hasRain = heavyRainBlocks.length > 0 || lightRainBlocks.length > 0;
 
             if (heavyRainBlocks.length > 0) {
-                rainBlocksText.push(...heavyRainBlocks.map(b => `🌧️ ตกหนัก: ${b}`));
+                rainBlocksText.push(`🌧️ ตกหนัก: ${heavyRainBlocks.join(', ')} น.`);
             }
             if (lightRainBlocks.length > 0) {
-                rainBlocksText.push(...lightRainBlocks.map(b => `🌦️ ตกปรอยๆ: ${b}`));
+                rainBlocksText.push(`🌦️ ตกปรอยๆ: ${lightRainBlocks.join(', ')} น.`);
             }
 
             if (heavyRainBlocks.length > 0 && lightRainBlocks.length > 0) {
-                employeeAdvice = `วันนี้ระวังฝนตกหนักช่วง ${heavyRainBlocks.join(' และ ')} และอาจมีฝนตกปรอยๆ ช่วง ${lightRainBlocks.join(' และ ')} อย่าลืมเตรียมร่ม/เสื้อกันฝนหนาๆ และเผื่อเวลาเดินทางด้วยนะครับ ⛈️`;
+                employeeAdvice = `วันนี้ระวังฝนตกหนักและตกปรอยๆ ในบางช่วง อย่าลืมเตรียมร่ม/เสื้อกันฝน และเผื่อเวลาเดินทางด้วยนะครับ ⛈️`;
             } else if (heavyRainBlocks.length > 0) {
-                employeeAdvice = `วันนี้คาดว่าจะมีฝนตกหนักช่วง ${heavyRainBlocks.join(' และ ')} พกร่มหรือเสื้อกันฝนแบบหนา และวางแผนเผื่อเวลาในการเดินทางเข้า/เลิกงานด้วยนะ 🌧️`;
+                employeeAdvice = `วันนี้คาดว่าจะมีฝนตกหนักในบางช่วง พกร่มหรือเสื้อกันฝนแบบหนา และวางแผนเผื่อเวลาในการเดินทางด้วยนะ 🌧️`;
             } else if (lightRainBlocks.length > 0) {
-                employeeAdvice = `วันนี้คาดว่าจะมีฝนตกปรอยๆ/มีละอองฝนช่วง ${lightRainBlocks.join(' และ ')} พกร่มหรือเสื้อกันฝนติดตัวไว้กันเหนียวด้วยนะครับ 🌦️`;
+                employeeAdvice = `วันนี้คาดว่าจะมีฝนตกปรอยๆ/มีละอองฝนในบางช่วง พกร่มหรือเสื้อกันฝนติดตัวไว้ด้วยนะครับ 🌦️`;
             } else {
                 employeeAdvice = `วันนี้ไม่มีฝนตก ท้องฟ้าค่อนข้างแจ่มใส ☀️`;
             }
