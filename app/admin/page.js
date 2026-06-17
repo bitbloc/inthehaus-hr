@@ -69,7 +69,16 @@ export default function AdminDashboard() {
             setIsAuthenticated(true);
         }
         setIsCheckingAuth(false);
+        const stored = localStorage.getItem("dismissed_draft_weeks");
+        if (stored) {
+            try {
+                setDismissedDraftWeeks(JSON.parse(stored));
+            } catch (e) {
+                console.error(e);
+            }
+        }
     }, []);
+
 
 
     // UI Local State
@@ -91,6 +100,8 @@ export default function AdminDashboard() {
     const [editingAnnouncement, setEditingAnnouncement] = useState(null); // for edit modal
     const [announcementPriority, setAnnouncementPriority] = useState(1);
     const [showAllLogs, setShowAllLogs] = useState(false);
+    const [dismissedDraftWeeks, setDismissedDraftWeeks] = useState([]);
+
 
     // Admin Leave Creation State
     const [showAdminLeaveModal, setShowAdminLeaveModal] = useState(false);
@@ -1015,6 +1026,7 @@ export default function AdminDashboard() {
                 const txDate = parseISO(tx.date);
                 const mon = startOfWeek(txDate, { weekStartsOn: 1 });
                 const monStr = format(mon, 'yyyy-MM-dd');
+                if (dismissedDraftWeeks.includes(monStr)) return;
                 if (!weeks[monStr]) {
                     const sun = addDays(mon, 6);
                     weeks[monStr] = {
@@ -1027,7 +1039,8 @@ export default function AdminDashboard() {
             }
         });
         return Object.values(weeks).sort((a, b) => a.start.localeCompare(b.start));
-    }, [data.transactions]);
+    }, [data.transactions, dismissedDraftWeeks]);
+
 
     const handleLogin = (e) => {
         e.preventDefault();
@@ -1099,6 +1112,13 @@ export default function AdminDashboard() {
             alert("เกิดข้อผิดพลาด: " + e.message);
         }
     };
+
+    const handleDismissDraftWeek = (weekStart) => {
+        const updated = [...dismissedDraftWeeks, weekStart];
+        setDismissedDraftWeeks(updated);
+        localStorage.setItem("dismissed_draft_weeks", JSON.stringify(updated));
+    };
+
 
     const navigationCategories = [
         {
@@ -1382,7 +1402,7 @@ export default function AdminDashboard() {
 
                             {/* Draft Schedules Warning Card */}
                             {draftWeeks.map(week => (
-                                <div key={week.start} className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/30 rounded-3xl p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-sm hover:shadow transition-all animate-fade-in-up">
+                                <div key={week.start} className="relative bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/30 rounded-3xl p-5 pr-12 sm:pr-14 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-sm hover:shadow transition-all animate-fade-in-up">
                                     <div className="flex gap-3">
                                         <div className="w-10 h-10 bg-amber-500/20 rounded-2xl flex items-center justify-center text-amber-700 shrink-0">
                                             <Icons.Alert size={20} />
@@ -1400,8 +1420,34 @@ export default function AdminDashboard() {
                                     >
                                         อนุมัติ & ประกาศ LINE
                                     </button>
+                                    <button
+                                        onClick={() => handleDismissDraftWeek(week.start)}
+                                        className="absolute top-4 right-4 p-1.5 rounded-xl text-amber-600 hover:text-amber-800 hover:bg-amber-500/20 transition-all"
+                                        title="ซ่อนคำเตือนนี้"
+                                    >
+                                        <Icons.X size={16} />
+                                    </button>
                                 </div>
                             ))}
+
+                            {/* Restore dismissed draft alerts */}
+                            {dismissedDraftWeeks.length > 0 && (
+                                <div className="flex justify-end pr-2">
+                                    <button
+                                        onClick={() => {
+                                            setDismissedDraftWeeks([]);
+                                            localStorage.removeItem("dismissed_draft_weeks");
+                                        }}
+                                        className="text-xs font-bold text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200/80 px-4 py-2.5 rounded-2xl transition-all shadow-sm flex items-center gap-1.5"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3.5 h-3.5">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                                        </svg>
+                                        แสดงตารางงานร่างที่ซ่อนไว้ ({dismissedDraftWeeks.length})
+                                    </button>
+                                </div>
+                            )}
+
 
                             {/* Quick Stats */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
