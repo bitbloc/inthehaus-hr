@@ -208,9 +208,9 @@ function formatLeaveRequestBubble(l, isHistory = false) {
 export async function handleRosterCommand(event, client, text, rawText, userId) {
   if (text === 'stcalendar' || text === 'ตารางทั้งสัปดาห์' || text === 'วีคนี้' || text.includes('calendar')) {
     const today = addHours(new Date(), 7);
+    const todayDateStr = format(today, 'yyyy-MM-dd');
     const startOfThisWeek = startOfWeek(today, { weekStartsOn: 1 });
     const tomorrow = addDays(today, 1);
-    const tomorrowDateStr = format(tomorrow, 'yyyy-MM-dd');
     const start = startOfWeek(tomorrow, { weekStartsOn: 1 }); // Monday of tomorrow's week
     const isNextWeek = format(start, 'yyyy-MM-dd') > format(startOfThisWeek, 'yyyy-MM-dd');
     const titleText = isNextWeek ? '📅 ตารางงานสัปดาห์หน้า' : '📅 ตารางงานสัปดาห์นี้';
@@ -218,15 +218,13 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
     const daysTitle = ["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์"];
     
     const contents = [];
-    contents.push({ type: 'text', text: titleText, weight: 'bold', size: 'xl', color: '#1DB446', align: 'center' });
-    contents.push({ type: 'separator', margin: 'md' });
 
     for (let i = 0; i < 7; i++) {
       const currentDay = addDays(start, i);
       const currentDayStr = format(currentDay, 'yyyy-MM-dd');
       
-      // Skip past days and today
-      if (currentDayStr < tomorrowDateStr) {
+      // Skip past days (but keep today!)
+      if (currentDayStr < todayDateStr) {
         continue;
       }
       
@@ -237,10 +235,10 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
 
       if (workingRoster.length > 0) {
         contents.push({
-          type: 'box', layout: 'horizontal', margin: 'lg',
+          type: 'box', layout: 'horizontal', margin: 'md',
           contents: [
-            { type: 'text', text: `${daysTitle[dayIndex]} ${dateStr}`, weight: 'bold', size: 'sm', color: '#333333', flex: 2 },
-            { type: 'text', text: `${workingRoster.length} คน`, size: 'xs', color: '#555555', align: 'end', flex: 1 }
+            { type: 'text', text: `📅 ${daysTitle[dayIndex]} ${dateStr}`, weight: 'bold', size: 'sm', color: '#1e293b', flex: 1 },
+            { type: 'text', text: `👥 ${workingRoster.length} คน`, size: 'xs', color: '#64748b', align: 'end', weight: 'bold' }
           ]
         });
         workingRoster.forEach(emp => {
@@ -249,36 +247,74 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
           const shiftStart = emp.shift?.start_time?.slice(0,5) || '';
           const shiftEnd = emp.shift?.end_time?.slice(0,5) || '';
           const shiftName = emp.shift?.name || 'Custom';
-          const timeStr = shiftStart && shiftEnd ? ` (${shiftStart}-${shiftEnd})` : shiftStart ? ` (${shiftStart})` : '';
           
           const colorHex = getShiftColorHex(shiftName, isOff, isCustomOrExtra);
 
           const displayTime = shiftStart && shiftEnd ? `${shiftStart}-${shiftEnd}` : shiftStart || '';
           contents.push({
             type: 'box', layout: 'horizontal', margin: 'xs',
+            paddingStart: '12px',
             contents: [
-              { type: 'text', text: `• ${emp.nickname || emp.name}`, size: 'xs', color: '#333333', flex: 3 },
+              { type: 'text', text: `👤 ${emp.nickname || emp.name}`, size: 'xs', color: '#334155', flex: 3 },
               { type: 'text', text: displayTime, size: 'xs', color: colorHex, align: 'end', flex: 2, weight: 'bold' }
             ]
           });
         });
-        contents.push({ type: 'separator', margin: 'sm' });
+        contents.push({ type: 'separator', margin: 'md', color: '#e2e8f0' });
       } else {
          contents.push({
-          type: 'box', layout: 'horizontal', margin: 'lg',
+          type: 'box', layout: 'horizontal', margin: 'md',
           contents: [
-            { type: 'text', text: `${daysTitle[dayIndex]} ${dateStr}`, weight: 'bold', size: 'sm', color: '#333333', flex: 2 },
-            { type: 'text', text: `ไม่มีคนเข้ากะ`, size: 'xs', color: '#555555', align: 'end', flex: 1 }
+            { type: 'text', text: `📅 ${daysTitle[dayIndex]} ${dateStr}`, weight: 'bold', size: 'sm', color: '#64748b', flex: 1 },
+            { type: 'text', text: `ไม่มีคนเข้ากะ 😴`, size: 'xs', color: '#94a3b8', align: 'end' }
           ]
         });
-        contents.push({ type: 'separator', margin: 'sm' });
+        contents.push({ type: 'separator', margin: 'md', color: '#e2e8f0' });
       }
     }
+
+    if (contents.length > 0 && contents[contents.length - 1].type === 'separator') {
+      contents.pop();
+    }
+
+    const flexBubble = {
+      type: 'bubble',
+      size: 'mega',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: '#0b8a4f',
+        paddingAll: '16px',
+        contents: [
+          {
+            type: 'text',
+            text: titleText,
+            weight: 'bold',
+            size: 'lg',
+            color: '#ffffff'
+          },
+          {
+            type: 'text',
+            text: isNextWeek ? 'ตารางเวรการทำงานล่วงหน้าสำหรับสัปดาห์หน้า' : 'ตารางเวรการทำงานสำหรับสัปดาห์นี้',
+            size: 'xs',
+            color: '#a7f3d0',
+            margin: 'xs'
+          }
+        ]
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        paddingAll: '16px',
+        spacing: 'md',
+        contents: contents
+      }
+    };
 
     await client.replyMessage(event.replyToken, {
       type: 'flex',
       altText: titleText,
-      contents: { type: 'bubble', size: 'mega', body: { type: 'box', layout: 'vertical', contents: contents } }
+      contents: flexBubble
     });
     return true;
   }
