@@ -73,7 +73,7 @@ export default function WeatherCard({ latitude, longitude, locationName = "Curre
         <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="w-full max-w-sm z-10 mb-4 px-6"
+            className="w-full z-10 mb-4"
         >
             <div className="relative bg-rams-panel border border-rams-rule-light p-4 overflow-hidden rounded-sm">
                 {loading ? (

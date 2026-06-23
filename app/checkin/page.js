@@ -655,7 +655,7 @@ export default function CheckIn() {
           <motion.div
             initial={{ opacity: 0, y: 5 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mt-6 mx-6 w-full max-w-sm z-10"
+            className="mt-6 w-full max-w-sm px-6 z-10"
           >
             <div className="flex items-center justify-between px-5 py-3 bg-rams-panel border border-rams-rule-light rounded-sm shadow-none">
               <div className="flex items-center gap-3">
@@ -757,9 +757,8 @@ export default function CheckIn() {
                     key={`fixed-${a.id}`}
                     initial={{ opacity: 0, y: 5 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="w-full bg-rams-panel border border-rams-rule-light p-4 shadow-none flex items-start gap-3.5 relative overflow-hidden rounded-sm"
+                    className="w-full bg-rams-panel border border-rams-rule-light p-4 shadow-none flex items-start gap-3.5 rounded-sm"
                   >
-                    <div className="absolute top-0 left-0 w-1.5 h-full bg-rams-orange" />
                     <div className="text-lg shrink-0 mt-0.5 select-none">📌</div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 mb-1.5">
@@ -801,9 +800,8 @@ export default function CheckIn() {
                       initial={{ opacity: 0, scale: 0.98 }}
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.98, height: 0, marginBottom: 0, padding: 0 }}
-                      className="w-full bg-rams-panel border border-rams-rule-light p-4 shadow-none flex items-start gap-3.5 relative overflow-hidden rounded-sm transition-all"
+                      className="w-full bg-rams-panel border border-rams-rule-light p-4 shadow-none flex items-start gap-3.5 rounded-sm transition-all"
                     >
-                      <div className={`absolute top-0 left-0 w-1.5 h-full ${accentColor}`} />
                       <div className="text-lg shrink-0 mt-0.5 select-none">{isUrgent ? '🚨' : '📢'}</div>
                       <div className="flex-1 min-w-0 pr-6">
                         <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
