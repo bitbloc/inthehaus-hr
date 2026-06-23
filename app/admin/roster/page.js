@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { Badge } from '../_components/ui/Badge';
 import { supabase } from '../../../lib/supabaseClient';
 import { startOfWeek, endOfWeek, addDays, format, subWeeks, addWeeks, parseISO } from 'date-fns';
 import { ChevronLeft, ChevronRight, Copy, CheckCircle, Save, Plus, Trash2, Printer } from 'lucide-react';
@@ -655,92 +656,92 @@ export default function AdminRosterPage() {
     };
 
     return (
-        <div className="p-6 max-w-7xl mx-auto space-y-6">
+        <div className="p-6 max-w-7xl mx-auto space-y-6 text-rams-ink font-sans min-h-screen bg-rams-bg selection:bg-rams-ink/10">
             <div className="mb-2">
-                <a href="/admin" className="text-sm text-gray-500 hover:text-gray-800 flex items-center gap-1 w-fit transition-colors">
-                    <ChevronLeft size={16} /> กลับสู่หน้าแดชบอร์ดหลัก
+                <a href="/admin" className="text-xs font-mono font-bold text-rams-ink-muted hover:text-rams-ink flex items-center gap-1.5 w-fit transition-colors uppercase tracking-wider">
+                    <ChevronLeft size={14} /> กลับสู่หน้าแดชบอร์ดหลัก
                 </a>
             </div>
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-rams-panel p-5 rounded-sm border border-rams-rule shadow-none">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-800">จัดการตารางงาน (Matrix View)</h1>
-                    <p className="text-gray-500 text-sm">จัดกะการทำงานรองรับแบบยืดหยุ่น ข้ามวัน และกะควบ</p>
+                    <h1 className="text-lg font-mono font-bold tracking-wider text-rams-ink uppercase">จัดการตารางงาน (Matrix View)</h1>
+                    <p className="text-[10px] font-mono uppercase tracking-widest text-rams-ink-muted mt-1.5">จัดกะการทำงานรองรับแบบยืดหยุ่น ข้ามวัน และกะควบ</p>
                 </div>
                 
-                <div className="flex gap-2">
-                    <button onClick={copyLastWeek} className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors">
-                        <Copy size={16} /> Copy from Last Week
+                <div className="flex flex-wrap gap-2">
+                    <button onClick={copyLastWeek} className="flex items-center gap-2 px-4 py-2 bg-rams-bg hover:bg-rams-ink-muted/10 text-rams-ink rounded-sm border border-rams-rule-light text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer">
+                        <Copy size={14} className="text-rams-ink-muted" /> Copy from Last Week
                     </button>
                     <a 
                         href={`/admin/roster/report?start=${format(weekStart, 'yyyy-MM-dd')}`} 
                         target="_blank"
-                        className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-black text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
+                        className="flex items-center gap-2 px-4 py-2 bg-rams-bg hover:bg-rams-ink-muted/10 text-rams-ink rounded-sm border border-rams-rule-light text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer"
                     >
-                        <Printer size={16} /> Export PDF
+                        <Printer size={14} className="text-rams-ink-muted" /> Export PDF
                     </a>
-                    <button onClick={publishWeek} className="flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-medium shadow-sm transition-colors">
-                        <CheckCircle size={16} /> Publish & Notify
+                    <button onClick={publishWeek} className="flex items-center gap-2 px-4 py-2 bg-rams-orange hover:bg-rams-orange-active text-rams-panel rounded-sm border border-rams-rule text-xs font-mono font-bold uppercase tracking-wider shadow-[0_2px_0_0_var(--color-rams-rule)] active:translate-y-[1px] active:shadow-none transition-all cursor-pointer">
+                        <CheckCircle size={14} /> Publish & Notify
                     </button>
                 </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="flex items-center justify-between p-4 border-b border-gray-100">
-                    <button onClick={prevWeek} className="p-2 hover:bg-gray-100 rounded-full transition-colors"><ChevronLeft /></button>
-                    <h2 className="text-lg font-semibold text-gray-700">
+            <div className="bg-rams-panel border border-rams-rule rounded-sm overflow-hidden shadow-none">
+                <div className="flex items-center justify-between p-4 border-b border-rams-rule-light bg-rams-bg/30">
+                    <button onClick={prevWeek} className="w-8 h-8 bg-rams-panel border border-rams-rule-light hover:border-rams-rule text-rams-ink flex items-center justify-center rounded-sm transition-all cursor-pointer"><ChevronLeft size={16} /></button>
+                    <h2 className="text-sm font-mono font-bold text-rams-ink uppercase tracking-wider">
                         {format(weekStart, 'dd MMM yyyy')} - {format(weekEnd, 'dd MMM yyyy')}
                     </h2>
-                    <button onClick={nextWeek} className="p-2 hover:bg-gray-100 rounded-full transition-colors"><ChevronRight /></button>
+                    <button onClick={nextWeek} className="w-8 h-8 bg-rams-panel border border-rams-rule-light hover:border-rams-rule text-rams-ink flex items-center justify-center rounded-sm transition-all cursor-pointer"><ChevronRight size={16} /></button>
                 </div>
 
                 <div className="overflow-x-auto">
                     {loading ? (
-                        <div className="p-12 text-center text-gray-500">Loading roster...</div>
+                        <div className="p-12 text-center font-mono text-xs text-rams-ink-muted uppercase tracking-wider">Loading roster...</div>
                     ) : (
-                        <table className="w-full text-sm text-left">
-                            <thead className="bg-gray-50 text-gray-600">
+                        <table className="w-full text-xs text-left">
+                            <thead className="bg-rams-bg/50 text-rams-ink-muted border-b border-rams-rule-light font-mono text-[9px] uppercase tracking-widest">
                                 <tr>
-                                    <th className="px-4 py-3 font-semibold border-b border-gray-200 min-w-[150px]">พนักงาน</th>
+                                    <th className="px-4 py-3 min-w-[150px]">พนักงาน</th>
                                     {dates.map((date, i) => (
-                                        <th key={i} className="px-4 py-3 font-semibold border-b border-gray-200 text-center min-w-[140px]">
-                                            <div className="text-xs text-black font-semibold">{daysTitle[i]}</div>
-                                            <div className="text-black font-bold">{format(date, 'dd/MM')}</div>
+                                        <th key={i} className="px-4 py-3 text-center min-w-[140px] border-l border-rams-rule-light">
+                                            <div className="text-[9px] font-mono text-rams-ink-muted uppercase tracking-widest">{daysTitle[i]}</div>
+                                            <div className="font-mono font-bold text-[11px] text-rams-ink mt-0.5">{format(date, 'dd/MM')}</div>
                                         </th>
                                     ))}
                                 </tr>
                             </thead>
-                            <tbody>
+                            <tbody className="divide-y divide-rams-rule-light">
                                 {employees.map(emp => (
-                                    <tr key={emp.id} className="border-b border-gray-100 hover:bg-gray-50">
-                                        <td className="px-4 py-3 font-medium text-gray-800">
+                                    <tr key={emp.id} className="hover:bg-rams-bg/30 text-rams-ink">
+                                        <td className="px-4 py-3 font-bold border-b border-rams-rule-light">
                                             {emp.nickname || emp.name}
-                                            <div className="text-xs text-black font-medium">{emp.position}</div>
+                                            <div className="text-[10px] font-mono text-rams-ink-muted uppercase tracking-wider mt-0.5">{emp.position}</div>
                                         </td>
                                         {dates.map((date, i) => {
                                             const slots = getCellSlots(emp.id, date);
                                             const dateStr = format(date, 'yyyy-MM-dd');
                                             const empLeaves = leaveRequests.filter(l => l.employee_id === emp.id && l.leave_date === dateStr);
                                             return (
-                                                <td key={i} className="px-2 py-2 border-l border-gray-100 align-top">
+                                                <td key={i} className="px-2 py-2 border-l border-rams-rule-light align-top bg-rams-panel/50">
                                                     <div 
-                                                        className="h-full min-h-[60px] w-full rounded-md border border-dashed border-gray-200 hover:border-blue-400 hover:bg-blue-50 cursor-pointer p-1 space-y-1 transition-colors flex flex-col"
+                                                        className="h-full min-h-[65px] w-full rounded-sm border border-dashed border-rams-rule-light hover:border-rams-rule hover:bg-rams-bg cursor-pointer p-1 space-y-1 transition-all flex flex-col"
                                                         onClick={() => openCellModal(emp, date)}
                                                     >
-                                                        {slots.length === 0 && empLeaves.length === 0 && <span className="text-gray-300 text-xs m-auto block text-center">+</span>}
+                                                        {slots.length === 0 && empLeaves.length === 0 && <span className="text-rams-ink-muted/50 font-mono text-xs m-auto block text-center">+</span>}
                                                         
                                                         {/* Leave Request Badges */}
                                                         {empLeaves.map((l, idx) => {
-                                                            let badgeColor = 'bg-amber-50 border-amber-250 text-amber-800';
+                                                            let badgeColor = 'bg-rams-amber/10 border-rams-amber/30 text-rams-amber';
                                                             let label = `⏳ ขอลา${l.leave_type === 'sick' ? 'ป่วย' : l.leave_type === 'business' ? 'กิจ' : 'พักร้อน'}`;
                                                             if (l.status === 'approved') {
-                                                                badgeColor = 'bg-green-50 border-green-250 text-green-800';
+                                                                badgeColor = 'bg-rams-green/10 border-rams-green/30 text-rams-green';
                                                                 label = `✅ ลา${l.leave_type === 'sick' ? 'ป่วย' : l.leave_type === 'business' ? 'กิจ' : 'พักร้อน'}`;
                                                             } else if (l.status === 'rejected') {
-                                                                badgeColor = 'bg-rose-50 border-rose-250 text-rose-800';
+                                                                badgeColor = 'bg-rams-red/10 border-rams-red/30 text-rams-red';
                                                                 label = `❌ ปฏิเสธลา${l.leave_type === 'sick' ? 'ป่วย' : l.leave_type === 'business' ? 'กิจ' : 'พักร้อน'}`;
                                                             }
                                                             return (
-                                                                <div key={`leave-${idx}`} className={`p-1 rounded text-[10px] font-bold border ${badgeColor} text-center`}>
+                                                                <div key={`leave-${idx}`} className={`p-1 rounded-sm text-[9px] font-mono font-bold border ${badgeColor} text-center uppercase tracking-wider`}>
                                                                     {label}
                                                                 </div>
                                                             );
@@ -767,11 +768,11 @@ export default function AdminRosterPage() {
                                                                 : (matchedPreset ? `${matchedPreset.icon || '⏰'} ${matchedPreset.name}` : (shiftObj?.name || 'Custom'));
 
                                                             return (
-                                                                    <div key={idx} className={`p-1.5 rounded text-xs border ${bgColor} ${s.status === 'DRAFT' ? 'border-dashed border-2' : ''}`}>
-                                                                        <div className="font-semibold">{cellLabel}</div>
-                                                                        {!s.is_off && <div className="text-[10px] font-bold text-black mt-0.5">{timeStr}</div>}
-                                                                        {s.slot_type !== 'MAIN' && <div className="text-[9px] uppercase font-bold tracking-wider opacity-60 mt-0.5">{s.slot_type}</div>}
-                                                                    </div>
+                                                                <div key={idx} className={`p-1.5 rounded-sm text-[10px] font-mono border ${bgColor} ${s.status === 'DRAFT' ? 'border-dashed border-2' : ''}`}>
+                                                                    <div className="font-bold">{cellLabel}</div>
+                                                                    {!s.is_off && <div className="text-[9px] font-bold text-rams-ink/80 mt-0.5">{timeStr}</div>}
+                                                                    {s.slot_type !== 'MAIN' && <div className="text-[9px] uppercase font-bold tracking-wider opacity-60 mt-0.5">{s.slot_type}</div>}
+                                                                </div>
                                                             )
                                                         })}
                                                     </div>
@@ -787,26 +788,26 @@ export default function AdminRosterPage() {
             </div>
 
             {/* Section: Leave Requests of the Week */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+            <div className="bg-rams-panel rounded-sm border border-rams-rule p-5 space-y-4 shadow-none">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
-                        <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                        <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-rams-ink flex items-center gap-2">
                             <span>📝</span> ข้อมูลการลาหยุดสัปดาห์นี้ ({leaveRequests.length} รายการ)
                         </h2>
-                        <p className="text-xs text-gray-500 font-medium">จัดการ อนุมัติ ปรับรายละเอียดการลา และซิงค์เข้าสู่ตารางเวร roster โดยตรง</p>
+                        <p className="text-[10px] text-rams-ink-muted">จัดการ อนุมัติ ปรับรายละเอียดการลา และซิงค์เข้าสู่ตารางเวร roster โดยตรง</p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                         {selectedLeaveIds.length > 0 && (
                             <button
                                 type="button"
                                 onClick={handleDeleteMultipleLeaves}
-                                className="flex items-center gap-2 px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-800 border border-rose-200 rounded-lg text-xs font-bold transition-all shadow-sm"
+                                className="flex items-center gap-2 px-3 py-1.5 bg-rams-red/10 hover:bg-rams-red/20 text-rams-red border border-rams-red/30 rounded-sm text-xs font-mono font-bold uppercase tracking-wider transition-all shadow-none cursor-pointer"
                             >
                                 🗑️ ลบใบลาที่เลือก ({selectedLeaveIds.length})
                             </button>
                         )}
                         {leaveRequests.length > 0 && (
-                            <label className="flex items-center gap-1.5 px-3 py-2 bg-gray-50 hover:bg-gray-100 border border-gray-250 rounded-lg text-xs font-bold transition-all shadow-sm cursor-pointer select-none">
+                            <label className="flex items-center gap-1.5 px-3 py-1.5 bg-rams-bg hover:bg-rams-panel border border-rams-rule-light rounded-sm text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer select-none">
                                 <input
                                     type="checkbox"
                                     checked={leaveRequests.length > 0 && selectedLeaveIds.length === leaveRequests.length}
@@ -817,7 +818,7 @@ export default function AdminRosterPage() {
                                             setSelectedLeaveIds([]);
                                         }
                                     }}
-                                    className="w-3.5 h-3.5 rounded text-blue-600 focus:ring-blue-500 border-gray-300"
+                                    className="w-3 h-3 rounded-sm border-rams-rule bg-rams-bg accent-rams-orange focus:ring-0 cursor-pointer"
                                 />
                                 เลือกทั้งหมด
                             </label>
@@ -826,7 +827,7 @@ export default function AdminRosterPage() {
                             <button 
                                 type="button"
                                 onClick={syncAllApprovedLeaves}
-                                className="flex items-center gap-2 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 hover:text-blue-800 border border-blue-200 rounded-lg text-xs font-bold transition-all shadow-sm"
+                                className="flex items-center gap-2 px-3 py-1.5 bg-rams-panel hover:bg-rams-bg text-rams-ink border border-rams-rule rounded-sm text-xs font-mono font-bold uppercase tracking-wider transition-all shadow-none cursor-pointer"
                             >
                                 🔄 ซิงค์ใบลาที่อนุมัติแล้วทั้งหมดเข้าตาราง
                             </button>
@@ -835,7 +836,7 @@ export default function AdminRosterPage() {
                 </div>
                 
                 {leaveRequests.length === 0 ? (
-                    <div className="text-center py-8 text-gray-400 text-sm font-medium bg-gray-50/50 rounded-xl border border-dashed border-gray-200">
+                    <div className="text-center py-8 text-rams-ink-muted text-xs font-mono uppercase tracking-wider bg-rams-bg rounded-sm border border-dashed border-rams-rule-light">
                         ไม่มีคำขอลาหยุดในสัปดาห์นี้
                     </div>
                 ) : (
@@ -843,9 +844,9 @@ export default function AdminRosterPage() {
                         {leaveRequests.map((req) => {
                             const isEditing = editingLeaveId === req.id;
                             return (
-                                <div key={req.id} className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden flex flex-col transition-all hover:shadow-md">
+                                <div key={req.id} className="bg-rams-panel border border-rams-rule-light rounded-sm shadow-none overflow-hidden flex flex-col transition-all">
                                     {/* Card Header */}
-                                    <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+                                    <div className="px-4 py-3 bg-rams-bg border-b border-rams-rule-light flex justify-between items-center">
                                         <div className="flex items-center gap-2.5">
                                             <input 
                                                 type="checkbox"
@@ -857,31 +858,25 @@ export default function AdminRosterPage() {
                                                         setSelectedLeaveIds(selectedLeaveIds.filter(id => id !== req.id));
                                                     }
                                                 }}
-                                                className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-gray-300 cursor-pointer"
+                                                className="w-3.5 h-3.5 rounded-sm border-rams-rule bg-rams-bg accent-rams-orange focus:ring-0 cursor-pointer"
                                             />
                                             <div>
-                                                <div className="font-bold text-gray-800">{req.employees?.nickname || req.employees?.name}</div>
-                                                <div className="text-[10px] text-gray-500 font-bold">{req.employees?.position || 'พนักงาน'}</div>
+                                                <div className="font-bold text-rams-ink">{req.employees?.nickname || req.employees?.name}</div>
+                                                <div className="text-[9px] text-rams-ink-muted font-mono font-bold uppercase tracking-widest">{req.employees?.position || 'พนักงาน'}</div>
                                             </div>
                                         </div>
-                                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-black tracking-wide uppercase border ${
-                                            req.status === 'approved' 
-                                                ? 'bg-emerald-50 text-emerald-700 border-emerald-250' 
-                                                : req.status === 'rejected' 
-                                                    ? 'bg-rose-50 text-rose-700 border-rose-250' 
-                                                    : 'bg-amber-50 text-amber-700 border-amber-250'
-                                        }`}>
+                                        <Badge color={req.status === 'approved' ? 'emerald' : req.status === 'rejected' ? 'rose' : 'amber'}>
                                             {req.status === 'approved' ? 'อนุมัติแล้ว' : req.status === 'rejected' ? 'ปฏิเสธแล้ว' : 'รออนุมัติ'}
-                                        </span>
+                                        </Badge>
                                     </div>
                                     
                                     {/* Card Body */}
-                                    <div className="p-4 flex-1 space-y-3 text-xs text-gray-700">
+                                    <div className="p-4 flex-1 space-y-3 text-xs text-rams-ink">
                                         {isEditing ? (
                                             <div className="space-y-3">
                                                 <div className="grid grid-cols-2 gap-2">
                                                     <div>
-                                                        <label className="block text-[10px] font-bold text-gray-500 mb-1">วันที่เริ่มลา</label>
+                                                        <label className="block text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1">วันที่เริ่มลา</label>
                                                         <input 
                                                             type="date"
                                                             value={leaveForm.startDate}
@@ -890,26 +885,26 @@ export default function AdminRosterPage() {
                                                                 startDate: e.target.value,
                                                                 endDate: leaveForm.endDate < e.target.value ? e.target.value : leaveForm.endDate 
                                                             })}
-                                                            className="w-full border border-gray-300 rounded-lg p-2 text-xs text-gray-900 bg-white outline-none focus:ring-2 focus:ring-blue-500"
+                                                            className="w-full border border-rams-rule-light rounded-sm p-2 text-xs font-mono text-rams-ink bg-rams-bg outline-none focus:border-rams-rule"
                                                         />
                                                     </div>
                                                     <div>
-                                                        <label className="block text-[10px] font-bold text-gray-500 mb-1">วันสิ้นสุด</label>
+                                                        <label className="block text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1">วันสิ้นสุด</label>
                                                         <input 
                                                             type="date"
                                                             value={leaveForm.endDate}
                                                             onChange={e => setLeaveForm({ ...leaveForm, endDate: e.target.value })}
-                                                            className="w-full border border-gray-300 rounded-lg p-2 text-xs text-gray-900 bg-white outline-none focus:ring-2 focus:ring-blue-500"
+                                                            className="w-full border border-rams-rule-light rounded-sm p-2 text-xs font-mono text-rams-ink bg-rams-bg outline-none focus:border-rams-rule"
                                                             min={leaveForm.startDate}
                                                         />
                                                     </div>
                                                 </div>
                                                 <div>
-                                                    <label className="block text-[10px] font-bold text-gray-500 mb-1">ประเภท</label>
+                                                    <label className="block text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1">ประเภท</label>
                                                     <select
                                                         value={leaveForm.leave_type}
                                                         onChange={e => setLeaveForm({ ...leaveForm, leave_type: e.target.value })}
-                                                        className="w-full border border-gray-300 rounded-lg p-2 text-xs text-gray-900 bg-white outline-none focus:ring-2 focus:ring-blue-500"
+                                                        className="w-full border border-rams-rule-light rounded-sm p-2 text-xs font-mono text-rams-ink bg-rams-bg outline-none focus:border-rams-rule cursor-pointer"
                                                     >
                                                         <option value="sick">ลาป่วย 😷</option>
                                                         <option value="business">ลากิจ 💼</option>
@@ -917,11 +912,11 @@ export default function AdminRosterPage() {
                                                     </select>
                                                 </div>
                                                 <div>
-                                                    <label className="block text-[10px] font-bold text-gray-500 mb-1">คนแทน</label>
+                                                    <label className="block text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1">คนแทน</label>
                                                     <select
                                                         value={leaveForm.replacement_employee_id}
                                                         onChange={e => setLeaveForm({ ...leaveForm, replacement_employee_id: e.target.value })}
-                                                        className="w-full border border-gray-300 rounded-lg p-2 text-xs text-gray-900 bg-white outline-none focus:ring-2 focus:ring-blue-500"
+                                                        className="w-full border border-rams-rule-light rounded-sm p-2 text-xs font-mono text-rams-ink bg-rams-bg outline-none focus:border-rams-rule cursor-pointer"
                                                     >
                                                         <option value="">-- เลือกผู้ปฏิบัติหน้าที่แทน --</option>
                                                         {employees.filter(e => e.id !== req.employee_id).map(emp => (
@@ -932,39 +927,39 @@ export default function AdminRosterPage() {
                                                     </select>
                                                 </div>
                                                 <div>
-                                                    <label className="block text-[10px] font-bold text-gray-500 mb-1">เหตุผล</label>
+                                                    <label className="block text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1">เหตุผล</label>
                                                     <input 
                                                         type="text"
                                                         value={leaveForm.reason}
                                                         onChange={e => setLeaveForm({ ...leaveForm, reason: e.target.value })}
-                                                        className="w-full border border-gray-300 rounded-lg p-2 text-xs text-gray-900 bg-white outline-none focus:ring-2 focus:ring-blue-500"
+                                                        className="w-full border border-rams-rule-light rounded-sm p-2 text-xs font-sans text-rams-ink bg-rams-bg outline-none focus:border-rams-rule"
                                                         placeholder="ระบุเหตุผล"
                                                     />
                                                 </div>
                                             </div>
                                         ) : (
                                             <div className="space-y-2">
-                                                <div className="flex justify-between">
-                                                    <span className="text-gray-500">วันที่ลา:</span>
-                                                    <span className="font-bold text-gray-900">
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest">วันที่ลา:</span>
+                                                    <span className="font-mono text-xs font-bold text-rams-ink">
                                                         {req.leave_date ? format(parseISO(req.leave_date), 'dd/MM/yyyy') : '-'}
                                                     </span>
                                                 </div>
-                                                <div className="flex justify-between">
-                                                    <span className="text-gray-500">ประเภท:</span>
-                                                    <span className="font-semibold text-gray-900">
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest">ประเภท:</span>
+                                                    <span className="font-bold text-rams-ink text-xs">
                                                         {req.leave_type === 'sick' ? 'ลาป่วย 😷' : req.leave_type === 'business' ? 'ลากิจ 💼' : 'พักร้อน 🏖️'}
                                                     </span>
                                                 </div>
-                                                <div className="flex justify-between">
-                                                    <span className="text-gray-500">ปฏิบัติงานแทนโดย:</span>
-                                                    <span className="font-medium text-gray-800">
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest">ปฏิบัติงานแทนโดย:</span>
+                                                    <span className="font-bold text-rams-ink text-xs">
                                                         {req.replacement_employee ? `${req.replacement_employee.name} (${req.replacement_employee.nickname || "-"})` : '-'}
                                                     </span>
                                                 </div>
-                                                <div className="pt-1 border-t border-gray-100 mt-1">
-                                                    <span className="text-gray-500 block mb-0.5">เหตุผลการลา:</span>
-                                                    <span className="text-gray-700 italic block font-medium">&ldquo;{req.reason || '-'}&rdquo;</span>
+                                                <div className="pt-1 border-t border-rams-rule-light mt-1">
+                                                    <span className="text-[9px] font-mono font-bold text-rams-ink-muted block mb-0.5 uppercase tracking-widest">เหตุผลการลา:</span>
+                                                    <span className="text-rams-ink italic block text-xs">&ldquo;{req.reason || '-'}&rdquo;</span>
                                                 </div>
                                                 {req.status === 'approved' && (() => {
                                                     const isRequesterOff = transactions.some(t => t.employee_id === req.employee_id && t.date === req.leave_date && t.is_off);
@@ -972,7 +967,7 @@ export default function AdminRosterPage() {
                                                         ? transactions.some(t => t.employee_id === req.replacement_employee_id && t.date === req.leave_date && !t.is_off)
                                                         : false;
                                                     return (
-                                                        <div className="mt-2 p-2 bg-emerald-50 rounded-lg border border-emerald-100 flex flex-col gap-1 text-[10px] text-emerald-800 font-bold">
+                                                        <div className="mt-2 p-2 bg-rams-green/5 rounded-sm border border-rams-green/20 flex flex-col gap-1 text-[10px] text-rams-green font-mono font-bold uppercase tracking-wider">
                                                             <div className="flex items-center gap-1">
                                                                 <span>{isRequesterOff ? '✅' : '❌'}</span>
                                                                 <span>พนักงานลาหยุด: {isRequesterOff ? 'บันทึกวันหยุด (OFF) แล้ว' : 'ยังไม่ได้บันทึกวันหยุด'}</span>
@@ -991,20 +986,20 @@ export default function AdminRosterPage() {
                                     </div>
                                     
                                     {/* Card Footer Actions */}
-                                    <div className="px-4 py-3 bg-gray-50 border-t border-gray-100 flex justify-end gap-2">
+                                    <div className="px-4 py-3 bg-rams-bg border-t border-rams-rule-light flex justify-end gap-2">
                                         {isEditing ? (
                                             <>
                                                 <button 
                                                     type="button"
                                                     onClick={() => setEditingLeaveId(null)}
-                                                    className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold rounded-lg text-[10px] transition-colors"
+                                                    className="px-3 py-1.5 bg-rams-bg hover:bg-rams-ink-muted/10 border border-rams-rule-light text-rams-ink font-mono font-bold rounded-sm text-[9px] uppercase tracking-wider transition-all cursor-pointer"
                                                 >
                                                     ยกเลิก
                                                 </button>
                                                 <button 
                                                     type="button"
                                                     onClick={() => saveLeaveEdit(req.id)}
-                                                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-[10px] transition-colors"
+                                                    className="px-3 py-1.5 bg-rams-orange text-rams-panel font-mono font-bold rounded-sm text-[9px] uppercase tracking-wider border border-rams-rule shadow-[0_1.5px_0_0_var(--color-rams-rule)] hover:bg-rams-orange-active active:translate-y-[1px] active:shadow-none transition-all cursor-pointer"
                                                 >
                                                     บันทึก
                                                 </button>
@@ -1014,14 +1009,14 @@ export default function AdminRosterPage() {
                                                 <button 
                                                     type="button"
                                                     onClick={() => startEditLeave(req)}
-                                                    className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold rounded-lg text-[10px] transition-colors"
+                                                    className="px-3 py-1.5 bg-rams-bg hover:bg-rams-ink-muted/10 border border-rams-rule-light text-rams-ink font-mono font-bold rounded-sm text-[9px] uppercase tracking-wider transition-all cursor-pointer"
                                                 >
                                                     แก้ไขข้อมูล
                                                 </button>
                                                 <button 
                                                     type="button"
                                                     onClick={() => handleDeleteLeaveRequest(req)}
-                                                    className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-bold rounded-lg text-[10px] transition-colors flex items-center gap-1 shadow-sm"
+                                                    className="px-3 py-1.5 bg-rams-red/10 hover:bg-rams-red/20 text-rams-red border border-rams-red/20 font-mono font-bold rounded-sm text-[9px] uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer"
                                                     title="ลบคำขอลาหยุด"
                                                 >
                                                     🗑️ ลบใบลา
@@ -1031,16 +1026,16 @@ export default function AdminRosterPage() {
                                                         <button 
                                                             type="button"
                                                             onClick={() => handleApproveAndSyncLeave(req)}
-                                                            className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg text-[10px] transition-colors shadow-sm"
+                                                            className="px-3 py-1.5 bg-rams-green text-rams-panel font-mono font-bold rounded-sm text-[9px] uppercase tracking-wider border border-rams-rule shadow-[0_1.5px_0_0_var(--color-rams-rule)] hover:bg-rams-green/90 active:translate-y-[1px] active:shadow-none cursor-pointer transition-all"
                                                         >
-                                                            อนุมัติ & ซิงค์ตาราง
+                                                            อนุมัติ & ซิงค์
                                                         </button>
                                                         <button 
                                                             type="button"
                                                             onClick={() => handleRejectLeave(req)}
-                                                            className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg text-[10px] transition-colors shadow-sm"
+                                                            className="px-3 py-1.5 bg-rams-red text-rams-panel font-mono font-bold rounded-sm text-[9px] uppercase tracking-wider border border-rams-rule shadow-[0_1.5px_0_0_var(--color-rams-rule)] hover:bg-rams-red/90 active:translate-y-[1px] active:shadow-none transition-all cursor-pointer"
                                                         >
-                                                            ปฏิเสธคำขอ
+                                                            ปฏิเสธ
                                                         </button>
                                                     </>
                                                 )}
@@ -1048,7 +1043,7 @@ export default function AdminRosterPage() {
                                                     <button 
                                                         type="button"
                                                         onClick={() => handleResetLeaveStatus(req)}
-                                                        className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-[10px] transition-colors shadow-sm"
+                                                        className="px-3 py-1.5 bg-rams-amber text-rams-panel font-mono font-bold rounded-sm text-[9px] uppercase tracking-wider border border-rams-rule shadow-[0_1.5px_0_0_var(--color-rams-rule)] hover:bg-rams-amber/90 active:translate-y-[1px] active:shadow-none transition-all cursor-pointer"
                                                     >
                                                         ยกเลิกการอนุมัติ
                                                     </button>
@@ -1065,16 +1060,16 @@ export default function AdminRosterPage() {
 
             {/* Edit Cell Modal */}
             {editingCell && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
-                        <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
-                            <h3 className="font-bold text-lg text-gray-800">
+                <div className="fixed inset-0 bg-rams-ink/40 backdrop-blur-[2px] flex items-center justify-center z-50 p-4">
+                    <div className="bg-rams-panel border border-rams-rule rounded-sm w-full max-w-md overflow-hidden shadow-none flex flex-col">
+                        <div className="px-6 py-4 border-b border-rams-rule-light flex justify-between items-center bg-rams-bg/30">
+                            <h3 className="font-mono font-bold text-sm uppercase tracking-wider text-rams-ink">
                                 จัดตาราง: {editingCell.employee.nickname} <br/>
-                                <span className="text-sm font-normal text-gray-500">{format(editingCell.date, 'dd MMM yyyy')}</span>
+                                <span className="text-[10px] font-mono text-rams-ink-muted uppercase tracking-widest block mt-0.5">{format(editingCell.date, 'dd MMM yyyy')}</span>
                             </h3>
                         </div>
                         
-                        <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto bg-gray-50">
+                        <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto bg-rams-panel custom-scrollbar">
                             {(() => {
                                 const dateStr = format(editingCell.date, 'yyyy-MM-dd');
                                 const cellLeaves = leaveRequests.filter(l => l.employee_id === editingCell.employee.id && l.leave_date === dateStr);
@@ -1082,22 +1077,20 @@ export default function AdminRosterPage() {
                                 return (
                                     <div className="space-y-3 mb-2">
                                         {cellLeaves.map((l, idx) => (
-                                            <div key={idx} className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-2 text-xs text-amber-900 shadow-sm">
-                                                <div className="font-bold flex justify-between items-center text-sm">
+                                            <div key={idx} className="bg-rams-amber/10 border border-rams-rule-light rounded-sm p-4 space-y-2 text-xs text-rams-ink shadow-none font-sans">
+                                                <div className="font-mono font-bold uppercase tracking-wider text-[10px] text-rams-ink flex justify-between items-center">
                                                     <span className="flex items-center gap-1">📌 ข้อมูลการลาหยุดวันนี้</span>
-                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                                        l.status === 'approved' ? 'bg-green-100 text-green-800' : l.status === 'rejected' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'
-                                                    }`}>
+                                                    <Badge color={l.status === 'approved' ? 'emerald' : l.status === 'rejected' ? 'rose' : 'amber'}>
                                                         {l.status === 'approved' ? 'อนุมัติแล้ว' : l.status === 'rejected' ? 'ปฏิเสธแล้ว' : 'รออนุมัติ'}
-                                                    </span>
+                                                    </Badge>
                                                 </div>
-                                                <div className="grid grid-cols-2 gap-2 mt-1">
+                                                <div className="grid grid-cols-2 gap-2 mt-1 font-mono text-[10px] text-rams-ink-muted uppercase tracking-wider">
                                                     <div><strong>ประเภท:</strong> {l.leave_type === 'sick' ? 'ลาป่วย 😷' : l.leave_type === 'business' ? 'ลากิจ 💼' : 'พักร้อน 🏖️'}</div>
                                                     <div><strong>คนปฏิบัติแทน:</strong> {l.replacement_employee ? (l.replacement_employee.nickname || l.replacement_employee.name) : '-'}</div>
                                                 </div>
-                                                <div className="mt-1 font-medium"><strong>เหตุผล:</strong> {l.reason || '-'}</div>
+                                                <div className="mt-1 font-sans text-xs text-rams-ink"><strong>เหตุผล:</strong> {l.reason || '-'}</div>
                                                 
-                                                <div className="flex gap-2 pt-1 border-t border-amber-200/50 mt-2">
+                                                <div className="flex gap-2 pt-1 border-t border-rams-rule-light mt-2">
                                                     {l.status === 'pending' && (
                                                         <>
                                                             <button 
@@ -1106,7 +1099,7 @@ export default function AdminRosterPage() {
                                                                     await handleApproveAndSyncLeave(l);
                                                                     setEditingCell(null);
                                                                 }}
-                                                                className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold text-[11px] transition-colors shadow-sm"
+                                                                className="px-3 py-1.5 bg-rams-green text-rams-panel font-mono font-bold text-[9px] uppercase tracking-wider rounded-sm border border-rams-rule shadow-[0_1.5px_0_0_var(--color-rams-rule)] hover:bg-rams-green/90 active:translate-y-[1px] active:shadow-none cursor-pointer transition-all"
                                                             >
                                                                 อนุมัติและปรับตารางเวร
                                                             </button>
@@ -1116,7 +1109,7 @@ export default function AdminRosterPage() {
                                                                     await handleRejectLeave(l);
                                                                     setEditingCell(null);
                                                                 }}
-                                                                className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold text-[11px] transition-colors shadow-sm"
+                                                                className="px-3 py-1.5 bg-rams-red text-rams-panel font-mono font-bold text-[9px] uppercase tracking-wider rounded-sm border border-rams-rule shadow-[0_1.5px_0_0_var(--color-rams-rule)] hover:bg-rams-red/90 active:translate-y-[1px] active:shadow-none cursor-pointer transition-all"
                                                             >
                                                                 ปฏิเสธคำขอลา
                                                             </button>
@@ -1129,7 +1122,7 @@ export default function AdminRosterPage() {
                                                                 await handleResetLeaveStatus(l);
                                                                 setEditingCell(null);
                                                             }}
-                                                            className="px-3 py-1.5 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-bold text-[11px] transition-colors shadow-sm"
+                                                            className="px-3 py-1.5 bg-rams-bg border border-rams-rule-light text-rams-ink-muted font-mono font-bold rounded-sm text-[9px] uppercase tracking-wider hover:bg-rams-ink-muted/10 cursor-pointer transition-all"
                                                         >
                                                             ยกเลิกการอนุมัติ (กลับเป็นรออนุมัติ)
                                                         </button>
@@ -1140,7 +1133,7 @@ export default function AdminRosterPage() {
                                                             await handleDeleteLeaveRequest(l);
                                                             setEditingCell(null);
                                                         }}
-                                                        className="px-3 py-1.5 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-lg font-bold text-[11px] transition-colors shadow-sm"
+                                                        className="px-3 py-1.5 bg-rams-red/10 hover:bg-rams-red/20 text-rams-red border border-rams-red/20 font-mono font-bold rounded-sm text-[9px] uppercase tracking-wider cursor-pointer transition-all"
                                                     >
                                                         🗑️ ลบใบลา
                                                     </button>
@@ -1151,39 +1144,40 @@ export default function AdminRosterPage() {
                                 );
                             })()}
                             {editingCell.slots.map((slot, index) => (
-                                <div key={index} className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm space-y-3 relative">
+                                <div key={index} className="bg-rams-panel p-4 rounded-sm border border-rams-rule-light shadow-none space-y-3 relative">
                                     <div className="flex justify-between items-center mb-2">
                                         <select 
                                             value={slot.slot_type}
                                             onChange={e => handleSlotChange(index, 'slot_type', e.target.value)}
-                                            className="text-xs font-bold uppercase bg-gray-100 text-gray-700 px-2 py-1 rounded"
+                                            className="text-[10px] font-mono font-bold uppercase bg-rams-bg text-rams-ink px-2 py-1 rounded-sm border border-rams-rule-light outline-none cursor-pointer"
                                         >
                                             <option value="MAIN">Main Shift</option>
                                             <option value="SPLIT">Split Shift</option>
                                             <option value="OVERTIME">Overtime</option>
                                         </select>
-                                        <button onClick={() => removeSlot(index)} className="text-red-400 hover:text-red-600">
+                                        <button onClick={() => removeSlot(index)} className="text-rams-red hover:text-rams-red/80 transition-colors cursor-pointer">
                                             <Trash2 size={16} />
                                         </button>
                                     </div>
                                     
-                                    <label className="flex items-center gap-2 text-sm font-medium text-red-600 bg-red-50 p-2 rounded border border-red-100">
+                                    <label className="flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-rams-red bg-rams-red/5 p-2 rounded-sm border border-rams-red/20 cursor-pointer select-none">
                                         <input 
                                             type="checkbox" 
                                             checked={slot.is_off}
                                             onChange={e => handleSlotChange(index, 'is_off', e.target.checked)}
+                                            className="w-3.5 h-3.5 rounded-sm border-rams-red/30 bg-rams-bg accent-rams-red focus:ring-0 cursor-pointer"
                                         />
                                         วันหยุด (OFF)
                                     </label>
-
+ 
                                     {!slot.is_off && (
                                         <>
                                             <div>
-                                                <label className="block text-xs text-black font-semibold mb-1">เลือกกะสำเร็จรูป</label>
+                                                <label className="block text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1">เลือกกะสำเร็จรูป</label>
                                                 <select 
                                                     value={slot.shift_id || ''}
                                                     onChange={e => handleSlotChange(index, 'shift_id', e.target.value)}
-                                                    className="w-full border border-gray-300 rounded-md p-2 text-sm text-gray-900 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                                                    className="w-full border border-rams-rule-light rounded-sm p-2 text-xs font-mono text-rams-ink bg-rams-bg outline-none focus:border-rams-rule cursor-pointer"
                                                 >
                                                     <option value="">-- กะกำหนดเอง (Custom) --</option>
                                                     {shifts.map(sh => (
@@ -1191,50 +1185,50 @@ export default function AdminRosterPage() {
                                                     ))}
                                                 </select>
                                             </div>
-
+ 
                                             {!slot.shift_id && (
-                                                <div className="space-y-2 border-t border-gray-100 pt-2">
+                                                <div className="space-y-2 border-t border-rams-rule-light pt-2">
                                                     <div className="grid grid-cols-2 gap-3">
                                                         <div>
-                                                            <label className="block text-xs text-black font-semibold mb-1">เวลาเริ่ม</label>
+                                                            <label className="block text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1">เวลาเริ่ม</label>
                                                             <input 
                                                                 type="time" 
                                                                 value={slot.custom_start_time || ''}
                                                                 onChange={e => handleSlotChange(index, 'custom_start_time', e.target.value)}
-                                                                className="w-full border border-gray-300 rounded-md p-2 text-sm text-gray-900 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                                                                className="w-full border border-rams-rule-light rounded-sm p-2 text-xs font-mono text-rams-ink bg-rams-bg outline-none"
                                                             />
                                                         </div>
                                                         <div>
-                                                            <label className="block text-xs text-black font-semibold mb-1">เวลาเลิก</label>
+                                                            <label className="block text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1">เวลาเลิก</label>
                                                             <input 
                                                                 type="time" 
                                                                 value={slot.custom_end_time || ''}
                                                                 onChange={e => handleSlotChange(index, 'custom_end_time', e.target.value)}
-                                                                className="w-full border border-gray-300 rounded-md p-2 text-sm text-gray-900 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                                                                className="w-full border border-rams-rule-light rounded-sm p-2 text-xs font-mono text-rams-ink bg-rams-bg outline-none"
                                                             />
                                                         </div>
                                                     </div>
-
+ 
                                                     {slot.custom_start_time && slot.custom_end_time && (
                                                         <button 
                                                             type="button"
                                                             onClick={() => openPresetModal(slot.custom_start_time, slot.custom_end_time)}
-                                                            className="text-xs text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1 mt-1 transition-colors"
+                                                            className="text-[10px] font-mono font-bold text-rams-orange hover:text-rams-orange-active uppercase tracking-wider flex items-center gap-1 mt-1 transition-colors cursor-pointer"
                                                         >
                                                             💾 บันทึกเป็น Preset ({slot.custom_start_time} - {slot.custom_end_time})
                                                         </button>
                                                     )}
-
+ 
                                                     {customPresets.length > 0 && (
                                                         <div className="mt-3">
-                                                            <label className="block text-xs text-black font-bold mb-1.5">⚡ Preset ที่บันทึกไว้:</label>
+                                                            <label className="block text-[9px] font-mono font-bold text-rams-ink uppercase tracking-widest mb-1.5">⚡ Preset ที่บันทึกไว้:</label>
                                                             <div className="flex flex-wrap gap-2">
                                                                 {customPresets.map((preset, pIdx) => {
                                                                     const pc = getPresetColor(preset.color);
                                                                     return (
                                                                         <div 
                                                                             key={pIdx}
-                                                                            className={`flex items-center gap-1.5 px-3 py-1.5 ${pc.bg} hover:opacity-80 ${pc.text} rounded-full text-xs font-bold cursor-pointer border ${pc.border} transition-all shadow-sm hover:shadow`}
+                                                                            className={`flex items-center gap-1.5 px-2.5 py-1 ${pc.bg} hover:bg-opacity-90 ${pc.text} rounded-sm text-[10px] font-mono font-bold cursor-pointer border ${pc.border} transition-all uppercase tracking-wider`}
                                                                             onClick={() => {
                                                                                 handleSlotChange(index, 'custom_start_time', preset.start);
                                                                                 handleSlotChange(index, 'custom_end_time', preset.end);
@@ -1249,7 +1243,7 @@ export default function AdminRosterPage() {
                                                                                     e.stopPropagation();
                                                                                     deleteCustomPreset(pIdx);
                                                                                 }}
-                                                                                className="opacity-40 hover:opacity-100 hover:text-red-600 ml-0.5 font-bold text-sm leading-none"
+                                                                                className="opacity-50 hover:opacity-100 hover:text-rams-red ml-1 font-bold text-xs leading-none cursor-pointer"
                                                                                 title="ลบ"
                                                                             >
                                                                                 ×
@@ -1266,23 +1260,23 @@ export default function AdminRosterPage() {
                                     )}
                                 </div>
                             ))}
-
-                            <button onClick={addSlot} className="w-full py-2 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 font-medium hover:bg-gray-100 flex justify-center items-center gap-2">
+ 
+                            <button onClick={addSlot} className="w-full py-2 border border-dashed border-rams-rule-light rounded-sm text-rams-ink-muted font-mono font-bold text-xs uppercase tracking-wider hover:bg-rams-bg transition-colors flex justify-center items-center gap-2 cursor-pointer">
                                 <Plus size={16} /> เพิ่มกะในวันนี้ (Split Shift)
                             </button>
                         </div>
-
-                        <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 bg-white">
+ 
+                        <div className="px-6 py-4 border-t border-rams-rule-light flex justify-end gap-3 bg-rams-bg/30 shrink-0">
                             <button 
                                 onClick={() => setEditingCell(null)}
-                                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg font-medium transition-colors"
+                                className="px-4 py-2 text-rams-ink hover:bg-rams-ink-muted/10 border border-rams-rule-light rounded-sm font-mono font-bold text-xs uppercase tracking-wider transition-all cursor-pointer"
                             >
                                 ยกเลิก
                             </button>
                             <button 
                                 onClick={saveCell}
                                 disabled={saving}
-                                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium shadow-sm transition-colors flex items-center gap-2"
+                                className="px-4 py-2 bg-rams-orange text-rams-panel font-mono font-bold text-xs uppercase tracking-wider rounded-sm border border-rams-rule shadow-[0_2px_0_0_var(--color-rams-rule)] hover:bg-rams-orange-active active:translate-y-[1px] active:shadow-none transition-all flex items-center gap-2 cursor-pointer"
                             >
                                 {saving ? 'กำลังบันทึก...' : <><Save size={16} /> บันทึก</>}
                             </button>
@@ -1293,37 +1287,37 @@ export default function AdminRosterPage() {
 
             {/* Preset Creation Modal */}
             {presetModal && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
-                        <div className="px-6 py-5 border-b border-gray-100">
-                            <h3 className="text-lg font-black text-gray-900">✨ สร้าง Preset ใหม่</h3>
-                            <p className="text-xs text-gray-500 mt-1 font-medium">เวลา: {presetModal.start} - {presetModal.end}</p>
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-rams-ink/40 backdrop-blur-[2px] p-4">
+                    <div className="bg-rams-panel border border-rams-rule rounded-sm w-full max-w-sm overflow-hidden shadow-none">
+                        <div className="px-6 py-4 border-b border-rams-rule-light bg-rams-bg/30">
+                            <h3 className="font-mono font-bold text-sm uppercase tracking-wider text-rams-ink">✨ สร้าง Preset ใหม่</h3>
+                            <p className="text-[10px] font-mono text-rams-ink-muted uppercase tracking-widest block mt-0.5">เวลา: {presetModal.start} - {presetModal.end}</p>
                         </div>
                         <div className="px-6 py-5 space-y-5">
                             {/* Name */}
                             <div>
-                                <label className="block text-xs font-bold text-gray-700 mb-1.5">ชื่อ Preset</label>
+                                <label className="block text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1.5">ชื่อ Preset</label>
                                 <input
                                     type="text"
                                     value={presetModal.name}
                                     onChange={e => setPresetModal(p => ({ ...p, name: e.target.value }))}
                                     placeholder={`เช่น กะพิเศษ, เปิดร้าน...`}
-                                    className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm font-medium text-gray-900 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                                    className="w-full border border-rams-rule-light rounded-sm px-3 py-2 text-xs font-sans text-rams-ink bg-rams-bg outline-none focus:border-rams-rule"
                                 />
                             </div>
                             {/* Icon */}
                             <div>
-                                <label className="block text-xs font-bold text-gray-700 mb-1.5">เลือก Icon</label>
+                                <label className="block text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1.5">เลือก Icon</label>
                                 <div className="flex flex-wrap gap-2">
                                     {PRESET_ICONS.map(icon => (
                                         <button
                                             key={icon}
                                             type="button"
                                             onClick={() => setPresetModal(p => ({ ...p, icon }))}
-                                            className={`w-10 h-10 rounded-xl text-lg flex items-center justify-center border-2 transition-all ${
+                                            className={`w-9 h-9 rounded-sm text-sm flex items-center justify-center border transition-all cursor-pointer ${
                                                 presetModal.icon === icon
-                                                    ? 'border-blue-500 bg-blue-50 scale-110 shadow-md'
-                                                    : 'border-gray-200 bg-gray-50 hover:border-gray-300'
+                                                    ? 'border-rams-rule bg-rams-ink text-rams-panel'
+                                                    : 'border-rams-rule-light bg-rams-bg hover:border-rams-rule text-rams-ink'
                                             }`}
                                         >
                                             {icon}
@@ -1333,20 +1327,20 @@ export default function AdminRosterPage() {
                             </div>
                             {/* Color */}
                             <div>
-                                <label className="block text-xs font-bold text-gray-700 mb-1.5">เลือกสี</label>
+                                <label className="block text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1.5">เลือกสี</label>
                                 <div className="flex flex-wrap gap-2">
                                     {PRESET_COLORS.map(c => (
                                         <button
                                             key={c.id}
                                             type="button"
                                             onClick={() => setPresetModal(p => ({ ...p, color: c.id }))}
-                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border-2 transition-all ${c.bg} ${c.text} ${
+                                            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-[10px] font-mono font-bold border transition-all cursor-pointer ${c.bg} ${c.text} ${
                                                 presetModal.color === c.id
-                                                    ? `${c.border} ring-2 ring-offset-1 ring-blue-400 scale-105`
-                                                    : 'border-transparent hover:border-gray-300'
+                                                    ? `${c.border} border-rams-rule ring-1 ring-rams-rule`
+                                                    : 'border-rams-rule-light hover:border-rams-rule'
                                             }`}
                                         >
-                                            <span className={`w-2.5 h-2.5 rounded-full ${c.dot}`}></span>
+                                            <span className={`w-2.5 h-2.5 rounded-sm ${c.dot}`}></span>
                                             {c.label}
                                         </button>
                                     ))}
@@ -1354,11 +1348,11 @@ export default function AdminRosterPage() {
                             </div>
                             {/* Preview */}
                             <div>
-                                <label className="block text-xs font-bold text-gray-700 mb-1.5">ตัวอย่าง</label>
+                                <label className="block text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1.5">ตัวอย่าง</label>
                                 {(() => {
                                     const pc = getPresetColor(presetModal.color);
                                     return (
-                                        <div className={`inline-flex items-center gap-1.5 px-4 py-2 ${pc.bg} ${pc.text} rounded-full text-sm font-bold border ${pc.border} shadow-sm`}>
+                                        <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 ${pc.bg} ${pc.text} rounded-sm text-xs font-mono font-bold border ${pc.border} uppercase tracking-wider`}>
                                             <span>{presetModal.icon || '⏰'}</span>
                                             <span>{presetModal.name || `${presetModal.start}-${presetModal.end}`}</span>
                                             <span className="opacity-50 text-[10px] font-semibold">({presetModal.start}-{presetModal.end})</span>
@@ -1367,16 +1361,16 @@ export default function AdminRosterPage() {
                                 })()}
                             </div>
                         </div>
-                        <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 bg-gray-50/50">
+                        <div className="px-6 py-4 border-t border-rams-rule-light flex justify-end gap-3 bg-rams-bg/30">
                             <button
                                 onClick={() => setPresetModal(null)}
-                                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-xl font-medium text-sm transition-colors"
+                                className="px-4 py-2 text-rams-ink hover:bg-rams-ink-muted/10 border border-rams-rule-light rounded-sm font-mono font-bold text-xs uppercase tracking-wider transition-all cursor-pointer"
                             >
                                 ยกเลิก
                             </button>
                             <button
                                 onClick={confirmSavePreset}
-                                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm shadow-sm transition-colors"
+                                className="px-5 py-2 bg-rams-orange text-rams-panel font-mono font-bold text-xs uppercase tracking-wider rounded-sm border border-rams-rule shadow-[0_2px_0_0_var(--color-rams-rule)] hover:bg-rams-orange-active active:translate-y-[1px] active:shadow-none transition-all cursor-pointer"
                             >
                                 💾 บันทึก Preset
                             </button>

@@ -6,22 +6,23 @@ export function TabButton({ active, onClick, label, icon: Icon, id }) {
         <button
             onClick={onClick}
             className={clsx(
-                "relative flex items-center gap-2 px-3.5 py-2.5 rounded-2xl text-sm font-bold transition-all duration-300 ease-out z-10 flex-shrink-0",
+                "relative flex items-center gap-2 px-3.5 py-2 rounded-sm text-xs font-mono font-bold uppercase tracking-wider transition-all z-10 flex-shrink-0 select-none cursor-pointer border border-transparent",
                 active
-                    ? "text-white scale-105"
-                    : "text-slate-400 hover:bg-slate-50 hover:text-slate-600"
+                    ? "text-rams-panel"
+                    : "text-rams-ink-muted hover:text-rams-ink hover:bg-rams-panel/50"
             )}
         >
             {active && (
                 <motion.div
                     layoutId="activeTab"
-                    className="absolute inset-0 bg-slate-800 rounded-2xl shadow-lg shadow-slate-200"
-                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                    className="absolute inset-0 bg-rams-ink rounded-sm border border-rams-rule"
+                    transition={{ type: "tween", duration: 0.18 }}
                     style={{ zIndex: -1 }}
                 />
             )}
-            {Icon && <Icon size={16} strokeWidth={2.5} />}
+            {Icon && <Icon size={14} strokeWidth={2.5} />}
             <span className="relative z-10">{label}</span>
         </button>
     );
 }
+

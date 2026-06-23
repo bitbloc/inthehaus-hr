@@ -3,27 +3,28 @@ import { twMerge } from "tailwind-merge";
 
 export function Badge({ children, color = "slate", icon, className }) {
     const colors = {
-        slate: "bg-slate-100 text-slate-600 border-slate-200",
-        emerald: "bg-emerald-50 text-emerald-600 border-emerald-100",
-        rose: "bg-rose-50 text-rose-600 border-rose-100",
-        amber: "bg-amber-50 text-amber-600 border-amber-100",
-        blue: "bg-blue-50 text-blue-600 border-blue-100",
-        purple: "bg-purple-50 text-purple-600 border-purple-100",
-        orange: "bg-orange-50 text-orange-600 border-orange-100",
+        slate: "bg-rams-bg text-rams-ink-muted border-rams-rule-light",
+        emerald: "bg-rams-green/10 text-rams-green border-rams-green/30",
+        rose: "bg-rams-red/10 text-rams-red border-rams-red/30",
+        amber: "bg-rams-amber/10 text-rams-amber border-rams-amber/30",
+        blue: "bg-rams-orange/10 text-rams-orange border-rams-orange/30",
+        purple: "bg-rams-bg text-rams-ink border-rams-rule-light",
+        orange: "bg-rams-orange/10 text-rams-orange border-rams-orange/30",
     };
 
     return (
         <span
             className={twMerge(
                 clsx(
-                    "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold tracking-wide border",
+                    "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-sm text-[9px] font-mono font-bold uppercase tracking-widest border",
                     colors[color] || colors.slate,
                     className
                 )
             )}
         >
-            {icon && <span className="opacity-70">{icon}</span>}
+            {icon && <span className="opacity-85">{icon}</span>}
             {children}
         </span>
     );
 }
+

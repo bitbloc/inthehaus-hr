@@ -1056,39 +1056,39 @@ export default function AdminDashboard() {
 
     if (!isAuthenticated) {
         return (
-            <div className="min-h-screen bg-[#F8F9FA] flex flex-col items-center justify-center p-4">
-                <Card className="w-full max-w-sm p-8 space-y-6 bg-white shadow-xl border border-slate-100 rounded-3xl">
+            <div className="min-h-screen bg-rams-bg flex flex-col items-center justify-center p-4 text-rams-ink font-sans">
+                <div className="w-full max-w-sm p-8 space-y-6 bg-rams-panel border border-rams-rule rounded-sm shadow-none">
                     <div className="text-center space-y-2">
-                        <div className="w-16 h-16 bg-slate-900 rounded-2xl mx-auto flex items-center justify-center text-white text-2xl font-bold shadow-lg shadow-slate-200">H</div>
-                        <h1 className="text-2xl font-bold tracking-tight text-slate-800">Admin Login</h1>
-                        <p className="text-sm text-slate-500 font-medium">Please enter your credentials</p>
+                        <div className="w-12 h-12 bg-rams-ink rounded-sm mx-auto flex items-center justify-center text-rams-panel text-xl font-mono font-black border border-rams-rule">H</div>
+                        <h1 className="text-xl font-mono font-bold tracking-wider text-rams-ink uppercase">Admin Login</h1>
+                        <p className="text-[10px] font-mono text-rams-ink-muted uppercase tracking-widest">Please enter your credentials</p>
                     </div>
                     <form onSubmit={handleLogin} className="space-y-4">
                         <div>
-                            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">Username</label>
+                            <label className="text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest ml-1">Username</label>
                             <input
                                 type="text"
-                                className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl mt-1 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-slate-300 transition-all"
+                                className="w-full p-3.5 bg-rams-bg border border-rams-rule-light rounded-sm mt-1 text-xs font-mono font-bold text-rams-ink outline-none focus:border-rams-rule transition-all"
                                 value={loginUser}
                                 onChange={e => setLoginUser(e.target.value)}
                                 required
                             />
                         </div>
                         <div>
-                            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">Password</label>
+                            <label className="text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest ml-1">Password</label>
                             <input
                                 type="password"
-                                className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl mt-1 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-slate-300 transition-all"
+                                className="w-full p-3.5 bg-rams-bg border border-rams-rule-light rounded-sm mt-1 text-xs font-mono font-bold text-rams-ink outline-none focus:border-rams-rule transition-all"
                                 value={loginPass}
                                 onChange={e => setLoginPass(e.target.value)}
                                 required
                             />
                         </div>
-                        <button type="submit" className="w-full py-4 bg-slate-900 text-white rounded-xl font-bold shadow-lg shadow-slate-200 hover:bg-slate-800 transition-transform active:scale-95 mt-4">
+                        <button type="submit" className="w-full py-3.5 bg-rams-orange text-rams-panel border border-rams-rule rounded-sm font-mono font-bold uppercase tracking-wider hover:bg-rams-orange-active shadow-[0_2px_0_0_var(--color-rams-rule)] active:translate-y-[2px] active:shadow-none transition-all cursor-pointer mt-4">
                             Access Dashboard
                         </button>
                     </form>
-                </Card>
+                </div>
             </div>
         );
     }
@@ -1157,21 +1157,21 @@ export default function AdminDashboard() {
     const totalAlertsCount = pendingLeaveCount + pendingSwapCount + pendingStaffCount;
 
     return (
-        <div className="flex min-h-screen bg-[#F8F9FA] text-slate-800 font-sans selection:bg-slate-200">
+        <div className="flex min-h-screen bg-rams-bg text-rams-ink font-sans selection:bg-rams-ink/10">
             {/* Desktop Sidebar */}
-            <aside className="hidden lg:flex flex-col w-64 bg-white border-r border-slate-200/50 sticky top-0 h-screen shrink-0 z-30">
-                <div className="flex items-center gap-3 px-6 py-6 border-b border-slate-100 shrink-0">
-                    <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center text-white text-lg font-bold shadow-lg shadow-slate-200">H</div>
+            <aside className="hidden lg:flex flex-col w-64 bg-rams-panel border-r border-rams-rule sticky top-0 h-screen shrink-0 z-30">
+                <div className="flex items-center gap-3 px-6 py-6 border-b border-rams-rule-light shrink-0 bg-rams-bg/50">
+                    <div className="w-10 h-10 bg-rams-ink border border-rams-rule rounded-sm flex items-center justify-center text-rams-panel text-lg font-mono font-black">H</div>
                     <div>
-                        <h1 className="text-base font-extrabold tracking-tight text-slate-800 leading-none">In the Haus</h1>
-                        <p className="text-[9px] uppercase tracking-widest text-indigo-600 font-bold mt-1">HR & Operations</p>
+                        <h1 className="text-sm font-mono font-bold tracking-wider text-rams-ink uppercase leading-none">In the Haus</h1>
+                        <p className="text-[9px] uppercase tracking-widest text-rams-orange font-mono font-bold mt-1.5">HR & Operations</p>
                     </div>
                 </div>
 
                 <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-6 custom-scrollbar">
                     {navigationCategories.map((category, idx) => (
-                        <div key={idx} className="space-y-2">
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3">{category.title}</span>
+                        <div key={idx} className="space-y-2.5">
+                            <span className="text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest px-3">{category.title}</span>
                             <div className="space-y-1">
                                 {category.items.map(item => {
                                     const active = activeTab === item.id;
@@ -1187,21 +1187,21 @@ export default function AdminDashboard() {
                                                     setIsDrawerOpen(false);
                                                 }
                                             }}
-                                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold transition-all duration-200 ${
+                                            className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-sm text-xs font-mono font-bold uppercase tracking-wider transition-all duration-150 border cursor-pointer ${
                                                 active
-                                                    ? "bg-slate-900 text-white shadow-lg shadow-slate-900/10 scale-[1.02]"
-                                                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                                                    ? "bg-rams-ink text-rams-panel border-rams-rule shadow-none"
+                                                    : "text-rams-ink-muted border-transparent hover:bg-rams-bg hover:text-rams-ink"
                                             }`}
                                         >
-                                            {Icon && <Icon size={18} strokeWidth={active ? 2.5 : 2} className={active ? "text-indigo-400" : "text-slate-400"} />}
+                                            {Icon && <Icon size={16} strokeWidth={active ? 2.5 : 2} className={active ? "text-rams-orange" : "text-rams-ink-muted"} />}
                                             <span>{item.label}</span>
                                             {item.id === 'requests' && pendingLeaveCount > 0 && (
-                                                <span className="ml-auto w-5 h-5 bg-rose-500 text-white rounded-full flex items-center justify-center text-[10px] font-bold animate-pulse">
+                                                <span className="ml-auto px-2 py-0.5 bg-rams-red text-rams-panel rounded-sm text-[9px] font-mono font-bold tracking-normal animate-pulse border border-rams-rule">
                                                     {pendingLeaveCount}
                                                 </span>
                                             )}
                                             {item.id === 'applications' && data.jobApplications.filter(r => r.status === 'Pending').length > 0 && (
-                                                <span className="ml-auto w-5 h-5 bg-amber-500 text-white rounded-full flex items-center justify-center text-[10px] font-bold">
+                                                <span className="ml-auto px-2 py-0.5 bg-rams-amber text-rams-ink rounded-sm text-[9px] font-mono font-bold tracking-normal border border-rams-rule">
                                                     {data.jobApplications.filter(r => r.status === 'Pending').length}
                                                 </span>
                                             )}
@@ -1213,24 +1213,24 @@ export default function AdminDashboard() {
                     ))}
                 </nav>
 
-                <div className="p-4 border-t border-slate-100 shrink-0">
+                <div className="p-4 border-t border-rams-rule-light bg-rams-bg/50 shrink-0">
                     <div className="flex items-center gap-3 px-2 py-1.5">
-                        <div className="w-8 h-8 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-xs font-bold text-indigo-600">
+                        <div className="w-8 h-8 rounded-sm bg-rams-ink border border-rams-rule flex items-center justify-center text-xs font-mono font-black text-rams-panel">
                             AD
                         </div>
                         <div className="flex-1 min-w-0">
-                            <p className="text-xs font-bold text-slate-800 truncate">Administrator</p>
-                            <p className="text-[10px] text-slate-400 font-medium truncate">inthehaus</p>
+                            <p className="text-xs font-mono font-bold text-rams-ink truncate">Administrator</p>
+                            <p className="text-[9px] font-mono text-rams-ink-muted uppercase tracking-widest truncate">inthehaus</p>
                         </div>
                         <button 
                             onClick={() => {
                                 sessionStorage.removeItem("adminAuth");
                                 window.location.reload();
                             }}
-                            className="p-1.5 hover:bg-rose-50 text-slate-400 hover:text-rose-500 rounded-lg transition-colors"
+                            className="p-1.5 border border-rams-rule-light hover:border-rams-rule hover:bg-rams-bg text-rams-ink-muted hover:text-rams-ink rounded-sm transition-all cursor-pointer"
                             title="Log Out"
                         >
-                            <Icons.Out size={16} />
+                            <Icons.Out size={14} />
                         </button>
                     </div>
                 </div>
@@ -1241,31 +1241,31 @@ export default function AdminDashboard() {
                 <div className="fixed inset-0 z-50 lg:hidden flex">
                     <div 
                         onClick={() => setIsDrawerOpen(false)}
-                        className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity duration-300"
+                        className="fixed inset-0 bg-rams-ink/40 backdrop-blur-[2px] transition-opacity duration-300"
                     />
                     
-                    <aside className="relative flex flex-col w-64 max-w-xs bg-white h-full shadow-2xl animate-in slide-in-from-left duration-250 z-50">
+                    <aside className="relative flex flex-col w-64 max-w-xs bg-rams-panel border-r border-rams-rule h-full shadow-none animate-in slide-in-from-left duration-250 z-50">
                         <div className="absolute top-4 right-4">
                             <button 
                                 onClick={() => setIsDrawerOpen(false)}
-                                className="p-1.5 hover:bg-slate-50 text-slate-400 hover:text-slate-600 rounded-lg transition-colors"
+                                className="w-8 h-8 border border-rams-rule-light hover:border-rams-rule bg-rams-bg text-rams-ink-muted hover:text-rams-ink flex items-center justify-center font-mono text-xs transition-all cursor-pointer"
                             >
-                                <Icons.X size={20} />
+                                <Icons.X size={16} />
                             </button>
                         </div>
                         
-                        <div className="flex items-center gap-3 px-6 py-6 border-b border-slate-100 shrink-0">
-                            <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center text-white text-lg font-bold shadow-lg shadow-slate-200">H</div>
+                        <div className="flex items-center gap-3 px-6 py-6 border-b border-rams-rule-light shrink-0 bg-rams-bg/50">
+                            <div className="w-10 h-10 bg-rams-ink border border-rams-rule rounded-sm flex items-center justify-center text-rams-panel text-lg font-mono font-black">H</div>
                             <div>
-                                <h1 className="text-base font-extrabold tracking-tight text-slate-800 leading-none">In the Haus</h1>
-                                <p className="text-[9px] uppercase tracking-widest text-indigo-600 font-bold mt-1">HR & Operations</p>
+                                <h1 className="text-sm font-mono font-bold tracking-wider text-rams-ink uppercase leading-none">In the Haus</h1>
+                                <p className="text-[9px] uppercase tracking-widest text-rams-orange font-mono font-bold mt-1.5">HR & Operations</p>
                             </div>
                         </div>
                         
-                        <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-6 custom-scrollbar">
+                        <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-6 custom-scrollbar bg-rams-panel">
                             {navigationCategories.map((category, idx) => (
-                                <div key={idx} className="space-y-2">
-                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3">{category.title}</span>
+                                <div key={idx} className="space-y-2.5">
+                                    <span className="text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest px-3">{category.title}</span>
                                     <div className="space-y-1">
                                         {category.items.map(item => {
                                             const active = activeTab === item.id;
@@ -1281,21 +1281,21 @@ export default function AdminDashboard() {
                                                             setIsDrawerOpen(false);
                                                         }
                                                     }}
-                                                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold transition-all duration-200 ${
+                                                    className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-sm text-xs font-mono font-bold uppercase tracking-wider transition-all duration-150 border cursor-pointer ${
                                                         active
-                                                            ? "bg-slate-900 text-white shadow-lg shadow-slate-900/10 scale-[1.02]"
-                                                            : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                                                            ? "bg-rams-ink text-rams-panel border-rams-rule shadow-none"
+                                                            : "text-rams-ink-muted border-transparent hover:bg-rams-bg hover:text-rams-ink"
                                                     }`}
                                                 >
-                                                    {Icon && <Icon size={18} strokeWidth={active ? 2.5 : 2} className={active ? "text-indigo-400" : "text-slate-400"} />}
+                                                    {Icon && <Icon size={16} strokeWidth={active ? 2.5 : 2} className={active ? "text-rams-orange" : "text-rams-ink-muted"} />}
                                                     <span>{item.label}</span>
                                                     {item.id === 'requests' && pendingLeaveCount > 0 && (
-                                                        <span className="ml-auto w-5 h-5 bg-rose-500 text-white rounded-full flex items-center justify-center text-[10px] font-bold">
+                                                        <span className="ml-auto px-2 py-0.5 bg-rams-red text-rams-panel rounded-sm text-[9px] font-mono font-bold tracking-normal animate-pulse border border-rams-rule">
                                                             {pendingLeaveCount}
                                                         </span>
                                                     )}
                                                     {item.id === 'applications' && data.jobApplications.filter(r => r.status === 'Pending').length > 0 && (
-                                                        <span className="ml-auto w-5 h-5 bg-amber-500 text-white rounded-full flex items-center justify-center text-[10px] font-bold">
+                                                        <span className="ml-auto px-2 py-0.5 bg-rams-amber text-rams-ink rounded-sm text-[9px] font-mono font-bold tracking-normal border border-rams-rule">
                                                             {data.jobApplications.filter(r => r.status === 'Pending').length}
                                                         </span>
                                                     )}
@@ -1307,24 +1307,24 @@ export default function AdminDashboard() {
                             ))}
                         </nav>
                         
-                        <div className="p-4 border-t border-slate-100 shrink-0">
+                        <div className="p-4 border-t border-rams-rule-light bg-rams-bg/50 shrink-0">
                             <div className="flex items-center gap-3 px-2 py-1.5">
-                                <div className="w-8 h-8 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-xs font-bold text-indigo-600">
+                                <div className="w-8 h-8 rounded-sm bg-rams-ink border border-rams-rule flex items-center justify-center text-xs font-mono font-black text-rams-panel">
                                     AD
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <p className="text-xs font-bold text-slate-800 truncate">Administrator</p>
-                                    <p className="text-[10px] text-slate-400 font-medium truncate">inthehaus</p>
+                                    <p className="text-xs font-mono font-bold text-rams-ink truncate">Administrator</p>
+                                    <p className="text-[9px] font-mono text-rams-ink-muted uppercase tracking-widest truncate">inthehaus</p>
                                 </div>
                                 <button 
                                     onClick={() => {
                                         sessionStorage.removeItem("adminAuth");
                                         window.location.reload();
                                     }}
-                                    className="p-1.5 hover:bg-rose-50 text-slate-400 hover:text-rose-500 rounded-lg transition-colors"
+                                    className="p-1.5 border border-rams-rule-light hover:border-rams-rule hover:bg-rams-bg text-rams-ink-muted hover:text-rams-ink rounded-sm transition-all cursor-pointer"
                                     title="Log Out"
                                 >
-                                    <Icons.Out size={16} />
+                                    <Icons.Out size={14} />
                                 </button>
                             </div>
                         </div>
@@ -1335,25 +1335,25 @@ export default function AdminDashboard() {
             {/* Main content wrapper */}
             <div className="flex-1 flex flex-col min-w-0">
                 {/* Mobile Top Header */}
-                <header className="lg:hidden sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-200/50 px-4 py-3 flex items-center justify-between">
+                <header className="lg:hidden sticky top-0 z-40 bg-rams-panel/90 backdrop-blur-[2px] border-b border-rams-rule px-4 py-3 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <button 
                             onClick={() => setIsDrawerOpen(true)}
-                            className="p-2 -ml-2 text-slate-600 hover:bg-slate-50 rounded-xl transition-colors"
+                            className="p-2 -ml-2 text-rams-ink hover:bg-rams-bg rounded-sm border border-transparent hover:border-rams-rule-light transition-all cursor-pointer"
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
                             </svg>
                         </button>
                         <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center text-white text-sm font-bold shadow-md shadow-slate-200">H</div>
-                            <h1 className="text-sm font-extrabold tracking-tight text-slate-800 leading-none">In the Haus</h1>
+                            <div className="w-8 h-8 bg-rams-ink border border-rams-rule rounded-sm flex items-center justify-center text-rams-panel text-sm font-mono font-black">H</div>
+                            <h1 className="text-sm font-mono font-bold tracking-wider text-rams-ink uppercase leading-none">In the Haus</h1>
                         </div>
                     </div>
                     
-                    <div className="group relative bg-white px-3 py-1.5 rounded-xl border border-slate-200 flex items-center gap-1.5 shadow-sm">
-                        <Icons.Calendar size={12} className="text-slate-400" />
-                        <input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="bg-transparent font-bold text-slate-700 outline-none text-xs cursor-pointer border-none p-0 focus:ring-0 w-24" />
+                    <div className="group relative bg-rams-bg px-3 py-1 rounded-sm border border-rams-rule-light flex items-center gap-1.5 shadow-none">
+                        <Icons.Calendar size={12} className="text-rams-ink-muted" />
+                        <input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="bg-transparent font-mono font-bold text-rams-ink outline-none text-[10px] cursor-pointer border-none p-0 focus:ring-0 w-24 uppercase" />
                     </div>
                 </header>
 
@@ -1362,18 +1362,18 @@ export default function AdminDashboard() {
                     {/* Header bar on Desktop */}
                     <div className="hidden lg:flex justify-between items-center mb-2">
                         <div>
-                            <h1 className="text-2xl font-black text-slate-900 tracking-tight capitalize">
+                            <h1 className="text-xl font-mono font-bold text-rams-ink uppercase tracking-wider">
                                 {activeTab === 'dashboard' ? 'Overview' : activeTab === 'shift_manage' ? 'Shifts Approval' : activeTab.replace('_', ' ')}
                             </h1>
                         </div>
                         
-                        <div className="flex items-center gap-2 bg-white px-4 py-2.5 rounded-2xl border border-slate-200/60 shadow-sm hover:shadow transition-all">
-                            <Icons.Calendar size={16} className="text-indigo-500" />
+                        <div className="flex items-center gap-2 bg-rams-panel px-3.5 py-1.5 rounded-sm border border-rams-rule shadow-[0_2px_0_0_var(--color-rams-rule)] transition-all">
+                            <Icons.Calendar size={14} className="text-rams-orange" />
                             <input 
                                 type="month" 
                                 value={selectedMonth} 
                                 onChange={e => setSelectedMonth(e.target.value)} 
-                                className="bg-transparent font-bold text-slate-800 outline-none text-sm cursor-pointer border-none p-0 focus:ring-0" 
+                                className="bg-transparent font-mono font-bold text-rams-ink outline-none text-xs cursor-pointer border-none p-0 focus:ring-0 uppercase" 
                             />
                         </div>
                     </div>
@@ -1382,50 +1382,47 @@ export default function AdminDashboard() {
                     {activeTab === 'dashboard' && (
                         <div className="space-y-6">
                             {/* Welcome Header */}
-                            <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-[2rem] p-6 md:p-8 text-white shadow-xl relative overflow-hidden">
-                                <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
-                                <div className="absolute bottom-0 left-1/3 w-48 h-48 bg-emerald-500/5 rounded-full blur-2xl pointer-events-none" />
-                                
+                            <div className="bg-rams-panel border border-rams-rule rounded-sm p-6 md:p-8 text-rams-ink shadow-none relative overflow-hidden">
                                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative z-10">
                                     <div>
-                                        <span className="text-[10px] tracking-widest uppercase font-bold text-indigo-300 bg-indigo-500/20 px-2.5 py-1 rounded-full">Restaurant OS</span>
-                                        <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight mt-2 text-white">ยินดีต้อนรับกลับมา, บอส 👋</h2>
-                                        <p className="text-xs md:text-sm text-slate-300 mt-1 font-medium">ภาพรวมการปฏิบัติงานและตารางงานวันนี้ของคุณ</p>
+                                        <span className="text-[9px] tracking-widest uppercase font-mono font-bold text-rams-ink bg-rams-bg border border-rams-rule-light px-2.5 py-1 rounded-sm">Restaurant OS</span>
+                                        <h2 className="text-xl md:text-2xl font-sans font-bold tracking-tight mt-2 text-rams-ink">ยินดีต้อนรับกลับมา, บอส 👋</h2>
+                                        <p className="text-xs text-rams-ink-muted mt-1 font-sans">ภาพรวมการปฏิบัติงานและตารางงานวันนี้ของคุณ</p>
                                     </div>
-                                    <div className="flex gap-2">
-                                        <button onClick={() => handleNotify('/api/notify')} className="px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white text-xs font-bold rounded-xl border border-white/15 transition-all">Daily Summary LINE</button>
-                                        <button onClick={() => setShowManualModal(true)} className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow transition-all">+ Manual Entry</button>
-                                        <button onClick={handleFinalizeDay} className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-xl border border-slate-700 transition-all">🏁 Cut-off วัน</button>
+                                    <div className="flex flex-wrap gap-2">
+                                        <button onClick={() => handleNotify('/api/notify')} className="px-4 py-2 bg-rams-bg hover:bg-rams-ink-muted/10 text-rams-ink text-xs font-mono font-bold uppercase tracking-wider rounded-sm border border-rams-rule-light transition-all cursor-pointer">Daily Summary LINE</button>
+                                        <button onClick={() => setShowManualModal(true)} className="px-4 py-2 bg-rams-orange hover:bg-rams-orange-active text-rams-panel text-xs font-mono font-bold uppercase tracking-wider rounded-sm border border-rams-rule shadow-[0_2px_0_0_var(--color-rams-rule)] active:translate-y-[2px] active:shadow-none transition-all cursor-pointer">+ Manual Entry</button>
+                                        <button onClick={handleFinalizeDay} className="px-4 py-2 bg-rams-ink text-rams-panel hover:bg-rams-ink-muted text-xs font-mono font-bold uppercase tracking-wider rounded-sm border border-rams-rule transition-all cursor-pointer">🏁 Cut-off วัน</button>
                                     </div>
                                 </div>
                             </div>
 
                             {/* Draft Schedules Warning Card */}
                             {draftWeeks.map(week => (
-                                <div key={week.start} className="relative bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/30 rounded-3xl p-5 pr-12 sm:pr-14 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-sm hover:shadow transition-all animate-fade-in-up">
+                                <div key={week.start} className="relative bg-rams-amber/10 border border-rams-rule rounded-sm p-4 pr-12 sm:pr-14 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-none animate-fade-in-up">
                                     <div className="flex gap-3">
-                                        <div className="w-10 h-10 bg-amber-500/20 rounded-2xl flex items-center justify-center text-amber-700 shrink-0">
-                                            <Icons.Alert size={20} />
+                                        <div className="w-10 h-10 bg-rams-amber/20 rounded-sm flex items-center justify-center border border-rams-rule text-rams-ink shrink-0">
+                                            <Icons.Alert size={18} />
                                         </div>
                                         <div>
-                                            <h4 className="font-extrabold text-slate-800 text-sm">พบตารางงานร่าง (Draft Roster) ที่ยังไม่เผยแพร่</h4>
-                                            <p className="text-xs text-slate-600 mt-1 font-medium">
+                                            <h4 className="font-mono font-bold text-rams-ink text-xs uppercase tracking-wider">พบตารางงานร่าง (Draft Roster) ที่ยังไม่เผยแพร่</h4>
+                                            <p className="text-[11px] font-sans text-rams-ink-muted mt-1">
                                                 สัปดาห์วันที่ {formatDate(week.start)} - {formatDate(week.end)} (มีทั้งหมด {week.count} กะงานที่ยังไม่ได้เผยแพร่)
                                             </p>
                                         </div>
                                     </div>
                                     <button 
                                         onClick={() => handlePublishRoster(week.start, week.end)}
-                                        className="w-full sm:w-auto px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow transition-colors shrink-0"
+                                        className="w-full sm:w-auto px-4 py-2 bg-rams-orange text-rams-panel font-mono font-bold text-xs uppercase tracking-wider rounded-sm border border-rams-rule shadow-[0_2px_0_0_var(--color-rams-rule)] hover:bg-rams-orange-active active:translate-y-[2px] active:shadow-none transition-all cursor-pointer shrink-0"
                                     >
                                         อนุมัติ & ประกาศ LINE
                                     </button>
                                     <button
                                         onClick={() => handleDismissDraftWeek(week.start)}
-                                        className="absolute top-4 right-4 p-1.5 rounded-xl text-amber-600 hover:text-amber-800 hover:bg-amber-500/20 transition-all"
+                                        className="absolute top-4 right-4 w-6 h-6 flex items-center justify-center border border-rams-rule-light hover:border-rams-rule bg-rams-panel text-rams-ink-muted hover:text-rams-ink font-mono text-[10px] transition-all cursor-pointer rounded-sm"
                                         title="ซ่อนคำเตือนนี้"
                                     >
-                                        <Icons.X size={16} />
+                                        <Icons.X size={12} />
                                     </button>
                                 </div>
                             ))}
@@ -1438,9 +1435,9 @@ export default function AdminDashboard() {
                                             setDismissedDraftWeeks([]);
                                             localStorage.removeItem("dismissed_draft_weeks");
                                         }}
-                                        className="text-xs font-bold text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200/80 px-4 py-2.5 rounded-2xl transition-all shadow-sm flex items-center gap-1.5"
+                                        className="text-[10px] font-mono font-bold text-rams-ink bg-rams-panel border border-rams-rule shadow-[0_2px_0_0_var(--color-rams-rule)] px-3 py-1.5 rounded-sm hover:bg-rams-bg-active active:translate-y-[1px] active:shadow-none transition-all flex items-center gap-1.5 cursor-pointer uppercase tracking-wider"
                                     >
-                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3.5 h-3.5">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3 h-3">
                                             <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
                                         </svg>
                                         แสดงตารางงานร่างที่ซ่อนไว้ ({dismissedDraftWeeks.length})
@@ -1451,19 +1448,19 @@ export default function AdminDashboard() {
 
                             {/* Quick Stats */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                                <Card className="relative overflow-hidden hover:scale-[1.02]">
+                                <Card className="shadow-none">
                                     <div className="flex justify-between items-start">
                                         <div>
-                                            <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Active Staff</p>
-                                            <h3 className="text-3xl font-black text-slate-800 mt-2">{data.employees.length}</h3>
+                                            <p className="text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest">Active Staff</p>
+                                            <h3 className="text-3xl font-mono font-black text-rams-ink mt-2">{data.employees.length}</h3>
                                         </div>
-                                        <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center text-slate-500">
-                                            <Icons.Staff size={20} />
+                                        <div className="w-10 h-10 bg-rams-bg border border-rams-rule-light rounded-sm flex items-center justify-center text-rams-ink-muted shrink-0">
+                                            <Icons.Staff size={18} />
                                         </div>
                                     </div>
                                 </Card>
 
-                                <Card className="relative overflow-hidden hover:scale-[1.02]">
+                                <Card className="shadow-none">
                                     {(() => {
                                         const todayStr = format(new Date(), 'yyyy-MM-dd');
                                         const todayLogs = data.logs.filter(log => format(new Date(log.timestamp), 'yyyy-MM-dd') === todayStr);
@@ -1471,18 +1468,18 @@ export default function AdminDashboard() {
                                         return (
                                             <div className="flex justify-between items-start">
                                                 <div>
-                                                    <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Today Check-ins</p>
-                                                    <h3 className="text-3xl font-black text-indigo-600 mt-2">{todayCheckIns}</h3>
+                                                    <p className="text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest">Today Check-ins</p>
+                                                    <h3 className="text-3xl font-mono font-black text-rams-orange mt-2">{todayCheckIns}</h3>
                                                 </div>
-                                                <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-500">
-                                                    <Icons.Check size={20} />
+                                                <div className="w-10 h-10 bg-rams-bg border border-rams-rule-light rounded-sm flex items-center justify-center text-rams-orange shrink-0">
+                                                    <Icons.Check size={18} />
                                                 </div>
                                             </div>
                                         );
                                     })()}
                                 </Card>
 
-                                <Card className="relative overflow-hidden hover:scale-[1.02]">
+                                <Card className="shadow-none">
                                     {(() => {
                                         const todayStr = format(new Date(), 'yyyy-MM-dd');
                                         const todayLogs = data.logs.filter(log => format(new Date(log.timestamp), 'yyyy-MM-dd') === todayStr);
@@ -1494,25 +1491,25 @@ export default function AdminDashboard() {
                                         return (
                                             <div className="flex justify-between items-start">
                                                 <div>
-                                                    <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Late Today</p>
-                                                    <h3 className="text-3xl font-black text-amber-600 mt-2">{todayLates}</h3>
+                                                    <p className="text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest">Late Today</p>
+                                                    <h3 className="text-3xl font-mono font-black text-rams-amber mt-2">{todayLates}</h3>
                                                 </div>
-                                                <div className="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center text-amber-500">
-                                                    <Icons.Alert size={20} />
+                                                <div className="w-10 h-10 bg-rams-bg border border-rams-rule-light rounded-sm flex items-center justify-center text-rams-amber shrink-0">
+                                                    <Icons.Alert size={18} />
                                                 </div>
                                             </div>
                                         );
                                     })()}
                                 </Card>
 
-                                <Card className="relative overflow-hidden hover:scale-[1.02]">
-                                    <div className="flex justify-between items-start">
+                                <Card className="shadow-none">
+                            <div className="flex justify-between items-start">
                                         <div>
-                                            <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Pending Alerts</p>
-                                            <h3 className="text-3xl font-black text-rose-600 mt-2">{totalAlertsCount}</h3>
+                                            <p className="text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest">Pending Alerts</p>
+                                            <h3 className="text-3xl font-mono font-black text-rams-red mt-2">{totalAlertsCount}</h3>
                                         </div>
-                                        <div className="w-10 h-10 bg-rose-50 rounded-xl flex items-center justify-center text-rose-500">
-                                            <Icons.Bell size={20} />
+                                        <div className="w-10 h-10 bg-rams-bg border border-rams-rule-light rounded-sm flex items-center justify-center text-rams-red shrink-0">
+                                            <Icons.Bell size={18} />
                                         </div>
                                     </div>
                                 </Card>
@@ -1522,45 +1519,44 @@ export default function AdminDashboard() {
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                                 {/* Real-time Activity Feed */}
                                 <div className="lg:col-span-2 space-y-6">
-                                    <Card className="p-0 overflow-hidden flex flex-col max-h-[650px] border border-slate-100">
-                                        <div className="p-6 border-b border-slate-100 flex justify-between items-center shrink-0 bg-white sticky top-0 z-20">
-                                            <h3 className="font-extrabold text-slate-800 text-base">Real-time Activity Feed</h3>
+                                    <div className="bg-rams-panel border border-rams-rule rounded-sm overflow-hidden flex flex-col max-h-[650px]">
+                                        <div className="p-5 border-b border-rams-rule-light flex justify-between items-center shrink-0 bg-rams-bg/30 sticky top-0 z-20">
+                                            <h3 className="font-mono font-bold text-rams-ink text-sm uppercase tracking-wider">Real-time Activity Feed</h3>
                                             <button
                                                 onClick={() => setShowAllLogs(!showAllLogs)}
-                                                className="text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1.5 rounded-lg hover:bg-slate-200 transition-colors"
+                                                className="text-[10px] font-mono font-bold text-rams-ink bg-rams-bg border border-rams-rule-light px-3 py-1.5 rounded-sm hover:bg-rams-bg-active transition-all uppercase tracking-wider cursor-pointer"
                                             >
                                                 {showAllLogs ? 'Show Less' : 'View All'}
                                             </button>
                                         </div>
-                                        <div className="overflow-auto custom-scrollbar flex-1">
-                                            <table className="w-full text-sm text-left relative">
-                                                <thead className="bg-slate-50/95 backdrop-blur text-slate-500 uppercase text-[10px] font-extrabold tracking-wider sticky top-0 z-10 border-b border-slate-100 shadow-sm">
+                                            <table className="w-full text-xs text-left relative">
+                                                <thead className="bg-rams-bg text-rams-ink-muted uppercase text-[9px] font-mono font-bold tracking-widest sticky top-0 z-10 border-b border-rams-rule-light shadow-none">
                                                     <tr>
-                                                        <th className="px-6 py-4 whitespace-nowrap">Date</th>
-                                                        <th className="px-6 py-4 whitespace-nowrap">Time</th>
-                                                        <th className="px-6 py-4 whitespace-nowrap">Photo</th>
-                                                        <th className="px-6 py-4 whitespace-nowrap">Staff</th>
-                                                        <th className="px-6 py-4 whitespace-nowrap">Action</th>
-                                                        <th className="px-6 py-4 whitespace-nowrap">Status</th>
-                                                        <th className="px-6 py-4 whitespace-nowrap w-10"></th>
+                                                        <th className="px-6 py-3 whitespace-nowrap">Date</th>
+                                                        <th className="px-6 py-3 whitespace-nowrap">Time</th>
+                                                        <th className="px-6 py-3 whitespace-nowrap">Photo</th>
+                                                        <th className="px-6 py-3 whitespace-nowrap">Staff</th>
+                                                        <th className="px-6 py-3 whitespace-nowrap">Action</th>
+                                                        <th className="px-6 py-3 whitespace-nowrap">Status</th>
+                                                        <th className="px-6 py-3 whitespace-nowrap w-10"></th>
                                                     </tr>
                                                 </thead>
-                                                <tbody className="divide-y divide-slate-100">
+                                                <tbody className="divide-y divide-rams-rule-light bg-rams-panel">
                                                     {(showAllLogs ? data.logs : data.logs.slice(0, 15)).map(log => {
                                                         const status = getShiftStatus(log);
                                                         return (
-                                                            <tr key={log.id} className="group hover:bg-slate-50/50 transition-all duration-150">
-                                                                <td className="px-6 py-4 font-mono text-slate-900 font-extrabold text-xs whitespace-nowrap">{formatDate(log.timestamp)}</td>
-                                                                <td className="px-6 py-4 font-mono text-slate-900 font-black text-sm whitespace-nowrap">{formatTime(log.timestamp)}</td>
+                                                            <tr key={log.id} className="group hover:bg-rams-bg/30 transition-all duration-100">
+                                                                <td className="px-6 py-4 font-mono text-rams-ink font-bold text-xs whitespace-nowrap">{formatDate(log.timestamp)}</td>
+                                                                <td className="px-6 py-4 font-mono text-rams-ink-muted font-bold text-xs whitespace-nowrap">{formatTime(log.timestamp)}</td>
                                                                 <td className="px-6 py-4">
                                                                     {log.photo_url ? (
                                                                         <a href={log.photo_url} target="_blank" rel="noopener noreferrer">
-                                                                            <img src={log.photo_url} alt="log" className="w-10 h-10 rounded-lg object-cover border border-slate-100 shadow-sm hover:scale-150 transition-transform duration-200" referrerPolicy="no-referrer" />
+                                                                            <img src={log.photo_url} alt="log" className="w-9 h-9 rounded-sm object-cover border border-rams-rule-light hover:border-rams-rule transition-all" referrerPolicy="no-referrer" />
                                                                         </a>
-                                                                    ) : <span className="text-slate-300 font-bold">-</span>}
+                                                                    ) : <span className="text-rams-ink-muted font-mono font-bold">-</span>}
                                                                 </td>
-                                                                <td className="px-6 py-4 font-black text-slate-900 flex items-center gap-3 whitespace-nowrap">
-                                                                    <div className="w-8 h-8 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-xs text-indigo-600 font-black shrink-0">
+                                                                <td className="px-6 py-4 font-bold text-rams-ink flex items-center gap-3 whitespace-nowrap">
+                                                                    <div className="w-7 h-7 rounded-sm bg-rams-ink border border-rams-rule flex items-center justify-center text-xs text-rams-panel font-mono font-bold shrink-0">
                                                                         {log.employees?.name?.charAt(0)}
                                                                     </div>
                                                                     {log.employees?.name}
@@ -1574,10 +1570,10 @@ export default function AdminDashboard() {
                                                                 <td className="px-6 py-4 whitespace-nowrap text-right">
                                                                     <button
                                                                         onClick={(e) => { e.stopPropagation(); handleDeleteLog(log.id); }}
-                                                                        className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all"
+                                                                        className="w-7 h-7 flex items-center justify-center border border-rams-rule-light hover:border-rams-red hover:bg-rams-red/10 text-rams-ink-muted hover:text-rams-red transition-all cursor-pointer rounded-sm"
                                                                         title="Delete Log"
                                                                     >
-                                                                        <Icons.Trash size={14} />
+                                                                        <Icons.Trash size={12} />
                                                                     </button>
                                                                 </td>
                                                             </tr>
@@ -1598,14 +1594,13 @@ export default function AdminDashboard() {
                                                 </tbody>
                                             </table>
                                         </div>
-                                    </Card>
-                                </div>
+                                    </div>
 
                                 {/* Alerts Hub (Action Center) */}
                                 <div className="space-y-6">
-                                    <Card className="border border-slate-100">
-                                        <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-100">
-                                            <h3 className="font-extrabold text-slate-800 text-base">Alerts Hub (Action Center)</h3>
+                                    <div className="bg-rams-panel border border-rams-rule rounded-sm p-5 shadow-none">
+                                        <div className="flex justify-between items-center mb-4 pb-2 border-b border-rams-rule-light -mx-5 -mt-5 p-5 bg-rams-bg/30">
+                                            <h3 className="font-mono font-bold text-rams-ink text-sm uppercase tracking-wider">Alerts Hub</h3>
                                             <Badge color={totalAlertsCount > 0 ? "orange" : "emerald"}>
                                                 {totalAlertsCount > 0 ? `${totalAlertsCount} pending` : "All cleared"}
                                             </Badge>
@@ -1613,41 +1608,41 @@ export default function AdminDashboard() {
 
                                         <div className="space-y-4 max-h-[500px] overflow-y-auto pr-1 custom-scrollbar">
                                             {totalAlertsCount === 0 ? (
-                                                <div className="text-center py-12 space-y-3">
-                                                    <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto text-xl font-bold">
+                                                <div className="text-center py-12 space-y-3 bg-rams-panel">
+                                                    <div className="w-10 h-10 bg-rams-green/10 border border-rams-rule text-rams-green rounded-sm flex items-center justify-center mx-auto text-sm font-mono font-bold">
                                                         ✓
                                                     </div>
-                                                    <p className="text-xs font-extrabold text-slate-700">ทุกอย่างเรียบร้อยดี!</p>
-                                                    <p className="text-[10px] text-slate-600">ไม่มีคำขออนุมัติหรือพนักงานสมัครใหม่ในขณะนี้</p>
+                                                    <p className="text-xs font-mono font-bold text-rams-ink uppercase tracking-wider">ทุกอย่างเรียบร้อยดี!</p>
+                                                    <p className="text-[10px] font-mono text-rams-ink-muted uppercase tracking-wider">ไม่มีคำขออนุมัติหรือพนักงานสมัครใหม่</p>
                                                 </div>
                                             ) : (
                                                 <>
                                                     {/* 1. Leave Requests */}
                                                     {data.leaveRequests.filter(r => r.status === 'pending').map(req => (
-                                                        <div key={`leave-${req.id}`} className="p-4 bg-rose-50/50 border border-rose-100 rounded-2xl space-y-3 animate-fade-in-up">
+                                                        <div key={`leave-${req.id}`} className="p-4 bg-rams-red/5 border border-rams-rule-light rounded-sm space-y-3">
                                                             <div className="flex justify-between items-start">
                                                                 <Badge color="rose">ขอลาหยุด</Badge>
-                                                                <span className="text-[10px] font-black text-slate-900">{formatDate(req.leave_date)}</span>
+                                                                <span className="text-[10px] font-mono font-bold text-rams-ink">{formatDate(req.leave_date)}</span>
                                                             </div>
-                                                            <div className="text-xs text-slate-800">
-                                                                <span className="font-extrabold text-slate-900">{req.employees?.name}</span> ขอลาหยุดประเภท <span className="font-bold text-indigo-600">{req.leave_type}</span>
-                                                                <p className="mt-1 font-medium text-slate-600 font-semibold">เหตุผล: &quot;{req.reason || '-'}&quot;</p>
+                                                            <div className="text-xs text-rams-ink font-sans">
+                                                                <span className="font-bold text-rams-ink">{req.employees?.name}</span> ขอลาหยุดประเภท <span className="font-mono font-bold text-rams-orange">{req.leave_type}</span>
+                                                                <div className="mt-1.5 p-2 bg-rams-bg border border-rams-rule-light rounded-sm font-mono text-[10px] text-rams-ink-muted leading-normal">เหตุผล: &quot;{req.reason || '-'}&quot;</div>
                                                                 {req.replacement_employee && (
-                                                                    <p className="mt-1 text-xs font-bold text-slate-700">
-                                                                        👤 คนทำงานแทน: <span className="text-indigo-650 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded-md">{req.replacement_employee.name} {req.replacement_employee.nickname ? `(${req.replacement_employee.nickname})` : ""}</span>
+                                                                    <p className="mt-2 text-xs font-mono font-bold text-rams-ink-muted">
+                                                                        👤 คนทำงานแทน: <span className="bg-rams-bg border border-rams-rule-light text-rams-ink font-mono px-1.5 py-0.5 rounded-sm">{req.replacement_employee.name} {req.replacement_employee.nickname ? `(${req.replacement_employee.nickname})` : ""}</span>
                                                                     </p>
                                                                 )}
                                                             </div>
                                                             <div className="flex gap-2 justify-end pt-1">
                                                                 <button 
                                                                     onClick={() => handleLeaveAction(req, 'approved')} 
-                                                                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] rounded-lg shadow-sm"
+                                                                    className="px-3 py-1.5 bg-rams-green text-rams-panel font-mono font-bold text-[9px] uppercase tracking-wider rounded-sm border border-rams-rule shadow-[0_1.5px_0_0_var(--color-rams-rule)] hover:bg-rams-green/90 active:translate-y-[1px] active:shadow-none cursor-pointer transition-all"
                                                                 >
                                                                     ✓ อนุมัติ
                                                                 </button>
                                                                 <button 
                                                                     onClick={() => handleLeaveAction(req, 'rejected')} 
-                                                                    className="px-3 py-1.5 bg-rose-100 hover:bg-rose-200 text-rose-700 font-bold text-[10px] rounded-lg"
+                                                                    className="px-3 py-1.5 bg-rams-bg border border-rams-rule-light text-rams-ink-muted font-mono font-bold text-[9px] uppercase tracking-wider rounded-sm hover:bg-rams-ink-muted/10 cursor-pointer transition-all"
                                                                 >
                                                                     ✕ ปฏิเสธ
                                                                 </button>
@@ -1657,25 +1652,25 @@ export default function AdminDashboard() {
 
                                                     {/* 2. Shift Swaps */}
                                                     {data.swapRequests.filter(r => r.status === 'PENDING_MANAGER').map(req => (
-                                                        <div key={`swap-${req.id}`} className="p-4 bg-blue-50/50 border border-blue-100 rounded-2xl space-y-3 animate-fade-in-up">
+                                                        <div key={`swap-${req.id}`} className="p-4 bg-rams-orange/5 border border-rams-rule-light rounded-sm space-y-3">
                                                             <div className="flex justify-between items-start">
                                                                 <Badge color="blue">สลับกะ</Badge>
-                                                                <span className="text-[10px] font-black text-slate-900">{req.target_date}</span>
+                                                                <span className="text-[10px] font-mono font-bold text-rams-ink">{req.target_date}</span>
                                                             </div>
-                                                            <div className="text-xs text-slate-800">
-                                                                <span className="font-extrabold text-slate-900">{req.requester?.name}</span> ขอสลับกะกับ <span className="font-bold text-slate-900">{req.peer?.name || 'Open Pool'}</span>
-                                                                <p className="mt-1 font-medium text-slate-600 font-semibold">โน้ต: &quot;{req.notes || '-'}&quot;</p>
+                                                            <div className="text-xs text-rams-ink font-sans">
+                                                                <span className="font-bold text-rams-ink">{req.requester?.name}</span> ขอสลับกะกับ <span className="font-bold text-rams-ink">{req.peer?.name || 'Open Pool'}</span>
+                                                                <div className="mt-1.5 p-2 bg-rams-bg border border-rams-rule-light rounded-sm font-mono text-[10px] text-rams-ink-muted leading-normal">โน้ต: &quot;{req.notes || '-'}&quot;</div>
                                                             </div>
                                                             <div className="flex gap-2 justify-end pt-1">
                                                                 <button 
                                                                     onClick={() => handleSwapDecision(req.id, 'APPROVE')} 
-                                                                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] rounded-lg shadow-sm"
+                                                                    className="px-3 py-1.5 bg-rams-green text-rams-panel font-mono font-bold text-[9px] uppercase tracking-wider rounded-sm border border-rams-rule shadow-[0_1.5px_0_0_var(--color-rams-rule)] hover:bg-rams-green/90 active:translate-y-[1px] active:shadow-none cursor-pointer transition-all"
                                                                 >
                                                                     ✓ อนุมัติ
                                                                 </button>
                                                                 <button 
                                                                     onClick={() => handleSwapDecision(req.id, 'REJECT')} 
-                                                                    className="px-3 py-1.5 bg-rose-100 hover:bg-rose-200 text-rose-700 font-bold text-[10px] rounded-lg"
+                                                                    className="px-3 py-1.5 bg-rams-bg border border-rams-rule-light text-rams-ink-muted font-mono font-bold text-[9px] uppercase tracking-wider rounded-sm hover:bg-rams-ink-muted/10 cursor-pointer transition-all"
                                                                 >
                                                                     ✕ ปฏิเสธ
                                                                 </button>
@@ -1685,18 +1680,18 @@ export default function AdminDashboard() {
 
                                                     {/* 3. Pending Employees */}
                                                     {data.pendingEmployees?.map(emp => (
-                                                        <div key={`emp-${emp.id}`} className="p-4 bg-amber-50/50 border border-amber-100 rounded-2xl space-y-3 animate-fade-in-up">
+                                                        <div key={`emp-${emp.id}`} className="p-4 bg-rams-amber/5 border border-rams-rule-light rounded-sm space-y-3 animate-fade-in-up">
                                                             <div className="flex justify-between items-start">
                                                                 <Badge color="amber">พนักงานสมัครใหม่</Badge>
-                                                                <span className="text-[10px] font-black text-slate-900">สมัครทาง LINE</span>
+                                                                <span className="text-[10px] font-mono font-bold text-rams-ink uppercase tracking-wider">สมัครทาง LINE</span>
                                                             </div>
-                                                            <div className="text-xs text-slate-800">
-                                                                <span className="font-extrabold text-slate-900">{emp.name}</span> ได้สมัครบัญชีพนักงานเข้ามา รอคุณอนุมัติ
+                                                            <div className="text-xs text-rams-ink font-sans">
+                                                                <span className="font-bold text-rams-ink">{emp.name}</span> ได้สมัครบัญชีพนักงานเข้ามา รอคุณอนุมัติ
                                                             </div>
                                                             <div className="flex justify-end pt-1">
                                                                 <button 
                                                                     onClick={() => { setEditingStaff(emp); setShowStaffModal(true); }}
-                                                                    className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-[10px] rounded-lg shadow-sm"
+                                                                    className="px-3 py-1.5 bg-rams-orange text-rams-panel font-mono font-bold text-[9px] uppercase tracking-wider rounded-sm border border-rams-rule shadow-[0_1.5px_0_0_var(--color-rams-rule)] hover:bg-rams-orange-active active:translate-y-[1px] active:shadow-none cursor-pointer transition-all"
                                                                 >
                                                                     ตั้งค่า & อนุมัติบัญชี
                                                                 </button>
@@ -1706,7 +1701,7 @@ export default function AdminDashboard() {
                                                 </>
                                             )}
                                         </div>
-                                    </Card>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1714,18 +1709,18 @@ export default function AdminDashboard() {
 
                     {/* Manual Entry Modal */}
                     {showManualModal && (
-                        <div className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-                            <Card className="w-full max-w-sm space-y-4 animate-in fade-in zoom-in-95 duration-200">
-                                <div className="flex justify-between items-center">
-                                    <h3 className="font-extrabold text-slate-800">Manual Attendance</h3>
-                                    <button onClick={() => setShowManualModal(false)} className="text-slate-400 hover:text-slate-600">✕</button>
+                        <div className="fixed inset-0 z-[60] bg-rams-ink/40 backdrop-blur-[2px] flex items-center justify-center p-4">
+                            <div className="bg-rams-panel border border-rams-rule rounded-sm w-full max-w-sm p-6 space-y-4 shadow-none">
+                                <div className="flex justify-between items-center border-b border-rams-rule-light pb-2">
+                                    <h3 className="font-mono font-bold text-rams-ink text-sm uppercase tracking-wider">Manual Attendance</h3>
+                                    <button onClick={() => setShowManualModal(false)} className="w-7 h-7 flex items-center justify-center border border-rams-rule-light hover:border-rams-rule bg-rams-bg text-rams-ink font-mono text-xs transition-all cursor-pointer">✕</button>
                                 </div>
 
-                                <div className="space-y-3">
+                                <div className="space-y-4">
                                     <div>
-                                        <label className="text-xs font-bold text-slate-700 uppercase">Employee</label>
+                                        <label className="block text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1.5">Employee</label>
                                         <select
-                                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-slate-200"
+                                            className="w-full p-2.5 bg-rams-bg border border-rams-rule-light rounded-sm text-xs font-mono font-bold text-rams-ink outline-none focus:border-rams-rule transition-all cursor-pointer appearance-none"
                                             value={manualForm.empId}
                                             onChange={e => setManualForm({ ...manualForm, empId: e.target.value })}
                                         >
@@ -1736,19 +1731,19 @@ export default function AdminDashboard() {
 
                                     <div className="grid grid-cols-2 gap-3">
                                         <div>
-                                            <label className="text-xs font-bold text-slate-700 uppercase">Date</label>
+                                            <label className="block text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1.5">Date</label>
                                             <input
                                                 type="date"
-                                                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none"
+                                                className="w-full p-2.5 bg-rams-bg border border-rams-rule-light rounded-sm text-xs font-mono font-bold text-rams-ink outline-none focus:border-rams-rule transition-all"
                                                 value={manualForm.date}
                                                 onChange={e => setManualForm({ ...manualForm, date: e.target.value })}
                                             />
                                         </div>
                                         <div>
-                                            <label className="text-xs font-bold text-slate-700 uppercase">Time</label>
+                                            <label className="block text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1.5">Time</label>
                                             <input
                                                 type="time"
-                                                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none"
+                                                className="w-full p-2.5 bg-rams-bg border border-rams-rule-light rounded-sm text-xs font-mono font-bold text-rams-ink outline-none focus:border-rams-rule transition-all"
                                                 value={manualForm.time}
                                                 onChange={e => setManualForm({ ...manualForm, time: e.target.value })}
                                             />
@@ -1756,17 +1751,17 @@ export default function AdminDashboard() {
                                     </div>
 
                                     <div>
-                                        <label className="text-xs font-bold text-slate-700 uppercase">Action Type</label>
+                                        <label className="block text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1.5">Action Type</label>
                                         <div className="grid grid-cols-2 gap-2 mt-1">
                                             <button
                                                 onClick={() => setManualForm({ ...manualForm, type: 'check_in' })}
-                                                className={`p-3 rounded-xl text-sm font-bold border transition-all ${manualForm.type === 'check_in' ? 'bg-emerald-50 border-emerald-500 text-emerald-700 ring-1 ring-emerald-500' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'}`}
+                                                className={`p-2.5 rounded-sm text-xs font-mono font-bold uppercase tracking-wider border transition-all cursor-pointer ${manualForm.type === 'check_in' ? 'bg-rams-green/10 border-rams-green text-rams-green' : 'bg-rams-bg border-rams-rule-light text-rams-ink-muted hover:border-rams-rule'}`}
                                             >
                                                 Check In
                                             </button>
                                             <button
                                                 onClick={() => setManualForm({ ...manualForm, type: 'check_out' })}
-                                                className={`p-3 rounded-xl text-sm font-bold border transition-all ${manualForm.type === 'check_out' ? 'bg-amber-50 border-amber-500 text-amber-700 ring-1 ring-amber-500' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'}`}
+                                                className={`p-2.5 rounded-sm text-xs font-mono font-bold uppercase tracking-wider border transition-all cursor-pointer ${manualForm.type === 'check_out' ? 'bg-rams-orange/10 border-rams-orange text-rams-orange' : 'bg-rams-bg border-rams-rule-light text-rams-ink-muted hover:border-rams-rule'}`}
                                             >
                                                 Check Out
                                             </button>
@@ -1775,12 +1770,12 @@ export default function AdminDashboard() {
 
                                     <button
                                         onClick={handleManualSubmit}
-                                        className="w-full py-3 bg-slate-800 text-white rounded-xl font-bold shadow-lg shadow-slate-200 hover:bg-slate-900 transition-transform active:scale-95"
+                                        className="w-full py-2.5 bg-rams-orange text-rams-panel border border-rams-rule rounded-sm font-mono font-bold text-xs uppercase tracking-wider shadow-[0_2px_0_0_var(--color-rams-rule)] hover:bg-rams-orange-active active:translate-y-[2px] active:shadow-none transition-all cursor-pointer mt-4"
                                     >
                                         Confirm Entry
                                     </button>
                                 </div>
-                            </Card>
+                            </div>
                         </div>
                     )}
 

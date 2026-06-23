@@ -633,25 +633,25 @@ export default function ChecklistPage() {
 
     // --- RENDER ---
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-zinc-950 text-slate-900 dark:text-zinc-50 font-sans p-4 md:p-8 transition-colors duration-200">
-            <div className="max-w-6xl mx-auto space-y-8">
+        <div className="min-h-screen bg-rams-bg text-rams-ink font-sans p-4 md:p-8 font-feature-settings-['ss01'] pb-32 transition-colors">
+            <div className="max-w-6xl mx-auto space-y-6">
                 
                 {/* Header Section */}
-                <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-white dark:bg-zinc-900 p-6 md:p-8 rounded-[2rem] shadow-sm border border-slate-100 dark:border-zinc-800">
+                <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-rams-panel p-6 border border-rams-rule-light rounded-sm shadow-none">
                     <div className="space-y-1">
                         <div className="flex items-center gap-3">
-                            <h1 className="text-3xl font-bold tracking-tight text-slate-950 dark:text-white">Checklist System</h1>
-                            <span className="relative flex h-3 w-3">
+                            <h1 className="text-2xl font-mono font-bold tracking-tight text-rams-ink uppercase">Checklist System</h1>
+                            <span className="relative flex h-2.5 w-2.5">
                                 {isAutoSync && (
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                    <span className="animate-pulse absolute inline-flex h-full w-full rounded-full bg-rams-green opacity-75"></span>
                                 )}
                                 <span className={cn(
-                                    "relative inline-flex rounded-full h-3 w-3",
-                                    isAutoSync ? "bg-emerald-500" : "bg-zinc-300 dark:bg-zinc-600"
+                                    "relative inline-flex rounded-full h-2.5 w-2.5 border border-rams-rule-light",
+                                    isAutoSync ? "bg-rams-green" : "bg-rams-ink-muted"
                                 )}></span>
                             </span>
                         </div>
-                        <p className="text-slate-500 dark:text-zinc-400 text-sm font-medium">
+                        <p className="text-rams-ink-muted text-xs font-semibold">
                             ระบบบันทึกความถูกต้อง รายงานเปิด-ปิดร้านประจำวัน และการสรุปข้อมูลแบบ Real-time
                         </p>
                     </div>
@@ -666,16 +666,16 @@ export default function ChecklistPage() {
                                         setSelectedMonth(e.target.value);
                                         setSelectedDayFilter(null);
                                     }}
-                                    className="appearance-none pl-4 pr-10 py-2.5 rounded-2xl bg-slate-100 dark:bg-zinc-800 border-0 text-sm font-semibold text-slate-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-lime-500/20 hover:bg-slate-200 dark:hover:bg-zinc-700/80 transition-all cursor-pointer min-w-[160px]"
+                                    className="appearance-none pl-3 pr-8 py-2 rounded-sm bg-rams-bg border border-rams-rule-light text-xs font-mono font-bold text-rams-ink focus:outline-none focus:border-rams-rule transition-all cursor-pointer min-w-[150px]"
                                 >
                                     {availableMonths.map(m => (
                                         <option key={m} value={m}>
-                                            {format(parse(m, 'MMMM yyyy', new Date()), 'MMMM yyyy', { locale: th })}
+                                            {format(parse(m, 'MMMM yyyy', new Date()), 'MMMM yyyy', { locale: th }).toUpperCase()}
                                         </option>
                                     ))}
                                 </select>
-                                <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-slate-400">
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" /></svg>
+                                <div className="absolute inset-y-0 right-2 flex items-center pointer-events-none text-rams-ink-muted">
+                                    <ChevronRight size={14} className="rotate-90" />
                                 </div>
                             </div>
                         )}
@@ -684,23 +684,23 @@ export default function ChecklistPage() {
                         <button
                             onClick={() => setIsAutoSync(!isAutoSync)}
                             className={cn(
-                                "flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all border shadow-sm",
+                                "flex items-center gap-2 px-3 py-2 rounded-sm text-[10px] font-mono font-bold uppercase transition-all border cursor-pointer select-none active:translate-y-[1px]",
                                 isAutoSync 
-                                    ? "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200/50 dark:border-emerald-900/30 text-emerald-700 dark:text-emerald-400"
-                                    : "bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-800 text-slate-500 dark:text-zinc-400"
+                                    ? "bg-rams-green/10 text-rams-green border-rams-green/30"
+                                    : "bg-rams-bg border-rams-rule-light text-rams-ink-muted hover:text-rams-ink"
                             )}
                         >
-                            {isAutoSync ? <Pause size={13} className="animate-pulse" /> : <Play size={13} />}
-                            {isAutoSync ? `สด (Auto ${countdown}s)` : "หยุดอัปเดต"}
+                            {isAutoSync ? <Pause size={11} className="animate-pulse" /> : <Play size={11} />}
+                            {isAutoSync ? `LIVE (Auto ${countdown}s)` : "SYNC OFF"}
                         </button>
 
                         {/* Refresh Button */}
                         <button
                             onClick={fetchData}
                             disabled={loading}
-                            className="p-3 flex items-center justify-center rounded-2xl bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-600 dark:text-zinc-400 transition-all shadow-sm active:scale-95 disabled:opacity-50"
+                            className="p-2 flex items-center justify-center rounded-sm bg-rams-bg border border-rams-rule-light hover:bg-rams-panel/50 hover:text-rams-ink text-rams-ink-muted transition-all active:translate-y-[1px] cursor-pointer disabled:opacity-50"
                         >
-                            <RefreshCw size={16} className={cn(loading && "animate-spin")} />
+                            <RefreshCw size={14} className={cn(loading && "animate-spin")} />
                         </button>
                     </div>
                 </header>
@@ -708,27 +708,27 @@ export default function ChecklistPage() {
                 {/* Dashboard Stats */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                     {/* Stat Card 1: Score */}
-                    <div className="bg-white dark:bg-zinc-900 p-6 rounded-[2rem] border border-slate-100 dark:border-zinc-800 shadow-sm flex flex-col justify-between">
-                        <span className="text-slate-400 dark:text-zinc-400 text-xs font-bold uppercase tracking-wider">ความสมบูรณ์ข้อมูล</span>
-                        <div className="flex items-end justify-between mt-4">
-                            <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight text-slate-950 dark:text-white font-mono">
+                    <div className="bg-rams-panel p-5 border border-rams-rule-light rounded-sm shadow-none flex flex-col justify-between">
+                        <span className="text-rams-ink-muted text-[9px] font-mono font-bold tracking-widest uppercase block mb-3">ความสมบูรณ์ข้อมูล</span>
+                        <div className="flex items-end justify-between">
+                            <h2 className="text-3xl font-mono font-black tracking-tight text-rams-ink">
                                 {stats.complianceScore}%
                             </h2>
                             <span className={cn(
-                                "text-xs font-bold px-2 py-1 rounded-lg",
-                                stats.complianceScore > 85 ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/20 dark:text-emerald-400" :
-                                stats.complianceScore > 60 ? "bg-amber-50 text-amber-600 dark:bg-amber-950/20 dark:text-amber-400" :
-                                "bg-rose-50 text-rose-600 dark:bg-rose-950/20 dark:text-rose-400"
+                                "text-[9px] font-mono font-bold uppercase tracking-widest px-2 py-0.5 rounded-sm border",
+                                stats.complianceScore > 85 ? "bg-rams-green/10 text-rams-green border-rams-green/30" :
+                                stats.complianceScore > 60 ? "bg-rams-amber/10 text-rams-amber border-rams-amber/30" :
+                                "bg-rams-red/10 text-rams-red border-rams-red/30"
                             )}>
-                                {stats.complianceScore === 100 ? "สมบูรณ์ดีมาก" : stats.complianceScore > 85 ? "ดีมาก" : "ต้องปรับปรุง"}
+                                {stats.complianceScore === 100 ? "EXCELLENT" : stats.complianceScore > 85 ? "GOOD" : "WARNING"}
                             </span>
                         </div>
-                        <div className="h-1.5 w-full bg-slate-100 dark:bg-zinc-800 rounded-full mt-4 overflow-hidden">
+                        <div className="h-2 w-full bg-rams-bg border border-rams-rule-light rounded-sm mt-3.5 overflow-hidden">
                             <div 
                                 className={cn(
-                                    "h-full rounded-full transition-all duration-500",
-                                    stats.complianceScore > 85 ? "bg-emerald-500" :
-                                    stats.complianceScore > 60 ? "bg-amber-500" : "bg-rose-500"
+                                    "h-full transition-all duration-500",
+                                    stats.complianceScore > 85 ? "bg-rams-green" :
+                                    stats.complianceScore > 60 ? "bg-rams-amber" : "bg-rams-red"
                                 )} 
                                 style={{ width: `${stats.complianceScore}%` }}
                             />
@@ -736,86 +736,86 @@ export default function ChecklistPage() {
                     </div>
 
                     {/* Stat Card 2: Submissions */}
-                    <div className="bg-white dark:bg-zinc-900 p-6 rounded-[2rem] border border-slate-100 dark:border-zinc-800 shadow-sm flex flex-col justify-between">
-                        <span className="text-slate-400 dark:text-zinc-400 text-xs font-bold uppercase tracking-wider">รายงานทั้งหมด (รอบ/วัน)</span>
-                        <div className="mt-4">
-                            <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight text-slate-950 dark:text-white font-mono">
-                                {stats.total} <span className="text-sm font-normal text-slate-400">รายการ</span>
+                    <div className="bg-rams-panel p-5 border border-rams-rule-light rounded-sm shadow-none flex flex-col justify-between">
+                        <span className="text-rams-ink-muted text-[9px] font-mono font-bold tracking-widest uppercase block mb-3">รายงานทั้งหมด</span>
+                        <div>
+                            <h2 className="text-3xl font-mono font-black tracking-tight text-rams-ink">
+                                {stats.total} <span className="text-xs font-normal text-rams-ink-muted">REPORTS</span>
                             </h2>
-                            <div className="flex gap-4 mt-2 text-xs font-semibold text-slate-400">
-                                <span className="flex items-center gap-1"><span className="text-amber-500">☀️</span> เปิด {stats.opening}</span>
-                                <span className="flex items-center gap-1"><span className="text-indigo-500">🌙</span> ปิด {stats.closing}</span>
+                            <div className="flex gap-3 mt-3 text-[9px] font-mono font-bold tracking-wider text-rams-ink-muted uppercase">
+                                <span className="flex items-center gap-1 text-rams-orange">☀️ OPEN: {stats.opening}</span>
+                                <span className="flex items-center gap-1 text-rams-ink">🌙 CLOSE: {stats.closing}</span>
                             </div>
                         </div>
                     </div>
 
                     {/* Stat Card 3: Discrepancy Count */}
-                    <div className="bg-white dark:bg-zinc-900 p-6 rounded-[2rem] border border-slate-100 dark:border-zinc-800 shadow-sm flex flex-col justify-between">
-                        <span className="text-slate-400 dark:text-zinc-400 text-xs font-bold uppercase tracking-wider">จำนวนจุดบกพร่อง / ต่างกะ</span>
-                        <div className="flex items-end justify-between mt-4">
+                    <div className="bg-rams-panel p-5 border border-rams-rule-light rounded-sm shadow-none flex flex-col justify-between">
+                        <span className="text-rams-ink-muted text-[9px] font-mono font-bold tracking-widest uppercase block mb-3">จุดบกพร่อง / ต่างกะ</span>
+                        <div className="flex items-end justify-between">
                             <div>
-                                <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight text-slate-950 dark:text-white font-mono">
-                                    {stats.mismatches} <span className="text-sm font-normal text-slate-400">กะ</span>
+                                <h2 className="text-3xl font-mono font-black tracking-tight text-rams-ink">
+                                    {stats.mismatches} <span className="text-xs font-normal text-rams-ink-muted">SHIFTS</span>
                                 </h2>
-                                <p className="text-xs text-slate-400 mt-1">ยอดเงินเปิด-ปิดข้ามกะไม่ตรง</p>
+                                <p className="text-[9px] font-mono text-rams-ink-muted uppercase tracking-wider mt-1.5">ยอดข้ามกะไม่ตรงกัน</p>
                             </div>
                             <div className={cn(
-                                "p-2 rounded-xl flex items-center justify-center",
-                                stats.mismatches > 0 ? "bg-amber-50 dark:bg-amber-950/20 text-amber-500" : "bg-emerald-50 dark:bg-emerald-950/20 text-emerald-500"
+                                "p-2 rounded-sm border flex items-center justify-center",
+                                stats.mismatches > 0 ? "bg-rams-amber/10 border-rams-amber/30 text-rams-amber" : "bg-rams-green/10 border-rams-green/30 text-rams-green"
                             )}>
-                                <AlertTriangle size={20} />
+                                <AlertTriangle size={16} />
                             </div>
                         </div>
                     </div>
 
                     {/* Stat Card 4: Accum Discrepancy */}
-                    <div className="bg-white dark:bg-zinc-900 p-6 rounded-[2rem] border border-slate-100 dark:border-zinc-800 shadow-sm flex flex-col justify-between">
-                        <span className="text-slate-400 dark:text-zinc-400 text-xs font-bold uppercase tracking-wider">ผลรวมเงินดรอเวอร์คลาดเคลื่อน</span>
-                        <div className="flex items-end justify-between mt-4">
+                    <div className="bg-rams-panel p-5 border border-rams-rule-light rounded-sm shadow-none flex flex-col justify-between">
+                        <span className="text-rams-ink-muted text-[9px] font-mono font-bold tracking-widest uppercase block mb-3">สะสมเงินคลาดเคลื่อน</span>
+                        <div className="flex items-end justify-between">
                             <div>
                                 <h2 className={cn(
-                                    "text-3xl md:text-4xl font-extrabold tracking-tight font-mono",
-                                    stats.netMismatch > 0 ? "text-emerald-600 dark:text-emerald-400" :
-                                    stats.netMismatch < 0 ? "text-rose-600 dark:text-rose-400" : "text-slate-950 dark:text-white"
+                                    "text-3xl font-mono font-black tracking-tight",
+                                    stats.netMismatch > 0 ? "text-rams-green" :
+                                    stats.netMismatch < 0 ? "text-rams-red" : "text-rams-ink"
                                 )}>
-                                    {stats.netMismatch > 0 ? `+${stats.netMismatch}` : stats.netMismatch} <span className="text-sm font-normal text-slate-400">THB</span>
+                                    {stats.netMismatch > 0 ? `+${stats.netMismatch}` : stats.netMismatch} <span className="text-xs font-normal text-rams-ink-muted">THB</span>
                                 </h2>
-                                <p className="text-xs text-slate-400 mt-1">สะสมสุทธิตามบัญชีเปิดปิด</p>
+                                <p className="text-[9px] font-mono text-rams-ink-muted uppercase tracking-wider mt-1.5">ดรอเวอร์ดิฟสะสม</p>
                             </div>
                             <div className={cn(
-                                "p-2 rounded-xl flex items-center justify-center",
-                                stats.netMismatch > 0 ? "bg-emerald-50 text-emerald-500" :
-                                stats.netMismatch < 0 ? "bg-rose-50 text-rose-500" : "bg-slate-50 dark:bg-zinc-800 text-slate-400"
+                                "p-2 rounded-sm border flex items-center justify-center",
+                                stats.netMismatch > 0 ? "bg-rams-green/10 border-rams-green/30 text-rams-green" :
+                                stats.netMismatch < 0 ? "bg-rams-red/10 border-rams-red/30 text-rams-red" : "bg-rams-bg border-rams-rule-light text-rams-ink-muted"
                             )}>
-                                {stats.netMismatch > 0 ? <ArrowUpRight size={20} /> : <ArrowDownRight size={20} />}
+                                {stats.netMismatch > 0 ? <ArrowUpRight size={16} /> : <ArrowDownRight size={16} />}
                             </div>
                         </div>
                     </div>
                 </div>
 
                 {/* Calendar View Grid */}
-                <div className="bg-white dark:bg-zinc-900 p-6 md:p-8 rounded-[2rem] border border-slate-100 dark:border-zinc-800 shadow-sm">
+                <div className="bg-rams-panel p-6 border border-rams-rule-light rounded-sm shadow-none">
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
                         <div>
-                            <h2 className="text-xl font-bold text-slate-950 dark:text-white">ปฏิทินความถูกต้อง (Monthly Activity)</h2>
-                            <p className="text-xs text-slate-400 mt-0.5">กดที่วันที่เพื่อดูรายละเอียด หรือกดซ้ำเพื่อยกเลิกตัวกรอง</p>
+                            <h2 className="text-lg font-mono font-bold text-rams-ink uppercase tracking-wider">ปฏิทินความถูกต้อง (Monthly Activity)</h2>
+                            <p className="text-[10px] font-mono text-rams-ink-muted uppercase tracking-wider mt-0.5">กดเลือกวันที่ต้องการตรวจสอบรายการบันทึก หรือกดซ้ำเพื่อยกเลิกตัวกรอง</p>
                         </div>
                         
                         {selectedDayFilter && (
                             <button
                                 onClick={() => setSelectedDayFilter(null)}
-                                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-xs font-semibold text-slate-600 dark:text-zinc-300 transition-all self-start md:self-auto"
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-sm bg-rams-bg border border-rams-rule-light hover:bg-rams-panel/50 hover:text-rams-ink text-xs font-mono font-bold text-rams-ink transition-all self-start md:self-auto cursor-pointer"
                             >
                                 <X size={12} />
-                                ล้างตัวกรองวันที่: {format(parse(selectedDayFilter, 'yyyy-MM-dd', new Date()), 'd MMM yyyy', { locale: th })}
+                                CLEAR FILTER: {format(parse(selectedDayFilter, 'yyyy-MM-dd', new Date()), 'd MMM yyyy', { locale: th }).toUpperCase()}
                             </button>
                         )}
                     </div>
 
                     {/* Weekday headers */}
-                    <div className="grid grid-cols-7 gap-2 mb-2 text-center text-xs font-bold text-slate-400 dark:text-zinc-500">
+                    <div className="grid grid-cols-7 gap-2 mb-2 text-center text-[10px] font-mono font-extrabold uppercase text-rams-ink-muted border-b border-rams-rule-light pb-2">
                         {['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'].map(day => (
-                            <div key={day} className="py-2">{day}</div>
+                            <div key={day} className="py-1">{day}</div>
                         ))}
                     </div>
 
@@ -823,7 +823,7 @@ export default function ChecklistPage() {
                     <div className="grid grid-cols-7 gap-2">
                         {/* Padding cells */}
                         {Array.from({ length: firstDayOfWeek }).map((_, i) => (
-                            <div key={`pad-${i}`} className="aspect-square rounded-2xl bg-slate-50/50 dark:bg-zinc-900/50 border border-dashed border-slate-100 dark:border-zinc-800/40" />
+                            <div key={`pad-${i}`} className="aspect-square rounded-sm bg-rams-bg/30 border border-dashed border-rams-rule-light/40" />
                         ))}
 
                         {/* Day cells */}
@@ -835,10 +835,10 @@ export default function ChecklistPage() {
 
                             // Determine status styles for dots
                             const getDotClass = (entry) => {
-                                if (!entry) return "bg-slate-200 dark:bg-zinc-700";
+                                if (!entry) return "bg-rams-bg border border-rams-rule-light/50";
                                 return entry.hasDiscrepancies 
-                                    ? "bg-amber-500 ring-2 ring-amber-500/20" 
-                                    : "bg-emerald-500 ring-2 ring-emerald-500/20";
+                                    ? "bg-rams-amber border border-rams-amber" 
+                                    : "bg-rams-green border border-rams-green";
                             };
 
                             return (
@@ -846,39 +846,39 @@ export default function ChecklistPage() {
                                     key={dateStr}
                                     onClick={() => handleDayClick(dateStr)}
                                     className={cn(
-                                        "aspect-square rounded-2xl p-2 flex flex-col justify-between border cursor-pointer transition-all relative overflow-hidden group select-none",
+                                        "aspect-square rounded-sm p-2 flex flex-col justify-between border cursor-pointer transition-all relative overflow-hidden group select-none",
                                         isSelected 
-                                            ? "bg-lime-500/10 border-lime-500 dark:border-lime-500/60 shadow-sm"
+                                            ? "bg-rams-orange/10 border-rams-orange"
                                             : isToday
-                                                ? "bg-slate-50 dark:bg-zinc-800 border-slate-300 dark:border-zinc-700"
-                                                : "bg-white dark:bg-zinc-900 border-slate-100 dark:border-zinc-800 hover:border-slate-300 dark:hover:border-zinc-700"
+                                                ? "bg-rams-bg border-rams-rule"
+                                                : "bg-rams-panel border-rams-rule-light hover:border-rams-rule"
                                     )}
                                 >
                                     {/* Day Number */}
                                     <div className="flex justify-between items-start">
                                         <span className={cn(
-                                            "text-xs md:text-sm font-bold",
-                                            isToday ? "text-lime-600 dark:text-lime-400 font-extrabold" : "text-slate-700 dark:text-zinc-300",
-                                            isSelected && "text-lime-700 dark:text-lime-400"
+                                            "text-xs font-mono font-bold",
+                                            isToday ? "text-rams-orange font-black" : "text-rams-ink",
+                                            isSelected && "text-rams-orange"
                                         )}>
                                             {day.getDate()}
                                         </span>
                                         {isToday && (
-                                            <span className="w-1.5 h-1.5 rounded-full bg-lime-500 animate-pulse" />
+                                            <span className="w-1.5 h-1.5 rounded-full bg-rams-orange animate-pulse" />
                                         )}
                                     </div>
 
                                     {/* Shift dots */}
-                                    <div className="flex justify-center gap-1.5 mt-auto">
+                                    <div className="flex justify-center gap-1 mt-auto">
                                         {/* Opening Dot */}
                                         <div 
                                             title={status?.opening ? `เปิดกะ: ${status.opening.staffName}` : "ไม่มีข้อมูลเปิดร้าน"} 
-                                            className={cn("w-2 h-2 rounded-full", getDotClass(status?.opening))}
+                                            className={cn("w-1.5 h-1.5 rounded-full", getDotClass(status?.opening))}
                                         />
                                         {/* Closing Dot */}
                                         <div 
                                             title={status?.closing ? `ปิดกะ: ${status.closing.staffName}` : "ไม่มีข้อมูลปิดร้าน"} 
-                                            className={cn("w-2 h-2 rounded-full", getDotClass(status?.closing))}
+                                            className={cn("w-1.5 h-1.5 rounded-full", getDotClass(status?.closing))}
                                         />
                                     </div>
                                 </div>
@@ -890,30 +890,30 @@ export default function ChecklistPage() {
                 {/* Content Section: Lists & Logs */}
                 <div ref={logsContainerRef} className="space-y-6">
                     {/* Filter and Section Header */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-zinc-800 pb-5">
-                        <div>
-                            <h2 className="text-2xl font-bold text-slate-950 dark:text-white">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-rams-rule-light pb-5">
+                        <div className="space-y-0.5">
+                            <h2 className="text-xl font-mono font-bold text-rams-ink uppercase tracking-wider">
                                 {selectedDayFilter 
-                                    ? `บันทึกรายการสำหรับวันที่ ${format(parse(selectedDayFilter, 'yyyy-MM-dd', new Date()), 'd MMMM yyyy', { locale: th })}`
+                                    ? `บันทึกสำหรับวันที่ ${format(parse(selectedDayFilter, 'yyyy-MM-dd', new Date()), 'd MMMM yyyy', { locale: th }).toUpperCase()}`
                                     : "บันทึกการตรวจงานทั้งหมด"
                                 }
                             </h2>
-                            <p className="text-slate-400 text-xs mt-0.5">
-                                กำลังแสดง {filteredData.length} รายการ จากทั้งหมดในเดือน
+                            <p className="text-rams-ink-muted text-[10px] font-mono uppercase tracking-wider">
+                                SHOWING {filteredData.length} OF {currentMonthData.length} MONTHLY ENTRIES
                             </p>
                         </div>
 
                         {/* Filter Tabs */}
-                        <div className="flex p-1 bg-slate-100 dark:bg-zinc-800 rounded-xl max-w-fit">
+                        <div className="flex p-0.5 bg-rams-bg border border-rams-rule-light rounded-sm max-w-fit">
                             {['All', 'Opening', 'Closing'].map((f) => (
                                 <button
                                     key={f}
                                     onClick={() => setFilter(f)}
                                     className={cn(
-                                        "px-4 py-2 rounded-lg text-xs font-bold transition-all ease-out duration-200",
+                                        "px-3.5 py-1.5 rounded-sm text-[10px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer select-none",
                                         filter === f
-                                            ? "bg-white dark:bg-zinc-900 text-slate-900 dark:text-white shadow-[0_2px_8px_rgba(0,0,0,0.06)]"
-                                            : "text-slate-400 hover:text-slate-600 dark:text-zinc-400 dark:hover:text-zinc-200"
+                                            ? "bg-rams-ink text-rams-panel border border-rams-rule"
+                                            : "text-rams-ink-muted hover:text-rams-ink"
                                     )}
                                 >
                                     {f === 'All' ? 'ทั้งหมด' : f === 'Opening' ? '☀️ เปิดร้าน' : '🌙 ปิดร้าน'}
@@ -926,17 +926,17 @@ export default function ChecklistPage() {
                     {loading && data.length === 0 ? (
                         <div className="space-y-6">
                             {[1, 2, 3].map(i => (
-                                <div key={i} className="w-full h-56 bg-white dark:bg-zinc-900 rounded-[2rem] animate-pulse border border-slate-100 dark:border-zinc-800 shadow-sm" />
+                                <div key={i} className="w-full h-56 bg-rams-panel rounded-sm animate-pulse border border-rams-rule-light shadow-none" />
                             ))}
                         </div>
                     ) : filteredData.length === 0 ? (
-                        <div className="bg-white dark:bg-zinc-900 rounded-[2rem] p-12 text-center border border-slate-100 dark:border-zinc-800 shadow-sm flex flex-col items-center justify-center">
-                            <div className="p-4 bg-slate-50 dark:bg-zinc-800 rounded-full text-slate-400 mb-4">
-                                <FileText size={32} />
+                        <div className="bg-rams-panel rounded-sm p-12 text-center border border-rams-rule-light shadow-none flex flex-col items-center justify-center">
+                            <div className="p-3 bg-rams-bg border border-rams-rule-light text-rams-ink-muted mb-4 rounded-sm">
+                                <FileText size={24} />
                             </div>
-                            <h3 className="text-lg font-bold text-slate-800 dark:text-zinc-200">ไม่พบรายงานบันทึก</h3>
-                            <p className="text-slate-400 text-sm mt-1 max-w-xs">
-                                ไม่มีรายงานที่ตรงตามเงื่อนไขในขณะนี้ ลองเลือกเงื่อนไขหรือวันที่อื่น
+                            <h3 className="text-sm font-mono font-bold text-rams-ink uppercase tracking-wider">ไม่พบรายงานบันทึก</h3>
+                            <p className="text-rams-ink-muted text-xs font-mono uppercase tracking-wider mt-1 max-w-xs leading-relaxed">
+                                NO ENTRIES COMPLY WITH THE APPLIED DATE OR SHIFT FILTERS
                             </p>
                         </div>
                     ) : (
@@ -946,59 +946,59 @@ export default function ChecklistPage() {
                                     <motion.div
                                         key={item.id}
                                         layout
-                                        initial={{ opacity: 0, scale: 0.98 }}
+                                        initial={{ opacity: 0, scale: 0.99 }}
                                         animate={{ opacity: 1, scale: 1 }}
-                                        exit={{ opacity: 0, scale: 0.95 }}
-                                        transition={{ duration: 0.3, type: "spring", bounce: 0.2 }}
+                                        exit={{ opacity: 0, scale: 0.98 }}
+                                        transition={{ duration: 0.15 }}
                                         className={cn(
-                                            "bg-white dark:bg-zinc-900 rounded-[2rem] p-6 md:p-8 shadow-sm border transition-all overflow-hidden relative group",
+                                            "bg-rams-panel rounded-sm p-6 md:p-8 shadow-none border transition-all overflow-hidden relative group",
                                             item.hasDiscrepancies
-                                                ? "border-amber-200/60 dark:border-amber-900/30"
-                                                : "border-slate-100 dark:border-zinc-800/80"
+                                                ? "border-rams-amber"
+                                                : "border-rams-rule-light"
                                         )}
                                     >
                                         {/* Status Accent Strip */}
                                         <div className={cn(
-                                            "absolute left-0 top-0 bottom-0 w-1.5 transition-colors duration-300",
+                                            "absolute left-0 top-0 bottom-0 w-1 transition-colors duration-300",
                                             item.type === 'Opening' 
-                                                ? "bg-amber-400" 
-                                                : "bg-indigo-500"
+                                                ? "bg-rams-orange" 
+                                                : "bg-rams-ink"
                                         )} />
 
-                                        <div className="pl-2 sm:pl-4">
+                                        <div className="pl-2">
                                             {/* Top Metadata Header */}
                                             <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-6">
                                                 {/* Left Info Column */}
                                                 <div className="space-y-2">
-                                                    <div className="flex flex-wrap items-center gap-2">
+                                                    <div className="flex flex-wrap items-center gap-3">
                                                         <span className={cn(
-                                                            "text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-lg",
+                                                            "text-[9px] font-mono font-bold uppercase tracking-widest px-2.5 py-0.5 rounded-sm border",
                                                             item.type === 'Opening'
-                                                                ? "bg-amber-50 text-amber-600 dark:bg-amber-950/30 dark:text-amber-400"
-                                                                : "bg-indigo-50 text-indigo-600 dark:bg-indigo-950/30 dark:text-indigo-400"
+                                                                ? "bg-rams-orange/10 text-rams-orange border-rams-orange/30"
+                                                                : "bg-rams-ink text-rams-panel border border-rams-rule"
                                                         )}>
-                                                            {item.type === 'Opening' ? '☀️ OPENING (เปิดกะ)' : '🌙 CLOSING (ปิดกะ)'}
+                                                            {item.type === 'Opening' ? '☀️ OPENING' : '🌙 CLOSING'}
                                                         </span>
-                                                        <span className="text-slate-400 dark:text-zinc-500 text-xs font-semibold flex items-center gap-1">
+                                                        <span className="text-rams-ink-muted text-xs font-mono font-semibold flex items-center gap-1">
                                                             <Clock size={12} />
                                                             {format(item.timestamp, "d MMMM yyyy • HH:mm", { locale: th })} น.
                                                         </span>
                                                     </div>
-                                                    <h3 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                                                        <User size={18} className="text-slate-400" />
-                                                        {item.staffName}
+                                                    <h3 className="text-2xl font-mono font-black text-rams-ink flex items-center gap-2">
+                                                        <User size={18} className="text-rams-ink-muted" />
+                                                        {item.staffName.toUpperCase()}
                                                     </h3>
                                                 </div>
 
                                                 {/* Right Cash Badge */}
                                                 {item.cashStr && (
-                                                    <div className="flex flex-col md:items-end bg-slate-50 dark:bg-zinc-800/50 p-4 rounded-2xl border border-slate-100 dark:border-zinc-800 min-w-[150px]">
-                                                        <span className="text-[10px] font-extrabold text-slate-400 dark:text-zinc-500 uppercase tracking-widest mb-1">
+                                                    <div className="flex flex-col md:items-end bg-rams-bg p-3.5 rounded-sm border border-rams-rule-light min-w-[140px] shadow-none">
+                                                        <span className="text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1.5">
                                                             CASH IN DRAWER
                                                         </span>
-                                                        <span className="font-mono text-xl font-black text-slate-800 dark:text-white tabular-nums">
+                                                        <span className="font-mono text-xl font-black text-rams-ink tabular-nums">
                                                             {item.cash !== null ? item.cash.toLocaleString() : item.cashStr}{' '}
-                                                            <span className="text-xs font-bold text-slate-400 dark:text-zinc-500">THB</span>
+                                                            <span className="text-xs font-bold text-rams-ink-muted">THB</span>
                                                         </span>
                                                     </div>
                                                 )}
@@ -1006,14 +1006,14 @@ export default function ChecklistPage() {
 
                                             {/* Validation Warnings Panel (if any) */}
                                             {item.warnings.length > 0 && (
-                                                <div className="mb-6 p-4 bg-amber-50/50 dark:bg-amber-950/10 rounded-2xl border border-amber-200/50 dark:border-amber-900/30 space-y-2">
-                                                    <div className="flex items-center gap-2 text-amber-800 dark:text-amber-400 font-bold text-sm">
-                                                        <AlertCircle size={16} />
-                                                        <span>พบความผิดปกติที่ต้องตรวจสอบ ({item.warnings.length} จุด)</span>
+                                                <div className="mb-6 p-4 bg-rams-amber/5 rounded-sm border border-rams-amber/35 space-y-2">
+                                                    <div className="flex items-center gap-2 text-rams-amber font-mono font-bold text-xs uppercase tracking-wider">
+                                                        <AlertCircle size={14} />
+                                                        <span>พบจุดที่ต้องตรวจสอบ ({item.warnings.length} รายการ)</span>
                                                     </div>
-                                                    <ul className="space-y-1 pl-6 list-disc text-xs text-amber-700/90 dark:text-amber-400/80 leading-relaxed font-semibold">
+                                                    <ul className="space-y-1 pl-5 list-disc text-xs text-rams-ink-muted leading-relaxed font-mono font-semibold">
                                                         {item.warnings.map((w, idx) => (
-                                                            <li key={idx}>
+                                                            <li key={idx} className="marker:text-rams-amber">
                                                                 {w.message}
                                                             </li>
                                                         ))}
@@ -1024,32 +1024,32 @@ export default function ChecklistPage() {
                                             {/* Main Content Sections */}
                                             <div className="grid md:grid-cols-2 gap-6 mb-6">
                                                 {/* Left Column: Tasks Completed */}
-                                                <div className="bg-slate-50/80 dark:bg-zinc-800/30 rounded-2xl p-5 border border-slate-100 dark:border-zinc-800/40">
-                                                    <div className="flex items-center justify-between mb-4 border-b border-slate-200/50 dark:border-zinc-800 pb-2">
-                                                        <span className="text-xs font-extrabold text-slate-400 dark:text-zinc-500 uppercase tracking-wider flex items-center gap-1.5">
-                                                            <CheckSquare size={13} className="text-slate-400" />
+                                                <div className="bg-rams-bg rounded-sm p-4 border border-rams-rule-light">
+                                                    <div className="flex items-center justify-between mb-4 border-b border-rams-rule-light/60 pb-2">
+                                                        <span className="text-[10px] font-mono font-bold text-rams-ink-muted uppercase tracking-wider flex items-center gap-1.5">
+                                                            <CheckSquare size={12} className="text-rams-ink-muted" />
                                                             รายการภารกิจที่ทำเสร็จ
                                                         </span>
-                                                        <span className="text-xs font-bold px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400">
-                                                            {item.tasks.length} สำเร็จ
+                                                        <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-sm bg-rams-green/10 text-rams-green border border-rams-green/20">
+                                                            {item.tasks.length} COMPLETED
                                                         </span>
                                                     </div>
 
                                                     {item.tasks.length > 0 ? (
-                                                        <div className="space-y-2.5 max-h-[220px] overflow-y-auto custom-scrollbar pr-2">
+                                                        <div className="space-y-2 max-h-[220px] overflow-y-auto custom-scrollbar pr-1">
                                                             {item.tasks.map((taskText, idx) => (
                                                                 <div key={idx} className="flex items-start gap-2.5">
-                                                                    <div className="mt-1 w-3.5 h-3.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center flex-shrink-0 border border-emerald-200/20">
-                                                                        <Check size={10} className="text-emerald-500 dark:text-emerald-400" strokeWidth={3} />
+                                                                    <div className="mt-1 w-3 h-3 rounded-full bg-rams-green/10 flex items-center justify-center flex-shrink-0 border border-rams-green/20">
+                                                                        <Check size={8} className="text-rams-green" strokeWidth={3} />
                                                                     </div>
-                                                                    <span className="text-slate-700 dark:text-zinc-300 text-xs leading-relaxed font-semibold">
+                                                                    <span className="text-rams-ink text-xs leading-relaxed font-mono font-semibold">
                                                                         {taskText}
                                                                     </span>
                                                                 </div>
                                                             ))}
                                                         </div>
                                                     ) : (
-                                                        <p className="text-slate-400 dark:text-zinc-500 text-xs italic py-2">
+                                                        <p className="text-rams-ink-muted font-mono text-xs italic py-1">
                                                             ไม่มีการบันทึกงานภารกิจหลัก
                                                         </p>
                                                     )}
@@ -1057,17 +1057,17 @@ export default function ChecklistPage() {
 
                                                 {/* Right Column: General Notes & Metadata Fields */}
                                                 <div className="flex flex-col justify-between gap-4">
-                                                    <div className="bg-slate-50/80 dark:bg-zinc-800/30 rounded-2xl p-5 border border-slate-100 dark:border-zinc-800/40 flex-1">
-                                                        <span className="text-xs font-extrabold text-slate-400 dark:text-zinc-500 uppercase tracking-wider flex items-center gap-1.5 mb-3">
-                                                            <FileText size={13} />
+                                                    <div className="bg-rams-bg rounded-sm p-4 border border-rams-rule-light flex-1">
+                                                        <span className="text-[10px] font-mono font-bold text-rams-ink-muted uppercase tracking-wider flex items-center gap-1.5 mb-3">
+                                                            <FileText size={12} className="text-rams-ink-muted" />
                                                             บันทึกเพิ่มเติม / หมายเหตุ
                                                         </span>
                                                         {item.note ? (
-                                                            <p className="text-slate-700 dark:text-zinc-300 text-xs leading-relaxed font-semibold bg-white dark:bg-zinc-900 p-3.5 rounded-xl border border-slate-100 dark:border-zinc-800/60">
+                                                            <p className="text-rams-ink text-xs leading-relaxed font-mono font-semibold bg-rams-panel p-3 rounded-sm border border-rams-rule-light">
                                                                 {item.note}
                                                             </p>
                                                         ) : (
-                                                            <p className="text-slate-400 dark:text-zinc-500 text-xs italic py-2">
+                                                            <p className="text-rams-ink-muted font-mono text-xs italic py-1">
                                                                 ไม่มีหมายเหตุเพิ่มเติม
                                                             </p>
                                                         )}
@@ -1075,17 +1075,17 @@ export default function ChecklistPage() {
 
                                                     {/* Other form fields if present (e.g. coffee clean) */}
                                                     {(item.raw["[ เวรล้างถังน้ำเครื่องกาแฟ - ทุก 2 วัน]"] || item.raw["ใส่ชื่อผู้ล้าง ถังน้ำกาแฟ **"] || item.raw["จุดที่ไม่เรียบร้อย (จากกะกลางคืน ) เพื่อปรับปรุง ไม่มีให้เว้นว่างเอาไว้ *"]) && (
-                                                        <div className="bg-slate-50/80 dark:bg-zinc-800/30 rounded-2xl p-4 border border-slate-100 dark:border-zinc-800/40 text-[11px] space-y-2">
+                                                        <div className="bg-rams-bg rounded-sm p-3.5 border border-rams-rule-light text-[10px] font-mono space-y-2">
                                                             {item.raw["ใส่ชื่อผู้ล้าง ถังน้ำกาแฟ **"] && (
                                                                 <div className="flex justify-between">
-                                                                    <span className="text-slate-400 font-bold">เวรล้างถังน้ำกาแฟ:</span>
-                                                                    <span className="text-slate-700 dark:text-zinc-300 font-semibold">{item.raw["ใส่ชื่อผู้ล้าง ถังน้ำกาแฟ **"]}</span>
+                                                                    <span className="text-rams-ink-muted font-bold">เวรล้างถังน้ำกาแฟ:</span>
+                                                                    <span className="text-rams-ink font-semibold">{item.raw["ใส่ชื่อผู้ล้าง ถังน้ำกาแฟ **"].toUpperCase()}</span>
                                                                 </div>
                                                             )}
                                                             {item.raw["จุดที่ไม่เรียบร้อย (จากกะกลางคืน ) เพื่อปรับปรุง ไม่มีให้เว้นว่างเอาไว้ *"] && (
-                                                                <div className="flex flex-col gap-1">
-                                                                    <span className="text-slate-400 font-bold">จุดบกพร่องจากกะก่อนหน้า:</span>
-                                                                    <span className="text-slate-700 dark:text-zinc-300 font-semibold bg-amber-50 dark:bg-amber-950/20 p-2 rounded border border-amber-100/30">
+                                                                <div className="flex flex-col gap-1.5 pt-1.5 border-t border-rams-rule-light/40">
+                                                                    <span className="text-rams-ink-muted font-bold">จุดบกพร่องจากกะก่อนหน้า:</span>
+                                                                    <span className="text-rams-ink font-semibold bg-rams-amber/5 p-2 rounded-sm border border-rams-amber/25">
                                                                         {item.raw["จุดที่ไม่เรียบร้อย (จากกะกลางคืน ) เพื่อปรับปรุง ไม่มีให้เว้นว่างเอาไว้ *"]}
                                                                     </span>
                                                                 </div>
@@ -1098,8 +1098,8 @@ export default function ChecklistPage() {
                                             {/* Evidence Photo Gallery */}
                                             {item.photos.length > 0 && (
                                                 <div className="space-y-3">
-                                                    <span className="text-xs font-extrabold text-slate-400 dark:text-zinc-500 uppercase tracking-wider flex items-center gap-1.5">
-                                                        <Camera size={13} />
+                                                    <span className="text-[10px] font-mono font-bold text-rams-ink-muted uppercase tracking-wider flex items-center gap-1.5">
+                                                        <Camera size={12} />
                                                         ภาพถ่ายหลักฐานประกอบ ({item.photos.length} รูป)
                                                     </span>
                                                     <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
@@ -1107,13 +1107,13 @@ export default function ChecklistPage() {
                                                             <div
                                                                 key={i}
                                                                 onClick={() => setSelectedImage(photo.full)}
-                                                                className="aspect-square rounded-2xl overflow-hidden cursor-pointer relative group border border-slate-100 dark:border-zinc-800 shadow-sm hover:shadow-md hover:scale-105 active:scale-95 transition-all duration-300 bg-slate-100 dark:bg-zinc-800"
+                                                                className="aspect-square rounded-sm overflow-hidden cursor-pointer relative group border border-rams-rule-light bg-rams-bg hover:border-rams-rule transition-all duration-200"
                                                             >
-                                                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors z-10" />
+                                                                <div className="absolute inset-0 bg-rams-ink/0 group-hover:bg-rams-ink/5 transition-colors z-10" />
                                                                 <img
                                                                     src={photo.thumbnail}
                                                                     alt="Checklist Evidence"
-                                                                    className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500"
+                                                                    className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-300"
                                                                     onError={(e) => {
                                                                         e.target.style.display = 'none';
                                                                     }}
@@ -1140,28 +1140,28 @@ export default function ChecklistPage() {
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={() => setSelectedImage(null)}
-                        className="fixed inset-0 z-[100] bg-zinc-950/95 backdrop-blur-md flex items-center justify-center p-4 md:p-8"
+                        className="fixed inset-0 z-[100] bg-rams-ink/90 backdrop-blur-sm flex items-center justify-center p-4 md:p-8"
                     >
                         <motion.div
-                            initial={{ scale: 0.95, opacity: 0 }}
+                            initial={{ scale: 0.98, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0.95, opacity: 0 }}
+                            exit={{ scale: 0.98, opacity: 0 }}
                             onClick={(e) => e.stopPropagation()}
-                            className="w-full h-full max-w-5xl bg-black rounded-3xl overflow-hidden shadow-2xl relative border border-white/10"
+                            className="w-full h-full max-w-5xl bg-rams-bg rounded-sm overflow-hidden shadow-none relative border border-rams-rule"
                         >
                             {/* IFrame or Image Element */}
                             {selectedImage.includes('drive.google.com') ? (
                                 <iframe
                                     src={selectedImage}
-                                    className="w-full h-full border-0 bg-zinc-900"
+                                    className="w-full h-full border-0 bg-rams-bg"
                                     allow="autoplay"
                                 />
                             ) : (
-                                <div className="w-full h-full flex items-center justify-center bg-zinc-950 p-2">
+                                <div className="w-full h-full flex items-center justify-center bg-rams-bg p-2">
                                     <img 
                                         src={selectedImage} 
                                         alt="Evidence Full" 
-                                        className="max-w-full max-h-full object-contain rounded-2xl" 
+                                        className="max-w-full max-h-full object-contain rounded-sm" 
                                     />
                                 </div>
                             )}
@@ -1169,9 +1169,9 @@ export default function ChecklistPage() {
                             {/* Close button */}
                             <button
                                 onClick={() => setSelectedImage(null)}
-                                className="absolute top-6 right-6 w-11 h-11 bg-white/10 hover:bg-white/20 text-white rounded-full flex items-center justify-center backdrop-blur-md border border-white/15 transition-all active:scale-90"
+                                className="absolute top-4 right-4 w-9 h-9 bg-rams-panel hover:bg-rams-bg text-rams-ink rounded-sm flex items-center justify-center border border-rams-rule-light transition-all active:translate-y-[1px] cursor-pointer"
                             >
-                                <X size={20} />
+                                <X size={16} />
                             </button>
                         </motion.div>
                     </motion.div>

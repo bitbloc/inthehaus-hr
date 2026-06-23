@@ -39,13 +39,14 @@ export function LongPressButton({ onLongPress, className, label = "Delete", dura
             onMouseLeave={stop}
             onTouchStart={start}
             onTouchEnd={stop}
-            className={clsx("relative overflow-hidden bg-rose-50 text-rose-500 px-3 py-1 rounded font-bold text-xs hover:bg-rose-100 select-none", className)}
+            className={clsx("relative overflow-hidden bg-rams-red/10 text-rams-red border border-rams-red/20 px-3 py-1 rounded-sm font-mono font-bold text-[10px] uppercase tracking-wider select-none hover:bg-rams-red/20 active:translate-y-[1px] transition-all cursor-pointer", className)}
         >
-            <span className="relative z-10">{pressing ? "Hold..." : label}</span>
+            <span className="relative z-10">{pressing ? "HOLD..." : label}</span>
             <div
                 style={{ width: `${progress}%` }}
-                className="absolute left-0 top-0 bottom-0 bg-rose-200 z-0 transition-all duration-75 ease-linear"
+                className="absolute left-0 top-0 bottom-0 bg-rams-red/35 z-0 transition-all duration-75 ease-linear"
             />
         </button>
     );
 }
+

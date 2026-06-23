@@ -70,112 +70,112 @@ export default function PayrollDashboard() {
     const totalNetSalary = payrollData.reduce((sum, item) => sum + item.netSalary, 0);
 
     return (
-        <div className="p-6 max-w-7xl mx-auto space-y-6 text-gray-800">
+        <div className="p-6 max-w-7xl mx-auto space-y-6 text-rams-ink font-sans min-h-screen bg-rams-bg selection:bg-rams-ink/10">
             <div className="mb-2">
-                <a href="/admin" className="text-sm text-gray-500 hover:text-gray-800 flex items-center gap-1 w-fit transition-colors">
-                    <ChevronLeft size={16} /> กลับสู่หน้าแดชบอร์ดหลัก
+                <a href="/admin" className="text-xs font-mono font-bold text-rams-ink-muted hover:text-rams-ink flex items-center gap-1.5 w-fit transition-colors uppercase tracking-wider">
+                    <ChevronLeft size={14} /> กลับสู่หน้าแดชบอร์ดหลัก
                 </a>
             </div>
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-rams-panel p-5 rounded-sm border border-rams-rule shadow-none">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-800">ระบบสรุปเงินเดือน (Payroll)</h1>
-                    <p className="text-gray-500 text-sm">ประมวลผลจากตารางงาน (Roster) และเวลาเข้างานจริง</p>
+                    <h1 className="text-lg font-mono font-bold tracking-wider text-rams-ink uppercase">ระบบสรุปเงินเดือน (Payroll)</h1>
+                    <p className="text-[10px] font-mono uppercase tracking-widest text-rams-ink-muted mt-1.5">ประมวลผลจากตารางงาน (Roster) และเวลาเข้างานจริง</p>
                 </div>
                 
                 <div className="flex gap-2">
                     <a 
                         href={`/admin/payroll/report?month=${selectedMonth}&type=master`} 
                         target="_blank"
-                        className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-black text-white rounded-lg text-sm font-medium transition-colors"
+                        className="flex items-center gap-2 px-4 py-2 bg-rams-bg hover:bg-rams-ink-muted/10 text-rams-ink rounded-sm border border-rams-rule-light text-xs font-mono font-bold uppercase tracking-wider transition-all"
                     >
-                        <FileText size={16} /> สรุปรวม (Master)
+                        <FileText size={14} className="text-rams-ink-muted" /> สรุปรวม (Master)
                     </a>
                     <a 
                         href={`/admin/payroll/report?month=${selectedMonth}&type=individual`} 
                         target="_blank"
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
+                        className="flex items-center gap-2 px-4 py-2 bg-rams-orange hover:bg-rams-orange-active text-rams-panel rounded-sm border border-rams-rule text-xs font-mono font-bold uppercase tracking-wider shadow-[0_2px_0_0_var(--color-rams-rule)] active:translate-y-[1px] active:shadow-none transition-all"
                     >
-                        <Printer size={16} /> พิมพ์สลิป (Payslips)
+                        <Printer size={14} /> พิมพ์สลิป (Payslips)
                     </a>
                 </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
+                <div className="bg-rams-panel p-5 rounded-sm border border-rams-rule-light shadow-none flex items-center justify-between">
                     <div>
-                        <p className="text-sm text-gray-500 mb-1">ยอดรวมที่ต้องจ่ายเดือนนี้</p>
-                        <h3 className="text-3xl font-bold text-gray-800">฿{totalNetSalary.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</h3>
+                        <p className="text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1.5">ยอดรวมที่ต้องจ่ายเดือนนี้</p>
+                        <h3 className="text-2xl font-mono font-black text-rams-ink tracking-tight">฿{totalNetSalary.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</h3>
                     </div>
                 </div>
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-center items-center">
-                    <p className="text-sm text-gray-500 mb-2">เลือกเดือน</p>
+                <div className="bg-rams-panel p-4 rounded-sm border border-rams-rule-light flex flex-col justify-center items-center shadow-none">
+                    <p className="text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-2.5">เลือกเดือน</p>
                     <div className="flex items-center gap-4">
-                        <button onClick={prevMonth} className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full"><ChevronLeft size={20}/></button>
-                        <span className="text-xl font-semibold w-32 text-center">
+                        <button onClick={prevMonth} className="w-8 h-8 bg-rams-bg border border-rams-rule-light hover:border-rams-rule text-rams-ink flex items-center justify-center rounded-sm transition-all cursor-pointer"><ChevronLeft size={16}/></button>
+                        <span className="text-sm font-mono font-bold w-32 text-center uppercase tracking-wider text-rams-ink">
                             {format(new Date(selectedMonth + '-01'), 'MMMM yyyy', { locale: th })}
                         </span>
-                        <button onClick={nextMonth} className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full"><ChevronRight size={20}/></button>
+                        <button onClick={nextMonth} className="w-8 h-8 bg-rams-bg border border-rams-rule-light hover:border-rams-rule text-rams-ink flex items-center justify-center rounded-sm transition-all cursor-pointer"><ChevronRight size={16}/></button>
                     </div>
                 </div>
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-center">
-                    <p className="text-sm text-gray-500 mb-1">จำนวนพนักงานที่ทำงาน</p>
-                    <h3 className="text-3xl font-bold text-gray-800">{payrollData.filter(d => d.workDays > 0).length} <span className="text-lg font-normal text-gray-500">คน</span></h3>
+                <div className="bg-rams-panel p-5 rounded-sm border border-rams-rule-light shadow-none flex flex-col justify-center">
+                    <p className="text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1.5">จำนวนพนักงานที่ทำงาน</p>
+                    <h3 className="text-2xl font-mono font-black text-rams-ink tracking-tight">{payrollData.filter(d => d.workDays > 0).length} <span className="text-sm font-normal text-rams-ink-muted">คน</span></h3>
                 </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="bg-rams-panel border border-rams-rule rounded-sm overflow-hidden shadow-none">
                 <div className="overflow-x-auto">
                     {loading ? (
-                        <div className="p-12 text-center text-gray-500">กำลังประมวลผลข้อมูลเงินเดือน...</div>
+                        <div className="p-12 text-center font-mono text-xs text-rams-ink-muted uppercase tracking-wider">กำลังประมวลผลข้อมูลเงินเดือน...</div>
                     ) : (
-                        <table className="w-full text-sm text-left">
-                            <thead className="bg-gray-50 text-gray-600 border-b border-gray-200">
+                        <table className="w-full text-xs text-left">
+                            <thead className="bg-rams-bg/50 text-rams-ink-muted border-b border-rams-rule-light font-mono text-[9px] uppercase tracking-widest">
                                 <tr>
-                                    <th className="px-6 py-4 font-semibold">พนักงาน</th>
-                                    <th className="px-6 py-4 font-semibold text-center">วันทำงาน</th>
-                                    <th className="px-6 py-4 font-semibold text-center">ชม.ปกติ</th>
-                                    <th className="px-6 py-4 font-semibold text-center">OT (ชม.)</th>
-                                    <th className="px-6 py-4 font-semibold text-center">สาย (ครั้ง)</th>
-                                    <th className="px-6 py-4 font-semibold text-right">ค่าแรงปกติ</th>
-                                    <th className="px-6 py-4 font-semibold text-right">ค่า OT</th>
-                                    <th className="px-6 py-4 font-semibold text-right">ยอดสุทธิ (บาท)</th>
+                                    <th className="px-6 py-4">พนักงาน</th>
+                                    <th className="px-6 py-4 text-center">วันทำงาน</th>
+                                    <th className="px-6 py-4 text-center">ชม.ปกติ</th>
+                                    <th className="px-6 py-4 text-center">OT (ชม.)</th>
+                                    <th className="px-6 py-4 text-center">สาย (ครั้ง)</th>
+                                    <th className="px-6 py-4 text-right">ค่าแรงปกติ</th>
+                                    <th className="px-6 py-4 text-right">ค่า OT</th>
+                                    <th className="px-6 py-4 text-right">ยอดสุทธิ</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-100">
+                            <tbody className="divide-y divide-rams-rule-light">
                                 {payrollData.map(item => (
                                     <React.Fragment key={item.emp.id}>
                                         <tr 
-                                             className="hover:bg-gray-50 cursor-pointer transition-colors text-gray-800"
+                                             className="hover:bg-rams-bg/30 cursor-pointer transition-colors text-rams-ink border-b border-rams-rule-light"
                                              onClick={() => toggleExpand(item.emp.id)}
                                          >
                                             <td className="px-6 py-4">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-gray-400">
-                                                        {expandedEmpId === item.emp.id ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                                <div className="flex items-center gap-3">
+                                                    <span className="text-rams-ink-muted">
+                                                        {expandedEmpId === item.emp.id ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                                                     </span>
                                                     <div>
-                                                        <div className="font-medium text-gray-800">{item.emp.nickname || item.emp.name}</div>
-                                                        <div className="text-xs text-gray-400">{item.emp.position}</div>
+                                                        <div className="font-bold text-rams-ink">{item.emp.nickname || item.emp.name}</div>
+                                                        <div className="text-[10px] font-mono text-rams-ink-muted uppercase tracking-wider mt-0.5">{item.emp.position}</div>
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-4 text-center">{item.workDays}</td>
-                                            <td className="px-6 py-4 text-center text-blue-600 font-medium">{item.totalRegularHours.toFixed(1)}</td>
-                                            <td className="px-6 py-4 text-center text-orange-600 font-medium">{item.totalOTHours.toFixed(1)}</td>
-                                            <td className="px-6 py-4 text-center text-red-500">{item.lateCount > 0 ? item.lateCount : '-'}</td>
-                                            <td className="px-6 py-4 text-right text-black font-semibold">{item.totalSalary.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td>
-                                            <td className="px-6 py-4 text-right text-black font-semibold">{item.totalOTPay.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td>
-                                            <td className="px-6 py-4 text-right font-bold text-green-600">{item.netSalary.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td>
+                                            <td className="px-6 py-4 text-center font-mono font-bold">{item.workDays}</td>
+                                            <td className="px-6 py-4 text-center text-rams-orange font-mono font-bold">{item.totalRegularHours.toFixed(1)}</td>
+                                            <td className="px-6 py-4 text-center text-rams-orange font-mono font-bold">{item.totalOTHours.toFixed(1)}</td>
+                                            <td className="px-6 py-4 text-center font-mono font-bold text-rams-red">{item.lateCount > 0 ? item.lateCount : '-'}</td>
+                                            <td className="px-6 py-4 text-right font-mono font-bold">฿{item.totalSalary.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td>
+                                            <td className="px-6 py-4 text-right font-mono font-bold">฿{item.totalOTPay.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td>
+                                            <td className="px-6 py-4 text-right font-mono font-black text-rams-green text-sm">฿{item.netSalary.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td>
                                         </tr>
                                         {expandedEmpId === item.emp.id && (
                                             <tr>
-                                                <td colSpan={8} className="px-6 py-4 bg-gray-50/50 border-t border-b border-gray-200">
-                                                    <div className="p-4 bg-white rounded-lg border border-gray-200 shadow-inner max-h-96 overflow-y-auto">
-                                                        <h4 className="font-bold text-gray-700 mb-3 flex items-center gap-2">
-                                                            📅 บันทึกการเข้า-ออกงานและค่าแรงรายวันของ {item.emp.nickname || item.emp.name}
+                                                <td colSpan={8} className="p-4 bg-rams-bg/20 border-t border-b border-rams-rule-light">
+                                                    <div className="p-4 bg-rams-panel border border-rams-rule-light rounded-sm shadow-none max-h-96 overflow-y-auto">
+                                                        <h4 className="font-mono font-bold text-rams-ink text-xs uppercase tracking-wider mb-4">
+                                                            ⚙️ Daily Records - {item.emp.nickname || item.emp.name}
                                                         </h4>
-                                                        <table className="w-full text-xs text-left">
-                                                            <thead className="bg-gray-100 text-gray-600 border-b border-gray-200">
+                                                        <table className="w-full text-[11px] text-left">
+                                                            <thead className="bg-rams-bg/75 text-rams-ink-muted border-b border-rams-rule-light uppercase text-[9px] font-mono font-bold tracking-widest">
                                                                 <tr>
                                                                     <th className="px-3 py-2">วันที่</th>
                                                                     <th className="px-3 py-2">กะงาน</th>
@@ -184,12 +184,12 @@ export default function PayrollDashboard() {
                                                                     <th className="px-3 py-2">สถานะ</th>
                                                                     <th className="px-3 py-2 text-center">ชม.ปกติ</th>
                                                                     <th className="px-3 py-2 text-center">OT (ชม.)</th>
-                                                                    <th className="px-3 py-2 text-right">ค่าแรง (บาท)</th>
-                                                                    <th className="px-3 py-2 text-right">ค่า OT (บาท)</th>
-                                                                    <th className="px-3 py-2 text-right">รวม (บาท)</th>
+                                                                    <th className="px-3 py-2 text-right">ค่าแรง</th>
+                                                                    <th className="px-3 py-2 text-right">ค่า OT</th>
+                                                                    <th className="px-3 py-2 text-right">รวม</th>
                                                                 </tr>
                                                             </thead>
-                                                            <tbody className="divide-y divide-gray-100">
+                                                            <tbody className="divide-y divide-rams-rule-light font-mono">
                                                                 {item.dailyDetails.map((day, idx) => {
                                                                     const isOff = day.shift === 'OFF' || day.status === 'Off Day';
                                                                     const isAbsent = day.status?.includes('Absent');
@@ -197,29 +197,29 @@ export default function PayrollDashboard() {
                                                                     const isLate = day.status?.includes('Late');
                                                                     const isUnscheduled = day.status === 'Unscheduled Work';
                                                                     
-                                                                    let statusBadgeColor = 'bg-green-50 text-green-700 border-green-200';
-                                                                    if (isOff) statusBadgeColor = 'bg-gray-50 text-gray-500 border-gray-200';
-                                                                    else if (isAbsent) statusBadgeColor = 'bg-red-50 text-red-700 border-red-200';
-                                                                    else if (isIncomplete) statusBadgeColor = 'bg-amber-50 text-amber-700 border-amber-200';
-                                                                    else if (isLate) statusBadgeColor = 'bg-rose-50 text-rose-700 border-rose-200';
-                                                                    else if (isUnscheduled) statusBadgeColor = 'bg-blue-50 text-blue-700 border-blue-200';
+                                                                    let statusBadgeColor = 'bg-rams-green/10 text-rams-green border-rams-green/30';
+                                                                    if (isOff) statusBadgeColor = 'bg-rams-bg text-rams-ink-muted border-rams-rule-light';
+                                                                    else if (isAbsent) statusBadgeColor = 'bg-rams-red/10 text-rams-red border-rams-red/30';
+                                                                    else if (isIncomplete) statusBadgeColor = 'bg-rams-amber/10 text-rams-amber border-rams-amber/30';
+                                                                    else if (isLate) statusBadgeColor = 'bg-rams-red/10 text-rams-red border-rams-red/30';
+                                                                    else if (isUnscheduled) statusBadgeColor = 'bg-rams-orange/10 text-rams-orange border-rams-orange/30';
 
                                                                     return (
-                                                                        <tr key={idx} className={`${isOff ? 'text-gray-400 bg-gray-50/50' : 'text-gray-800 hover:bg-gray-50'}`}>
-                                                                            <td className="px-3 py-2 font-mono">{format(new Date(day.date), 'dd MMM yyyy', { locale: th })}</td>
-                                                                            <td className="px-3 py-2">{day.shift}</td>
-                                                                            <td className={`px-3 py-2 font-mono ${isOff ? 'text-gray-400' : 'text-black font-semibold'}`}>{day.scheduled_in ? `${day.scheduled_in} - ${day.scheduled_out}` : '-'}</td>
-                                                                            <td className={`px-3 py-2 font-mono font-bold ${isOff ? 'text-gray-400' : 'text-black'}`}>{day.in !== '-' || day.out !== '-' ? `${day.in} - ${day.out}` : '-'}</td>
+                                                                        <tr key={idx} className={`${isOff ? 'text-rams-ink-muted bg-rams-bg/10' : 'text-rams-ink hover:bg-rams-bg/40'}`}>
+                                                                            <td className="px-3 py-2 font-bold">{format(new Date(day.date), 'dd MMM yyyy', { locale: th })}</td>
+                                                                            <td className="px-3 py-2 font-bold">{day.shift}</td>
+                                                                            <td className={`px-3 py-2 ${isOff ? 'text-rams-ink-muted' : 'text-rams-ink font-bold'}`}>{day.scheduled_in ? `${day.scheduled_in} - ${day.scheduled_out}` : '-'}</td>
+                                                                            <td className={`px-3 py-2 font-bold ${isOff ? 'text-rams-ink-muted' : 'text-rams-ink'}`}>{day.in !== '-' || day.out !== '-' ? `${day.in} - ${day.out}` : '-'}</td>
                                                                             <td className="px-3 py-2">
-                                                                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${statusBadgeColor}`}>
+                                                                                <span className={`px-2 py-0.5 rounded-sm text-[9px] font-mono font-bold border uppercase tracking-wider ${statusBadgeColor}`}>
                                                                                     {day.status}
                                                                                 </span>
                                                                             </td>
-                                                                            <td className={`px-3 py-2 text-center font-mono font-semibold ${isOff ? 'text-gray-400' : 'text-black'}`}>{day.regular_hours > 0 ? day.regular_hours.toFixed(1) : '-'}</td>
-                                                                            <td className={`px-3 py-2 text-center font-mono ${isOff ? 'text-gray-400' : 'text-orange-600 font-medium'}`}>{day.ot_hours > 0 ? day.ot_hours.toFixed(1) : '-'}</td>
-                                                                            <td className={`px-3 py-2 text-right font-mono font-semibold ${isOff ? 'text-gray-400' : 'text-black'}`}>{day.wage > 0 ? day.wage.toLocaleString('th-TH', { minimumFractionDigits: 2 }) : '-'}</td>
-                                                                            <td className={`px-3 py-2 text-right font-mono ${isOff ? 'text-gray-400' : 'text-orange-600 font-medium'}`}>{day.ot > 0 ? day.ot.toLocaleString('th-TH', { minimumFractionDigits: 2 }) : '-'}</td>
-                                                                            <td className={`px-3 py-2 text-right font-mono font-bold ${isOff ? 'text-gray-400' : 'text-black'}`}>
+                                                                            <td className={`px-3 py-2 text-center font-bold ${isOff ? 'text-rams-ink-muted' : 'text-rams-ink'}`}>{day.regular_hours > 0 ? day.regular_hours.toFixed(1) : '-'}</td>
+                                                                            <td className={`px-3 py-2 text-center ${isOff ? 'text-rams-ink-muted' : 'text-rams-orange font-bold'}`}>{day.ot_hours > 0 ? day.ot_hours.toFixed(1) : '-'}</td>
+                                                                            <td className={`px-3 py-2 text-right font-bold ${isOff ? 'text-rams-ink-muted' : 'text-rams-ink'}`}>{day.wage > 0 ? day.wage.toLocaleString('th-TH', { minimumFractionDigits: 2 }) : '-'}</td>
+                                                                            <td className={`px-3 py-2 text-right ${isOff ? 'text-rams-ink-muted' : 'text-rams-orange font-bold'}`}>{day.ot > 0 ? day.ot.toLocaleString('th-TH', { minimumFractionDigits: 2 }) : '-'}</td>
+                                                                            <td className={`px-3 py-2 text-right font-bold ${isOff ? 'text-rams-ink-muted' : 'text-rams-ink'}`}>
                                                                                 {(day.wage + day.ot) > 0 ? (day.wage + day.ot).toLocaleString('th-TH', { minimumFractionDigits: 2 }) : '-'}
                                                                             </td>
                                                                         </tr>

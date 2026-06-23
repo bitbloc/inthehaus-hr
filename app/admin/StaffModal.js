@@ -68,24 +68,24 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
     ];
 
     return (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col">
+        <div className="fixed inset-0 bg-rams-ink/40 backdrop-blur-[2px] flex items-center justify-center z-50 p-4">
+            <div className="bg-rams-panel border border-rams-rule rounded-sm w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-none flex flex-col">
                 {/* Header */}
-                <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <div className="p-6 border-b border-rams-rule-light flex justify-between items-center bg-rams-bg/50">
                     <div>
-                        <h2 className="text-xl font-bold text-slate-800">{isEditing ? 'Edit Staff Profile' : 'Add New Staff'}</h2>
-                        <p className="text-xs text-slate-500">Manage detailed employee information</p>
+                        <h2 className="text-lg font-mono font-bold text-rams-ink uppercase tracking-wider">{isEditing ? 'Edit Staff Profile' : 'Add New Staff'}</h2>
+                        <p className="text-[10px] font-mono text-rams-ink-muted uppercase tracking-widest mt-1">Manage detailed employee information</p>
                     </div>
-                    <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full text-slate-400 font-bold transition">✕</button>
+                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center border border-rams-rule-light hover:border-rams-rule hover:bg-rams-bg text-rams-ink font-mono text-sm transition-all cursor-pointer">✕</button>
                 </div>
 
                 {/* Tabs */}
-                <div className="flex px-6 border-b border-slate-100 overflow-x-auto">
+                <div className="flex px-6 border-b border-rams-rule-light overflow-x-auto bg-rams-bg/25">
                     {tabs.map(tab => (
                         <button
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id)}
-                            className={`px-4 py-3 text-xs font-bold uppercase tracking-wider transition-all border-b-2 whitespace-nowrap ${activeTab === tab.id ? 'border-slate-800 text-slate-800' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                            className={`px-4 py-3.5 text-xs font-mono font-bold uppercase tracking-wider transition-all border-b-2 whitespace-nowrap -mb-[1px] cursor-pointer ${activeTab === tab.id ? 'border-rams-rule text-rams-ink bg-rams-panel' : 'border-transparent text-rams-ink-muted hover:text-rams-ink'}`}
                         >
                             {tab.label}
                         </button>
@@ -93,19 +93,19 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 overflow-y-auto p-6 bg-slate-50/30">
+                <div className="flex-1 overflow-y-auto p-6 bg-rams-panel">
                     <form id="staffForm" onSubmit={handleSubmit} className="space-y-6">
                         {activeTab === 'core' && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-fade-in">
-                                <div className="md:col-span-2 bg-slate-100 p-4 rounded-xl flex items-center justify-between">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="md:col-span-2 bg-rams-bg p-4 border border-rams-rule-light rounded-sm flex items-center justify-between">
                                     <div className="flex items-center gap-3">
-                                        <div className={`w-3 h-3 rounded-full ${formData.is_active ? 'bg-emerald-500' : 'bg-slate-400'}`}></div>
-                                        <span className="text-sm font-bold text-slate-700">Account Status</span>
+                                        <div className={`w-2.5 h-2.5 rounded-sm ${formData.is_active ? 'bg-rams-green' : 'bg-rams-ink-muted/50'} border border-rams-rule`}></div>
+                                        <span className="text-xs font-mono font-bold text-rams-ink uppercase tracking-wider">Account Status</span>
                                     </div>
                                     <label className="relative inline-flex items-center cursor-pointer">
                                         <input type="checkbox" checked={formData.is_active} onChange={e => setFormData({ ...formData, is_active: e.target.checked })} className="sr-only peer" />
-                                        <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
-                                        <span className="ml-3 text-xs font-bold text-slate-500">{formData.is_active ? 'ACTIVE' : 'INACTIVE'}</span>
+                                        <div className="w-9 h-5 bg-rams-ink-muted/20 border border-rams-rule-light rounded-sm peer peer-focus:outline-none peer-checked:after:translate-x-4 after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-rams-ink after:rounded-sm after:h-3 after:w-3 after:transition-all peer-checked:bg-rams-green/20 peer-checked:border-rams-rule"></div>
+                                        <span className="ml-3 text-[10px] font-mono font-bold text-rams-ink-muted uppercase tracking-wider">{formData.is_active ? 'ACTIVE' : 'INACTIVE'}</span>
                                     </label>
                                 </div>
                                 <FormInput label="Full Name (TH)" name="name" value={formData.name} onChange={handleChange} required placeholder="นาย สมชาย ใจดี" />
@@ -118,14 +118,14 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
                                 <FormInput label="Email" name="email" value={formData.email} onChange={handleChange} type="email" />
                                 <FormInput label="ID Card Number" name="id_card" value={formData.id_card} onChange={handleChange} placeholder="1-xxxx-xxxxx-xx-x" mono />
                                 <div className="md:col-span-2">
-                                    <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Address</label>
-                                    <textarea name="address" value={formData.address} onChange={handleChange} className="w-full p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-slate-800 outline-none bg-white min-h-[80px]" placeholder="Current address..." />
+                                    <label className="block text-[10px] font-mono font-bold text-rams-ink-muted mb-1.5 uppercase tracking-wider">Address</label>
+                                    <textarea name="address" value={formData.address} onChange={handleChange} className="w-full p-2.5 rounded-sm border border-rams-rule-light focus:border-rams-rule outline-none bg-rams-bg text-rams-ink font-sans text-xs min-h-[80px] transition-all" placeholder="Current address..." />
                                 </div>
                             </div>
                         )}
 
                         {activeTab === 'employment' && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-fade-in">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <FormSelect label="Employment Status" name="employment_status" value={formData.employment_status} onChange={handleChange} options={['Probation', 'Fulltime', 'Contract', 'Resigned']} />
                                 <FormInput label="Job Title / Position" name="position" value={formData.position} onChange={handleChange} required />
                                 <FormInput label="Job Level" name="job_level" value={formData.job_level} onChange={handleChange} placeholder="Junior, Senior, Manager..." />
@@ -135,9 +135,9 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
                         )}
 
                         {activeTab === 'compensation' && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-fade-in">
-                                <div className="md:col-span-2 bg-yellow-50 p-4 rounded-xl border border-yellow-100 mb-2">
-                                    <h3 className="text-sm font-bold text-yellow-800 mb-2">🏷️ Shift Daily Rates (Pay per Day)</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="md:col-span-2 bg-rams-bg p-4 rounded-sm border border-rams-rule-light mb-2">
+                                    <h3 className="text-xs font-mono font-bold text-rams-ink mb-3 uppercase tracking-wider">⚙️ Shift Daily Rates (Pay per Day)</h3>
                                     <div className="grid grid-cols-3 gap-4">
                                         <FormInput label="Morning (THB)" name="rate_morning" type="number" value={formData.shift_rates?.morning || ''} onChange={handleChange} placeholder="0" />
                                         <FormInput label="Evening (THB)" name="rate_evening" type="number" value={formData.shift_rates?.evening || ''} onChange={handleChange} placeholder="0" />
@@ -154,9 +154,9 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
                         )}
 
                         {activeTab === 'talent' && (
-                            <div className="space-y-4 animate-fade-in">
-                                <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 text-blue-800 text-sm">
-                                    🚧 Talent Management (Skills & Education) implementation coming soon.
+                            <div className="space-y-4">
+                                <div className="bg-rams-bg p-4 rounded-sm border border-rams-rule-light text-rams-ink text-xs font-mono uppercase tracking-wide leading-relaxed">
+                                    ⚠️ Talent Management (Skills & Education) implementation coming soon.
                                     <br />For now, please upload relevant documents to the system manually if needed.
                                 </div>
                                 <FormInput label="Key Skills (Comma separated)" name="skills" value={formData.skills} onChange={handleChange} placeholder="Java, React, Teamwork..." />
@@ -164,18 +164,17 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
                         )}
 
                         {activeTab === 'compliance' && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-fade-in">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <FormInput label="Emergency Contact Name" name="emergency_contact" value={formData.emergency_contact} onChange={handleChange} />
-                                {/* Add more compliance fields here */}
                             </div>
                         )}
                     </form>
                 </div>
 
                 {/* Footer */}
-                <div className="p-6 border-t border-slate-100 flex justify-end gap-3 bg-slate-50/50">
-                    <button type="button" onClick={onClose} className="px-6 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-200 transition">Cancel</button>
-                    <button type="submit" form="staffForm" className="px-8 py-3 rounded-xl font-bold text-white bg-slate-800 hover:bg-slate-900 shadow-lg transition transform active:scale-95">
+                <div className="p-6 border-t border-rams-rule-light flex justify-end gap-3 bg-rams-bg">
+                    <button type="button" onClick={onClose} className="px-5 py-2 rounded-sm font-mono font-bold text-xs uppercase tracking-wider text-rams-ink-muted hover:bg-rams-ink-muted/10 border border-transparent transition-all cursor-pointer">Cancel</button>
+                    <button type="submit" form="staffForm" className="px-6 py-2 rounded-sm font-mono font-bold text-xs uppercase tracking-wider text-rams-panel bg-rams-orange border border-rams-rule shadow-[0_2px_0_0_var(--color-rams-rule)] hover:bg-rams-orange-active active:translate-y-[2px] active:shadow-none transition-all cursor-pointer">
                         {isEditing ? 'Update Profile' : 'Create Staff'}
                     </button>
                 </div>
@@ -187,15 +186,15 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
 // Helper Components
 const FormInput = ({ label, mono, ...props }) => (
     <div>
-        <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">{label}</label>
-        <input {...props} className={`w-full p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-slate-800 outline-none bg-white transition ${mono ? 'font-mono' : ''}`} />
+        <label className="block text-[10px] font-mono font-bold text-rams-ink-muted mb-1.5 uppercase tracking-wider">{label}</label>
+        <input {...props} className={`w-full p-2.5 rounded-sm border border-rams-rule-light focus:border-rams-rule outline-none bg-rams-bg text-rams-ink font-sans text-xs transition-all ${mono ? 'font-mono' : ''}`} />
     </div>
 );
 
 const FormSelect = ({ label, options, ...props }) => (
     <div>
-        <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">{label}</label>
-        <select {...props} className="w-full p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-slate-800 outline-none bg-white transition appearance-none">
+        <label className="block text-[10px] font-mono font-bold text-rams-ink-muted mb-1.5 uppercase tracking-wider">{label}</label>
+        <select {...props} className="w-full p-2.5 rounded-sm border border-rams-rule-light focus:border-rams-rule outline-none bg-rams-bg text-rams-ink font-sans text-xs transition-all appearance-none cursor-pointer">
             {options.map(o => <option key={o} value={o}>{o}</option>)}
         </select>
     </div>
