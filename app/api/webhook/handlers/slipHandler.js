@@ -92,7 +92,7 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
            layout: 'vertical',
            paddingAll: '20px',
            contents: [
-             { type: 'text', text: 'VOUCHER // DEPOSIT RECORDED', color: '#1c1c1c', size: 'sm', weight: 'bold' },
+             { type: 'text', text: 'BANK SLIP // DEPOSIT RECORDED', color: '#1c1c1c', size: 'sm', weight: 'bold' },
              { type: 'text', text: 'STATUS: SUCCESS', color: '#2e7d32', size: 'xxs', weight: 'bold', margin: 'xs' }
            ]
          },
@@ -105,7 +105,7 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
                type: 'box',
                layout: 'horizontal',
                contents: [
-                 { type: 'text', text: 'VOUCHER AMOUNT', color: '#666666', size: 'xs', gravity: 'center', flex: 1 },
+                 { type: 'text', text: 'TRANSFER AMOUNT', color: '#666666', size: 'xs', gravity: 'center', flex: 1 },
                  { type: 'text', text: `฿${parsedAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})}`, align: 'end', color: '#1c1c1c', size: 'lg', weight: 'bold', flex: 2 }
                ]
              },
@@ -165,7 +165,7 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
            layout: 'vertical',
            paddingAll: '20px',
            contents: [
-             { type: 'text', text: 'Yuzu AI จัดการให้แล้วค่ะ เมี๊ยว~ 🐾', size: 'xs', align: 'center', color: '#b0b0b0' }
+             { type: 'text', text: 'บันทึกแล้ว', size: 'xs', align: 'center', color: '#b0b0b0' }
            ]
          }
        }
