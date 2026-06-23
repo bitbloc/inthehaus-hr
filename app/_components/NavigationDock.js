@@ -21,7 +21,7 @@ export default function NavigationDock() {
 
     return (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-full max-w-sm px-6">
-            <div className="bg-rams-panel border-2 border-rams-rule p-2 flex justify-between items-center rounded-sm shadow-none">
+            <div className="bg-rams-panel border border-rams-rule-light p-2 flex justify-between items-center rounded-sm shadow-none">
 
                 {NAV_ITEMS.map((item, index) => {
                     const isActive = pathname === item.href;
@@ -32,7 +32,7 @@ export default function NavigationDock() {
                             <div key={item.href} className="relative flex-1 flex justify-center">
                                 <div className="flex-1 flex flex-col items-center py-2 gap-1 text-rams-ink font-mono font-bold relative">
                                     {isActive && <div className="absolute -top-1.5 w-2 h-2 bg-rams-orange border border-rams-rule rounded-full animate-pulse"></div>}
-                                    <Link href={item.href} className={`bg-rams-bg p-2 rounded-sm -mt-3 border-2 border-rams-rule active:translate-y-[2px] transition-all ${isActive ? 'text-rams-orange' : 'text-rams-ink-muted hover:text-rams-ink'}`}>
+                                    <Link href={item.href} className={`bg-rams-bg p-2 rounded-sm -mt-3 border border-rams-rule active:translate-y-[2px] transition-all ${isActive ? 'text-rams-orange' : 'text-rams-ink-muted hover:text-rams-ink'}`}>
                                         <Icon />
                                     </Link>
                                 </div>

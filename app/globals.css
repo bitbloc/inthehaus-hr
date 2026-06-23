@@ -38,12 +38,12 @@
   --font-mono: var(--font-geist-mono);
   --radius-xl: var(--radius);
 
-  --color-rams-bg: oklch(93% 0.005 60);
-  --color-rams-panel: oklch(97% 0.005 60);
-  --color-rams-ink: oklch(22% 0.004 60);
-  --color-rams-ink-muted: oklch(48% 0.004 60);
-  --color-rams-rule: oklch(35% 0.004 60);
-  --color-rams-rule-light: oklch(80% 0.004 60);
+  --color-rams-bg: oklch(96% 0.006 80);
+  --color-rams-panel: oklch(99% 0.003 80);
+  --color-rams-ink: oklch(20% 0.003 80);
+  --color-rams-ink-muted: oklch(50% 0.003 80);
+  --color-rams-rule: oklch(35% 0.003 80);
+  --color-rams-rule-light: oklch(88% 0.004 80);
   --color-rams-orange: oklch(62% 0.16 45);
   --color-rams-orange-active: oklch(56% 0.16 45);
   --color-rams-green: oklch(70% 0.15 145);

@@ -75,7 +75,7 @@ export default function WeatherCard({ latitude, longitude, locationName = "Curre
             animate={{ opacity: 1, y: 0 }}
             className="w-full max-w-sm z-10 mb-4 px-6"
         >
-            <div className="relative bg-rams-panel border-2 border-rams-rule p-4 overflow-hidden rounded-sm">
+            <div className="relative bg-rams-panel border border-rams-rule-light p-4 overflow-hidden rounded-sm">
                 {loading ? (
                     <div className="flex items-center gap-3 py-2 font-mono text-xs">
                         <div className="animate-spin w-4 h-4 border-2 border-rams-rule-light border-t-rams-rule rounded-full" />
@@ -129,7 +129,7 @@ export default function WeatherCard({ latitude, longitude, locationName = "Curre
                                 </div>
                                 <button
                                     onClick={() => setShowRadar(prev => !prev)}
-                                    className={`w-8 h-8 rounded-sm flex items-center justify-center border-2 border-rams-rule transition-all active:translate-y-[1px] ${
+                                    className={`w-8 h-8 rounded-sm flex items-center justify-center border border-rams-rule-light transition-all active:translate-y-[1px] ${
                                         showRadar 
                                             ? 'bg-rams-ink text-rams-panel' 
                                             : 'bg-rams-bg text-rams-ink hover:bg-rams-rule-light'
@@ -142,7 +142,7 @@ export default function WeatherCard({ latitude, longitude, locationName = "Curre
                         </div>
 
                         {/* Minimal advice row */}
-                        <div className="mt-3 pt-2.5 border-t-2 border-rams-rule flex items-start gap-1.5 text-[10px] font-mono font-semibold text-rams-ink">
+                        <div className="mt-3 pt-2.5 border-t border-rams-rule-light flex items-start gap-1.5 text-[10px] font-mono font-semibold text-rams-ink">
                             <span className="text-rams-orange font-mono font-extrabold shrink-0 flex items-center gap-0.5">
                                 <Sparkles className="w-3 h-3 text-rams-orange" /> Yuzu 🐾
                             </span>
@@ -164,7 +164,7 @@ export default function WeatherCard({ latitude, longitude, locationName = "Curre
                                     <iframe
                                         id="windy-radar-iframe"
                                         src={`https://embed.windy.com/embed.html?lat=${latitude}&lon=${longitude}&zoom=9&level=surface&overlay=rain&product=ecmwf&menu=&message=&marker=true&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=default&metricTemp=default&radarRange=-1`}
-                                        className="w-full h-56 rounded-sm border-2 border-rams-rule"
+                                        className="w-full h-56 rounded-sm border border-rams-rule-light"
                                         title="Windy Live Rain Radar"
                                         loading="lazy"
                                     />
