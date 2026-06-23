@@ -19,27 +19,63 @@ export async function handleOrderAndReservationDetection(event, client, rawText,
         }).select().single();
 
         if (!error && order) {
-          const itemsText = orderData.items.map(i => `- ${i.name} (x${i.qty})`).join('\n');
+          const itemsText = orderData.items.map((i, idx) => `${String(idx + 1).padStart(2, '0')}  ${i.name} [x${i.qty}]`).join('\n');
           const orderFlex = {
             type: 'bubble',
-            header: { type: 'box', layout: 'vertical', backgroundColor: '#e8f5e9', contents: [{ type: 'text', text: '📞 พบรายการโทรสั่งอาหาร', weight: 'bold', color: '#2e7d32' }] },
+            cornerRadius: 'none',
+            styles: {
+              header: { backgroundColor: '#f3f3f3' },
+              body: { backgroundColor: '#f3f3f3' },
+              footer: { backgroundColor: '#ebebeb' }
+            },
+            header: {
+              type: 'box',
+              layout: 'vertical',
+              paddingAll: '20px',
+              contents: [
+                { type: 'text', text: 'PHONE ORDER INCOMING', weight: 'bold', color: '#1c1c1c', size: 'sm' },
+                { type: 'text', text: 'STATUS: PENDING ACCEPTANCE', color: '#ef6c00', size: 'xxs', weight: 'bold', margin: 'xs' }
+              ]
+            },
             body: {
-              type: 'box', layout: 'vertical', contents: [
-                { type: 'text', text: `👤 ลูกค้า: ${orderData.customerName || 'ไม่ระบุ'}`, size: 'sm', weight: 'bold' },
-                { type: 'text', text: `📱 เบอร์โทร: ${orderData.phone || 'ไม่ระบุ'}`, size: 'sm' },
-                { type: 'separator', margin: 'md' },
-                { type: 'text', text: itemsText, wrap: true, margin: 'md', size: 'sm' }
+              type: 'box',
+              layout: 'vertical',
+              paddingAll: '20px',
+              spacing: 'sm',
+              contents: [
+                {
+                  type: 'box',
+                  layout: 'horizontal',
+                  contents: [
+                    { type: 'text', text: 'CUSTOMER', size: 'xs', color: '#666666', flex: 1 },
+                    { type: 'text', text: orderData.customerName || 'UNSPECIFIED', size: 'xs', color: '#1c1c1c', align: 'end', flex: 2 }
+                  ]
+                },
+                {
+                  type: 'box',
+                  layout: 'horizontal',
+                  contents: [
+                    { type: 'text', text: 'PHONE', size: 'xs', color: '#666666', flex: 1 },
+                    { type: 'text', text: orderData.phone || 'UNSPECIFIED', size: 'xs', color: '#1c1c1c', align: 'end', flex: 2 }
+                  ]
+                },
+                { type: 'separator', margin: 'md', color: '#cccccc' },
+                { type: 'text', text: 'ORDER ITEMS', size: 'xxs', color: '#666666', weight: 'bold', margin: 'md' },
+                { type: 'text', text: itemsText, wrap: true, size: 'xs', color: '#1c1c1c', style: 'normal' }
               ]
             },
             footer: {
-              type: 'box', layout: 'horizontal', spacing: 'sm',
+              type: 'box',
+              layout: 'horizontal',
+              paddingAll: '15px',
+              spacing: 'sm',
               contents: [
-                { type: 'button', style: 'primary', color: '#1DB446', action: { type: 'postback', label: '✅ รับออเดอร์', data: `action=confirm_phone_order&id=${order.id}` } },
-                { type: 'button', style: 'secondary', action: { type: 'postback', label: '✅ ทำเสร็จแล้ว', data: `action=done_phone_order&id=${order.id}` } }
+                { type: 'button', style: 'primary', color: '#1c1c1c', action: { type: 'postback', label: 'ACCEPT ORDER', data: `action=confirm_phone_order&id=${order.id}` } },
+                { type: 'button', style: 'secondary', action: { type: 'postback', label: 'MARK COMPLETE', data: `action=done_phone_order&id=${order.id}` } }
               ]
             }
           };
-          await client.replyMessage(event.replyToken, { type: 'flex', altText: '📞 บันทึกออเดอร์โทรศัพท์', contents: orderFlex });
+          await client.replyMessage(event.replyToken, { type: 'flex', altText: 'พบรายการโทรสั่งอาหาร', contents: orderFlex });
           return true;
         }
      }
@@ -63,25 +99,81 @@ export async function handleOrderAndReservationDetection(event, client, rawText,
         if (!error && reservation) {
           const resFlex = {
             type: 'bubble',
-            header: { type: 'box', layout: 'vertical', backgroundColor: '#fff3e0', contents: [{ type: 'text', text: '🗓️ พบการจองโต๊ะใหม่', weight: 'bold', color: '#e65100' }] },
+            cornerRadius: 'none',
+            styles: {
+              header: { backgroundColor: '#f3f3f3' },
+              body: { backgroundColor: '#f3f3f3' },
+              footer: { backgroundColor: '#ebebeb' }
+            },
+            header: {
+              type: 'box',
+              layout: 'vertical',
+              paddingAll: '20px',
+              contents: [
+                { type: 'text', text: 'TABLE RESERVATION INCOMING', weight: 'bold', color: '#1c1c1c', size: 'sm' },
+                { type: 'text', text: 'STATUS: PENDING CONFIRMATION', color: '#ef6c00', size: 'xxs', weight: 'bold', margin: 'xs' }
+              ]
+            },
             body: {
-              type: 'box', layout: 'vertical', contents: [
-                { type: 'text', text: `👤 ลูกค้า: ${resData.name || 'ไม่ระบุ'}`, size: 'sm', weight: 'bold' },
-                { type: 'text', text: `📱 เบอร์โทร: ${resData.phone || 'ไม่ระบุ'}`, size: 'sm' },
-                { type: 'text', text: `📅 วันที่: ${resData.date}`, size: 'sm' },
-                { type: 'text', text: `⏰ เวลา: ${resData.time || 'ไม่ระบุ'}`, size: 'sm' },
-                { type: 'text', text: `👥 จำนวน: ${resData.guests} ท่าน`, size: 'sm' }
+              type: 'box',
+              layout: 'vertical',
+              paddingAll: '20px',
+              spacing: 'sm',
+              contents: [
+                {
+                  type: 'box',
+                  layout: 'horizontal',
+                  contents: [
+                    { type: 'text', text: 'CUSTOMER', size: 'xs', color: '#666666', flex: 1 },
+                    { type: 'text', text: resData.name || 'UNSPECIFIED', size: 'xs', color: '#1c1c1c', align: 'end', flex: 2 }
+                  ]
+                },
+                {
+                  type: 'box',
+                  layout: 'horizontal',
+                  contents: [
+                    { type: 'text', text: 'PHONE', size: 'xs', color: '#666666', flex: 1 },
+                    { type: 'text', text: resData.phone || 'UNSPECIFIED', size: 'xs', color: '#1c1c1c', align: 'end', flex: 2 }
+                  ]
+                },
+                {
+                  type: 'box',
+                  layout: 'horizontal',
+                  contents: [
+                    { type: 'text', text: 'DATE', size: 'xs', color: '#666666', flex: 1 },
+                    { type: 'text', text: resData.date, size: 'xs', color: '#1c1c1c', align: 'end', flex: 2 }
+                  ]
+                },
+                {
+                  type: 'box',
+                  layout: 'horizontal',
+                  contents: [
+                    { type: 'text', text: 'TIME', size: 'xs', color: '#666666', flex: 1 },
+                    { type: 'text', text: resData.time || 'UNSPECIFIED', size: 'xs', color: '#1c1c1c', align: 'end', flex: 2 }
+                  ]
+                },
+                {
+                  type: 'box',
+                  layout: 'horizontal',
+                  contents: [
+                    { type: 'text', text: 'GUESTS', size: 'xs', color: '#666666', flex: 1 },
+                    { type: 'text', text: `${resData.guests} PAX`, size: 'xs', color: '#1c1c1c', align: 'end', weight: 'bold', flex: 2 }
+                  ]
+                }
               ]
             },
             footer: {
-              type: 'box', layout: 'horizontal', spacing: 'sm',
+              type: 'box',
+              layout: 'horizontal',
+              paddingAll: '15px',
+              spacing: 'sm',
               contents: [
-                { type: 'button', style: 'primary', color: '#ff9800', action: { type: 'postback', label: '✅ ยืนยันจอง', data: `action=confirm_table_reservation&id=${reservation.id}` } },
-                { type: 'button', style: 'secondary', action: { type: 'postback', label: '❌ ยกเลิก', data: `action=cancel_table_reservation&id=${reservation.id}` } }
+                { type: 'button', style: 'primary', color: '#1c1c1c', action: { type: 'postback', label: 'CONFIRM BOOKING', data: `action=confirm_table_reservation&id=${reservation.id}` } },
+                { type: 'button', style: 'secondary', action: { type: 'postback', label: 'CANCEL', data: `action=cancel_table_reservation&id=${reservation.id}` } }
               ]
             }
           };
-          await client.replyMessage(event.replyToken, { type: 'flex', altText: '🗓️ บันทึกการจองโต๊ะ', contents: resFlex });
+          await client.replyMessage(event.replyToken, { type: 'flex', altText: 'บันทึกการจองโต๊ะ', contents: resFlex });
           return true;
        }
      }

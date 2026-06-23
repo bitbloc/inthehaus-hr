@@ -31,17 +31,17 @@ export function isEspressoShotReport(text) {
 function getStatusDisplay(status, defaultValue = '-') {
   switch (status) {
     case 'OK':
-      return { text: '✅ ปกติ', color: '#1DB446' };
+      return { text: 'ปกติ', color: '#2e7d32' };
     case 'LOW':
-      return { text: '⚠️ น้อยไป', color: '#ff9800' };
+      return { text: 'ต่ำกว่าเกณฑ์', color: '#ef6c00' };
     case 'HIGH':
-      return { text: '⚠️ เยอะไป', color: '#ff9800' };
+      return { text: 'สูงกว่าเกณฑ์', color: '#ef6c00' };
     case 'FAST':
-      return { text: '❌ ไหลเร็วไป', color: '#ef4444' };
+      return { text: 'ไหลเร็วเกินไป', color: '#c62828' };
     case 'SLOW':
-      return { text: '❌ ไหลช้าไป', color: '#ef4444' };
+      return { text: 'ไหลช้าเกินไป', color: '#c62828' };
     default:
-      return { text: defaultValue, color: '#888888' };
+      return { text: defaultValue, color: '#666666' };
   }
 }
 
@@ -68,52 +68,75 @@ export async function handleEspressoShotAnalysis(event, client, rawText, userId,
 
     // Build the grind adjustment message
     let grindStatusText = '-';
-    let grindColor = '#888888';
+    let grindColor = '#666666';
     if (analysis.grindAdjustment) {
       if (analysis.isGrindAdjustmentCorrect === true) {
-        grindStatusText = `✅ ${analysis.grindAdjustment} (ปรับถูกต้องค๊า!)`;
-        grindColor = '#1DB446';
+        grindStatusText = `${analysis.grindAdjustment} [ปรับถูกต้อง]`;
+        grindColor = '#2e7d32';
       } else if (analysis.isGrindAdjustmentCorrect === false) {
-        grindStatusText = `❌ ${analysis.grindAdjustment} (ปรับผิดทิศทางนะคะ!)`;
-        grindColor = '#ef4444';
+        grindStatusText = `${analysis.grindAdjustment} [ปรับผิดทิศทาง]`;
+        grindColor = '#c62828';
       } else {
-        grindStatusText = `⚙️ ${analysis.grindAdjustment}`;
-        grindColor = '#007bff';
+        grindStatusText = `${analysis.grindAdjustment}`;
+        grindColor = '#3b82f6';
       }
     }
 
-    // Determine overall header color based on totalTime status
-    let headerColor = '#1DB446'; // Green by default
+    // Determine overall status text & color
+    let statusLabel = 'SYSTEM OK';
+    let accentColor = '#2e7d32'; // Green by default
     if (analysis.totalTime?.status === 'SLOW' || analysis.totalTime?.status === 'FAST') {
-      headerColor = '#ef4444'; // Red if out of spec
+      statusLabel = 'OUT OF SPEC';
+      accentColor = '#c62828'; // Red if out of spec
     } else if (analysis.dose?.status !== 'OK' || analysis.yield?.status !== 'OK') {
-      headerColor = '#ff9800'; // Orange if warning
+      statusLabel = 'WARNING';
+      accentColor = '#ef6c00'; // Orange if warning
     }
 
     const flexMsg = {
       type: 'flex',
-      altText: `☕ สรุปวิเคราะห์ช็อตกาแฟของ พี่${friendlyName}`,
+      altText: `วิเคราะห์ช็อตกาแฟของ พี่${friendlyName}`,
       contents: {
         type: 'bubble',
         size: 'mega',
+        cornerRadius: 'none',
+        styles: {
+          header: { backgroundColor: '#f3f3f3' },
+          body: { backgroundColor: '#f3f3f3' },
+          footer: { backgroundColor: '#ebebeb' }
+        },
         header: {
           type: 'box',
           layout: 'vertical',
-          backgroundColor: headerColor,
-          paddingAll: '15px',
+          paddingAll: '20px',
           contents: [
             {
-              type: 'text',
-              text: '☕ Espresso Shot Analysis',
-              color: '#ffffff',
-              weight: 'bold',
-              size: 'lg'
+              type: 'box',
+              layout: 'horizontal',
+              contents: [
+                {
+                  type: 'text',
+                  text: 'ESPRESSO EXTRACTION ANALYTICS',
+                  color: '#1c1c1c',
+                  weight: 'bold',
+                  size: 'sm',
+                  flex: 1
+                },
+                {
+                  type: 'text',
+                  text: statusLabel,
+                  color: accentColor,
+                  weight: 'bold',
+                  size: 'xs',
+                  align: 'end'
+                }
+              ]
             },
             {
               type: 'text',
-              text: `รายงานโดย: พี่${friendlyName} 🐾`,
-              color: '#ffffffb3',
-              size: 'xs',
+              text: `OPERATOR: ${friendlyName.toUpperCase()}`,
+              color: '#666666',
+              size: 'xxs',
               margin: 'xs'
             }
           ]
@@ -121,6 +144,7 @@ export async function handleEspressoShotAnalysis(event, client, rawText, userId,
         body: {
           type: 'box',
           layout: 'vertical',
+          paddingAll: '20px',
           spacing: 'md',
           contents: [
             // Row 1: Dose
@@ -128,45 +152,45 @@ export async function handleEspressoShotAnalysis(event, client, rawText, userId,
               type: 'box',
               layout: 'horizontal',
               contents: [
-                { type: 'text', text: 'ผงกาแฟ (Dose)', size: 'sm', color: '#555555', flex: 3 },
-                { type: 'text', text: analysis.dose?.value ? `${analysis.dose.value} g` : '-', size: 'sm', weight: 'bold', flex: 2 },
-                { type: 'text', text: doseDisplay.text, color: doseDisplay.color, size: 'sm', align: 'end', weight: 'bold', flex: 3 }
+                { type: 'text', text: 'ผงกาแฟ (DOSE)', size: 'xs', color: '#666666', flex: 4 },
+                { type: 'text', text: analysis.dose?.value ? `${analysis.dose.value} g` : '-', size: 'xs', color: '#1c1c1c', weight: 'bold', flex: 2 },
+                { type: 'text', text: doseDisplay.text, color: doseDisplay.color, size: 'xs', align: 'end', weight: 'bold', flex: 3 }
               ]
             },
-            { type: 'separator', margin: 'xs' },
+            { type: 'separator', color: '#e0e0e0' },
             // Row 2: Yield
             {
               type: 'box',
               layout: 'horizontal',
               contents: [
-                { type: 'text', text: 'น้ำกาแฟ (Yield)', size: 'sm', color: '#555555', flex: 3 },
-                { type: 'text', text: analysis.yield?.value ? `${analysis.yield.value} ml` : '-', size: 'sm', weight: 'bold', flex: 2 },
-                { type: 'text', text: yieldDisplay.text, color: yieldDisplay.color, size: 'sm', align: 'end', weight: 'bold', flex: 3 }
+                { type: 'text', text: 'น้ำกาแฟ (YIELD)', size: 'xs', color: '#666666', flex: 4 },
+                { type: 'text', text: analysis.yield?.value ? `${analysis.yield.value} ml` : '-', size: 'xs', color: '#1c1c1c', weight: 'bold', flex: 2 },
+                { type: 'text', text: yieldDisplay.text, color: yieldDisplay.color, size: 'xs', align: 'end', weight: 'bold', flex: 3 }
               ]
             },
-            { type: 'separator', margin: 'xs' },
+            { type: 'separator', color: '#e0e0e0' },
             // Row 3: First Drop
             {
               type: 'box',
               layout: 'horizontal',
               contents: [
-                { type: 'text', text: 'หยดแรก (First Drop)', size: 'sm', color: '#555555', flex: 3 },
-                { type: 'text', text: analysis.firstDrop?.value ? `${analysis.firstDrop.value} วิ` : '-', size: 'sm', weight: 'bold', flex: 2 },
-                { type: 'text', text: firstDropDisplay.text, color: firstDropDisplay.color, size: 'sm', align: 'end', weight: 'bold', flex: 3 }
+                { type: 'text', text: 'หยดแรก (FIRST DROP)', size: 'xs', color: '#666666', flex: 4 },
+                { type: 'text', text: analysis.firstDrop?.value ? `${analysis.firstDrop.value} s` : '-', size: 'xs', color: '#1c1c1c', weight: 'bold', flex: 2 },
+                { type: 'text', text: firstDropDisplay.text, color: firstDropDisplay.color, size: 'xs', align: 'end', weight: 'bold', flex: 3 }
               ]
             },
-            { type: 'separator', margin: 'xs' },
+            { type: 'separator', color: '#e0e0e0' },
             // Row 4: Total Time
             {
               type: 'box',
               layout: 'horizontal',
               contents: [
-                { type: 'text', text: 'เวลาสกัด (Total Time)', size: 'sm', color: '#555555', flex: 3 },
-                { type: 'text', text: analysis.totalTime?.value ? `${analysis.totalTime.value} วิ` : '-', size: 'sm', weight: 'bold', flex: 2 },
-                { type: 'text', text: totalTimeDisplay.text, color: totalTimeDisplay.color, size: 'sm', align: 'end', weight: 'bold', flex: 3 }
+                { type: 'text', text: 'เวลาสกัด (TOTAL TIME)', size: 'xs', color: '#666666', flex: 4 },
+                { type: 'text', text: analysis.totalTime?.value ? `${analysis.totalTime.value} s` : '-', size: 'xs', color: '#1c1c1c', weight: 'bold', flex: 2 },
+                { type: 'text', text: totalTimeDisplay.text, color: totalTimeDisplay.color, size: 'xs', align: 'end', weight: 'bold', flex: 3 }
               ]
             },
-            { type: 'separator', margin: 'md', color: '#dddddd' },
+            { type: 'separator', margin: 'md', color: '#cccccc' },
             
             // Taste Profile Section
             {
@@ -174,8 +198,8 @@ export async function handleEspressoShotAnalysis(event, client, rawText, userId,
               layout: 'vertical',
               spacing: 'xs',
               contents: [
-                { type: 'text', text: '👅 โทนรสชาติที่คาดเดาจากช็อตนี้:', size: 'xs', color: '#888888', weight: 'bold' },
-                { type: 'text', text: analysis.tasteProfile || 'รสชาติสมดุลปกติ', size: 'sm', color: '#e11d48', weight: 'bold', wrap: true }
+                { type: 'text', text: 'ESTIMATED TASTE PROFILE', size: 'xxs', color: '#666666', weight: 'bold' },
+                { type: 'text', text: analysis.tasteProfile || 'ปกติ', size: 'sm', color: '#1c1c1c', weight: 'bold', wrap: true }
               ]
             },
             
@@ -186,11 +210,11 @@ export async function handleEspressoShotAnalysis(event, client, rawText, userId,
               margin: 'sm',
               spacing: 'xs',
               contents: [
-                { type: 'text', text: '⚙️ การปรับเบอร์บด:', size: 'xs', color: '#888888', weight: 'bold' },
+                { type: 'text', text: 'GRIND ADJUSTMENT', size: 'xxs', color: '#666666', weight: 'bold' },
                 { type: 'text', text: grindStatusText, size: 'sm', color: grindColor, weight: 'bold', wrap: true }
               ]
             },
-            { type: 'separator', margin: 'md', color: '#dddddd' },
+            { type: 'separator', margin: 'md', color: '#cccccc' },
             
             // Recommendation Section
             {
@@ -198,8 +222,8 @@ export async function handleEspressoShotAnalysis(event, client, rawText, userId,
               layout: 'vertical',
               spacing: 'xs',
               contents: [
-                { type: 'text', text: '💡 คำแนะนำจากยูซุ:', size: 'xs', color: '#888888', weight: 'bold' },
-                { type: 'text', text: analysis.recommendation, size: 'sm', color: '#333333', wrap: true, style: 'italic' }
+                { type: 'text', text: 'SYSTEM RECOMMENDATION', size: 'xxs', color: '#666666', weight: 'bold' },
+                { type: 'text', text: analysis.recommendation, size: 'sm', color: '#333333', wrap: true }
               ]
             }
           ]

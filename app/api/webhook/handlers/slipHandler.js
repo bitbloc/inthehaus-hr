@@ -82,14 +82,19 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
        contents: {
          type: 'bubble',
          size: 'kilo',
+         cornerRadius: 'none',
+         styles: {
+           header: { backgroundColor: '#f3f3f3' },
+           body: { backgroundColor: '#f3f3f3' },
+           footer: { backgroundColor: '#ebebeb' }
+         },
          header: {
            type: 'box',
            layout: 'vertical',
-           backgroundColor: '#1DB446',
            paddingAll: '20px',
            contents: [
-             { type: 'text', text: 'RECEIPT', color: '#ffffff80', size: 'xs', weight: 'bold' },
-             { type: 'text', text: 'บันทึกยอดเงินสำเร็จ', color: '#ffffff', size: 'lg', weight: 'bold', margin: 'xs' }
+             { type: 'text', text: 'VOUCHER // DEPOSIT RECORDED', color: '#1c1c1c', size: 'sm', weight: 'bold' },
+             { type: 'text', text: 'STATUS: SUCCESS', color: '#2e7d32', size: 'xxs', weight: 'bold', margin: 'xs' }
            ]
          },
          body: {
@@ -101,11 +106,11 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
                type: 'box',
                layout: 'horizontal',
                contents: [
-                 { type: 'text', text: 'ยอดโอน', color: '#8c8c8c', size: 'sm', gravity: 'center', flex: 1 },
-                 { type: 'text', text: `฿${parsedAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})}`, align: 'end', color: '#1DB446', size: 'xl', weight: 'bold', flex: 2 }
+                 { type: 'text', text: 'VOUCHER AMOUNT', color: '#666666', size: 'xs', gravity: 'center', flex: 1 },
+                 { type: 'text', text: `฿${parsedAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})}`, align: 'end', color: '#1c1c1c', size: 'lg', weight: 'bold', flex: 2 }
                ]
              },
-             { type: 'separator', margin: 'lg' },
+             { type: 'separator', margin: 'lg', color: '#cccccc' },
              {
                type: 'box',
                layout: 'vertical',
@@ -116,40 +121,40 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
                    type: 'box',
                    layout: 'horizontal',
                    contents: [
-                     { type: 'text', text: 'ธนาคาร', size: 'sm', color: '#8c8c8c', flex: 1 },
-                     { type: 'text', text: result.bankName || 'ไม่ระบุ', size: 'sm', color: '#333333', align: 'end', flex: 2, wrap: true }
+                     { type: 'text', text: 'BANK', size: 'xs', color: '#666666', flex: 1 },
+                     { type: 'text', text: result.bankName || 'ไม่ระบุ', size: 'xs', color: '#1c1c1c', align: 'end', flex: 2, wrap: true }
                    ]
                  },
                  {
                    type: 'box',
                    layout: 'horizontal',
                    contents: [
-                     { type: 'text', text: 'ผู้โอน', size: 'sm', color: '#8c8c8c', flex: 1 },
-                     { type: 'text', text: result.senderName || 'ไม่ระบุ', size: 'sm', color: '#333333', align: 'end', flex: 2, wrap: true }
+                     { type: 'text', text: 'SENDER', size: 'xs', color: '#666666', flex: 1 },
+                     { type: 'text', text: result.senderName || 'ไม่ระบุ', size: 'xs', color: '#1c1c1c', align: 'end', flex: 2, wrap: true }
                    ]
                  },
                  {
                    type: 'box',
                    layout: 'horizontal',
                    contents: [
-                     { type: 'text', text: 'วันเวลาโอน', size: 'sm', color: '#8c8c8c', flex: 1 },
-                     { type: 'text', text: result.transTime || 'ไม่ระบุ', size: 'sm', color: '#333333', align: 'end', flex: 2, wrap: true }
+                     { type: 'text', text: 'DATETIME', size: 'xs', color: '#666666', flex: 1 },
+                     { type: 'text', text: result.transTime || 'ไม่ระบุ', size: 'xs', color: '#1c1c1c', align: 'end', flex: 2, wrap: true }
                    ]
                  },
                  {
                    type: 'box',
                    layout: 'horizontal',
                    contents: [
-                     { type: 'text', text: 'รหัสอ้างอิง', size: 'sm', color: '#8c8c8c', flex: 1 },
-                     { type: 'text', text: result.transactionRef || 'ไม่ระบุ', size: 'sm', color: '#333333', align: 'end', flex: 2, wrap: true }
+                     { type: 'text', text: 'REFERENCE', size: 'xs', color: '#666666', flex: 1 },
+                     { type: 'text', text: result.transactionRef || 'ไม่ระบุ', size: 'xs', color: '#1c1c1c', align: 'end', flex: 2, wrap: true }
                    ]
                  },
                  {
                    type: 'box',
                    layout: 'horizontal',
                    contents: [
-                     { type: 'text', text: 'ผู้ส่งสลิป', size: 'sm', color: '#8c8c8c', flex: 1 },
-                     { type: 'text', text: senderName, size: 'sm', color: '#333333', align: 'end', flex: 2, wrap: true }
+                     { type: 'text', text: 'OPERATOR', size: 'xs', color: '#666666', flex: 1 },
+                     { type: 'text', text: senderName, size: 'xs', color: '#1c1c1c', align: 'end', flex: 2, wrap: true }
                    ]
                  }
                ]

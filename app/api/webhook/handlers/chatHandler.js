@@ -336,18 +336,38 @@ ${dailyLogs || 'ไม่มีความเคลื่อนไหว'}
 
           const confirmFlex = {
             type: 'bubble',
-            header: { type: 'box', layout: 'vertical', backgroundColor: isBossUser ? '#ffc107' : '#007bff', contents: [{ type: 'text', text: isBossUser ? '👑 บอสสั่งแก้ตารางกะ!' : '📝 ยืนยันข้อมูลตารางงาน', color: isBossUser ? '#000000' : '#ffffff', weight: 'bold' }] },
+            cornerRadius: 'none',
+            styles: {
+              header: { backgroundColor: '#f3f3f3' },
+              body: { backgroundColor: '#f3f3f3' },
+              footer: { backgroundColor: '#ebebeb' }
+            },
+            header: {
+              type: 'box',
+              layout: 'vertical',
+              paddingAll: '20px',
+              contents: [
+                { type: 'text', text: 'ROSTER CHANGE PROPOSAL', color: '#1c1c1c', weight: 'bold', size: 'sm' },
+                { type: 'text', text: `CLASSIFICATION: ${isBossUser ? 'DIRECTIVE (BOSS)' : 'PROPOSAL'}`, color: '#1c1c1c', weight: 'bold', size: 'xxs', margin: 'xs' }
+              ]
+            },
             body: {
-              type: 'box', layout: 'vertical', contents: [
-                { type: 'text', text: summaryText, wrap: true, size: 'sm' },
-                { type: 'text', text: isBossUser ? 'ข้อมูลเป๊ะไหมคะบอส? กดอัปเดตเพื่อเปลี่ยนกะทันทีเงียบๆ ค่ะ เมี๊ยว~' : 'ข้อมูลถูกต้องไหมคะ? ถ้าใช่รบกวนกดยืนยันเพื่อส่งเรื่องให้บอสพิจารณาน้ำตาซึมค่ะ เมี๊ยว~', margin: 'md', size: 'xs', color: '#aaaaaa', wrap: true }
+              type: 'box',
+              layout: 'vertical',
+              paddingAll: '20px',
+              contents: [
+                { type: 'text', text: summaryText, wrap: true, size: 'sm', color: '#1c1c1c' },
+                { type: 'text', text: isBossUser ? 'PLEASE REVIEW THE PROPOSAL DETAILS BEFORE EXECUTING UPDATE.' : 'PLEASE CONFIRM THAT THE INFORMATION ABOVE IS ACCURATE TO SUBMIT FOR REVIEW.', margin: 'md', size: 'xxs', color: '#888888', wrap: true }
               ]
             },
             footer: {
-              type: 'box', layout: 'horizontal', spacing: 'sm',
+              type: 'box',
+              layout: 'horizontal',
+              paddingAll: '15px',
+              spacing: 'sm',
               contents: [
-                { type: 'button', style: 'primary', color: '#06c755', action: { type: 'postback', label: isBossUser ? '✅ ยืนยัน/อัปเดต' : '✅ ถูกต้อง', data: `action=confirm_roster&payload=${Buffer.from(JSON.stringify(actionData)).toString('base64')}` } },
-                { type: 'button', style: 'secondary', action: { type: 'postback', label: '❌ ยกเลิก', data: 'action=cancel_roster' } }
+                { type: 'button', style: 'primary', color: '#1c1c1c', action: { type: 'postback', label: isBossUser ? 'EXECUTE UPDATE' : 'CONFIRM SUBMISSION', data: `action=confirm_roster&payload=${Buffer.from(JSON.stringify(actionData)).toString('base64')}` } },
+                { type: 'button', style: 'secondary', action: { type: 'postback', label: 'CANCEL', data: 'action=cancel_roster' } }
               ]
             }
           };
@@ -372,21 +392,42 @@ ${dailyLogs || 'ไม่มีความเคลื่อนไหว'}
           const insightFlex = {
             type: 'bubble',
             size: 'kilo',
-            header: { type: 'box', layout: 'vertical', backgroundColor: '#9333ea', contents: [{ type: 'text', text: '💡 พบความรู้ใหม่แว่วมาจากแชท', color: '#ffffff', weight: 'bold', size: 'sm' }] },
+            cornerRadius: 'none',
+            styles: {
+              header: { backgroundColor: '#f3f3f3' },
+              body: { backgroundColor: '#f3f3f3' },
+              footer: { backgroundColor: '#ebebeb' }
+            },
+            header: {
+              type: 'box',
+              layout: 'vertical',
+              paddingAll: '20px',
+              contents: [
+                { type: 'text', text: 'KNOWLEDGE PROTOCOL DETECTED', color: '#1c1c1c', weight: 'bold', size: 'sm' },
+                { type: 'text', text: 'STATUS: PENDING MANAGER REVIEW', color: '#ef6c00', size: 'xxs', weight: 'bold', margin: 'xs' }
+              ]
+            },
             body: {
-              type: 'box', layout: 'vertical', spacing: 'md', contents: [
-                { type: 'text', text: savedFact.content, wrap: true, size: 'sm', weight: 'medium', color: '#333333' },
-                { type: 'box', layout: 'horizontal', spacing: 'sm', contents: [
-                  { type: 'text', text: 'Keywords:', size: 'xxs', color: '#aaaaaa', flex: 0 },
-                  { type: 'text', text: (savedFact.metadata?.keywords || []).join(', '), size: 'xxs', color: '#6366f1', flex: 1, wrap: true }
+              type: 'box',
+              layout: 'vertical',
+              paddingAll: '20px',
+              spacing: 'md',
+              contents: [
+                { type: 'text', text: savedFact.content, wrap: true, size: 'xs', color: '#1c1c1c' },
+                { type: 'box', layout: 'vertical', spacing: 'xs', contents: [
+                  { type: 'text', text: 'KEYWORDS', size: 'xxs', color: '#888888', weight: 'bold' },
+                  { type: 'text', text: (savedFact.metadata?.keywords || []).map(kw => `[${kw.toUpperCase()}]`).join(' '), size: 'xxs', color: '#3b82f6', wrap: true }
                 ]}
               ]
             },
             footer: {
-              type: 'box', layout: 'horizontal', spacing: 'sm',
+              type: 'box',
+              layout: 'horizontal',
+              paddingAll: '15px',
+              spacing: 'sm',
               contents: [
-                { type: 'button', style: 'primary', color: '#10b981', action: { type: 'postback', label: '✅ อนุมัติ', data: `action=approve_insight&id=${savedFact.id}` } },
-                { type: 'button', style: 'secondary', color: '#f43f5e', action: { type: 'postback', label: '❌ ลบออก', data: `action=reject_insight&id=${savedFact.id}` } }
+                { type: 'button', style: 'primary', color: '#1c1c1c', action: { type: 'postback', label: 'APPROVE', data: `action=approve_insight&id=${savedFact.id}` } },
+                { type: 'button', style: 'secondary', action: { type: 'postback', label: 'DISMISS', data: `action=reject_insight&id=${savedFact.id}` } }
               ]
             }
           };
@@ -477,26 +518,29 @@ function formatNewsFlex(data, rawFallbackText) {
     const contents = {
       type: "bubble",
       size: "mega",
+      cornerRadius: "none",
       styles: {
-        header: { backgroundColor: "#1e293b" },
-        body: { backgroundColor: "#0f172a" }
+        header: { backgroundColor: "#181818" },
+        body: { backgroundColor: "#181818" }
       },
       header: {
         type: "box",
         layout: "vertical",
+        paddingAll: "20px",
         contents: [
           {
             type: "text",
-            text: data.title || "🐱 สรุปข่าวสาร & ต้นทุนรายวันโดย Yuzu",
+            text: "DAILY INTELLIGENCE REPORT // OPERATIONS",
             weight: "bold",
             color: "#ffffff",
-            size: "md"
+            size: "sm"
           },
           {
             type: "text",
-            text: data.subtitle || "ข้อมูลอัปเดตล่าสุดสำหรับร้าน In The Haus",
-            color: "#94a3b8",
-            size: "xs",
+            text: "DATA SOURCE: IN THE HAUS INTEL SERVICE",
+            color: "#888888",
+            size: "xxs",
+            weight: "bold",
             margin: "xs"
           }
         ]
@@ -504,107 +548,110 @@ function formatNewsFlex(data, rawFallbackText) {
       body: {
         type: "box",
         layout: "vertical",
+        paddingAll: "20px",
         spacing: "md",
         contents: []
       }
     };
 
     if (data.news) {
-      const titleText = data.costs ? "📍 ข่าวเด่นนครพนม & อีสาน" : "📰 สรุปข่าวรอบวัน";
       contents.body.contents.push({
         type: "box",
         layout: "vertical",
         spacing: "xs",
         contents: [
-          { type: "text", text: titleText, weight: "bold", size: "xs", color: "#38bdf8" },
-          { type: "text", text: data.news, size: "xs", color: "#cbd5e1", wrap: true }
+          { type: "text", text: "01 NEWS FEED", weight: "bold", size: "xs", color: "#ffffff" },
+          { type: "text", text: data.news, size: "xs", color: "#c5c5c5", wrap: true }
         ]
       });
     }
 
     if (data.industry) {
       if (contents.body.contents.length > 0) {
-        contents.body.contents.push({ type: "separator", color: "#334155" });
+        contents.body.contents.push({ type: "separator", color: "#333333" });
       }
       contents.body.contents.push({
         type: "box",
         layout: "vertical",
         spacing: "xs",
         contents: [
-          { type: "text", text: "🍽️ วงการร้านอาหารในไทย/อีสาน", weight: "bold", size: "xs", color: "#bef264" },
-          { type: "text", text: data.industry, size: "xs", color: "#cbd5e1", wrap: true }
+          { type: "text", text: "02 INDUSTRY TRENDS", weight: "bold", size: "xs", color: "#ffffff" },
+          { type: "text", text: data.industry, size: "xs", color: "#c5c5c5", wrap: true }
         ]
       });
     }
 
     if (data.costs) {
       if (contents.body.contents.length > 0) {
-        contents.body.contents.push({ type: "separator", color: "#334155" });
+        contents.body.contents.push({ type: "separator", color: "#333333" });
       }
       contents.body.contents.push({
         type: "box",
         layout: "vertical",
         spacing: "xs",
         contents: [
-          { type: "text", text: "⛽ สรุปต้นทุนน้ำมัน & ค่าไฟ & วัตถุดิบ", weight: "bold", size: "xs", color: "#f59e0b" },
-          { type: "text", text: data.costs, size: "xs", color: "#cbd5e1", wrap: true }
+          { type: "text", text: "03 OPERATING COSTS", weight: "bold", size: "xs", color: "#ffffff" },
+          { type: "text", text: data.costs, size: "xs", color: "#c5c5c5", wrap: true }
         ]
       });
     }
 
     if (data.advice) {
       if (contents.body.contents.length > 0) {
-        contents.body.contents.push({ type: "separator", color: "#334155" });
+        contents.body.contents.push({ type: "separator", color: "#333333" });
       }
       contents.body.contents.push({
         type: "box",
         layout: "vertical",
         spacing: "xs",
         contents: [
-          { type: "text", text: "🐾 คำแนะนำจาก Yuzu", weight: "bold", size: "xs", color: "#f97316" },
-          { type: "text", text: data.advice, size: "xs", color: "#cbd5e1", wrap: true }
+          { type: "text", text: "04 STRATEGIC ADVICE", weight: "bold", size: "xs", color: "#ffffff" },
+          { type: "text", text: data.advice, size: "xs", color: "#c5c5c5", wrap: true }
         ]
       });
     }
 
     return {
       type: "flex",
-      altText: `🐱 สรุปข่าวสาร & ต้นทุนโดย Yuzu`,
+      altText: `สรุปข่าวสาร & ต้นทุนโดย Yuzu`,
       contents: contents
     };
   } else {
     return {
       type: "flex",
-      altText: `🐱 สรุปข่าวสาร & ต้นทุนโดย Yuzu`,
+      altText: `สรุปข่าวสาร & ต้นทุนโดย Yuzu`,
       contents: {
         type: "bubble",
         size: "mega",
+        cornerRadius: "none",
         styles: {
-          header: { backgroundColor: "#1e293b" },
-          body: { backgroundColor: "#0f172a" }
+          header: { backgroundColor: "#181818" },
+          body: { backgroundColor: "#181818" }
         },
         header: {
           type: "box",
           layout: "vertical",
+          paddingAll: "20px",
           contents: [
             {
               type: "text",
-              text: "🐱 สรุปข่าวสาร & ต้นทุนโดย Yuzu",
+              text: "DAILY INTELLIGENCE REPORT // OPERATIONS",
               weight: "bold",
               color: "#ffffff",
-              size: "md"
+              size: "sm"
             }
           ]
         },
         body: {
           type: "box",
           layout: "vertical",
+          paddingAll: "20px",
           contents: [
             {
               type: "text",
               text: rawFallbackText,
               size: "xs",
-              color: "#cbd5e1",
+              color: "#c5c5c5",
               wrap: true
             }
           ]

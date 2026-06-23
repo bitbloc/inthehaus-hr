@@ -109,27 +109,47 @@ export async function handleStockResponseTags(response, request, query = "") {
          if (actionData.action === 'CREATE_ITEM') confirmMsg = `ยืนยันการสร้างรายการสินค้าใหม่: [${actionData.itemName}]`;
          
          const confirmFlex = {
-           type: 'flex',
-           altText: '📦 ยืนยันการอัปเดตคลังสินค้า',
-           contents: {
-             type: 'bubble',
-             header: { type: 'box', layout: 'vertical', backgroundColor: '#e91e63', contents: [{ type: 'text', text: '📦 อัปเดตคลังสินค้า (Stock)', color: '#ffffff', weight: 'bold' }] },
-             body: {
-               type: 'box', layout: 'vertical', contents: [
-                 { type: 'text', text: confirmMsg, wrap: true, size: 'sm', weight: 'bold' },
-                 { type: 'text', text: 'ข้อมูลจะถูกส่งเข้า API ทันที โปรดตรวจสอบให้ถูกต้อง เมี๊ยว~', margin: 'md', size: 'xs', color: '#aaaaaa', wrap: true }
-               ]
-             },
-             footer: {
-               type: 'box', layout: 'horizontal', spacing: 'sm',
-               contents: [
-                 { type: 'button', style: 'primary', color: '#06c755', action: { type: 'postback', label: '✅ ยืนยัน', data: `action=confirm_stock&payload=${Buffer.from(JSON.stringify(actionData)).toString('base64')}` } },
-                 { type: 'button', style: 'secondary', action: { type: 'postback', label: '❌ ยกเลิก', data: 'action=cancel_stock' } }
-               ]
-             }
-           }
-         };
-         return confirmFlex;
+            type: 'flex',
+            altText: 'ยืนยันการอัปเดตคลังสินค้า',
+            contents: {
+              type: 'bubble',
+              cornerRadius: 'none',
+              styles: {
+                header: { backgroundColor: '#f3f3f3' },
+                body: { backgroundColor: '#f3f3f3' },
+                footer: { backgroundColor: '#ebebeb' }
+              },
+              header: {
+                type: 'box',
+                layout: 'vertical',
+                paddingAll: '20px',
+                contents: [
+                  { type: 'text', text: 'STOCK INVENTORY UPDATE REQUEST', color: '#1c1c1c', weight: 'bold', size: 'sm' },
+                  { type: 'text', text: 'STATUS: PENDING CONFIRMATION', color: '#ef6c00', size: 'xxs', weight: 'bold', margin: 'xs' }
+                ]
+              },
+              body: {
+                type: 'box',
+                layout: 'vertical',
+                paddingAll: '20px',
+                contents: [
+                  { type: 'text', text: confirmMsg, wrap: true, size: 'xs', color: '#1c1c1c', weight: 'bold' },
+                  { type: 'text', text: 'PLEASE CONFIRM THE TRANSACTION DETAILS BEFORE SUBMITTING TO API.', margin: 'md', size: 'xxs', color: '#888888', wrap: true }
+                ]
+              },
+              footer: {
+                type: 'box',
+                layout: 'horizontal',
+                paddingAll: '15px',
+                spacing: 'sm',
+                contents: [
+                  { type: 'button', style: 'primary', color: '#1c1c1c', action: { type: 'postback', label: 'CONFIRM UPDATE', data: `action=confirm_stock&payload=${Buffer.from(JSON.stringify(actionData)).toString('base64')}` } },
+                  { type: 'button', style: 'secondary', action: { type: 'postback', label: 'CANCEL', data: 'action=cancel_stock' } }
+                ]
+              }
+            }
+          };
+          return confirmFlex;
       }
     } catch (e) {
       console.error("Stock Action Error:", e);
@@ -145,16 +165,35 @@ export async function handleStockResponseTags(response, request, query = "") {
       
       const auditFlex = {
         type: 'bubble',
-        header: { type: 'box', layout: 'vertical', backgroundColor: '#ec4899', contents: [{ type: 'text', text: '📋 ฟอร์มตรวจนับสต็อก', color: '#ffffff', weight: 'bold' }] },
+        cornerRadius: 'none',
+        styles: {
+          header: { backgroundColor: '#f3f3f3' },
+          body: { backgroundColor: '#f3f3f3' },
+          footer: { backgroundColor: '#ebebeb' }
+        },
+        header: {
+          type: 'box',
+          layout: 'vertical',
+          paddingAll: '20px',
+          contents: [
+            { type: 'text', text: 'STOCK AUDIT REGISTRY', color: '#1c1c1c', weight: 'bold', size: 'sm' },
+            { type: 'text', text: 'SYSTEM TYPE: INTERACTIVE FORM', color: '#666666', size: 'xxs', weight: 'bold', margin: 'xs' }
+          ]
+        },
         body: {
-          type: 'box', layout: 'vertical', contents: [
-            { type: 'text', text: 'กดที่ปุ่มด้านล่างเพื่อเปิดฟอร์มนับสต็อกผ่านมือถือ ดึงข้อมูลแบบ Real-time ค่ะ เมี๊ยว~', wrap: true, size: 'sm' }
+          type: 'box',
+          layout: 'vertical',
+          paddingAll: '20px',
+          contents: [
+            { type: 'text', text: 'LAUNCH THE STOCK AUDIT INTERFACE TO REPORT INVENTORY COUNTS IN REAL-TIME.', wrap: true, size: 'xs', color: '#1c1c1c' }
           ]
         },
         footer: {
-          type: 'box', layout: 'vertical',
+          type: 'box',
+          layout: 'vertical',
+          paddingAll: '15px',
           contents: [
-            { type: 'button', style: 'primary', color: '#111827', action: { type: 'uri', label: '📱 เปิดฟอร์มนับสต็อก', uri: liffUrl } }
+            { type: 'button', style: 'primary', color: '#1c1c1c', action: { type: 'uri', label: 'LAUNCH AUDIT FORM', uri: liffUrl } }
           ]
         }
       };
@@ -257,22 +296,23 @@ function formatLowStockFlex(lowStockData) {
   const contents = [
     {
       type: "text",
-      text: "⚠️ สินค้าใกล้หมดสต็อก",
+      text: "STOCK LEVEL WARNING // REORDER REQUIRED",
       weight: "bold",
-      size: "md",
-      color: "#ffffff"
+      size: "sm",
+      color: "#c62828"
     },
     {
       type: "text",
-      text: `ตรวจพบสินค้าเหลือน้อยกว่าจุดสั่งซื้อ ${lowStockData.length} รายการ`,
-      color: "#f87171",
-      size: "xs",
+      text: `ITEMS BELOW MINIMUM SPECIFICATION: ${lowStockData.length}`,
+      color: "#666666",
+      size: "xxs",
+      weight: "bold",
       margin: "xs"
     },
     {
       type: "separator",
       margin: "md",
-      color: "#475569"
+      color: "#cccccc"
     }
   ];
 
@@ -289,17 +329,17 @@ function formatLowStockFlex(lowStockData) {
           contents: [
             {
               type: "text",
-              text: item.name,
+              text: item.name.toUpperCase(),
               weight: "bold",
-              size: "sm",
-              color: "#f8fafc",
+              size: "xs",
+              color: "#1c1c1c",
               wrap: true
             },
             {
               type: "text",
-              text: item.category || "ทั่วไป",
+              text: (item.category || "GENERAL").toUpperCase(),
               size: "xxs",
-              color: "#64748b"
+              color: "#888888"
             }
           ]
         },
@@ -310,18 +350,18 @@ function formatLowStockFlex(lowStockData) {
           contents: [
             {
               type: "text",
-              text: `${item.current_quantity} ${item.unit}`,
+              text: `${item.current_quantity} ${item.unit.toUpperCase()}`,
               align: "end",
               weight: "bold",
-              size: "sm",
-              color: "#ef4444"
+              size: "xs",
+              color: "#c62828"
             },
             {
               type: "text",
-              text: `(Min: ${item.reorder_point})`,
+              text: `MIN: ${item.reorder_point}`,
               align: "end",
               size: "xxs",
-              color: "#64748b"
+              color: "#888888"
             }
           ]
         }
@@ -336,49 +376,49 @@ function formatLowStockFlex(lowStockData) {
       {
         type: "separator",
         margin: "md",
-        color: "#334155"
+        color: "#cccccc"
       },
       {
         type: "text",
-        text: `... และรายการอื่นๆ อีก ${lowStockData.length - 15} รายการ`,
-        size: "xs",
-        color: "#64748b",
+        text: `AND ${lowStockData.length - 15} OTHER ITEMS`,
+        size: "xxs",
+        color: "#888888",
         margin: "md",
-        align: "center"
+        align: "center",
+        weight: "bold"
       }
     );
   }
 
   return {
     type: "flex",
-    altText: `⚠️ สินค้าใกล้หมดสต็อก ${lowStockData.length} รายการ`,
+    altText: `แจ้งเตือน: สินค้าใกล้หมดสต็อก ${lowStockData.length} รายการ`,
     contents: {
       type: "bubble",
       size: "mega",
+      cornerRadius: "none",
       styles: {
-        header: {
-          backgroundColor: "#e11d48"
-        },
-        body: {
-          backgroundColor: "#0f172a"
-        }
+        header: { backgroundColor: "#f3f3f3" },
+        body: { backgroundColor: "#f3f3f3" }
       },
       header: {
         type: "box",
         layout: "vertical",
+        paddingAll: "20px",
         contents: [
           {
             type: "text",
-            text: "🚨 แจ้งเตือน: คลังสินค้าใกล้หมด",
+            text: "INVENTORY STATUS ALERT",
             weight: "bold",
-            color: "#ffffff",
-            size: "md"
+            color: "#c62828",
+            size: "sm"
           }
         ]
       },
       body: {
         type: "box",
         layout: "vertical",
+        paddingAll: "20px",
         spacing: "xs",
         contents: contents
       }
@@ -390,22 +430,23 @@ function formatAllStockFlex(allItems) {
   const contents = [
     {
       type: "text",
-      text: "📦 รายการสินค้าทั้งหมดในคลัง",
+      text: "STOCK REGISTRY INVENTORY",
       weight: "bold",
-      size: "md",
-      color: "#ffffff"
+      size: "sm",
+      color: "#1c1c1c"
     },
     {
       type: "text",
-      text: `ข้อมูลอัปเดตเรียลไทม์ (ทั้งหมด ${allItems.length} รายการ)`,
-      color: "#94a3b8",
-      size: "xs",
+      text: `TOTAL REGISTERED ITEMS: ${allItems.length}`,
+      color: "#666666",
+      size: "xxs",
+      weight: "bold",
       margin: "xs"
     },
     {
       type: "separator",
       margin: "md",
-      color: "#475569"
+      color: "#cccccc"
     }
   ];
 
@@ -418,20 +459,20 @@ function formatAllStockFlex(allItems) {
       contents: [
         {
           type: "text",
-          text: item.name,
+          text: item.name.toUpperCase(),
           weight: "bold",
-          size: "sm",
-          color: "#f8fafc",
+          size: "xs",
+          color: "#1c1c1c",
           flex: 3,
           wrap: true
         },
         {
           type: "text",
-          text: `${item.current_quantity} ${item.unit}`,
+          text: `${item.current_quantity} ${item.unit.toUpperCase()}`,
           align: "end",
           weight: "bold",
-          size: "sm",
-          color: isLow ? "#ef4444" : "#10b981",
+          size: "xs",
+          color: isLow ? "#c62828" : "#2e7d32",
           flex: 1
         }
       ]
@@ -445,49 +486,49 @@ function formatAllStockFlex(allItems) {
       {
         type: "separator",
         margin: "md",
-        color: "#334155"
+        color: "#cccccc"
       },
       {
         type: "text",
-        text: `... และรายการอื่นๆ อีก ${allItems.length - 15} รายการ`,
-        size: "xs",
-        color: "#64748b",
+        text: `AND ${allItems.length - 15} OTHER ITEMS`,
+        size: "xxs",
+        color: "#888888",
         margin: "md",
-        align: "center"
+        align: "center",
+        weight: "bold"
       }
     );
   }
 
   return {
     type: "flex",
-    altText: `📦 คลังสินค้าทั้งหมด (${allItems.length} รายการ)`,
+    altText: `คลังสินค้าทั้งหมด (${allItems.length} รายการ)`,
     contents: {
       type: "bubble",
       size: "mega",
+      cornerRadius: "none",
       styles: {
-        header: {
-          backgroundColor: "#3b82f6"
-        },
-        body: {
-          backgroundColor: "#0f172a"
-        }
+        header: { backgroundColor: "#f3f3f3" },
+        body: { backgroundColor: "#f3f3f3" }
       },
       header: {
         type: "box",
         layout: "vertical",
+        paddingAll: "20px",
         contents: [
           {
             type: "text",
-            text: "📦 รายงานคลังสินค้า (Stock)",
+            text: "INVENTORY GENERAL REPORT",
             weight: "bold",
-            color: "#ffffff",
-            size: "md"
+            color: "#1c1c1c",
+            size: "sm"
           }
         ]
       },
       body: {
         type: "box",
         layout: "vertical",
+        paddingAll: "20px",
         spacing: "xs",
         contents: contents
       }
@@ -499,22 +540,23 @@ function formatStockHistoryFlex(historyData, title) {
   const contents = [
     {
       type: "text",
-      text: title,
+      text: "STOCK INVENTORY LOGS // MOVEMENTS",
       weight: "bold",
-      size: "md",
-      color: "#ffffff"
+      size: "sm",
+      color: "#1c1c1c"
     },
     {
       type: "text",
-      text: "ประวัติการเคลื่อนไหวคลังล่าสุด",
-      color: "#94a3b8",
-      size: "xs",
+      text: title.toUpperCase(),
+      color: "#666666",
+      size: "xxs",
+      weight: "bold",
       margin: "xs"
     },
     {
       type: "separator",
       margin: "md",
-      color: "#475569"
+      color: "#cccccc"
     }
   ];
 
@@ -523,9 +565,9 @@ function formatStockHistoryFlex(historyData, title) {
   const historyRows = sorted.slice(0, 7).map(h => {
     const tTime = format(addHours(new Date(h.created_at), 7), 'dd/MM HH:mm');
     const isRestock = h.transaction_type === 'in';
-    const signText = isRestock ? `📈 รับเข้า +${h.quantity_change}` : `📉 เบิกออก ${h.quantity_change}`;
-    const badgeColor = isRestock ? "#10b981" : "#ef4444";
-    const itemName = h.stock_items ? h.stock_items.name : 'สินค้า';
+    const signText = isRestock ? `INFLOW +${h.quantity_change}` : `OUTFLOW -${h.quantity_change}`;
+    const badgeColor = isRestock ? "#2e7d32" : "#c62828";
+    const itemName = h.stock_items ? h.stock_items.name.toUpperCase() : 'ITEM';
 
     return {
       type: "box",
@@ -541,8 +583,8 @@ function formatStockHistoryFlex(historyData, title) {
               type: "text",
               text: itemName,
               weight: "bold",
-              size: "sm",
-              color: "#f8fafc",
+              size: "xs",
+              color: "#1c1c1c",
               flex: 3,
               wrap: true
             },
@@ -550,8 +592,8 @@ function formatStockHistoryFlex(historyData, title) {
               type: "text",
               text: tTime,
               align: "end",
-              size: "xs",
-              color: "#64748b",
+              size: "xxs",
+              color: "#666666",
               flex: 1
             }
           ]
@@ -563,17 +605,17 @@ function formatStockHistoryFlex(historyData, title) {
             {
               type: "text",
               text: signText,
-              size: "xs",
+              size: "xxs",
               color: badgeColor,
               weight: "bold",
               flex: 2
             },
             {
               type: "text",
-              text: `โดย: ${h.performed_by || 'ไม่ทราบ'}`,
+              text: `BY: ${h.performed_by ? h.performed_by.toUpperCase() : 'UNKNOWN'}`,
               align: "end",
-              size: "xs",
-              color: "#94a3b8",
+              size: "xxs",
+              color: "#666666",
               flex: 2,
               wrap: true
             }
@@ -581,9 +623,9 @@ function formatStockHistoryFlex(historyData, title) {
         },
         ...(h.note ? [{
           type: "text",
-          text: `💬 ${h.note}`,
+          text: `NOTE: ${h.note.toUpperCase()}`,
           size: "xxs",
-          color: "#64748b",
+          color: "#888888",
           margin: "xs",
           wrap: true
         }] : [])
@@ -598,49 +640,49 @@ function formatStockHistoryFlex(historyData, title) {
       {
         type: "separator",
         margin: "md",
-        color: "#334155"
+        color: "#cccccc"
       },
       {
         type: "text",
-        text: `แสดงความเคลื่อนไหวล่าสุด 7 จาก ${sorted.length} รายการ`,
-        size: "xs",
-        color: "#64748b",
+        text: `SHOWING 7 OF ${sorted.length} MOVEMENT ENTRIES`,
+        size: "xxs",
+        color: "#888888",
         margin: "md",
-        align: "center"
+        align: "center",
+        weight: "bold"
       }
     );
   }
 
   return {
     type: "flex",
-    altText: `🕒 ${title}`,
+    altText: `ประวัติสต็อกสินค้า: ${title}`,
     contents: {
       type: "bubble",
       size: "mega",
+      cornerRadius: "none",
       styles: {
-        header: {
-          backgroundColor: "#8b5cf6"
-        },
-        body: {
-          backgroundColor: "#0f172a"
-        }
+        header: { backgroundColor: "#f3f3f3" },
+        body: { backgroundColor: "#f3f3f3" }
       },
       header: {
         type: "box",
         layout: "vertical",
+        paddingAll: "20px",
         contents: [
           {
             type: "text",
-            text: "🕒 ประวัติสต็อกสินค้า (History)",
+            text: "TRANSACTION HISTORY REGISTER",
             weight: "bold",
-            color: "#ffffff",
-            size: "md"
+            color: "#1c1c1c",
+            size: "sm"
           }
         ]
       },
       body: {
         type: "box",
         layout: "vertical",
+        paddingAll: "20px",
         spacing: "xs",
         contents: contents
       }
@@ -651,34 +693,33 @@ function formatStockHistoryFlex(historyData, title) {
 function formatStockSelectionFlex(searchQuery, matchingItems) {
   return {
     type: "flex",
-    altText: "🔍 เลือกสินค้าที่ต้องการเช็คสต็อก",
+    altText: "เลือกสินค้าที่ต้องการเช็คสต็อก",
     contents: {
       type: "bubble",
       size: "mega",
+      cornerRadius: "none",
       styles: {
-        header: {
-          backgroundColor: "#f59e0b"
-        },
-        body: {
-          backgroundColor: "#0f172a"
-        }
+        header: { backgroundColor: "#f3f3f3" },
+        body: { backgroundColor: "#f3f3f3" }
       },
       header: {
         type: "box",
         layout: "vertical",
+        paddingAll: "20px",
         contents: [
           {
             type: "text",
-            text: "🔍 ยูซุพบสินค้าหลายรายการ",
+            text: "QUERY MATCH RESOLUTION",
             weight: "bold",
-            color: "#ffffff",
-            size: "md"
+            color: "#1c1c1c",
+            size: "sm"
           },
           {
             type: "text",
-            text: `ผลการค้นหาสำหรับ "${searchQuery}"`,
-            color: "#94a3b8",
-            size: "xs",
+            text: `MULTIPLE MATCHES FOUND FOR "${searchQuery.toUpperCase()}"`,
+            color: "#666666",
+            size: "xxs",
+            weight: "bold",
             margin: "xs"
           }
         ]
@@ -686,13 +727,14 @@ function formatStockSelectionFlex(searchQuery, matchingItems) {
       body: {
         type: "box",
         layout: "vertical",
+        paddingAll: "20px",
         spacing: "md",
         contents: [
           {
             type: "text",
-            text: "ไม่แน่ใจว่าหมายถึงชิ้นไหน เลือกชิ้นที่ต้องการเช็คได้เลยค่ะ เมี๊ยว~",
+            text: "SELECT THE TARGET ITEM SPECIFICATION FOR RESOLUTION:",
             size: "xs",
-            color: "#e2e8f0",
+            color: "#333333",
             wrap: true
           },
           {
@@ -703,11 +745,11 @@ function formatStockSelectionFlex(searchQuery, matchingItems) {
               return {
                 type: "button",
                 style: "primary",
-                color: "#1e293b",
+                color: "#1c1c1c",
                 height: "sm",
                 action: {
                   type: "postback",
-                  label: item.name,
+                  label: item.name.toUpperCase(),
                   data: `action=check_exact_stock&itemName=${encodeURIComponent(item.name)}`
                 }
               };
@@ -721,38 +763,46 @@ function formatStockSelectionFlex(searchQuery, matchingItems) {
 
 function formatSingleItemStockFlex(item) {
   const isLow = item.current_quantity <= (item.reorder_point || 0);
-  const statusColor = isLow ? "#ef4444" : "#10b981";
+  const statusText = isLow ? "WARNING: REORDER REQUIRED" : "STATUS: NOMINAL";
+  const statusColor = isLow ? "#c62828" : "#2e7d32";
   
   return {
     type: "flex",
-    altText: `📦 เช็คสต็อก: ${item.name} มี ${item.current_quantity} ${item.unit}`,
+    altText: `เช็คสต็อก: ${item.name} มี ${item.current_quantity} ${item.unit}`,
     contents: {
       type: "bubble",
       size: "mega",
+      cornerRadius: "none",
       styles: {
-        header: {
-          backgroundColor: isLow ? "#ef4444" : "#10b981"
-        },
-        body: {
-          backgroundColor: "#0f172a"
-        }
+        header: { backgroundColor: "#f3f3f3" },
+        body: { backgroundColor: "#f3f3f3" }
       },
       header: {
         type: "box",
         layout: "vertical",
+        paddingAll: "20px",
         contents: [
           {
             type: "text",
-            text: `📦 ตรวจสอบสต็อก: ${item.name}`,
+            text: `STOCK REGISTRY ITEM REPORT`,
             weight: "bold",
-            color: "#ffffff",
-            size: "md"
+            color: "#1c1c1c",
+            size: "sm"
+          },
+          {
+            type: "text",
+            text: `SPECIFICATION: ${item.name.toUpperCase()}`,
+            color: "#666666",
+            size: "xxs",
+            weight: "bold",
+            margin: "xs"
           }
         ]
       },
       body: {
         type: "box",
         layout: "vertical",
+        paddingAll: "20px",
         spacing: "md",
         contents: [
           {
@@ -761,25 +811,25 @@ function formatSingleItemStockFlex(item) {
             contents: [
               {
                 type: "text",
-                text: "สถานะสต็อก",
+                text: "STOCK STATUS",
                 size: "xs",
-                color: "#94a3b8",
+                color: "#666666",
                 flex: 1
               },
               {
                 type: "text",
-                text: isLow ? "⚠️ สินค้าใกล้หมด" : "✅ ปกติ",
+                text: statusText,
                 size: "xs",
                 color: statusColor,
                 align: "end",
                 weight: "bold",
-                flex: 1
+                flex: 2
               }
             ]
           },
           {
             type: "separator",
-            color: "#334155"
+            color: "#cccccc"
           },
           {
             type: "box",
@@ -787,20 +837,20 @@ function formatSingleItemStockFlex(item) {
             contents: [
               {
                 type: "text",
-                text: "จำนวนปัจจุบัน",
-                size: "sm",
-                color: "#f8fafc",
+                text: "CURRENT BALANCE",
+                size: "xs",
+                color: "#1c1c1c",
                 weight: "bold",
                 flex: 1
               },
               {
                 type: "text",
-                text: `${item.current_quantity} ${item.unit}`,
+                text: `${item.current_quantity} ${item.unit.toUpperCase()}`,
                 align: "end",
                 weight: "bold",
-                size: "lg",
+                size: "sm",
                 color: statusColor,
-                flex: 1
+                flex: 2
               }
             ]
           },
@@ -810,18 +860,18 @@ function formatSingleItemStockFlex(item) {
             contents: [
               {
                 type: "text",
-                text: "จุดสั่งซื้อ (Min Reorder)",
+                text: "REORDER POINT (MIN)",
                 size: "xs",
-                color: "#94a3b8",
+                color: "#666666",
                 flex: 1
               },
               {
                 type: "text",
-                text: `${item.reorder_point || 0} ${item.unit}`,
+                text: `${item.reorder_point || 0} ${item.unit.toUpperCase()}`,
                 align: "end",
                 size: "xs",
-                color: "#94a3b8",
-                flex: 1
+                color: "#666666",
+                flex: 2
               }
             ]
           }
@@ -835,22 +885,23 @@ function formatMultiItemsStockFlex(searchQuery, items) {
   const contents = [
     {
       type: "text",
-      text: "🔍 รายการสินค้าที่พบในคลัง",
+      text: "STOCK INVENTORY SEARCH RESULT",
       weight: "bold",
-      size: "md",
-      color: "#ffffff"
+      size: "sm",
+      color: "#1c1c1c"
     },
     {
       type: "text",
-      text: `ผลการค้นหาสำหรับ "${searchQuery}" (${items.length} รายการ)`,
-      color: "#94a3b8",
-      size: "xs",
+      text: `MATCHES FOR "${searchQuery.toUpperCase()}" (${items.length} ITEMS)`,
+      color: "#666666",
+      size: "xxs",
+      weight: "bold",
       margin: "xs"
     },
     {
       type: "separator",
       margin: "md",
-      color: "#475569"
+      color: "#cccccc"
     }
   ];
 
@@ -863,20 +914,20 @@ function formatMultiItemsStockFlex(searchQuery, items) {
       contents: [
         {
           type: "text",
-          text: item.name,
+          text: item.name.toUpperCase(),
           weight: "bold",
-          size: "sm",
-          color: "#f8fafc",
+          size: "xs",
+          color: "#1c1c1c",
           flex: 3,
           wrap: true
         },
         {
           type: "text",
-          text: `${item.current_quantity} ${item.unit}`,
+          text: `${item.current_quantity} ${item.unit.toUpperCase()}`,
           align: "end",
           weight: "bold",
-          size: "sm",
-          color: isLow ? "#ef4444" : "#10b981",
+          size: "xs",
+          color: isLow ? "#c62828" : "#2e7d32",
           flex: 2
         }
       ]
@@ -890,49 +941,49 @@ function formatMultiItemsStockFlex(searchQuery, items) {
       {
         type: "separator",
         margin: "md",
-        color: "#334155"
+        color: "#cccccc"
       },
       {
         type: "text",
-        text: `... และรายการอื่นๆ อีก ${items.length - 15} รายการ`,
-        size: "xs",
-        color: "#64748b",
+        text: `AND ${items.length - 15} OTHER ITEMS`,
+        size: "xxs",
+        color: "#888888",
         margin: "md",
-        align: "center"
+        align: "center",
+        weight: "bold"
       }
     );
   }
 
   return {
     type: "flex",
-    altText: `🔍 ค้นหาสินค้า: ${searchQuery} (${items.length} รายการ)`,
+    altText: `ค้นหาสินค้า: ${searchQuery} (${items.length} รายการ)`,
     contents: {
       type: "bubble",
       size: "mega",
+      cornerRadius: "none",
       styles: {
-        header: {
-          backgroundColor: "#f59e0b"
-        },
-        body: {
-          backgroundColor: "#0f172a"
-        }
+        header: { backgroundColor: "#f3f3f3" },
+        body: { backgroundColor: "#f3f3f3" }
       },
       header: {
         type: "box",
         layout: "vertical",
+        paddingAll: "20px",
         contents: [
           {
             type: "text",
-            text: "🔍 ตรวจสอบสต็อกสินค้า",
+            text: "INVENTORY QUERY MATCHES",
             weight: "bold",
-            color: "#ffffff",
-            size: "md"
+            color: "#1c1c1c",
+            size: "sm"
           }
         ]
       },
       body: {
         type: "box",
         layout: "vertical",
+        paddingAll: "20px",
         spacing: "xs",
         contents: contents
       }
