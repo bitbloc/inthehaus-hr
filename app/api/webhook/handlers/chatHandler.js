@@ -336,7 +336,6 @@ ${dailyLogs || 'ไม่มีความเคลื่อนไหว'}
 
           const confirmFlex = {
             type: 'bubble',
-            cornerRadius: 'none',
             styles: {
               header: { backgroundColor: '#f3f3f3' },
               body: { backgroundColor: '#f3f3f3' },
@@ -392,7 +391,6 @@ ${dailyLogs || 'ไม่มีความเคลื่อนไหว'}
           const insightFlex = {
             type: 'bubble',
             size: 'kilo',
-            cornerRadius: 'none',
             styles: {
               header: { backgroundColor: '#f3f3f3' },
               body: { backgroundColor: '#f3f3f3' },
@@ -518,7 +516,6 @@ function formatNewsFlex(data, rawFallbackText) {
     const contents = {
       type: "bubble",
       size: "mega",
-      cornerRadius: "none",
       styles: {
         header: { backgroundColor: "#181818" },
         body: { backgroundColor: "#181818" }
@@ -623,7 +620,6 @@ function formatNewsFlex(data, rawFallbackText) {
       contents: {
         type: "bubble",
         size: "mega",
-        cornerRadius: "none",
         styles: {
           header: { backgroundColor: "#181818" },
           body: { backgroundColor: "#181818" }

@@ -22,7 +22,6 @@ export async function handleOrderAndReservationDetection(event, client, rawText,
           const itemsText = orderData.items.map((i, idx) => `${String(idx + 1).padStart(2, '0')}  ${i.name} [x${i.qty}]`).join('\n');
           const orderFlex = {
             type: 'bubble',
-            cornerRadius: 'none',
             styles: {
               header: { backgroundColor: '#f3f3f3' },
               body: { backgroundColor: '#f3f3f3' },
@@ -99,7 +98,6 @@ export async function handleOrderAndReservationDetection(event, client, rawText,
         if (!error && reservation) {
           const resFlex = {
             type: 'bubble',
-            cornerRadius: 'none',
             styles: {
               header: { backgroundColor: '#f3f3f3' },
               body: { backgroundColor: '#f3f3f3' },

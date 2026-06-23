@@ -385,7 +385,6 @@ export function formatWeatherFlex(weather) {
         contents: {
             type: "bubble",
             size: "mega",
-            cornerRadius: "none",
             styles: {
                 header: { backgroundColor: "#f3f3f3" },
                 body: { backgroundColor: "#f3f3f3" }

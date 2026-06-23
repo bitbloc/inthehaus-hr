@@ -82,7 +82,6 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
        contents: {
          type: 'bubble',
          size: 'kilo',
-         cornerRadius: 'none',
          styles: {
            header: { backgroundColor: '#f3f3f3' },
            body: { backgroundColor: '#f3f3f3' },

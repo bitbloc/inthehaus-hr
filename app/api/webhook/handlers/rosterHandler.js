@@ -49,7 +49,6 @@ function formatLeaveRequestBubble(l, isHistory = false) {
   const bubble = {
     type: 'bubble',
     size: 'mega',
-    cornerRadius: 'none',
     styles: {
       header: { backgroundColor: '#f3f3f3' },
       body: { backgroundColor: '#f3f3f3' },
@@ -244,7 +243,6 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
     const flexBubble = {
       type: 'bubble',
       size: 'mega',
-      cornerRadius: 'none',
       styles: {
         header: { backgroundColor: '#f3f3f3' },
         body: { backgroundColor: '#f3f3f3' }
@@ -341,7 +339,6 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
         altText: `ตารางงาน ${dateStr}`,
         contents: {
           type: 'bubble',
-          cornerRadius: 'none',
           styles: {
             header: { backgroundColor: '#f3f3f3' },
             body: { backgroundColor: '#f3f3f3' }
@@ -552,7 +549,6 @@ export async function handleRosterPostback(event, client, action, queryParams, u
       } else {
         const approvalFlex = {
           type: 'bubble',
-          cornerRadius: 'none',
           styles: {
             header: { backgroundColor: '#f3f3f3' },
             body: { backgroundColor: '#f3f3f3' },
@@ -813,7 +809,6 @@ export async function handleRosterPostback(event, client, action, queryParams, u
       contents: {
         type: 'bubble',
         size: 'kilo',
-        cornerRadius: 'none',
         styles: {
           header: { backgroundColor: '#f3f3f3' },
           body: { backgroundColor: '#f3f3f3' }

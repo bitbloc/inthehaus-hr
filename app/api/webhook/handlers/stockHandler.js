@@ -113,7 +113,6 @@ export async function handleStockResponseTags(response, request, query = "") {
             altText: 'ยืนยันการอัปเดตคลังสินค้า',
             contents: {
               type: 'bubble',
-              cornerRadius: 'none',
               styles: {
                 header: { backgroundColor: '#f3f3f3' },
                 body: { backgroundColor: '#f3f3f3' },
@@ -165,7 +164,6 @@ export async function handleStockResponseTags(response, request, query = "") {
       
       const auditFlex = {
         type: 'bubble',
-        cornerRadius: 'none',
         styles: {
           header: { backgroundColor: '#f3f3f3' },
           body: { backgroundColor: '#f3f3f3' },
@@ -396,7 +394,6 @@ function formatLowStockFlex(lowStockData) {
     contents: {
       type: "bubble",
       size: "mega",
-      cornerRadius: "none",
       styles: {
         header: { backgroundColor: "#f3f3f3" },
         body: { backgroundColor: "#f3f3f3" }
@@ -506,7 +503,6 @@ function formatAllStockFlex(allItems) {
     contents: {
       type: "bubble",
       size: "mega",
-      cornerRadius: "none",
       styles: {
         header: { backgroundColor: "#f3f3f3" },
         body: { backgroundColor: "#f3f3f3" }
@@ -660,7 +656,6 @@ function formatStockHistoryFlex(historyData, title) {
     contents: {
       type: "bubble",
       size: "mega",
-      cornerRadius: "none",
       styles: {
         header: { backgroundColor: "#f3f3f3" },
         body: { backgroundColor: "#f3f3f3" }
@@ -697,7 +692,6 @@ function formatStockSelectionFlex(searchQuery, matchingItems) {
     contents: {
       type: "bubble",
       size: "mega",
-      cornerRadius: "none",
       styles: {
         header: { backgroundColor: "#f3f3f3" },
         body: { backgroundColor: "#f3f3f3" }
@@ -772,7 +766,6 @@ function formatSingleItemStockFlex(item) {
     contents: {
       type: "bubble",
       size: "mega",
-      cornerRadius: "none",
       styles: {
         header: { backgroundColor: "#f3f3f3" },
         body: { backgroundColor: "#f3f3f3" }
@@ -961,7 +954,6 @@ function formatMultiItemsStockFlex(searchQuery, items) {
     contents: {
       type: "bubble",
       size: "mega",
-      cornerRadius: "none",
       styles: {
         header: { backgroundColor: "#f3f3f3" },
         body: { backgroundColor: "#f3f3f3" }
