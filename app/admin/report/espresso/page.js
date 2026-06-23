@@ -94,31 +94,31 @@ function EspressoPDFReportContent() {
     if (loading) return <div className="p-20 text-center font-bold tracking-widest text-slate-300">GENERATING ESPRESSO REPORT...</div>;
 
     return (
-        <div className="min-h-screen bg-white text-black p-8 md:p-16 font-sans selection:bg-black selection:text-white">
+        <div className="min-h-screen bg-white text-black p-8 md:p-16 font-mono selection:bg-black selection:text-white">
             {/* Header */}
-            <div className="flex justify-between items-center border-b-4 border-black pb-8 mb-12">
+            <div className="flex justify-between items-center border-b-2 border-black pb-8 mb-12">
                 <div className="flex items-center gap-4">
-                    <img src="/logo.png" className="h-14 w-auto object-contain" alt="In The Haus Logo" onError={(e) => e.target.style.display = 'none'} />
+                    <img src="/logo.png" className="h-12 w-auto object-contain" alt="In The Haus Logo" onError={(e) => e.target.style.display = 'none'} />
                     <div>
-                        <h1 className="text-3xl font-black tracking-tighter leading-none mb-1">IN THE HAUS</h1>
-                        <p className="text-[10px] font-bold tracking-[0.3em] uppercase opacity-50">Espresso Calibration Report</p>
+                        <h1 className="text-2xl font-bold tracking-widest leading-none mb-1">IN THE HAUS</h1>
+                        <p className="text-[9px] font-bold tracking-[0.2em] uppercase opacity-60">Espresso Calibration Report</p>
                     </div>
                 </div>
                 <div className="text-right">
-                    <div className="text-4xl font-black tracking-tighter">{format(new Date(reportDate), 'dd MMM yyyy', { locale: th })}</div>
-                    <div className="text-[10px] font-bold tracking-widest uppercase opacity-40">Report Generated: {format(new Date(), 'HH:mm:ss')}</div>
+                    <div className="text-2xl font-bold tracking-tight">{format(new Date(reportDate), 'dd MMM yyyy', { locale: th })}</div>
+                    <div className="text-[9px] font-bold tracking-widest uppercase opacity-50">Report Generated: {format(new Date(), 'HH:mm:ss')}</div>
                 </div>
             </div>
 
             {/* Hero Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-16">
-                <div className="border-l-8 border-black pl-6 py-2">
-                    <p className="text-[10px] font-bold tracking-[0.4em] uppercase opacity-40 mb-2">Total Extractions Logged</p>
-                    <p className="text-5xl font-black tracking-tighter">{reports.length}</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
+                <div className="border-2 border-black p-6 bg-white rounded-none">
+                    <p className="text-[9px] font-bold tracking-[0.2em] uppercase opacity-50 mb-2">Total Extractions Logged</p>
+                    <p className="text-3xl font-bold tracking-tight">{reports.length}</p>
                 </div>
-                <div className="border-l-8 border-black pl-6 py-2">
-                    <p className="text-[10px] font-bold tracking-[0.4em] uppercase opacity-40 mb-2">Total Supporting Images</p>
-                    <p className="text-5xl font-black tracking-tighter">
+                <div className="border-2 border-black p-6 bg-white rounded-none">
+                    <p className="text-[9px] font-bold tracking-[0.2em] uppercase opacity-50 mb-2">Total Supporting Images</p>
+                    <p className="text-3xl font-bold tracking-tight">
                         {reports.reduce((sum, r) => sum + r.photos.length, 0)}
                     </p>
                 </div>
@@ -126,24 +126,24 @@ function EspressoPDFReportContent() {
 
             {/* Reports List */}
             {reports.length === 0 ? (
-                <div className="py-20 text-center border-t-2 border-black border-dashed">
+                <div className="py-20 text-center border-2 border-black border-dashed">
                     <p className="text-slate-300 font-bold uppercase tracking-widest mb-1">No Extractions Logged</p>
                     <p className="text-slate-400 text-xs">ไม่พบข้อมูลการสกัดกาแฟในวันที่เลือก</p>
                 </div>
             ) : (
                 <div className="space-y-12">
                     {reports.map((report, idx) => (
-                        <div key={report.id} className="border-b border-slate-200 pb-12 last:border-0">
-                            <div className="flex flex-col md:flex-row md:items-center justify-between pb-4 mb-6 border-b border-slate-100 gap-2">
+                        <div key={report.id} className="border-b border-black/10 pb-12 last:border-0">
+                            <div className="flex flex-col md:flex-row md:items-center justify-between pb-3 mb-6 border-b border-black/10 gap-2">
                                 <div className="flex items-center gap-3">
-                                    <div className="bg-black text-white font-black px-2.5 py-1 text-xs tracking-tighter">
+                                    <div className="bg-black text-white font-bold px-3 py-1 text-xs uppercase tracking-widest rounded-none">
                                         SHOT #{idx + 1}
                                     </div>
                                     <span className="font-mono text-xs font-bold text-slate-400">
                                         {format(new Date(report.timestamp), 'HH:mm น.')}
                                     </span>
                                 </div>
-                                <div className="text-sm font-black uppercase tracking-tight text-slate-800">
+                                <div className="text-xs font-bold uppercase tracking-widest text-black">
                                     บาริสต้า: {getEmployeeDisplay(report.userId)}
                                 </div>
                             </div>
@@ -151,18 +151,18 @@ function EspressoPDFReportContent() {
                             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                                 {/* Left Side: Details & Photos */}
                                 <div className="lg:col-span-7 space-y-6">
-                                    <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
-                                        <h4 className="text-[10px] font-black tracking-widest uppercase opacity-40 mb-3">บันทึกพารามิเตอร์ (Raw Log)</h4>
-                                        <p className="text-sm font-bold leading-relaxed whitespace-pre-wrap">{report.rawText}</p>
+                                    <div className="bg-white p-6 border border-black rounded-none">
+                                        <h4 className="text-[9px] font-bold tracking-widest uppercase opacity-60 mb-3">บันทึกพารามิเตอร์ (Raw Log)</h4>
+                                        <p className="text-xs font-bold leading-relaxed whitespace-pre-wrap">{report.rawText}</p>
                                     </div>
 
                                     {report.photos.length > 0 && (
                                         <div className="space-y-3">
-                                            <h4 className="text-[10px] font-black tracking-widest uppercase opacity-40">ภาพประกอบการชง (Calibration Photos)</h4>
+                                            <h4 className="text-[9px] font-bold tracking-widest uppercase opacity-60">ภาพประกอบการชง (Calibration Photos)</h4>
                                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                                                 {report.photos.map((url, i) => (
-                                                    <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="aspect-square bg-slate-50 border border-slate-100 rounded-xl overflow-hidden block hover:scale-102 transition-all relative">
-                                                        <img src={url} alt={`Supporting photo ${i + 1}`} className="w-full h-full object-cover" />
+                                                    <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="aspect-square bg-slate-50 border border-black overflow-hidden block hover:opacity-85 transition-all relative rounded-none">
+                                                        <img src={url} alt={`Supporting photo ${i + 1}`} className="w-full h-full object-cover rounded-none" />
                                                     </a>
                                                 ))}
                                             </div>
@@ -172,14 +172,14 @@ function EspressoPDFReportContent() {
 
                                 {/* Right Side: Analysis & Feedback */}
                                 <div className="lg:col-span-5">
-                                    <div className="border-l-4 border-black pl-6 py-1 h-full flex flex-col justify-between">
+                                    <div className="border-2 border-black p-6 bg-white h-full flex flex-col justify-between rounded-none">
                                         <div>
-                                            <h4 className="text-[10px] font-black tracking-widest uppercase opacity-40 mb-3">บทวิเคราะห์และคำแนะนำจาก Yuzu AI</h4>
-                                            <p className="text-sm leading-relaxed text-slate-800 italic whitespace-pre-wrap">
+                                            <h4 className="text-[9px] font-bold tracking-widest uppercase opacity-60 mb-3">บทวิเคราะห์และคำแนะนำจาก Yuzu AI</h4>
+                                            <p className="text-xs leading-relaxed text-black italic whitespace-pre-wrap">
                                                 "{report.recommendation}"
                                             </p>
                                         </div>
-                                        <div className="text-[9px] font-bold text-slate-400 mt-6 uppercase tracking-wider">
+                                        <div className="text-[8px] font-bold text-black/50 mt-6 uppercase tracking-widest">
                                             Yuzu AI Assistant 🍊
                                         </div>
                                     </div>
@@ -191,18 +191,18 @@ function EspressoPDFReportContent() {
             )}
 
             {/* Footer */}
-            <div className="mt-20 pt-8 border-t border-slate-200">
+            <div className="mt-20 pt-8 border-t border-black/20">
                 <div className="flex justify-between items-end">
                     <div className="max-w-sm">
-                        <p className="text-[10px] font-bold tracking-[0.2em] uppercase mb-4 opacity-40">Verification & Archives</p>
-                        <p className="text-[10px] leading-relaxed text-slate-400">
+                        <p className="text-[9px] font-bold tracking-[0.2em] uppercase mb-3 opacity-50">Verification & Archives</p>
+                        <p className="text-[9px] leading-relaxed opacity-50">
                             This document is an automated calibration report processed by Yuzu AI for In The Haus. 
                             Extraction data and feedback are analyzed using Gemini 3.5 Flash.
                         </p>
                     </div>
                     <div className="text-right">
-                        <p className="text-xs font-black italic tracking-widest">YUZU x IN THE HAUS</p>
-                        <p className="text-[10px] font-bold text-slate-300">© {new Date().getFullYear()} All Rights Reserved</p>
+                        <p className="text-[10px] font-bold italic tracking-widest uppercase">YUZU x IN THE HAUS</p>
+                        <p className="text-[9px] font-bold opacity-30">© {new Date().getFullYear()} All Rights Reserved</p>
                     </div>
                 </div>
             </div>
@@ -220,7 +220,7 @@ function EspressoPDFReportContent() {
 
             <button 
                 onClick={() => window.print()}
-                className="fixed bottom-8 right-8 no-print bg-black text-white px-8 py-4 rounded-full font-bold text-xs tracking-widest uppercase shadow-2xl hover:scale-105 active:scale-95 transition-all"
+                className="fixed bottom-8 right-8 no-print bg-black border border-black text-white px-8 py-4 rounded-none font-bold text-xs tracking-widest uppercase hover:bg-white hover:text-black transition-all cursor-pointer shadow-none"
             >
                 Print to PDF
             </button>

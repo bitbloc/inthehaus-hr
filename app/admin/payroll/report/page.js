@@ -60,82 +60,82 @@ function PayrollPDFReportContent() {
     const printDateStr = format(new Date(monthParam + '-01'), 'MMMM yyyy', { locale: th });
 
     const MasterReport = () => (
-        <div className="min-h-screen bg-white text-black p-8 md:p-16 font-sans">
-            <div className="flex justify-between items-center border-b-4 border-black pb-8 mb-12">
+        <div className="min-h-screen bg-white text-black p-8 md:p-16 font-mono">
+            <div className="flex justify-between items-center border-b-2 border-black pb-8 mb-12">
                 <div className="flex items-center gap-4">
-                    <img src="/logo.png" className="h-14 w-auto object-contain" alt="In The Haus Logo" />
+                    <img src="/logo.png" className="h-12 w-auto object-contain" alt="In The Haus Logo" onError={(e) => e.target.style.display = 'none'} />
                     <div>
-                        <h1 className="text-3xl font-black tracking-tighter leading-none mb-1">IN THE HAUS</h1>
-                        <p className="text-[10px] font-bold tracking-[0.3em] uppercase opacity-50">Master Payroll Report</p>
+                        <h1 className="text-2xl font-bold tracking-widest leading-none mb-1">IN THE HAUS</h1>
+                        <p className="text-[9px] font-bold tracking-[0.2em] uppercase opacity-60">Master Payroll Report</p>
                     </div>
                 </div>
                 <div className="text-right">
-                    <div className="text-4xl font-black tracking-tighter">{printDateStr}</div>
-                    <div className="text-[10px] font-bold tracking-widest uppercase opacity-40">Report Generated: {format(new Date(), 'dd/MM/yyyy HH:mm')}</div>
+                    <div className="text-2xl font-bold tracking-tight">{printDateStr}</div>
+                    <div className="text-[9px] font-bold tracking-widest uppercase opacity-50">Report Generated: {format(new Date(), 'dd/MM/yyyy HH:mm')}</div>
                 </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
-                <div className="border-l-8 border-black pl-6 py-2">
-                    <p className="text-[10px] font-bold tracking-[0.4em] uppercase opacity-40 mb-2">Total Salary</p>
-                    <p className="text-4xl font-black tracking-tighter">฿{totalSalary.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</p>
+                <div className="border-2 border-black p-6 bg-white rounded-none">
+                    <p className="text-[9px] font-bold tracking-[0.2em] uppercase opacity-50 mb-2">Total Salary</p>
+                    <p className="text-3xl font-bold tracking-tight">฿{totalSalary.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</p>
                 </div>
-                <div className="border-l-8 border-black pl-6 py-2">
-                    <p className="text-[10px] font-bold tracking-[0.4em] uppercase opacity-40 mb-2">Total OT</p>
-                    <p className="text-4xl font-black tracking-tighter">฿{totalOT.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</p>
+                <div className="border-2 border-black p-6 bg-white rounded-none">
+                    <p className="text-[9px] font-bold tracking-[0.2em] uppercase opacity-50 mb-2">Total OT</p>
+                    <p className="text-3xl font-bold tracking-tight">฿{totalOT.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</p>
                 </div>
-                <div className="border-l-8 border-black pl-6 py-2 bg-gray-50">
-                    <p className="text-[10px] font-bold tracking-[0.4em] uppercase opacity-40 mb-2">Net Payout</p>
-                    <p className="text-4xl font-black text-green-600 tracking-tighter">฿{totalNet.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</p>
+                <div className="border-2 border-black p-6 bg-white rounded-none">
+                    <p className="text-[9px] font-bold tracking-[0.2em] uppercase opacity-50 mb-2">Net Payout</p>
+                    <p className="text-3xl font-bold tracking-tight">฿{totalNet.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</p>
                 </div>
             </div>
 
             <div className="space-y-1">
-                <div className="grid grid-cols-12 gap-4 pb-4 border-b-2 border-black text-[10px] font-black tracking-widest uppercase opacity-40">
+                <div className="grid grid-cols-12 gap-4 pb-3 border-b border-black text-[9px] font-bold tracking-widest uppercase opacity-60">
                     <div className="col-span-3">Employee</div>
                     <div className="col-span-2 text-center">Days</div>
                     <div className="col-span-2 text-center">Reg/OT Hrs</div>
                     <div className="col-span-2 text-right">Base Pay</div>
                     <div className="col-span-1 text-right">OT Pay</div>
-                    <div className="col-span-2 text-right text-black">Net Pay</div>
+                    <div className="col-span-2 text-right">Net Pay</div>
                 </div>
 
                 {payrollData.filter(d => d.workDays > 0).map((item) => (
-                    <div key={item.emp.id} className="grid grid-cols-12 gap-4 py-4 border-b border-slate-100 hover:bg-slate-50 items-center">
+                    <div key={item.emp.id} className="grid grid-cols-12 gap-4 py-4 border-b border-black/10 hover:bg-slate-50 transition-colors items-center text-xs">
                         <div className="col-span-3">
-                            <p className="text-sm font-black tracking-tight">{item.emp.nickname || item.emp.name}</p>
-                            <p className="text-[9px] font-bold uppercase tracking-tight text-slate-900">{item.emp.position}</p>
+                            <p className="font-bold">{item.emp.nickname || item.emp.name}</p>
+                            <p className="text-[9px] font-semibold uppercase tracking-tight text-black/60">{item.emp.position}</p>
                         </div>
-                        <div className="col-span-2 text-center font-mono text-xs font-bold text-black">
+                        <div className="col-span-2 text-center font-bold">
                             {item.workDays}
                         </div>
-                        <div className="col-span-2 text-center font-mono text-[10px] font-bold text-black">
+                        <div className="col-span-2 text-center text-[11px] font-medium">
                             {item.totalRegularHours.toFixed(1)} / {item.totalOTHours.toFixed(1)}
                         </div>
-                        <div className="col-span-2 text-right font-mono text-xs text-black font-semibold">
+                        <div className="col-span-2 text-right font-medium">
                             {item.totalSalary.toLocaleString('th-TH', { minimumFractionDigits: 2 })}
                         </div>
-                        <div className="col-span-1 text-right font-mono text-xs text-orange-600 font-bold">
+                        <div className="col-span-1 text-right font-bold text-rams-orange">
                             {item.totalOTPay.toLocaleString('th-TH', { minimumFractionDigits: 2 })}
                         </div>
-                        <div className="col-span-2 text-right text-base font-black tracking-tight text-green-600">
+                        <div className="col-span-2 text-right font-bold">
                             {item.netSalary.toLocaleString('th-TH', { minimumFractionDigits: 2 })}
                         </div>
                     </div>
                 ))}
             </div>
             
-            <div className="mt-20 pt-8 border-t border-slate-200">
+            <div className="mt-20 pt-8 border-t border-black/20">
                 <div className="flex justify-between items-end">
                     <div className="max-w-sm">
-                        <p className="text-[10px] font-bold tracking-[0.2em] uppercase mb-4 opacity-40">Verification</p>
-                        <p className="text-[10px] leading-relaxed text-slate-400">
+                        <p className="text-[9px] font-bold tracking-[0.2em] uppercase mb-3 opacity-50">Verification</p>
+                        <p className="text-[9px] leading-relaxed opacity-50">
                             This document is generated by Yuzu AI for In The Haus based on Roster and Time Attendance Logs.
                         </p>
                     </div>
                     <div className="text-right">
-                        <p className="text-xs font-black italic tracking-widest">YUZU x IN THE HAUS</p>
-                        <p className="text-[10px] font-bold text-slate-300">© {new Date().getFullYear()} All Rights Reserved</p>
+                        <p className="text-[10px] font-bold italic tracking-widest uppercase">YUZU x IN THE HAUS</p>
+                        <p className="text-[9px] font-bold opacity-30">© {new Date().getFullYear()} All Rights Reserved</p>
                     </div>
                 </div>
             </div>
@@ -143,43 +143,43 @@ function PayrollPDFReportContent() {
     );
 
     const IndividualReport = () => (
-        <div className="bg-gray-100 min-h-screen py-8">
+        <div className="bg-white min-h-screen py-8 font-mono">
             {payrollData.filter(d => d.workDays > 0).map((item, index) => (
-                <div key={item.emp.id} className="print-page bg-white text-gray-800 p-12 max-w-4xl mx-auto shadow-xl mb-8 rounded-xl border border-gray-200">
+                <div key={item.emp.id} className="print-page bg-white text-black p-12 max-w-4xl mx-auto mb-8 rounded-none border-2 border-black shadow-none">
                     {/* Payslip Header */}
-                    <div className="flex justify-between items-center border-b-4 border-black pb-6 mb-8">
+                    <div className="flex justify-between items-center border-b-2 border-black pb-6 mb-8">
                         <div className="flex items-center gap-4">
-                            <img src="/logo.png" className="h-12 w-auto object-contain" alt="In The Haus Logo" />
+                            <img src="/logo.png" className="h-12 w-auto object-contain" alt="In The Haus Logo" onError={(e) => e.target.style.display = 'none'} />
                             <div>
-                                <h1 className="text-3xl font-black tracking-tighter leading-none mb-1">IN THE HAUS</h1>
-                                <p className="text-[10px] font-bold tracking-[0.3em] uppercase opacity-50">Payslip / สลิปเงินเดือน</p>
+                                <h1 className="text-2xl font-bold tracking-widest leading-none mb-1">IN THE HAUS</h1>
+                                <p className="text-[9px] font-bold tracking-[0.2em] uppercase opacity-60">Payslip / สลิปเงินเดือน</p>
                             </div>
                         </div>
                         <div className="text-right">
-                            <div className="text-3xl font-black tracking-tighter">{printDateStr}</div>
-                            <div className="text-xs font-bold tracking-widest uppercase opacity-40 mt-1">
+                            <div className="text-2xl font-bold tracking-tight">{printDateStr}</div>
+                            <div className="text-xs font-bold tracking-widest uppercase opacity-50 mt-1">
                                 {item.emp.name} ({item.emp.nickname})
                             </div>
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-8 mb-8 border border-gray-200 p-6 rounded-lg bg-gray-50">
+                    <div className="grid grid-cols-2 gap-8 mb-8 border border-black p-6 rounded-none bg-rams-panel">
                         <div>
-                            <p className="text-[10px] font-bold tracking-[0.2em] uppercase text-gray-500 mb-1">Employee Info</p>
-                            <p className="font-bold text-lg">{item.emp.name}</p>
-                            <p className="text-sm text-gray-600">{item.emp.position}</p>
+                            <p className="text-[9px] font-bold tracking-[0.2em] uppercase opacity-60 mb-1">Employee Info</p>
+                            <p className="font-bold text-base">{item.emp.name}</p>
+                            <p className="text-xs text-black/80">{item.emp.position}</p>
                         </div>
                         <div className="text-right">
-                            <p className="text-[10px] font-bold tracking-[0.2em] uppercase text-gray-500 mb-1">Summary</p>
-                            <p className="text-sm text-gray-600">Total Work Days: <span className="font-bold text-black">{item.workDays}</span></p>
-                            <p className="text-sm text-gray-600">Total Hours (Reg / OT): <span className="font-bold text-black">{item.totalRegularHours.toFixed(1)} / {item.totalOTHours.toFixed(1)}</span></p>
+                            <p className="text-[9px] font-bold tracking-[0.2em] uppercase opacity-60 mb-1">Summary</p>
+                            <p className="text-xs text-black/80">Total Work Days: <span className="font-bold text-black">{item.workDays}</span></p>
+                            <p className="text-xs text-black/80">Total Hours (Reg / OT): <span className="font-bold text-black">{item.totalRegularHours.toFixed(1)} / {item.totalOTHours.toFixed(1)}</span></p>
                         </div>
                     </div>
 
                     <div className="mb-10">
-                        <h3 className="text-xs font-bold tracking-[0.2em] uppercase text-gray-500 mb-4 border-b border-gray-200 pb-2">Daily Attendance Breakdown</h3>
-                        <table className="w-full text-xs text-left">
-                            <thead className="text-gray-600 bg-gray-50 font-mono uppercase text-[9px] tracking-wider border-b border-gray-200">
+                        <h3 className="text-xs font-bold tracking-[0.2em] uppercase opacity-60 mb-4 border-b border-black pb-2">Daily Attendance Breakdown</h3>
+                        <table className="w-full text-xs text-left border-collapse">
+                            <thead className="text-black bg-rams-bg font-mono uppercase text-[9px] tracking-wider border-b border-black">
                                 <tr>
                                     <th className="py-2 px-2">Date</th>
                                     <th className="py-2 px-2">Shift</th>
@@ -193,7 +193,7 @@ function PayrollPDFReportContent() {
                                     <th className="py-2 px-2 text-right">Total (฿)</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-100">
+                            <tbody className="divide-y divide-black/10">
                                 {item.dailyDetails.map((d, i) => {
                                     const isOff = d.shift === 'OFF' || d.status === 'Off Day';
                                     const isAbsent = d.status?.includes('Absent');
@@ -201,24 +201,24 @@ function PayrollPDFReportContent() {
                                     const isUnscheduled = d.status === 'Unscheduled Work';
                                     const isIncomplete = d.status?.includes('Incomplete');
 
-                                    let statusColor = 'text-green-600';
-                                    if (isOff) statusColor = 'text-gray-400';
-                                    else if (isAbsent || isLate) statusColor = 'text-red-500';
-                                    else if (isIncomplete) statusColor = 'text-amber-600';
-                                    else if (isUnscheduled) statusColor = 'text-blue-600';
+                                    let statusColor = 'text-rams-green';
+                                    if (isOff) statusColor = 'text-rams-ink-muted';
+                                    else if (isAbsent || isLate) statusColor = 'text-rams-red';
+                                    else if (isIncomplete) statusColor = 'text-rams-amber';
+                                    else if (isUnscheduled) statusColor = 'text-rams-orange';
 
                                     return (
-                                        <tr key={i} className={`hover:bg-gray-50 ${isOff ? 'text-gray-400 bg-gray-50/20' : 'text-gray-800'}`}>
+                                        <tr key={i} className={`hover:bg-rams-bg/50 ${isOff ? 'text-rams-ink-muted bg-rams-bg/10' : 'text-black'}`}>
                                             <td className="py-1.5 px-2 font-mono">{d.date.slice(5)}</td>
                                             <td className="py-1.5 px-2">{d.shift}</td>
-                                            <td className={`py-1.5 px-2 font-mono ${isOff ? 'text-gray-400' : 'text-black font-semibold'}`}>{d.scheduled_in ? `${d.scheduled_in}-${d.scheduled_out}` : '-'}</td>
-                                            <td className={`py-1.5 px-2 font-mono font-bold ${isOff ? 'text-gray-400' : 'text-black'}`}>{d.in !== '-' || d.out !== '-' ? `${d.in}-${d.out}` : '-'}</td>
+                                            <td className={`py-1.5 px-2 font-mono ${isOff ? 'text-rams-ink-muted' : 'font-bold'}`}>{d.scheduled_in ? `${d.scheduled_in}-${d.scheduled_out}` : '-'}</td>
+                                            <td className={`py-1.5 px-2 font-mono font-bold ${isOff ? 'text-rams-ink-muted' : ''}`}>{d.in !== '-' || d.out !== '-' ? `${d.in}-${d.out}` : '-'}</td>
                                             <td className={`py-1.5 px-2 font-bold ${statusColor}`}>{d.status}</td>
-                                            <td className={`py-1.5 px-2 text-right font-mono font-semibold ${isOff ? 'text-gray-400' : 'text-black'}`}>{d.regular_hours > 0 ? Number(d.regular_hours).toFixed(1) : '-'}</td>
-                                            <td className={`py-1.5 px-2 text-right font-mono ${isOff ? 'text-gray-400' : 'text-orange-600 font-medium'}`}>{d.ot_hours > 0 ? Number(d.ot_hours).toFixed(1) : '-'}</td>
-                                            <td className={`py-1.5 px-2 text-right font-mono font-semibold ${isOff ? 'text-gray-400' : 'text-black'}`}>{d.wage > 0 ? d.wage.toLocaleString('th-TH', {minimumFractionDigits:2}) : '-'}</td>
-                                            <td className={`py-1.5 px-2 text-right font-mono ${isOff ? 'text-gray-400' : 'text-orange-600 font-medium'}`}>{d.ot > 0 ? d.ot.toLocaleString('th-TH', {minimumFractionDigits:2}) : '-'}</td>
-                                            <td className={`py-1.5 px-2 text-right font-mono font-bold ${isOff ? 'text-gray-400' : 'text-black'}`}>
+                                            <td className={`py-1.5 px-2 text-right font-mono font-semibold ${isOff ? 'text-rams-ink-muted' : ''}`}>{d.regular_hours > 0 ? Number(d.regular_hours).toFixed(1) : '-'}</td>
+                                            <td className={`py-1.5 px-2 text-right font-mono ${isOff ? 'text-rams-ink-muted' : 'text-rams-orange font-medium'}`}>{d.ot_hours > 0 ? Number(d.ot_hours).toFixed(1) : '-'}</td>
+                                            <td className={`py-1.5 px-2 text-right font-mono font-semibold ${isOff ? 'text-rams-ink-muted' : ''}`}>{d.wage > 0 ? d.wage.toLocaleString('th-TH', {minimumFractionDigits:2}) : '-'}</td>
+                                            <td className={`py-1.5 px-2 text-right font-mono ${isOff ? 'text-rams-ink-muted' : 'text-rams-orange font-medium'}`}>{d.ot > 0 ? d.ot.toLocaleString('th-TH', {minimumFractionDigits:2}) : '-'}</td>
+                                            <td className={`py-1.5 px-2 text-right font-mono font-bold ${isOff ? 'text-rams-ink-muted' : ''}`}>
                                                 {(d.wage + d.ot) > 0 ? (d.wage + d.ot).toLocaleString('th-TH', {minimumFractionDigits:2}) : '-'}
                                             </td>
                                         </tr>
@@ -233,25 +233,25 @@ function PayrollPDFReportContent() {
                         <div className="grid grid-cols-2 gap-8">
                             <div>
                                 <div className="flex justify-between mb-2">
-                                    <span className="text-sm font-bold text-gray-600">Base Salary</span>
-                                    <span className="text-sm font-mono font-medium">฿{item.totalSalary.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</span>
+                                    <span className="text-sm font-bold text-black/80">Base Salary</span>
+                                    <span className="text-sm font-mono font-bold">฿{item.totalSalary.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</span>
                                 </div>
                                 <div className="flex justify-between mb-2">
-                                    <span className="text-sm font-bold text-gray-600">Overtime (OT) Pay</span>
-                                    <span className="text-sm font-mono font-medium">฿{item.totalOTPay.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</span>
+                                    <span className="text-sm font-bold text-black/80">Overtime (OT) Pay</span>
+                                    <span className="text-sm font-mono font-bold">฿{item.totalOTPay.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</span>
                                 </div>
-                                <div className="flex justify-between border-b border-gray-200 pb-2 mb-2">
-                                    <span className="text-sm font-bold text-gray-600">Deductions (Late/Absent)</span>
-                                    <span className="text-sm font-mono font-medium text-red-500">-฿{item.totalDeduct.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</span>
+                                <div className="flex justify-between border-b border-black pb-2 mb-2">
+                                    <span className="text-sm font-bold text-black/80">Deductions (Late/Absent)</span>
+                                    <span className="text-sm font-mono font-bold text-rams-red">-฿{item.totalDeduct.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</span>
                                 </div>
                             </div>
-                            <div className="bg-black text-white p-6 rounded-lg flex flex-col justify-center">
-                                <span className="text-[10px] font-bold tracking-[0.2em] uppercase opacity-70 mb-1">Net Pay / รับสุทธิ</span>
-                                <span className="text-4xl font-black tracking-tighter">฿{item.netSalary.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</span>
+                            <div className="bg-rams-ink text-rams-panel p-6 rounded-none flex flex-col justify-center border-2 border-rams-ink">
+                                <span className="text-[9px] font-bold tracking-[0.2em] uppercase opacity-70 mb-1">Net Pay / รับสุทธิ</span>
+                                <span className="text-3xl font-bold tracking-tight">฿{item.netSalary.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</span>
                             </div>
                         </div>
-                        <div className="mt-8 text-center border-t border-gray-200 pt-4">
-                             <p className="text-[9px] font-bold tracking-widest text-gray-300 uppercase">YUZU PAYROLL ENGINE x IN THE HAUS</p>
+                        <div className="mt-8 text-center border-t border-black/10 pt-4">
+                             <p className="text-[9px] font-bold tracking-widest text-rams-ink-muted uppercase">YUZU PAYROLL ENGINE x IN THE HAUS</p>
                         </div>
                     </div>
                 </div>
@@ -278,13 +278,13 @@ function PayrollPDFReportContent() {
                         min-height: auto !important;
                     }
                     /* Remove background colors and make it printer friendly */
-                    .bg-gray-100 { background: white !important; }
+                    .bg-white { background: white !important; }
                 }
             `}</style>
             
             <button 
                 onClick={() => window.print()}
-                className="fixed bottom-8 right-8 no-print bg-black text-white px-8 py-4 rounded-full font-bold text-xs tracking-widest uppercase shadow-2xl hover:scale-105 active:scale-95 transition-all z-50"
+                className="fixed bottom-8 right-8 no-print bg-black border border-black text-white px-8 py-4 rounded-none font-bold text-xs tracking-widest uppercase hover:bg-white hover:text-black transition-all cursor-pointer shadow-none z-50"
             >
                 Print to PDF
             </button>

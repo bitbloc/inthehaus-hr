@@ -17,14 +17,14 @@ function RosterPDFReportContent() {
     const [customPresets, setCustomPresets] = useState([]);
 
     const PRESET_COLORS = [
-        { id: 'sky', bg: 'bg-sky-50', text: 'text-sky-800', border: 'border-sky-200' },
-        { id: 'amber', bg: 'bg-amber-50', text: 'text-amber-800', border: 'border-amber-200' },
-        { id: 'indigo', bg: 'bg-indigo-50', text: 'text-indigo-800', border: 'border-indigo-200' },
-        { id: 'rose', bg: 'bg-rose-50', text: 'text-rose-800', border: 'border-rose-200' },
-        { id: 'emerald', bg: 'bg-emerald-50', text: 'text-emerald-800', border: 'border-emerald-200' },
-        { id: 'violet', bg: 'bg-violet-50', text: 'text-violet-800', border: 'border-violet-200' },
-        { id: 'slate', bg: 'bg-slate-100', text: 'text-slate-800', border: 'border-slate-300' },
-        { id: 'teal', bg: 'bg-teal-50', text: 'text-teal-800', border: 'border-teal-200' },
+        { id: 'sky', bg: 'bg-rams-bg', text: 'text-rams-ink', border: 'border-rams-rule' },
+        { id: 'amber', bg: 'bg-rams-amber/10', text: 'text-rams-amber', border: 'border-rams-amber/30' },
+        { id: 'indigo', bg: 'bg-rams-ink text-rams-panel', text: 'text-rams-panel font-bold', border: 'border-rams-ink' },
+        { id: 'rose', bg: 'bg-rams-red/10', text: 'text-rams-red', border: 'border-rams-red/30' },
+        { id: 'emerald', bg: 'bg-rams-green/10', text: 'text-rams-green', border: 'border-rams-green/30' },
+        { id: 'violet', bg: 'bg-rams-orange/10', text: 'text-rams-orange', border: 'border-rams-orange/30' },
+        { id: 'slate', bg: 'bg-rams-panel', text: 'text-rams-ink-muted', border: 'border-rams-rule-light' },
+        { id: 'teal', bg: 'bg-rams-green/20', text: 'text-rams-green', border: 'border-rams-green/50' },
     ];
     const getPresetColor = (colorId) => PRESET_COLORS.find(c => c.id === colorId) || PRESET_COLORS[0];
 
@@ -74,26 +74,26 @@ function RosterPDFReportContent() {
     };
 
     const getShiftColorClass = (s, shiftObj) => {
-        if (s.is_off) return 'bg-red-50 border-red-200 text-red-700';
+        if (s.is_off) return 'bg-rams-red/10 border-rams-red/30 text-rams-red font-bold';
         if (!s.shift_id || s.custom_start_time || !shiftObj) {
-            return 'bg-sky-50 border-sky-200 text-sky-950';
+            return 'bg-rams-bg border-rams-rule-light text-rams-ink';
         }
 
         const name = (shiftObj.name || '').toLowerCase();
         
         if (name.includes('ควบ') || name.toLowerCase().includes('double')) {
-            return 'bg-rose-50 border-rose-200 text-rose-950';
+            return 'bg-rams-orange/10 border-rams-orange/30 text-rams-orange font-bold';
         }
         
         if (name.includes('ค่ำ') || name.includes('ดึก') || name.toLowerCase().includes('night') || name.toLowerCase().includes('evening')) {
-            return 'bg-indigo-50 border-indigo-200 text-indigo-950';
+            return 'bg-rams-ink text-rams-panel border-rams-ink font-bold';
         }
         
         if (name.includes('เช้า') || name.toLowerCase().includes('morning')) {
-            return 'bg-amber-50 border-amber-200 text-amber-950';
+            return 'bg-rams-amber/10 border-rams-amber/30 text-rams-amber font-bold';
         }
         
-        return 'bg-yellow-50 border-yellow-200 text-yellow-950';
+        return 'bg-rams-panel border-rams-rule-light text-rams-ink';
     };
 
     if (loading) return <div className="p-20 text-center font-bold tracking-widest text-slate-300">GENERATING ROSTER REPORT...</div>;
@@ -101,50 +101,50 @@ function RosterPDFReportContent() {
     const printDateRangeStr = `${format(weekStart, 'dd/MM/yyyy')} - ${format(weekEnd, 'dd/MM/yyyy')}`;
 
     return (
-        <div className="min-h-screen bg-white text-black p-6 md:p-12 font-sans selection:bg-black selection:text-white">
+        <div className="min-h-screen bg-white text-black p-6 md:p-12 font-mono selection:bg-black selection:text-white">
             {/* Header with Logo */}
-            <div className="flex justify-between items-center border-b-4 border-black pb-6 mb-8">
+            <div className="flex justify-between items-center border-b-2 border-black pb-6 mb-8">
                 <div className="flex items-center gap-4">
-                    <img src="/logo.png" className="h-14 w-auto object-contain" alt="In The Haus Logo" />
+                    <img src="/logo.png" className="h-12 w-auto object-contain" alt="In The Haus Logo" onError={(e) => e.target.style.display = 'none'} />
                     <div>
-                        <h1 className="text-3xl font-black tracking-tighter leading-none mb-1">IN THE HAUS</h1>
-                        <p className="text-[10px] font-bold tracking-[0.3em] uppercase opacity-50">Weekly Work Schedule / ตารางงานรายสัปดาห์</p>
+                        <h1 className="text-2xl font-bold tracking-widest leading-none mb-1">IN THE HAUS</h1>
+                        <p className="text-[9px] font-bold tracking-[0.2em] uppercase opacity-60">Weekly Work Schedule / ตารางงานรายสัปดาห์</p>
                     </div>
                 </div>
                 <div className="text-right">
-                    <div className="text-2xl font-black tracking-tighter">{printDateRangeStr}</div>
-                    <div className="text-[9px] font-bold tracking-widest uppercase opacity-40">Report Generated: {format(new Date(), 'dd/MM/yyyy HH:mm')}</div>
+                    <div className="text-2xl font-bold tracking-tight">{printDateRangeStr}</div>
+                    <div className="text-[9px] font-bold tracking-widest uppercase opacity-50">Report Generated: {format(new Date(), 'dd/MM/yyyy HH:mm')}</div>
                 </div>
             </div>
 
             {/* Roster Grid Table */}
-            <div className="overflow-x-auto border border-gray-300 rounded-lg">
+            <div className="overflow-x-auto border border-black rounded-none">
                 <table className="w-full text-xs text-left border-collapse">
                     <thead>
-                        <tr className="bg-gray-100 text-gray-700 border-b border-gray-300">
-                            <th className="px-4 py-3 font-bold border-r border-gray-300 w-[180px]">พนักงาน / ตำแหน่ง</th>
+                        <tr className="bg-rams-panel text-black border-b border-black">
+                            <th className="px-4 py-3 font-bold border-r border-black w-[180px]">พนักงาน / ตำแหน่ง</th>
                             {dates.map((date, i) => (
-                                <th key={i} className="px-3 py-3 font-bold text-center border-r border-gray-300 min-w-[120px]">
-                                    <div className="text-[10px] text-gray-500 uppercase">{daysTitle[i]}</div>
-                                    <div className="text-sm font-black mt-0.5">{format(date, 'dd/MM')}</div>
+                                <th key={i} className="px-3 py-3 font-bold text-center border-r border-black min-w-[120px]">
+                                    <div className="text-[9px] text-black/60 uppercase">{daysTitle[i]}</div>
+                                    <div className="text-sm font-bold mt-0.5">{format(date, 'dd/MM')}</div>
                                 </th>
                             ))}
                         </tr>
                     </thead>
                     <tbody>
                         {employees.map((emp, empIdx) => (
-                            <tr key={emp.id} className={`border-b border-gray-200 hover:bg-gray-50 ${empIdx % 2 === 1 ? 'bg-gray-50/30' : ''}`}>
-                                <td className="px-4 py-3 font-bold text-gray-900 border-r border-gray-300 align-middle">
+                            <tr key={emp.id} className={`border-b border-black/10 hover:bg-slate-50 transition-colors ${empIdx % 2 === 1 ? 'bg-rams-bg/10' : ''}`}>
+                                <td className="px-4 py-3 font-bold text-black border-r border-black align-middle">
                                     <div className="text-sm">{emp.nickname || emp.name}</div>
-                                    <div className="text-[9px] text-gray-500 font-semibold tracking-wider uppercase mt-0.5">{emp.position}</div>
+                                    <div className="text-[9px] text-black/60 font-semibold tracking-wider uppercase mt-0.5">{emp.position}</div>
                                 </td>
                                 {dates.map((date, dateIdx) => {
                                     const slots = getCellSlots(emp.id, date);
                                     return (
-                                        <td key={dateIdx} className="px-2 py-2 border-r border-gray-300 align-top h-full min-h-[80px]">
+                                        <td key={dateIdx} className="px-2 py-2 border-r border-black/10 align-top h-full min-h-[80px]">
                                             <div className="space-y-1.5 flex flex-col h-full justify-start">
                                                 {slots.length === 0 ? (
-                                                    <span className="text-gray-300 text-xs italic m-auto block text-center font-normal">-</span>
+                                                    <span className="text-black/30 text-xs italic m-auto block text-center font-normal">-</span>
                                                 ) : (
                                                     slots.map((s, idx) => {
                                                         const shiftObj = shifts.find(sh => sh.id === s.shift_id);
@@ -162,15 +162,15 @@ function RosterPDFReportContent() {
                                                         return (
                                                             <div 
                                                                 key={idx} 
-                                                                className={`p-2 rounded border ${colorClass} text-center shadow-sm relative flex flex-col justify-center items-center ${
+                                                                className={`p-2 rounded-none border ${colorClass} text-center shadow-none relative flex flex-col justify-center items-center ${
                                                                     s.status === 'DRAFT' ? 'border-dashed border-2 opacity-80' : ''
                                                                 }`}
                                                             >
-                                                                <div className="font-bold text-[10px] uppercase tracking-wide">
+                                                                <div className="font-bold text-[9px] uppercase tracking-wide">
                                                                     {cellLabel}
                                                                 </div>
                                                                 {!s.is_off && timeStr && (
-                                                                    <div className="text-[10px] font-black text-slate-800 mt-0.5">
+                                                                    <div className="text-[9px] font-bold text-black mt-0.5">
                                                                         {timeStr}
                                                                     </div>
                                                                 )}
@@ -180,7 +180,7 @@ function RosterPDFReportContent() {
                                                                     </div>
                                                                 )}
                                                                 {s.status === 'DRAFT' && (
-                                                                    <span className="text-[8px] font-semibold text-gray-500 uppercase tracking-widest border border-gray-300 px-1 rounded bg-white mt-1">
+                                                                    <span className="text-[8px] font-semibold text-gray-500 uppercase tracking-widest border border-gray-300 px-1 rounded-none bg-white mt-1">
                                                                         Draft
                                                                     </span>
                                                                 )}
@@ -199,18 +199,18 @@ function RosterPDFReportContent() {
             </div>
 
             {/* Verification & Notes Footer */}
-            <div className="mt-16 pt-8 border-t border-slate-200">
+            <div className="mt-16 pt-8 border-t border-black/20">
                 <div className="flex justify-between items-end">
                     <div className="max-w-sm">
-                        <p className="text-[9px] font-bold tracking-[0.2em] uppercase mb-3 opacity-40">Verification</p>
-                        <p className="text-[10px] leading-relaxed text-slate-400">
+                        <p className="text-[9px] font-bold tracking-[0.2em] uppercase mb-3 opacity-50">Verification</p>
+                        <p className="text-[9px] leading-relaxed opacity-50">
                             This document is an official work schedule generated by In The Haus. 
                             Any modifications must be approved by the management.
                         </p>
                     </div>
                     <div className="text-right">
-                        <p className="text-xs font-black italic tracking-widest">YUZU x IN THE HAUS</p>
-                        <p className="text-[9px] font-bold text-slate-300">© {new Date().getFullYear()} All Rights Reserved</p>
+                        <p className="text-[10px] font-bold italic tracking-widest uppercase">YUZU x IN THE HAUS</p>
+                        <p className="text-[9px] font-bold opacity-30">© {new Date().getFullYear()} All Rights Reserved</p>
                     </div>
                 </div>
             </div>
@@ -231,7 +231,7 @@ function RosterPDFReportContent() {
 
             <button 
                 onClick={() => window.print()}
-                className="fixed bottom-8 right-8 no-print bg-black text-white px-8 py-4 rounded-full font-bold text-xs tracking-widest uppercase shadow-2xl hover:scale-105 active:scale-95 transition-all z-50"
+                className="fixed bottom-8 right-8 no-print bg-black border border-black text-white px-8 py-4 rounded-none font-bold text-xs tracking-widest uppercase hover:bg-white hover:text-black transition-all cursor-pointer shadow-none z-50"
             >
                 Print to PDF
             </button>
