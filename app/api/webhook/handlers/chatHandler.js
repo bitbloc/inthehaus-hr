@@ -274,9 +274,14 @@ ${dailyLogs || 'ไม่มีความเคลื่อนไหว'}
 
     const replyMessages = [];
     if (isNewsOrCostRequest) {
-      const parsedData = parseFlexResponse(cleanedResponse);
-      const flexMsg = formatNewsFlex(parsedData, cleanedResponse);
-      replyMessages.push(flexMsg);
+      try {
+        const parsedData = parseFlexResponse(cleanedResponse);
+        const flexMsg = formatNewsFlex(parsedData, cleanedResponse.substring(0, 5000));
+        replyMessages.push(flexMsg);
+      } catch (flexErr) {
+        console.error("News Flex creation error:", flexErr);
+        replyMessages.push({ type: 'text', text: cleanedResponse.substring(0, 5000) });
+      }
     } else {
       replyMessages.push({ type: 'text', text: cleanedResponse });
     }

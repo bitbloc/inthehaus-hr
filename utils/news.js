@@ -155,7 +155,7 @@ export async function getAccurateNews(categories = ['latest', 'thailand', 'nakho
             }
 
             try {
-                const response = await fetch(url, { headers });
+                const response = await fetch(url, { headers, signal: AbortSignal.timeout(8000) });
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const html = await response.text();
                 const titles = [];
