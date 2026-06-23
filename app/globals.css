@@ -37,6 +37,18 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --radius-xl: var(--radius);
+
+  --color-rams-bg: oklch(93% 0.005 60);
+  --color-rams-panel: oklch(97% 0.005 60);
+  --color-rams-ink: oklch(22% 0.004 60);
+  --color-rams-ink-muted: oklch(48% 0.004 60);
+  --color-rams-rule: oklch(35% 0.004 60);
+  --color-rams-rule-light: oklch(80% 0.004 60);
+  --color-rams-orange: oklch(62% 0.16 45);
+  --color-rams-orange-active: oklch(56% 0.16 45);
+  --color-rams-green: oklch(70% 0.15 145);
+  --color-rams-red: oklch(55% 0.18 25);
+  --color-rams-amber: oklch(75% 0.15 75);
 }
 
 @media (prefers-color-scheme: dark) {

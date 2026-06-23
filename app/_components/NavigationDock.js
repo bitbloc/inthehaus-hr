@@ -21,7 +21,7 @@ export default function NavigationDock() {
 
     return (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-full max-w-sm px-6">
-            <div className="bg-white/70 backdrop-blur-xl border border-white/50 shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1)] rounded-[2rem] p-2 flex justify-between items-center">
+            <div className="bg-rams-panel border-2 border-rams-rule p-2 flex justify-between items-center rounded-sm shadow-none">
 
                 {NAV_ITEMS.map((item, index) => {
                     const isActive = pathname === item.href;
@@ -30,9 +30,9 @@ export default function NavigationDock() {
                     if (item.isCenter) {
                         return (
                             <div key={item.href} className="relative flex-1 flex justify-center">
-                                <div className="flex-1 flex flex-col items-center py-2 gap-1 text-neutral-900 font-bold relative">
-                                    {isActive && <div className="absolute -top-1 w-1 h-1 bg-neutral-900 rounded-full"></div>}
-                                    <Link href={item.href} className={`bg-white p-2 rounded-2xl -mt-2 shadow-sm border border-neutral-100 ${isActive ? '' : 'text-neutral-400 hover:text-neutral-900'}`}>
+                                <div className="flex-1 flex flex-col items-center py-2 gap-1 text-rams-ink font-mono font-bold relative">
+                                    {isActive && <div className="absolute -top-1.5 w-2 h-2 bg-rams-orange border border-rams-rule rounded-full animate-pulse"></div>}
+                                    <Link href={item.href} className={`bg-rams-bg p-2 rounded-sm -mt-3 border-2 border-rams-rule active:translate-y-[2px] transition-all ${isActive ? 'text-rams-orange' : 'text-rams-ink-muted hover:text-rams-ink'}`}>
                                         <Icon />
                                     </Link>
                                 </div>
@@ -42,9 +42,9 @@ export default function NavigationDock() {
 
                     return (
                         <div key={item.href} className="flex-1 flex justify-center">
-                            <Link href={item.href} className={`flex flex-col items-center py-2 gap-1 transition-colors group ${isActive ? 'text-neutral-900' : 'text-neutral-400 hover:text-neutral-900'}`}>
-                                <div className="group-hover:scale-110 transition-transform"><Icon /></div>
-                                <span className="text-[9px] font-bold tracking-wide">{item.label}</span>
+                            <Link href={item.href} className={`flex flex-col items-center py-2 gap-1 transition-colors group active:translate-y-[1px] ${isActive ? 'text-rams-orange' : 'text-rams-ink-muted hover:text-rams-ink'}`}>
+                                <div className="transition-transform duration-200"><Icon /></div>
+                                <span className="text-[9px] font-mono font-bold tracking-wider">{item.label}</span>
                             </Link>
                         </div>
                     )

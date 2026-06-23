@@ -1,3 +1,7 @@
+/* Hallmark · route: custom (bespoke) · structure: modular control grid · idea: "tactile push button & physical LED indicators"
+ * paper: oklch(93% 0.005 60) · accent: oklch(62% 0.16 45) · display: Geist Mono · body: Geist Sans
+ * axes: light / geometric-sans / warm · gates: all-pass · studied: no · pre-emit critique: P5 H5 E5 S5 R5 V5
+ */
 "use client";
 import { useEffect, useState, useRef } from "react";
 import liff from "@line/liff";
@@ -589,96 +593,91 @@ export default function CheckIn() {
 
   // Dynamic Button Colors and Logic
   const isLate = shiftContext?.isLate && lastAction !== 'check_in';
-  let mainButtonConfig = { label: 'Check In', icon: '☀️', sub: 'Start your day', color: "bg-[#171717] text-white border-[#262626]" };
+  let mainButtonConfig = { label: 'Check In', icon: '☀️', sub: 'Start your day', color: "bg-rams-orange text-rams-panel border-rams-rule active:bg-rams-orange-active shadow-[0_4px_0_0_var(--color-rams-rule)]" };
 
   if (lastAction === 'register') {
-    mainButtonConfig = { label: 'Register', icon: '📝', sub: 'Request Access', color: "bg-blue-600 text-white border-blue-500" };
+    mainButtonConfig = { label: 'Register', icon: '📝', sub: 'Request Access', color: "bg-rams-orange text-rams-panel border-rams-rule active:bg-rams-orange-active shadow-[0_4px_0_0_var(--color-rams-rule)]" };
   } else if (lastAction === 'pending') {
-    mainButtonConfig = { label: 'Pending', icon: '⏳', sub: 'Waiting Admin', color: "bg-amber-100 text-amber-700 border-amber-200" };
+    mainButtonConfig = { label: 'Pending', icon: '⏳', sub: 'Waiting Admin', color: "bg-rams-amber text-rams-ink border-rams-rule shadow-[0_4px_0_0_var(--color-rams-rule)]" };
   } else if (lastAction === 'check_in') {
-    mainButtonConfig = { label: 'Check Out', icon: '🌙', sub: 'Good rest!', color: "bg-white text-[#171717] border-white" };
+    mainButtonConfig = { label: 'Check Out', icon: '🌙', sub: 'Good rest!', color: "bg-rams-ink text-rams-panel border-rams-rule shadow-[0_4px_0_0_var(--color-rams-rule)]" };
   } else if (isLate) {
-    mainButtonConfig = { label: 'Check In', icon: '☀️', sub: 'Star your day', color: "bg-amber-400 text-black border-amber-300" };
+    mainButtonConfig = { label: 'Check In', icon: '☀️', sub: 'Start your day', color: "bg-rams-red text-rams-panel border-rams-rule active:bg-red-700 shadow-[0_4px_0_0_var(--color-rams-rule)]" };
   }
 
   return (
-    <div className="min-h-screen bg-[#F2F2F2] text-neutral-800 font-sans flex flex-col items-center relative overflow-hidden font-feature-settings-['ss01'] pb-32">
+    <div className="min-h-screen bg-rams-bg text-rams-ink font-sans flex flex-col items-center relative overflow-hidden font-feature-settings-['ss01'] pb-32">
 
-      {/* Background Gradient Blob (Nendo: Soft & Organic) */}
-      <div className="absolute top-[-20%] left-[-10%] w-[150%] h-[80%] bg-gradient-to-b from-blue-100/40 via-purple-100/30 to-transparent rounded-[100%] blur-3xl pointer-events-none" />
-
-      {/* 1. Header (Glassmorphism) */}
+      {/* 1. Header (Dieter Rams Utilitarian Solid Bar) */}
       <motion.div
-        className="w-full px-6 py-4 flex justify-between items-center z-20 sticky top-0 bg-white/60 backdrop-blur-xl border-b border-white/20 relative"
-        initial={{ y: -20, opacity: 0 }}
+        className="w-full px-6 py-4 flex justify-between items-center z-20 sticky top-0 bg-rams-panel border-b-2 border-rams-rule relative"
+        initial={{ y: -10, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
       >
         <div className="flex items-center z-10">
-          <button onClick={handleDevLogin} className="text-neutral-300 hover:text-neutral-900 transition-colors text-xs">🛠️</button>
+          <button onClick={handleDevLogin} className="text-rams-ink-muted hover:text-rams-ink transition-colors text-xs">🛠️</button>
         </div>
 
         {/* Center: Logo */}
         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center z-10 pointer-events-none">
-           <img src="/logo.png" alt="In The Haus" className="h-10 object-contain drop-shadow-sm" />
+           <img src="/logo.png" alt="In The Haus" className="h-9 object-contain grayscale brightness-90 contrast-125" />
         </div>
 
         <div className="flex items-center gap-3 z-10">
-          <Link href="https://forms.gle/3LdW9zdjdTCpfpTe8" target="_blank" className="text-[10px] font-medium text-neutral-400 hover:text-neutral-800 transition-colors mr-1">
+          <Link href="https://forms.gle/3LdW9zdjdTCpfpTe8" target="_blank" className="text-[10px] font-mono font-bold text-rams-ink-muted hover:text-rams-ink border border-rams-rule-light bg-rams-bg px-2.5 py-1 transition-colors mr-1 rounded-sm">
             คำขอเบิกเงินล่วงหน้า
           </Link>
           {profile ? (
             <div className="flex items-center gap-3">
               <div className="flex flex-col items-end">
-                <span className="text-xs font-bold text-neutral-800">{profile.displayName}</span>
+                <span className="text-xs font-mono font-bold text-rams-ink">{profile.displayName}</span>
                 <span
                   onClick={() => {
                     navigator.clipboard.writeText(profile.userId);
                     alert("Copied User ID");
                   }}
-                  className="text-[10px] text-neutral-500 font-medium cursor-pointer hover:text-blue-500 transition-colors"
+                  className="text-[9px] font-mono text-rams-ink-muted cursor-pointer hover:text-rams-orange transition-colors"
                 >
                   {employeeData?.position || (lastAction === 'pending' ? 'Pending' : 'Guest')}
                 </span>
               </div>
-              <img src={profile.pictureUrl} className="w-10 h-10 rounded-xl object-cover border-2 border-white shadow-sm" />
+              <img src={profile.pictureUrl} className="w-10 h-10 rounded-sm object-cover border-2 border-rams-rule" />
             </div>
           ) : (
-            <button onClick={() => liff.login()} className="px-4 py-2 bg-[#06C755] text-white rounded-full text-xs font-bold shadow-sm">LINE Login</button>
+            <button onClick={() => liff.login()} className="px-4 py-2 bg-[#06C755] text-white rounded-sm text-xs font-mono font-bold border border-black shadow-sm">LINE Login</button>
           )}
         </div>
       </motion.div>
 
-      {/* 2. Contextual Info (Next Shift) */}
+      {/* 2. Contextual Info (Next Shift - Rams Panel) */}
       <AnimatePresence>
         {shiftContext && (
           <motion.div
-            initial={{ opacity: 0, y: 10 }}
+            initial={{ opacity: 0, y: 5 }}
             animate={{ opacity: 1, y: 0 }}
             className="mt-6 mx-6 w-full max-w-sm z-10"
           >
-            <div className="flex items-center justify-between px-5 py-3 bg-white/60 backdrop-blur-md rounded-2xl border border-white/60 shadow-sm">
+            <div className="flex items-center justify-between px-5 py-3 bg-rams-panel border-2 border-rams-rule rounded-sm shadow-none">
               <div className="flex items-center gap-3">
-                <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center text-lg", isLate ? "bg-amber-100 text-amber-600" : "bg-blue-50 text-blue-500")}>
+                <div className={cn("w-10 h-10 rounded-sm border border-rams-rule flex items-center justify-center text-lg bg-rams-bg")}>
                   {isLate ? '⚠️' : '📅'}
                 </div>
                 <div>
-                  <h4 className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">
+                  <h4 className="text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest leading-tight">
                     {isLate ? "Running Late" : "Current Shift"}
                   </h4>
-                  <p className="text-sm font-bold text-neutral-700">
+                  <p className="text-sm font-mono font-bold text-rams-ink">
                     {shiftContext.start.slice(0, 5)} - {shiftContext.end.slice(0, 5)}
                   </p>
                 </div>
               </div>
               {isLate && (
-                <span className="px-2 py-1 bg-amber-100 text-amber-700 text-[10px] font-bold rounded-md border border-amber-200">LATE</span>
+                <span className="px-2 py-0.5 bg-rams-red text-rams-panel text-[9px] font-mono font-bold rounded-sm border border-rams-rule">LATE</span>
               )}
             </div>
           </motion.div>
         )}
       </AnimatePresence>
-
-
 
       {/* 3. Hero Clock & Main Action */}
       <div className="flex-1 flex flex-col items-center justify-start w-full z-10 mt-4">
@@ -687,25 +686,22 @@ export default function CheckIn() {
           animate={{ opacity: 1 }}
           className="text-center mb-6 w-full max-w-sm px-6"
         >
-          {/* Dieter Rams Typography: Big, Tight, Clean */}
-          <h2 className="text-[5.5rem] leading-none font-light tracking-tighter text-neutral-900 font-bold">
-            {currentTime ? format(currentTime, "HH:mm") : "--:--"}
-          </h2>
-          <p className="text-xs font-semibold text-neutral-450 mt-1 tracking-widest uppercase">
-            {currentTime ? format(currentTime, "EEEEที่ d MMMM yyyy", { locale: th }) : "Loading..."}
-          </p>
+          {/* Stark Digital Flip/LCD Style Bezel */}
+          <div className="border-2 border-rams-rule bg-rams-panel p-5 rounded-sm text-center shadow-none w-full mb-4">
+            <h2 className="text-[4.5rem] md:text-[5.5rem] leading-none font-mono font-bold text-rams-ink tracking-tight select-none">
+              {currentTime ? format(currentTime, "HH:mm") : "--:--"}
+            </h2>
+            <p className="text-[10px] font-mono font-bold text-rams-ink-muted mt-2 tracking-widest uppercase">
+              {currentTime ? format(currentTime, "EEEEที่ d MMMM yyyy", { locale: th }) : "Loading..."}
+            </p>
+          </div>
 
           <motion.div
-            animate={{ scale: status.includes('Ready') ? [1, 1.03, 1] : 1 }}
-            transition={{ repeat: Infinity, duration: 2 }}
             className={cn(
-              "mt-4 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[10px] font-bold tracking-wide transition-colors border backdrop-blur-sm",
-              status.includes('Ready')
-                ? 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20'
-                : 'bg-rose-500/10 text-rose-500 border-rose-500/20'
+              "inline-flex items-center gap-2 px-3 py-1 rounded-sm text-[10px] font-mono font-bold tracking-wider uppercase border-2 border-rams-rule bg-rams-panel"
             )}
           >
-            <span className={cn("w-1.5 h-1.5 rounded-full animate-pulse", status.includes('Ready') ? 'bg-emerald-500' : 'bg-rose-500')}></span>
+            <span className={cn("w-2.5 h-2.5 rounded-full border border-rams-rule shadow-inner animate-pulse shrink-0", status.includes('Ready') ? 'bg-rams-green' : 'bg-rams-red')}></span>
             {status}
           </motion.div>
           
@@ -715,7 +711,7 @@ export default function CheckIn() {
               <motion.div
                 initial={{ opacity: 0, y: 5 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="px-3.5 py-1.5 bg-gradient-to-r from-orange-100 to-amber-100 text-amber-700 rounded-full text-[10px] font-bold flex items-center gap-1.5 shadow-sm border border-amber-200"
+                className="px-3.5 py-1.5 bg-rams-orange/10 text-rams-orange border border-rams-rule rounded-sm text-[10px] font-mono font-bold flex items-center gap-1.5"
               >
                 🔥 มาเช้าจัง เยี่ยมไปเลย!
               </motion.div>
@@ -726,22 +722,20 @@ export default function CheckIn() {
         {/* Check-In / Check-Out Button (moved here, directly under GPS status) */}
         {!status.includes('Checking') && (
           <motion.button
-            initial={{ scale: 0.95, opacity: 0 }}
+            initial={{ scale: 0.98, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
             onClick={handleStartCheckIn}
-            className="w-full max-w-sm px-6 mb-6 z-30 transition-all duration-300"
+            className="w-full max-w-sm px-6 mb-6 z-30 transition-all active:translate-y-[4px] active:scale-[0.98]"
           >
             <div className={cn(
-              "w-full py-4 rounded-[2rem] flex flex-col items-center justify-center transition-all duration-300 border-b-4 shadow-sm",
+              "w-full py-4 rounded-sm flex flex-col items-center justify-center border-2 border-rams-rule transition-all text-center select-none cursor-pointer",
               mainButtonConfig.color
             )}>
               <span className="text-3xl mb-1">{mainButtonConfig.icon}</span>
-              <span className="text-lg font-black tracking-tight">
+              <span className="text-lg font-mono font-bold uppercase tracking-wider">
                 {mainButtonConfig.label}
               </span>
-              <span className="text-[9px] opacity-70 mt-0.5 font-bold uppercase tracking-wider">
+              <span className="text-[10px] font-mono opacity-80 mt-0.5 font-bold uppercase tracking-widest">
                 {mainButtonConfig.sub}
               </span>
             </div>
@@ -761,20 +755,20 @@ export default function CheckIn() {
                 {fixedAnnouncements.map((a) => (
                   <motion.div
                     key={`fixed-${a.id}`}
-                    initial={{ opacity: 0, y: 10 }}
+                    initial={{ opacity: 0, y: 5 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="w-full bg-white/80 backdrop-blur-md rounded-3xl p-4 shadow-sm border border-white/60 flex items-start gap-3.5 relative overflow-hidden"
+                    className="w-full bg-rams-panel border-2 border-rams-rule p-4 shadow-none flex items-start gap-3.5 relative overflow-hidden rounded-sm"
                   >
-                    <div className="absolute top-0 left-0 w-1 h-full bg-blue-500" />
+                    <div className="absolute top-0 left-0 w-1.5 h-full bg-rams-orange" />
                     <div className="text-lg shrink-0 mt-0.5 select-none">📌</div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <span className="text-[9px] font-extrabold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100 uppercase tracking-widest">Pinned</span>
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <span className="text-[9px] font-mono font-extrabold text-rams-ink border border-rams-rule bg-rams-bg px-2 py-0.5 rounded-sm uppercase tracking-widest">Pinned</span>
                         {a.priority > 1 && (
-                          <span className="text-[9px] font-extrabold text-red-655 bg-red-50 px-2 py-0.5 rounded-md border border-red-100 uppercase tracking-widest animate-pulse">Urgent</span>
+                          <span className="text-[9px] font-mono font-extrabold text-rams-panel border border-rams-rule bg-rams-red px-2 py-0.5 rounded-sm uppercase tracking-widest animate-pulse">Urgent</span>
                         )}
                       </div>
-                      <p className="text-xs font-bold text-neutral-800 leading-relaxed break-words">{a.message}</p>
+                      <p className="text-xs font-semibold text-rams-ink leading-relaxed break-words">{a.message}</p>
                     </div>
                   </motion.div>
                 ))}
@@ -799,43 +793,40 @@ export default function CheckIn() {
                     }
                   }
                   const isUrgent = a.priority > 1;
-                  const accentColor = isUrgent ? 'bg-orange-500' : 'bg-amber-500';
-                  const cardBg = isUrgent 
-                    ? 'bg-gradient-to-br from-orange-50/90 to-white/90 border-orange-200/50 shadow-orange-100/10'
-                    : 'bg-white/80 border-white/60';
+                  const accentColor = isUrgent ? 'bg-rams-red' : 'bg-rams-orange';
 
                   return (
                     <motion.div
                       key={`temp-${a.id}`}
-                      initial={{ opacity: 0, scale: 0.95 }}
+                      initial={{ opacity: 0, scale: 0.98 }}
                       animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.95, height: 0, marginBottom: 0, padding: 0 }}
-                      className={`w-full ${cardBg} backdrop-blur-md rounded-3xl p-4 shadow-sm border flex items-start gap-3.5 relative overflow-hidden transition-all duration-200`}
+                      exit={{ opacity: 0, scale: 0.98, height: 0, marginBottom: 0, padding: 0 }}
+                      className="w-full bg-rams-panel border-2 border-rams-rule p-4 shadow-none flex items-start gap-3.5 relative overflow-hidden rounded-sm transition-all"
                     >
-                      <div className={`absolute top-0 left-0 w-1 h-full ${accentColor}`} />
+                      <div className={`absolute top-0 left-0 w-1.5 h-full ${accentColor}`} />
                       <div className="text-lg shrink-0 mt-0.5 select-none">{isUrgent ? '🚨' : '📢'}</div>
                       <div className="flex-1 min-w-0 pr-6">
-                        <div className="flex items-center gap-1.5 mb-1 flex-wrap">
-                          <span className={`text-[9px] font-extrabold ${isUrgent ? 'text-orange-600 bg-orange-50 border-orange-100' : 'text-amber-600 bg-amber-50 border-amber-100'} px-2 py-0.5 rounded-md border uppercase tracking-widest`}>
+                        <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
+                          <span className={`text-[9px] font-mono font-extrabold text-rams-ink border border-rams-rule ${isUrgent ? 'bg-rams-red/10 text-rams-red' : 'bg-rams-orange/10 text-rams-orange'} px-2 py-0.5 rounded-sm uppercase tracking-widest`}>
                             {isUrgent ? 'Important' : 'News'}
                           </span>
                           {expLabel && (
-                            <span className="text-[9px] font-bold text-neutral-400 flex items-center gap-0.5">
+                            <span className="text-[9px] font-mono font-bold text-rams-ink-muted flex items-center gap-0.5">
                               ⏰ {expLabel}
                             </span>
                           )}
                         </div>
-                        <p className="text-xs font-semibold text-neutral-800 leading-relaxed break-words">{a.message}</p>
+                        <p className="text-xs font-semibold text-rams-ink leading-relaxed break-words">{a.message}</p>
                         <button
                           onClick={() => handleDismissAnnouncement(a.id)}
-                          className="mt-2 py-1 px-3 bg-neutral-900/5 hover:bg-neutral-900/10 active:scale-95 text-[10px] font-extrabold text-neutral-600 rounded-lg transition-all"
+                          className="mt-2 py-1 px-3 bg-rams-bg hover:bg-rams-bg/85 active:translate-y-[1px] text-[10px] font-mono font-extrabold text-rams-ink border border-rams-rule rounded-sm transition-all"
                         >
                           รับทราบ
                         </button>
                       </div>
                       <button 
                         onClick={() => handleDismissAnnouncement(a.id)}
-                        className="absolute top-3.5 right-3.5 w-6 h-6 rounded-full flex items-center justify-center text-neutral-400 hover:text-neutral-700 hover:bg-neutral-900/5 transition-all text-xs font-bold"
+                        className="absolute top-3.5 right-3.5 w-6 h-6 rounded-sm flex items-center justify-center text-rams-ink-muted hover:text-rams-ink hover:bg-rams-bg border border-rams-rule-light transition-all text-xs font-bold"
                       >
                         ✕
                       </button>
@@ -846,32 +837,32 @@ export default function CheckIn() {
 
               {/* Approved Leaves & My Pending Requests */}
               {(approvedLeaves.length > 0 || myPendingLeaves.length > 0) && (
-                <div className="w-full bg-white/70 backdrop-blur-md rounded-3xl border border-white/60 p-4 shadow-[0_4px_24px_0_rgba(0,0,0,0.02)] flex flex-col gap-3">
-                  <div className="flex items-center justify-between pb-2 border-b border-slate-100/80">
-                    <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest">ข้อมูลการลาหยุด</span>
-                    <span className="text-[9px] font-bold text-slate-400">{format(currentTime || new Date(), "dd MMMM yyyy", { locale: th })}</span>
+                <div className="w-full bg-rams-panel border-2 border-rams-rule p-4 shadow-none flex flex-col gap-3 rounded-sm">
+                  <div className="flex items-center justify-between pb-2 border-b border-rams-rule-light">
+                    <span className="text-[9px] font-mono font-extrabold text-rams-ink-muted uppercase tracking-widest">ข้อมูลการลาหยุด</span>
+                    <span className="text-[9px] font-mono font-bold text-rams-ink-muted">{format(currentTime || new Date(), "dd MMMM yyyy", { locale: th })}</span>
                   </div>
 
                   {/* Approved Leaves List (Sleek Avatar Cards) */}
                   <div className="flex flex-col gap-2">
-                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">รายชื่อลางานล่าสุด</p>
+                    <p className="text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-wider mb-1">รายชื่อลางานล่าสุด</p>
                     {approvedLeaves.length > 0 ? (
                       <div className="flex flex-col gap-2">
                         {approvedLeaves.map((l) => {
                           const empName = l.employees?.nickname || l.employees?.name?.split(' ')[0] || 'Staff';
                           const typeLabel = l.leave_type === 'sick' ? 'ลาป่วย 😷' : l.leave_type === 'business' ? 'ลากิจ 💼' : 'พักร้อน 🏖️';
                           const badgeColor = l.leave_type === 'sick' 
-                            ? 'bg-rose-50 border-rose-100 text-rose-600' 
+                            ? 'bg-rams-red/10 text-rams-red' 
                             : l.leave_type === 'business' 
-                              ? 'bg-amber-50 border-amber-100 text-amber-600' 
-                              : 'bg-sky-50 border-sky-100 text-sky-600';
+                              ? 'bg-rams-amber/10 text-rams-amber' 
+                              : 'bg-rams-orange/10 text-rams-orange';
                           
                           const isTodayLeave = l.leave_date === format(new Date(), 'yyyy-MM-dd');
                           const dateObj = new Date(l.leave_date);
                           const dateStrFormatted = format(dateObj, 'd MMM', { locale: th });
 
                           return (
-                            <div key={l.id} className="flex items-center justify-between p-2 bg-slate-50/40 rounded-2xl border border-slate-100/30">
+                            <div key={l.id} className="flex items-center justify-between p-2 bg-rams-bg rounded-sm border border-rams-rule-light">
                               <div className="flex items-center gap-2.5 min-w-0">
                                 {/* Employee Avatar with Fallback */}
                                 <div className="relative w-8 h-8 shrink-0">
@@ -885,33 +876,33 @@ export default function CheckIn() {
                                           const fallback = e.currentTarget.parentElement?.querySelector('.avatar-fallback');
                                           if (fallback) fallback.classList.remove('hidden');
                                         }}
-                                        className="w-8 h-8 rounded-full object-cover border border-white shadow-sm" 
+                                        className="w-8 h-8 rounded-sm object-cover border border-rams-rule shadow-none" 
                                       />
-                                      <div className="avatar-fallback hidden w-8 h-8 rounded-full bg-gradient-to-br from-indigo-100 to-slate-100 flex items-center justify-center text-[10px] font-extrabold text-indigo-500 border border-white shadow-sm absolute inset-0">
+                                      <div className="avatar-fallback hidden w-8 h-8 rounded-sm bg-rams-panel flex items-center justify-center text-[10px] font-mono font-extrabold text-rams-ink border border-rams-rule absolute inset-0">
                                         {empName.slice(0, 2).toUpperCase()}
                                       </div>
                                     </>
                                   ) : (
-                                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-100 to-slate-100 flex items-center justify-center text-[10px] font-extrabold text-indigo-500 border border-white shadow-sm">
+                                    <div className="w-8 h-8 rounded-sm bg-rams-panel flex items-center justify-center text-[10px] font-mono font-extrabold text-rams-ink border border-rams-rule">
                                       {empName.slice(0, 2).toUpperCase()}
                                     </div>
                                   )}
                                 </div>
                                 <div className="flex flex-col min-w-0 ml-1">
-                                  <span className="text-xs font-black text-slate-800 truncate leading-none mb-0.5">{empName}</span>
-                                  <span className="text-[9px] font-bold text-slate-400 truncate leading-none">{l.reason || 'ทำธุระส่วนตัว'}</span>
+                                  <span className="text-xs font-bold text-rams-ink truncate leading-none mb-1">{empName}</span>
+                                  <span className="text-[9px] font-mono text-rams-ink-muted truncate leading-none">{l.reason || 'ทำธุระส่วนตัว'}</span>
                                 </div>
                               </div>
 
                               <div className="flex items-center gap-1.5 shrink-0">
-                                <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-md border ${badgeColor}`}>
+                                <span className={`text-[9px] font-mono font-extrabold px-2 py-0.5 rounded-sm border border-rams-rule-light ${badgeColor}`}>
                                   {typeLabel}
                                 </span>
                                 <span className={cn(
-                                  "text-[9px] font-extrabold px-1.5 py-0.5 rounded-md border",
+                                  "text-[9px] font-mono font-extrabold px-1.5 py-0.5 rounded-sm border border-rams-rule-light",
                                   isTodayLeave 
-                                    ? "bg-rose-500 border-rose-600 text-white animate-pulse" 
-                                    : "bg-slate-100 border-slate-200 text-slate-500"
+                                    ? "bg-rams-red text-rams-panel animate-pulse" 
+                                    : "bg-rams-panel text-rams-ink-muted"
                                 )}>
                                   {isTodayLeave ? 'วันนี้' : dateStrFormatted}
                                 </span>
@@ -921,29 +912,29 @@ export default function CheckIn() {
                         })}
                       </div>
                     ) : (
-                      <span className="text-slate-400 font-semibold italic text-[11px] block mt-0.5">ช่วงนี้ไม่มีคนลาหยุด ☀️</span>
+                      <span className="text-rams-ink-muted font-mono font-bold italic text-[10px] block mt-0.5">ช่วงนี้ไม่มีคนลาหยุด ☀️</span>
                     )}
                   </div>
 
                   {/* My Pending Leaves */}
                   {myPendingLeaves.length > 0 && (
-                    <div className="flex items-start gap-2.5 min-w-0 pt-2 border-t border-slate-100/50">
+                    <div className="flex items-start gap-2.5 min-w-0 pt-2 border-t border-rams-rule-light">
                       <span className="text-sm shrink-0">⏳</span>
                       <div className="flex-1 min-w-0">
-                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">คำขอลาของคุณที่ค้างอยู่</p>
+                        <p className="text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-wider">คำขอลาของคุณที่ค้างอยู่</p>
                         <div className="flex flex-col gap-1 mt-1">
                           {myPendingLeaves.slice(0, 2).map((l, idx) => {
                             const dateFormatted = format(new Date(l.leave_date), 'dd/MM');
                             const typeLabel = l.leave_type === 'sick' ? 'ลาป่วย' : l.leave_type === 'business' ? 'ลากิจ' : 'ลาพักร้อน';
                             return (
-                              <div key={idx} className="flex items-center gap-1.5 text-[10px] font-bold text-amber-600">
-                                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0"></span>
+                              <div key={idx} className="flex items-center gap-1.5 text-[10px] font-mono font-bold text-rams-orange">
+                                <span className="w-1.5 h-1.5 rounded-full bg-rams-orange animate-pulse shrink-0"></span>
                                 <span>{typeLabel} วันที่ {dateFormatted} (รออนุมัติ)</span>
                               </div>
                             );
                           })}
                           {myPendingLeaves.length > 2 && (
-                            <span className="text-[9px] font-bold text-slate-400 pl-3">และรายการอื่นอีก {myPendingLeaves.length - 2} รายการ</span>
+                            <span className="text-[9px] font-mono font-bold text-rams-ink-muted pl-3">และรายการอื่นอีก {myPendingLeaves.length - 2} รายการ</span>
                           )}
                         </div>
                       </div>
@@ -954,25 +945,25 @@ export default function CheckIn() {
 
               {/* Weekly Schedule Row */}
               {weeklySchedule.length > 0 && (
-                <div className="w-full bg-white/70 backdrop-blur-md rounded-3xl border border-white/60 p-4 shadow-[0_4px_24px_0_rgba(0,0,0,0.02)] flex flex-col gap-2.5">
-                  <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest pb-1 border-b border-slate-100/80">ตารางงานสัปดาห์นี้</span>
+                <div className="w-full bg-rams-panel border-2 border-rams-rule p-4 shadow-none flex flex-col gap-2.5 rounded-sm">
+                  <span className="text-[9px] font-mono font-extrabold text-rams-ink-muted uppercase tracking-widest pb-1 border-b border-rams-rule-light">ตารางงานสัปดาห์นี้</span>
                   <div className="grid grid-cols-7 gap-1">
                     {weeklySchedule.map((day, idx) => {
                       const dayInitialsMap = { Mon: 'จ', Tue: 'อ', Wed: 'พ', Thu: 'พฤ', Fri: 'ศ', Sat: 'ส', Sun: 'อา' };
                       const thaiInitial = dayInitialsMap[day.dayName] || day.dayName;
 
                       let timeDisplay = '';
-                      let statusBg = 'bg-slate-50 border-slate-100 text-slate-600';
+                      let statusBg = 'bg-rams-bg border-rams-rule-light text-rams-ink-muted';
                       
                       if (day.isLeave) {
                         timeDisplay = 'ลา';
-                        statusBg = 'bg-rose-50 border-rose-100/60 text-rose-500';
+                        statusBg = 'bg-rams-red/10 border-rams-red/30 text-rams-red';
                       } else if (day.isOff) {
                         timeDisplay = 'หยุด';
-                        statusBg = 'bg-slate-100 border-slate-200/50 text-slate-400';
+                        statusBg = 'bg-rams-bg border-rams-rule-light text-rams-ink-muted/50';
                       } else {
                         timeDisplay = day.shiftTime ? day.shiftTime.split('-')[0] : 'งาน';
-                        statusBg = 'bg-indigo-50 border-indigo-100/60 text-indigo-650';
+                        statusBg = 'bg-rams-orange/10 border-rams-orange/30 text-rams-orange';
                       }
 
                       const isSelected = selectedDaySchedule?.dateStr === day.dateStr;
@@ -982,25 +973,25 @@ export default function CheckIn() {
                           key={idx}
                           onClick={() => setSelectedDaySchedule(day)}
                           className={cn(
-                            "flex flex-col items-center p-1 rounded-xl border text-center transition-all duration-200 min-w-0 cursor-pointer hover:scale-[1.03] active:scale-[0.97]",
+                            "flex flex-col items-center p-1 rounded-sm border text-center transition-all min-w-0 cursor-pointer active:translate-y-[1px]",
                             day.isToday 
-                              ? "bg-slate-900 border-slate-950 text-white shadow-md" 
+                              ? "bg-rams-ink border-rams-rule text-rams-panel shadow-none" 
                               : isSelected
-                                ? "bg-indigo-50 border-indigo-400 text-indigo-750 shadow-sm"
+                                ? "bg-rams-bg border-rams-rule text-rams-ink shadow-none"
                                 : statusBg
                           )}
                         >
-                          <span className={cn("text-[9px] font-bold", day.isToday ? "text-slate-300" : "text-slate-400")}>
+                          <span className={cn("text-[9px] font-mono font-bold", day.isToday ? "text-rams-panel/75" : "text-rams-ink-muted")}>
                             {thaiInitial}
                           </span>
-                          <span className="text-xs font-black tracking-tight mt-0.5">
+                          <span className="text-xs font-mono font-black tracking-tight mt-0.5">
                             {day.dateNum}
                           </span>
                           <span className={cn(
-                            "text-[7.5px] font-extrabold mt-1 px-0.5 py-0.5 rounded-md text-center tracking-tighter whitespace-nowrap", 
+                            "text-[8px] font-mono font-extrabold mt-1 px-1 py-0.5 rounded-sm text-center tracking-tighter whitespace-nowrap border border-rams-rule-light", 
                             day.isToday 
-                              ? (day.isLeave ? "bg-rose-500 text-white" : day.isOff ? "bg-slate-800 text-slate-400" : "bg-indigo-500 text-white")
-                              : (day.isLeave ? "bg-rose-100 text-rose-600" : day.isOff ? "bg-slate-200 text-slate-400" : "bg-indigo-100 text-indigo-600")
+                              ? (day.isLeave ? "bg-rams-red text-rams-panel border-rams-rule" : day.isOff ? "bg-rams-bg text-rams-ink-muted" : "bg-rams-orange text-rams-panel border-rams-rule")
+                              : (day.isLeave ? "bg-rams-red/10 text-rams-red" : day.isOff ? "bg-rams-bg text-rams-ink-muted/55" : "bg-rams-orange/10 text-rams-orange")
                           )}>
                             {timeDisplay}
                           </span>
@@ -1015,16 +1006,16 @@ export default function CheckIn() {
                       key={selectedDaySchedule.dateStr}
                       initial={{ opacity: 0, y: 5 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="mt-2 p-3 bg-slate-50/70 backdrop-blur-sm rounded-2xl border border-slate-100/50 flex items-center justify-between transition-all duration-300"
+                      className="mt-2 p-3 bg-rams-bg border border-rams-rule rounded-sm flex items-center justify-between transition-all duration-200"
                     >
                       <div className="flex items-center gap-3 min-w-0">
                         <div className={cn(
-                          "w-10 h-10 rounded-xl flex items-center justify-center text-lg shadow-sm border shrink-0",
+                          "w-10 h-10 rounded-sm flex items-center justify-center text-lg border border-rams-rule shrink-0 bg-rams-panel",
                           selectedDaySchedule.isLeave 
-                            ? "bg-rose-50 text-rose-500 border-rose-100" 
+                            ? "bg-rams-red/10 text-rams-red border-rams-red/30" 
                             : selectedDaySchedule.isOff 
-                              ? "bg-slate-100 text-slate-400 border-slate-200/50" 
-                              : "bg-indigo-50 text-indigo-500 border-indigo-100/60"
+                              ? "bg-rams-panel text-rams-ink-muted/50 border-rams-rule-light" 
+                              : "bg-rams-orange/10 text-rams-orange border-rams-orange/30"
                         )}>
                           {selectedDaySchedule.isLeave 
                             ? (selectedDaySchedule.leaveType === 'sick' ? '🤢' : selectedDaySchedule.leaveType === 'business' ? '💼' : '🏖️') 
@@ -1033,12 +1024,12 @@ export default function CheckIn() {
                               : (((selectedDaySchedule.shiftName || '').includes('ค่ำ') || (selectedDaySchedule.shiftName || '').includes('เย็น') || (selectedDaySchedule.shiftTime || '').startsWith('18') || (selectedDaySchedule.shiftTime || '').startsWith('17') || (selectedDaySchedule.shiftTime || '').startsWith('16')) ? '🌙' : '☀️')}
                         </div>
                         <div className="min-w-0">
-                          <h5 className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest leading-none mb-1.5 truncate">
+                          <h5 className="text-[9px] font-mono font-extrabold text-rams-ink-muted uppercase tracking-widest leading-none mb-1.5 truncate">
                             {format(selectedDaySchedule.date, 'EEEE d MMMM yyyy', { locale: th })} {selectedDaySchedule.isToday && '(วันนี้)'}
                           </h5>
-                          <p className="text-xs font-black text-slate-800 leading-none truncate">
+                          <p className="text-xs font-mono font-bold text-rams-ink leading-none truncate">
                             {selectedDaySchedule.isLeave 
-                              ? `ลากุน (${selectedDaySchedule.leaveType === 'sick' ? 'ลาป่วย 😷' : selectedDaySchedule.leaveType === 'business' ? 'ลากิจ 💼' : 'พักร้อน 🏖️'})` 
+                              ? `ลางาน (${selectedDaySchedule.leaveType === 'sick' ? 'ลาป่วย 😷' : selectedDaySchedule.leaveType === 'business' ? 'ลากิจ 💼' : 'พักร้อน 🏖️'})` 
                               : selectedDaySchedule.isOff 
                                 ? 'วันหยุด (OFF)' 
                                 : selectedDaySchedule.shiftName || 'กะงาน'}
@@ -1048,7 +1039,7 @@ export default function CheckIn() {
                       
                       {!selectedDaySchedule.isOff && !selectedDaySchedule.isLeave && selectedDaySchedule.shiftTime && (
                         <div className="text-right shrink-0 ml-3">
-                          <span className="text-[11px] font-black text-indigo-650 bg-indigo-100/60 border border-indigo-200/50 px-2.5 py-1.5 rounded-lg whitespace-nowrap">
+                          <span className="text-[11px] font-mono font-bold text-rams-ink bg-rams-panel border border-rams-rule px-2.5 py-1 rounded-sm whitespace-nowrap">
                             {selectedDaySchedule.shiftTime}
                           </span>
                         </div>
@@ -1063,7 +1054,7 @@ export default function CheckIn() {
 
       </div>
 
-      {/* 4. Recent Checkins (Glass Cards) */}
+      {/* 4. Recent Checkins (Dieter Rams Panels) */}
       <div className="w-full max-w-sm px-6 z-10 mb-8">
         <AnimatePresence>
           {userPosition && (
@@ -1075,7 +1066,7 @@ export default function CheckIn() {
           )}
         </AnimatePresence>
 
-        <h3 className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-4 pl-2">Recent Activity</h3>
+        <h3 className="text-[10px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-4 pl-2">Recent Activity</h3>
         <div className="flex flex-col gap-2">
           <AnimatePresence>
             {recentCheckins.slice(0, 3).map((log, i) => {
@@ -1085,7 +1076,7 @@ export default function CheckIn() {
                   key={log.id}
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
-                  className="flex items-center justify-between p-3 bg-white/40 backdrop-blur-md rounded-2xl border border-white/40 shadow-sm"
+                  className="flex items-center justify-between p-3 bg-rams-panel border-2 border-rams-rule rounded-sm shadow-none"
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="relative w-10 h-10 shrink-0">
@@ -1097,20 +1088,20 @@ export default function CheckIn() {
                           const fallback = e.currentTarget.parentElement?.querySelector('.avatar-fallback');
                           if (fallback) fallback.classList.remove('hidden');
                         }}
-                        className="w-10 h-10 rounded-full object-cover bg-slate-200 border border-white" 
+                        className="w-10 h-10 rounded-sm object-cover bg-rams-panel border border-rams-rule" 
                       />
-                      <div className="avatar-fallback hidden w-10 h-10 rounded-full bg-gradient-to-br from-indigo-100 to-slate-100 flex items-center justify-center text-xs font-extrabold text-indigo-500 border border-white shadow-sm absolute inset-0">
+                      <div className="avatar-fallback hidden w-10 h-10 rounded-sm bg-rams-bg flex items-center justify-center text-xs font-mono font-extrabold text-rams-ink border border-rams-rule absolute inset-0">
                         {namePart.slice(0, 2).toUpperCase()}
                       </div>
                     </div>
                     <div className="min-w-0">
-                      <p className="text-xs font-bold text-neutral-800 truncate">{namePart}</p>
-                      <p className="text-[10px] text-neutral-500 font-medium truncate">{log.action_type === 'check_in' ? 'Checked In' : 'Checked Out'}</p>
+                      <p className="text-xs font-bold text-rams-ink truncate">{namePart}</p>
+                      <p className="text-[10px] font-mono text-rams-ink-muted truncate">{log.action_type === 'check_in' ? 'Checked In' : 'Checked Out'}</p>
                     </div>
                   </div>
                   <div className="flex flex-col items-end shrink-0 ml-3">
-                    <span className="text-xs font-bold text-neutral-700 font-mono">{format(new Date(log.timestamp), "HH:mm")}</span>
-                    <span className="text-sm">{log.mood_status || ''}</span>
+                    <span className="text-xs font-mono font-bold text-rams-ink">{format(new Date(log.timestamp), "HH:mm")}</span>
+                    <span className="text-sm font-emoji">{log.mood_status || ''}</span>
                   </div>
                 </motion.div>
               );
@@ -1124,32 +1115,32 @@ export default function CheckIn() {
 
 
 
-      {/* Camera & Mood (Modals) */}
+      {/* Camera & Mood (Modals in Dieter Rams Style) */}
       <AnimatePresence>
         {showCamera && (
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-[#F2F2F2] flex flex-col items-center justify-center p-6"
+            className="fixed inset-0 z-50 bg-rams-bg flex flex-col items-center justify-center p-6"
           >
-            <div className="absolute top-0 w-full p-6 flex justify-between items-center">
-              <h3 className="text-xl font-bold text-neutral-800">Verify Location</h3>
-              <button onClick={() => setShowCamera(false)} className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm">✕</button>
+            <div className="absolute top-0 w-full p-6 flex justify-between items-center border-b-2 border-rams-rule bg-rams-panel">
+              <h3 className="text-lg font-mono font-bold text-rams-ink uppercase tracking-wider">Verify Location</h3>
+              <button onClick={() => setShowCamera(false)} className="w-10 h-10 bg-rams-bg border-2 border-rams-rule rounded-sm flex items-center justify-center font-bold active:translate-y-[1px]">✕</button>
             </div>
 
             <div
               onClick={() => fileInputRef.current?.click()}
-              className="relative w-full max-w-sm aspect-square bg-white rounded-[2.5rem] border-4 border-white shadow-xl flex flex-col items-center justify-center overflow-hidden active:scale-95 transition-transform cursor-pointer"
+              className="relative w-full max-w-sm aspect-square bg-rams-panel rounded-sm border-2 border-rams-rule flex flex-col items-center justify-center overflow-hidden active:translate-y-[2px] transition-transform cursor-pointer"
             >
               {isUploading
-                ? <div className="animate-spin w-12 h-12 border-4 border-neutral-100 border-t-neutral-800 rounded-full"></div>
+                ? <div className="animate-spin w-12 h-12 border-4 border-rams-rule-light border-t-rams-rule rounded-full"></div>
                 : <>
-                  <span className="text-6xl mb-4">📸</span>
-                  <span className="text-xs font-bold text-neutral-400 uppercase tracking-widest">Tap to Take Photo</span>
+                  <span className="text-6xl mb-4 select-none">📸</span>
+                  <span className="text-xs font-mono font-bold text-rams-ink-muted uppercase tracking-widest">Tap to Take Photo</span>
                 </>
               }
             </div>
 
-            <p className="mt-8 text-neutral-400 text-center text-sm font-medium">Please take a clear photo of yourself within the shop area.</p>
+            <p className="mt-8 text-rams-ink-muted text-center text-xs font-mono font-bold uppercase tracking-wider leading-relaxed max-w-xs">Please take a clear photo of yourself within the shop area.</p>
             <input type="file" accept="image/*" capture="user" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
           </motion.div>
         )}
@@ -1167,18 +1158,18 @@ export default function CheckIn() {
             <motion.div
               initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="w-full bg-[#FAFAFA] rounded-t-[2.5rem] p-8 pb-12 shadow-2xl pointer-events-auto relative"
+              className="w-full bg-rams-panel border-t-4 border-rams-rule p-8 pb-12 pointer-events-auto relative rounded-t-sm"
             >
-              <div className="w-12 h-1 bg-neutral-200 rounded-full mx-auto mb-8"></div>
-              <h3 className="text-xl font-bold text-neutral-800 text-center mb-8">How are you feeling?</h3>
+              <div className="w-12 h-1.5 bg-rams-rule rounded-full mx-auto mb-8"></div>
+              <h3 className="text-lg font-mono font-bold text-rams-ink text-center mb-8 uppercase tracking-wider">How are you feeling?</h3>
               <div className="flex justify-center gap-4 flex-wrap">
                 {['🔥', '😊', '😐', '😴', '🤒'].map((m) => (
                   <motion.button
                     key={m}
-                    whileHover={{ scale: 1.2, rotate: 10 }}
-                    whileTap={{ scale: 0.9 }}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
                     onClick={() => handleMoodSelect(m)}
-                    className="w-16 h-16 text-3xl flex items-center justify-center rounded-2xl bg-white hover:bg-neutral-900 hover:text-white shadow-sm border border-neutral-100 transition-all font-emoji"
+                    className="w-16 h-16 text-3xl flex items-center justify-center rounded-sm bg-rams-bg border-2 border-rams-rule hover:bg-rams-ink hover:text-rams-panel transition-all font-emoji"
                   >
                     {m}
                   </motion.button>
@@ -1189,7 +1180,7 @@ export default function CheckIn() {
                   setShowMoodSelector(false);
                   if (wrapUpData) setShowWrapUp(true);
                 }}
-                className="w-full mt-8 text-neutral-400 text-xs font-bold tracking-widest uppercase hover:text-neutral-800 transition-colors"
+                className="w-full mt-8 text-rams-ink-muted text-xs font-mono font-bold tracking-widest uppercase hover:text-rams-ink transition-colors"
               >
                 Skip This
               </button>
@@ -1210,26 +1201,26 @@ export default function CheckIn() {
             <motion.div
               initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="w-full bg-[#FAFAFA] rounded-t-[2.5rem] p-8 pb-12 shadow-2xl pointer-events-auto relative overflow-hidden"
+              className="w-full bg-rams-panel border-t-4 border-rams-rule p-8 pb-12 pointer-events-auto relative overflow-hidden rounded-t-sm"
             >
               <div className="absolute top-0 right-0 p-4 text-6xl opacity-5">🐾</div>
-              <div className="w-12 h-1 bg-neutral-200 rounded-full mx-auto mb-6"></div>
+              <div className="w-12 h-1.5 bg-rams-rule rounded-full mx-auto mb-6"></div>
               
               <div className="text-center mb-6">
-                <span className="inline-block p-4 bg-orange-100 text-orange-500 rounded-full text-4xl mb-4">🏆</span>
-                <h3 className="text-2xl font-black text-neutral-800 mb-2">เลิกงานแล้ว!</h3>
-                <p className="text-neutral-500 text-sm">
-                  กะที่ผ่านมาคุณทำงานไป <strong className="text-neutral-800">{wrapUpData.hours} ชั่วโมง {wrapUpData.minutes} นาที</strong>
+                <span className="inline-block p-4 bg-rams-orange/10 text-rams-orange border border-rams-rule rounded-sm text-4xl mb-4">🏆</span>
+                <h3 className="text-xl font-mono font-bold text-rams-ink mb-2 uppercase tracking-wide">เลิกงานแล้ว!</h3>
+                <p className="text-rams-ink-muted text-sm font-mono">
+                  กะที่ผ่านมาคุณทำงานไป <strong className="text-rams-ink font-bold">{wrapUpData.hours} ชั่วโมง {wrapUpData.minutes} นาที</strong>
                 </p>
               </div>
 
-              <div className="bg-white border border-neutral-100 rounded-2xl p-5 shadow-sm mb-6 relative">
-                <p className="text-sm font-medium text-neutral-700 leading-relaxed">
+              <div className="bg-rams-bg border-2 border-rams-rule p-5 mb-6 relative rounded-sm">
+                <p className="text-sm font-bold text-rams-ink leading-relaxed">
                   "ทำได้ดีมาก! ขอบคุณสำหรับความทุ่มเทในวันนี้นะ 🐾"
                 </p>
                 {(wrapUpData.mood === '😴' || wrapUpData.mood === '🤒') && (
-                  <div className="mt-3 pt-3 border-t border-neutral-100">
-                    <p className="text-xs text-orange-600 font-bold">
+                  <div className="mt-3 pt-3 border-t border-rams-rule-light">
+                    <p className="text-xs text-rams-orange font-mono font-bold">
                       💡 Yuzu says: พักผ่อนเยอะๆ นะ ดื่มน้ำอุ่นๆ ด้วยล่ะ!
                     </p>
                   </div>
@@ -1241,7 +1232,7 @@ export default function CheckIn() {
                   setShowWrapUp(false);
                   setWrapUpData(null);
                 }}
-                className="w-full py-4 bg-neutral-900 text-white rounded-2xl text-sm font-bold shadow-md hover:bg-neutral-800 transition-colors"
+                className="w-full py-4 bg-rams-ink text-rams-panel rounded-sm text-sm font-mono font-bold border-2 border-rams-rule hover:bg-neutral-800 active:translate-y-[2px] transition-all"
               >
                 ปิดหน้าต่าง
               </button>

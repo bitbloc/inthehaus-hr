@@ -71,21 +71,18 @@ export default function WeatherCard({ latitude, longitude, locationName = "Curre
 
     return (
         <motion.div
-            initial={{ opacity: 0, y: 15 }}
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             className="w-full max-w-sm z-10 mb-4 px-6"
         >
-            <div className="relative bg-white/70 backdrop-blur-xl border border-white rounded-[2rem] shadow-[0_8px_32px_0_rgba(31,38,135,0.06)] p-4 overflow-hidden transition-all duration-300 hover:shadow-[0_12px_40px_0_rgba(31,38,135,0.1)]">
-                {/* Background ambient glow blob */}
-                <div className={`absolute -top-12 -right-12 w-28 h-28 rounded-full bg-gradient-to-br ${glowClass} blur-xl pointer-events-none`} />
-
+            <div className="relative bg-rams-panel border-2 border-rams-rule p-4 overflow-hidden rounded-sm">
                 {loading ? (
-                    <div className="flex items-center gap-3 py-2">
-                        <div className="animate-spin w-4 h-4 border-2 border-slate-300 border-t-slate-600 rounded-full" />
-                        <div className="h-4 w-40 bg-slate-200 animate-pulse rounded-lg" />
+                    <div className="flex items-center gap-3 py-2 font-mono text-xs">
+                        <div className="animate-spin w-4 h-4 border-2 border-rams-rule-light border-t-rams-rule rounded-full" />
+                        <div className="h-4 w-40 bg-rams-bg animate-pulse rounded-sm" />
                     </div>
                 ) : error ? (
-                    <div className="text-xs text-red-500 font-medium py-1 flex items-center gap-2">
+                    <div className="text-xs text-rams-red font-mono py-1 flex items-center gap-2">
                         <span>⚠️ ไม่สามารถโหลดข้อมูลสภาพอากาศได้</span>
                     </div>
                 ) : (
@@ -94,23 +91,23 @@ export default function WeatherCard({ latitude, longitude, locationName = "Curre
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3 min-w-0">
                                 <motion.span
-                                    className="text-3xl drop-shadow-sm select-none block shrink-0"
-                                    animate={{ y: [0, -2, 0] }}
+                                    className="text-3xl drop-shadow-none select-none block shrink-0"
+                                    animate={{ y: [0, -1, 0] }}
                                     transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
                                 >
                                     {getWeatherIcon(weather?.conditionCode)}
                                 </motion.span>
                                 <div className="flex flex-col min-w-0">
-                                    <div className="flex items-baseline gap-1">
-                                        <span className="text-2xl font-black tracking-tight text-slate-800">
+                                    <div className="flex items-baseline gap-1.5">
+                                        <span className="text-2xl font-mono font-bold tracking-tight text-rams-ink">
                                             {Math.round(weather?.temperature)}°C
                                         </span>
-                                        <span className="text-[10px] font-bold text-slate-500 truncate">
+                                        <span className="text-[10px] font-mono font-bold text-rams-ink-muted truncate">
                                             • อากาศ{getWeatherLabel(weather?.conditionCode)}
                                         </span>
                                     </div>
-                                    <span className="text-[10px] text-slate-400 font-bold flex items-center gap-0.5 truncate">
-                                        <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
+                                    <span className="text-[10px] text-rams-ink-muted/80 font-mono font-bold flex items-center gap-1 truncate">
+                                        <MapPin className="w-3 h-3 text-rams-ink-muted shrink-0" />
                                         <span className="truncate">{weather?.address || locationName}</span>
                                     </span>
                                 </div>
@@ -118,7 +115,7 @@ export default function WeatherCard({ latitude, longitude, locationName = "Curre
 
                             {/* Info on the Right & Radar Trigger */}
                             <div className="flex items-center gap-3 shrink-0 ml-2">
-                                <div className="flex flex-col items-end text-right text-[10px] font-bold text-slate-500 leading-tight">
+                                <div className="flex flex-col items-end text-right text-[10px] font-mono font-bold text-rams-ink-muted leading-tight">
                                     <span>
                                         {weather?.tempDiffText 
                                             ? `🌡️ ${weather.tempDiffText.replace('ประมาณ ', '').replace('เมื่อเทียบกับเมื่อวาน ', '').replace('องศา', '°C').trim()}` 
@@ -132,24 +129,24 @@ export default function WeatherCard({ latitude, longitude, locationName = "Curre
                                 </div>
                                 <button
                                     onClick={() => setShowRadar(prev => !prev)}
-                                    className={`w-8 h-8 rounded-xl flex items-center justify-center border transition-all ${
+                                    className={`w-8 h-8 rounded-sm flex items-center justify-center border-2 border-rams-rule transition-all active:translate-y-[1px] ${
                                         showRadar 
-                                            ? 'bg-slate-900 border-slate-950 text-white shadow-sm' 
-                                            : 'bg-slate-900/5 border-slate-200/40 text-slate-600 hover:bg-slate-900/10'
+                                            ? 'bg-rams-ink text-rams-panel' 
+                                            : 'bg-rams-bg text-rams-ink hover:bg-rams-rule-light'
                                     }`}
                                     title="ดูเรดาร์ฝนสด"
                                 >
-                                    <Compass className={`w-4 h-4 transition-transform duration-300 ${showRadar ? 'rotate-180 text-indigo-400' : ''}`} />
+                                    <Compass className={`w-4 h-4 transition-transform duration-300 ${showRadar ? 'rotate-180 text-rams-orange' : ''}`} />
                                 </button>
                             </div>
                         </div>
 
-                        {/* Minimal mascot advice row */}
-                        <div className="mt-3 pt-2.5 border-t border-slate-100/80 flex items-start gap-1.5 text-[10px] font-semibold text-slate-600">
-                            <span className="text-orange-500 font-extrabold shrink-0 flex items-center gap-0.5">
-                                <Sparkles className="w-3 h-3 text-orange-400" /> Yuzu 🐾
+                        {/* Minimal advice row */}
+                        <div className="mt-3 pt-2.5 border-t-2 border-rams-rule flex items-start gap-1.5 text-[10px] font-mono font-semibold text-rams-ink">
+                            <span className="text-rams-orange font-mono font-extrabold shrink-0 flex items-center gap-0.5">
+                                <Sparkles className="w-3 h-3 text-rams-orange" /> Yuzu 🐾
                             </span>
-                            <p className="flex-1 leading-normal text-slate-700">
+                            <p className="flex-1 leading-normal text-rams-ink/90">
                                 {weather?.employeeAdvice}
                             </p>
                         </div>
@@ -161,17 +158,17 @@ export default function WeatherCard({ latitude, longitude, locationName = "Curre
                                     initial={{ height: 0, opacity: 0, marginTop: 0 }}
                                     animate={{ height: 'auto', opacity: 1, marginTop: 10 }}
                                     exit={{ height: 0, opacity: 0, marginTop: 0 }}
-                                    transition={{ duration: 0.25, ease: "easeInOut" }}
+                                    transition={{ duration: 0.2, ease: "easeInOut" }}
                                     className="overflow-hidden w-full flex flex-col"
                                 >
                                     <iframe
                                         id="windy-radar-iframe"
                                         src={`https://embed.windy.com/embed.html?lat=${latitude}&lon=${longitude}&zoom=9&level=surface&overlay=rain&product=ecmwf&menu=&message=&marker=true&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=default&metricTemp=default&radarRange=-1`}
-                                        className="w-full h-56 rounded-2xl border border-slate-200 shadow-inner"
+                                        className="w-full h-56 rounded-sm border-2 border-rams-rule"
                                         title="Windy Live Rain Radar"
                                         loading="lazy"
                                     />
-                                    <span className="text-[9px] font-bold text-slate-400 mt-1.5 text-center block">
+                                    <span className="text-[9px] font-mono font-bold text-rams-ink-muted mt-1.5 text-center block">
                                         *แผนที่พยากรณ์สดจาก Windy.com
                                     </span>
                                 </motion.div>
