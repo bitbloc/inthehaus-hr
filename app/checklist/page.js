@@ -637,9 +637,10 @@ export default function ChecklistPage() {
             <div className="max-w-6xl mx-auto space-y-6">
                 
                 {/* Header Section */}
-                <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-rams-panel p-6 border border-rams-rule-light rounded-sm shadow-none">
+                <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-rams-panel p-6 border border-rams-rule-light rounded-[1.8rem] shadow-none">
                     <div className="space-y-1">
                         <div className="flex items-center gap-3">
+                            <img src="/logo.png" className="h-8 w-auto object-contain mr-1" alt="Logo" onError={(e) => e.target.style.display = 'none'} />
                             <h1 className="text-2xl font-mono font-bold tracking-tight text-rams-ink uppercase">Checklist System</h1>
                             <span className="relative flex h-2.5 w-2.5">
                                 {isAutoSync && (
@@ -708,14 +709,14 @@ export default function ChecklistPage() {
                 {/* Dashboard Stats */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                     {/* Stat Card 1: Score */}
-                    <div className="bg-rams-panel p-5 border border-rams-rule-light rounded-sm shadow-none flex flex-col justify-between">
+                    <div className="bg-rams-panel p-5 border border-rams-rule-light rounded-[1.8rem] shadow-none flex flex-col justify-between">
                         <span className="text-rams-ink-muted text-[9px] font-mono font-bold tracking-widest uppercase block mb-3">ความสมบูรณ์ข้อมูล</span>
                         <div className="flex items-end justify-between">
                             <h2 className="text-3xl font-mono font-black tracking-tight text-rams-ink">
                                 {stats.complianceScore}%
                             </h2>
                             <span className={cn(
-                                "text-[9px] font-mono font-bold uppercase tracking-widest px-2 py-0.5 rounded-sm border",
+                                "text-[9px] font-mono font-bold uppercase tracking-widest px-2 py-0.5 rounded-lg border",
                                 stats.complianceScore > 85 ? "bg-rams-green/10 text-rams-green border-rams-green/30" :
                                 stats.complianceScore > 60 ? "bg-rams-amber/10 text-rams-amber border-rams-amber/30" :
                                 "bg-rams-red/10 text-rams-red border-rams-red/30"
@@ -723,7 +724,7 @@ export default function ChecklistPage() {
                                 {stats.complianceScore === 100 ? "EXCELLENT" : stats.complianceScore > 85 ? "GOOD" : "WARNING"}
                             </span>
                         </div>
-                        <div className="h-2 w-full bg-rams-bg border border-rams-rule-light rounded-sm mt-3.5 overflow-hidden">
+                        <div className="h-2 w-full bg-rams-bg border border-rams-rule-light rounded-lg mt-3.5 overflow-hidden">
                             <div 
                                 className={cn(
                                     "h-full transition-all duration-500",
@@ -736,7 +737,7 @@ export default function ChecklistPage() {
                     </div>
 
                     {/* Stat Card 2: Submissions */}
-                    <div className="bg-rams-panel p-5 border border-rams-rule-light rounded-sm shadow-none flex flex-col justify-between">
+                    <div className="bg-rams-panel p-5 border border-rams-rule-light rounded-[1.8rem] shadow-none flex flex-col justify-between">
                         <span className="text-rams-ink-muted text-[9px] font-mono font-bold tracking-widest uppercase block mb-3">รายงานทั้งหมด</span>
                         <div>
                             <h2 className="text-3xl font-mono font-black tracking-tight text-rams-ink">
@@ -750,7 +751,7 @@ export default function ChecklistPage() {
                     </div>
 
                     {/* Stat Card 3: Discrepancy Count */}
-                    <div className="bg-rams-panel p-5 border border-rams-rule-light rounded-sm shadow-none flex flex-col justify-between">
+                    <div className="bg-rams-panel p-5 border border-rams-rule-light rounded-[1.8rem] shadow-none flex flex-col justify-between">
                         <span className="text-rams-ink-muted text-[9px] font-mono font-bold tracking-widest uppercase block mb-3">จุดบกพร่อง / ต่างกะ</span>
                         <div className="flex items-end justify-between">
                             <div>
@@ -769,7 +770,7 @@ export default function ChecklistPage() {
                     </div>
 
                     {/* Stat Card 4: Accum Discrepancy */}
-                    <div className="bg-rams-panel p-5 border border-rams-rule-light rounded-sm shadow-none flex flex-col justify-between">
+                    <div className="bg-rams-panel p-5 border border-rams-rule-light rounded-[1.8rem] shadow-none flex flex-col justify-between">
                         <span className="text-rams-ink-muted text-[9px] font-mono font-bold tracking-widest uppercase block mb-3">สะสมเงินคลาดเคลื่อน</span>
                         <div className="flex items-end justify-between">
                             <div>
@@ -783,7 +784,7 @@ export default function ChecklistPage() {
                                 <p className="text-[9px] font-mono text-rams-ink-muted uppercase tracking-wider mt-1.5">ดรอเวอร์ดิฟสะสม</p>
                             </div>
                             <div className={cn(
-                                "p-2 rounded-sm border flex items-center justify-center",
+                                "p-2 rounded-xl border flex items-center justify-center",
                                 stats.netMismatch > 0 ? "bg-rams-green/10 border-rams-green/30 text-rams-green" :
                                 stats.netMismatch < 0 ? "bg-rams-red/10 border-rams-red/30 text-rams-red" : "bg-rams-bg border-rams-rule-light text-rams-ink-muted"
                             )}>
@@ -794,7 +795,7 @@ export default function ChecklistPage() {
                 </div>
 
                 {/* Calendar View Grid */}
-                <div className="bg-rams-panel p-6 border border-rams-rule-light rounded-sm shadow-none">
+                <div className="bg-rams-panel p-6 border border-rams-rule-light rounded-[1.8rem] shadow-none">
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
                         <div>
                             <h2 className="text-lg font-mono font-bold text-rams-ink uppercase tracking-wider">ปฏิทินความถูกต้อง (Monthly Activity)</h2>
@@ -904,7 +905,7 @@ export default function ChecklistPage() {
                         </div>
 
                         {/* Filter Tabs */}
-                        <div className="flex p-0.5 bg-rams-bg border border-rams-rule-light rounded-sm max-w-fit">
+                        <div className="flex p-0.5 bg-rams-bg border border-rams-rule-light rounded-xl max-w-fit">
                             {['All', 'Opening', 'Closing'].map((f) => (
                                 <button
                                     key={f}
@@ -951,7 +952,7 @@ export default function ChecklistPage() {
                                         exit={{ opacity: 0, scale: 0.98 }}
                                         transition={{ duration: 0.15 }}
                                         className={cn(
-                                            "bg-rams-panel rounded-sm p-6 md:p-8 shadow-none border transition-all overflow-hidden relative group",
+                                            "bg-rams-panel rounded-[1.8rem] p-6 md:p-8 shadow-none border transition-all overflow-hidden relative group",
                                             item.hasDiscrepancies
                                                 ? "border-rams-amber"
                                                 : "border-rams-rule-light"
@@ -1177,6 +1178,10 @@ export default function ChecklistPage() {
                     </motion.div>
                 )}
             </AnimatePresence>
+            {/* Brand Footer */}
+            <footer className="w-full text-center py-6 mt-8 text-[9px] font-mono tracking-[0.2em] text-rams-ink-muted uppercase select-none">
+                ONHAUS SYSTEM © {new Date().getFullYear()}
+            </footer>
         </div>
     );
 }

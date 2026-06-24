@@ -1161,7 +1161,7 @@ export default function AdminDashboard() {
             {/* Desktop Sidebar */}
             <aside className="hidden lg:flex flex-col w-64 bg-rams-panel border-r border-rams-rule sticky top-0 h-screen shrink-0 z-30">
                 <div className="flex items-center gap-3 px-6 py-6 border-b border-rams-rule-light shrink-0 bg-rams-bg/50">
-                    <div className="w-10 h-10 bg-rams-ink border border-rams-rule rounded-sm flex items-center justify-center text-rams-panel text-lg font-mono font-black">H</div>
+                    <img src="/logo.png" className="w-10 h-10 object-contain rounded-sm" alt="Logo" onError={(e) => { e.target.style.display = 'none'; }} />
                     <div>
                         <h1 className="text-sm font-mono font-bold tracking-wider text-rams-ink uppercase leading-none">In the Haus</h1>
                         <p className="text-[9px] uppercase tracking-widest text-rams-orange font-mono font-bold mt-1.5">HR & Operations</p>
@@ -1233,6 +1233,9 @@ export default function AdminDashboard() {
                             <Icons.Out size={14} />
                         </button>
                     </div>
+                    <div className="text-center py-2.5 text-[8px] font-mono text-rams-ink-muted uppercase border-t border-rams-rule-light/30 tracking-wider bg-rams-bg/30">
+                        ONHAUS SYSTEM © {new Date().getFullYear()}
+                    </div>
                 </div>
             </aside>
 
@@ -1255,7 +1258,7 @@ export default function AdminDashboard() {
                         </div>
                         
                         <div className="flex items-center gap-3 px-6 py-6 border-b border-rams-rule-light shrink-0 bg-rams-bg/50">
-                            <div className="w-10 h-10 bg-rams-ink border border-rams-rule rounded-sm flex items-center justify-center text-rams-panel text-lg font-mono font-black">H</div>
+                            <img src="/logo.png" className="w-10 h-10 object-contain rounded-sm" alt="Logo" onError={(e) => { e.target.style.display = 'none'; }} />
                             <div>
                                 <h1 className="text-sm font-mono font-bold tracking-wider text-rams-ink uppercase leading-none">In the Haus</h1>
                                 <p className="text-[9px] uppercase tracking-widest text-rams-orange font-mono font-bold mt-1.5">HR & Operations</p>
@@ -1326,6 +1329,9 @@ export default function AdminDashboard() {
                                 >
                                     <Icons.Out size={14} />
                                 </button>
+                            </div>
+                            <div className="text-center py-2.5 text-[8px] font-mono text-rams-ink-muted uppercase border-t border-rams-rule-light/30 tracking-wider bg-rams-bg/30">
+                                ONHAUS SYSTEM © {new Date().getFullYear()}
                             </div>
                         </div>
                     </aside>
@@ -3165,6 +3171,9 @@ export default function AdminDashboard() {
                             </div>
                         </div>
                     )}
+                    <footer className="w-full text-center py-6 mt-12 border-t border-rams-rule-light text-[9px] font-mono tracking-[0.2em] text-rams-ink-muted uppercase select-none">
+                        ONHAUS SYSTEM © {new Date().getFullYear()}
+                    </footer>
                 </main>
 
                 {/* Global FAB */}

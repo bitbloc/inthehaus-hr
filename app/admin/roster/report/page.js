@@ -17,7 +17,7 @@ function RosterPDFReportContent() {
     const [customPresets, setCustomPresets] = useState([]);
 
     const PRESET_COLORS = [
-        { id: 'sky', bg: 'bg-rams-bg', text: 'text-rams-ink', border: 'border-rams-rule' },
+        { id: 'sky', bg: 'bg-rams-bg', text: 'text-rams-ink', border: 'border-rams-rule-light' },
         { id: 'amber', bg: 'bg-rams-amber/10', text: 'text-rams-amber', border: 'border-rams-amber/30' },
         { id: 'indigo', bg: 'bg-rams-ink text-rams-panel', text: 'text-rams-panel font-bold', border: 'border-rams-ink' },
         { id: 'rose', bg: 'bg-rams-red/10', text: 'text-rams-red', border: 'border-rams-red/30' },
@@ -96,55 +96,55 @@ function RosterPDFReportContent() {
         return 'bg-rams-panel border-rams-rule-light text-rams-ink';
     };
 
-    if (loading) return <div className="p-20 text-center font-bold tracking-widest text-slate-300">GENERATING ROSTER REPORT...</div>;
+    if (loading) return <div className="p-20 text-center font-bold tracking-widest font-mono text-neutral-400">GENERATING ROSTER REPORT...</div>;
 
     const printDateRangeStr = `${format(weekStart, 'dd/MM/yyyy')} - ${format(weekEnd, 'dd/MM/yyyy')}`;
 
     return (
-        <div className="min-h-screen bg-white text-black p-6 md:p-12 font-mono selection:bg-black selection:text-white">
+        <div className="min-h-screen bg-[#fafaf9] text-neutral-900 p-6 md:p-12 font-mono selection:bg-neutral-900 selection:text-white">
             {/* Header with Logo */}
-            <div className="flex justify-between items-center border-b-2 border-black pb-6 mb-8">
+            <div className="flex justify-between items-center border-b-2 border-neutral-900 pb-6 mb-8">
                 <div className="flex items-center gap-4">
                     <img src="/logo.png" className="h-12 w-auto object-contain" alt="In The Haus Logo" onError={(e) => e.target.style.display = 'none'} />
                     <div>
-                        <h1 className="text-2xl font-bold tracking-widest leading-none mb-1">IN THE HAUS</h1>
-                        <p className="text-[9px] font-bold tracking-[0.2em] uppercase opacity-60">Weekly Work Schedule / ตารางงานรายสัปดาห์</p>
+                        <h1 className="text-xl font-bold tracking-widest leading-none mb-1">IN THE HAUS</h1>
+                        <p className="text-[9px] font-bold tracking-[0.2em] uppercase text-neutral-500">Weekly Work Schedule / ตารางงานรายสัปดาห์</p>
                     </div>
                 </div>
                 <div className="text-right">
-                    <div className="text-2xl font-bold tracking-tight">{printDateRangeStr}</div>
-                    <div className="text-[9px] font-bold tracking-widest uppercase opacity-50">Report Generated: {format(new Date(), 'dd/MM/yyyy HH:mm')}</div>
+                    <div className="text-xl font-bold tracking-tight text-neutral-800">{printDateRangeStr}</div>
+                    <div className="text-[8px] font-bold tracking-widest uppercase text-neutral-400 mt-1">Generated: {format(new Date(), 'dd/MM/yyyy HH:mm')}</div>
                 </div>
             </div>
 
             {/* Roster Grid Table */}
-            <div className="overflow-x-auto border border-black rounded-none">
+            <div className="overflow-x-auto border border-neutral-200 bg-white rounded-3xl">
                 <table className="w-full text-xs text-left border-collapse">
                     <thead>
-                        <tr className="bg-rams-panel text-black border-b border-black">
-                            <th className="px-4 py-3 font-bold border-r border-black w-[180px]">พนักงาน / ตำแหน่ง</th>
+                        <tr className="bg-[#fafaf9] text-neutral-800 border-b border-neutral-200">
+                            <th className="px-4 py-3.5 font-bold border-r border-neutral-200 w-[180px]">พนักงาน / ตำแหน่ง</th>
                             {dates.map((date, i) => (
-                                <th key={i} className="px-3 py-3 font-bold text-center border-r border-black min-w-[120px]">
-                                    <div className="text-[9px] text-black/60 uppercase">{daysTitle[i]}</div>
-                                    <div className="text-sm font-bold mt-0.5">{format(date, 'dd/MM')}</div>
+                                <th key={i} className="px-3 py-3.5 font-bold text-center border-r border-neutral-200 min-w-[120px]">
+                                    <div className="text-[9px] text-neutral-400 uppercase">{daysTitle[i]}</div>
+                                    <div className="text-sm font-bold mt-0.5 text-neutral-800">{format(date, 'dd/MM')}</div>
                                 </th>
                             ))}
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="divide-y divide-neutral-100">
                         {employees.map((emp, empIdx) => (
-                            <tr key={emp.id} className={`border-b border-black/10 hover:bg-slate-50 transition-colors ${empIdx % 2 === 1 ? 'bg-rams-bg/10' : ''}`}>
-                                <td className="px-4 py-3 font-bold text-black border-r border-black align-middle">
+                            <tr key={emp.id} className={`hover:bg-neutral-50/50 transition-colors ${empIdx % 2 === 1 ? 'bg-[#fafaf9]/20' : 'bg-white'}`}>
+                                <td className="px-4 py-3 font-bold text-neutral-800 border-r border-neutral-200 align-middle">
                                     <div className="text-sm">{emp.nickname || emp.name}</div>
-                                    <div className="text-[9px] text-black/60 font-semibold tracking-wider uppercase mt-0.5">{emp.position}</div>
+                                    <div className="text-[9px] text-neutral-400 font-semibold tracking-wider uppercase mt-0.5">{emp.position}</div>
                                 </td>
                                 {dates.map((date, dateIdx) => {
                                     const slots = getCellSlots(emp.id, date);
                                     return (
-                                        <td key={dateIdx} className="px-2 py-2 border-r border-black/10 align-top h-full min-h-[80px]">
+                                        <td key={dateIdx} className="px-2 py-2 border-r border-neutral-100 align-top h-full min-h-[80px]">
                                             <div className="space-y-1.5 flex flex-col h-full justify-start">
                                                 {slots.length === 0 ? (
-                                                    <span className="text-black/30 text-xs italic m-auto block text-center font-normal">-</span>
+                                                    <span className="text-neutral-300 text-xs italic m-auto block text-center font-normal">-</span>
                                                 ) : (
                                                     slots.map((s, idx) => {
                                                         const shiftObj = shifts.find(sh => sh.id === s.shift_id);
@@ -162,7 +162,7 @@ function RosterPDFReportContent() {
                                                         return (
                                                             <div 
                                                                 key={idx} 
-                                                                className={`p-2 rounded-none border ${colorClass} text-center shadow-none relative flex flex-col justify-center items-center ${
+                                                                className={`p-2 rounded-xl border ${colorClass} text-center shadow-none relative flex flex-col justify-center items-center ${
                                                                     s.status === 'DRAFT' ? 'border-dashed border-2 opacity-80' : ''
                                                                 }`}
                                                             >
@@ -170,7 +170,7 @@ function RosterPDFReportContent() {
                                                                     {cellLabel}
                                                                 </div>
                                                                 {!s.is_off && timeStr && (
-                                                                    <div className="text-[9px] font-bold text-black mt-0.5">
+                                                                    <div className="text-[9px] font-bold text-neutral-850 mt-0.5">
                                                                         {timeStr}
                                                                     </div>
                                                                 )}
@@ -180,7 +180,7 @@ function RosterPDFReportContent() {
                                                                     </div>
                                                                 )}
                                                                 {s.status === 'DRAFT' && (
-                                                                    <span className="text-[8px] font-semibold text-gray-500 uppercase tracking-widest border border-gray-300 px-1 rounded-none bg-white mt-1">
+                                                                    <span className="text-[8px] font-semibold text-neutral-500 uppercase tracking-widest border border-neutral-200 px-1 rounded-md bg-white mt-1">
                                                                         Draft
                                                                     </span>
                                                                 )}
@@ -199,18 +199,18 @@ function RosterPDFReportContent() {
             </div>
 
             {/* Verification & Notes Footer */}
-            <div className="mt-16 pt-8 border-t border-black/20">
-                <div className="flex justify-between items-end">
+            <div className="mt-16 pt-8 border-t border-neutral-200">
+                <div className="flex justify-between items-end flex-wrap gap-4">
                     <div className="max-w-sm">
-                        <p className="text-[9px] font-bold tracking-[0.2em] uppercase mb-3 opacity-50">Verification</p>
-                        <p className="text-[9px] leading-relaxed opacity-50">
+                        <p className="text-[9px] font-bold tracking-[0.2em] uppercase mb-2 text-neutral-400">Verification & Archives</p>
+                        <p className="text-[9px] leading-relaxed text-neutral-400">
                             This document is an official work schedule generated by In The Haus. 
                             Any modifications must be approved by the management.
                         </p>
                     </div>
                     <div className="text-right">
-                        <p className="text-[10px] font-bold italic tracking-widest uppercase">YUZU x IN THE HAUS</p>
-                        <p className="text-[9px] font-bold opacity-30">© {new Date().getFullYear()} All Rights Reserved</p>
+                        <p className="text-[10px] font-bold italic tracking-widest uppercase text-neutral-700">YUZU x IN THE HAUS</p>
+                        <p className="text-[9px] font-bold text-neutral-400 mt-1">ONHAUS SYSTEM © {new Date().getFullYear()} All Rights Reserved</p>
                     </div>
                 </div>
             </div>
@@ -231,7 +231,7 @@ function RosterPDFReportContent() {
 
             <button 
                 onClick={() => window.print()}
-                className="fixed bottom-8 right-8 no-print bg-black border border-black text-white px-8 py-4 rounded-none font-bold text-xs tracking-widest uppercase hover:bg-white hover:text-black transition-all cursor-pointer shadow-none z-50"
+                className="fixed bottom-8 right-8 no-print bg-neutral-900 border border-neutral-900 text-white px-8 py-4 rounded-xl font-bold text-xs tracking-widest uppercase hover:bg-white hover:text-neutral-900 transition-all cursor-pointer shadow-md z-50"
             >
                 Print to PDF
             </button>
@@ -241,8 +241,9 @@ function RosterPDFReportContent() {
 
 export default function RosterPDFReport() {
     return (
-        <Suspense fallback={<div className="p-20 text-center font-bold tracking-widest text-slate-300 uppercase">Loading Report Engine...</div>}>
+        <Suspense fallback={<div className="p-20 text-center font-bold tracking-widest text-slate-400 uppercase font-mono">Loading Roster Engine...</div>}>
             <RosterPDFReportContent />
         </Suspense>
     );
 }
+

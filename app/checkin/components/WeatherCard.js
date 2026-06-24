@@ -75,11 +75,11 @@ export default function WeatherCard({ latitude, longitude, locationName = "Curre
             animate={{ opacity: 1, y: 0 }}
             className="w-full z-10 mb-4"
         >
-            <div className="relative bg-rams-panel border border-rams-rule-light p-4 overflow-hidden rounded-sm">
+            <div className="relative bg-rams-panel border border-rams-rule-light p-4 overflow-hidden rounded-[1.8rem]">
                 {loading ? (
                     <div className="flex items-center gap-3 py-2 font-mono text-xs">
                         <div className="animate-spin w-4 h-4 border-2 border-rams-rule-light border-t-rams-rule rounded-full" />
-                        <div className="h-4 w-40 bg-rams-bg animate-pulse rounded-sm" />
+                        <div className="h-4 w-40 bg-rams-bg animate-pulse rounded-md" />
                     </div>
                 ) : error ? (
                     <div className="text-xs text-rams-red font-mono py-1 flex items-center gap-2">
@@ -129,7 +129,7 @@ export default function WeatherCard({ latitude, longitude, locationName = "Curre
                                 </div>
                                 <button
                                     onClick={() => setShowRadar(prev => !prev)}
-                                    className={`w-8 h-8 rounded-sm flex items-center justify-center border border-rams-rule-light transition-all active:translate-y-[1px] ${
+                                    className={`w-8 h-8 rounded-xl flex items-center justify-center border border-rams-rule-light transition-all active:translate-y-[1px] ${
                                         showRadar 
                                             ? 'bg-rams-ink text-rams-panel' 
                                             : 'bg-rams-bg text-rams-ink hover:bg-rams-rule-light'
@@ -164,7 +164,7 @@ export default function WeatherCard({ latitude, longitude, locationName = "Curre
                                     <iframe
                                         id="windy-radar-iframe"
                                         src={`https://embed.windy.com/embed.html?lat=${latitude}&lon=${longitude}&zoom=9&level=surface&overlay=rain&product=ecmwf&menu=&message=&marker=true&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=default&metricTemp=default&radarRange=-1`}
-                                        className="w-full h-56 rounded-sm border border-rams-rule-light"
+                                        className="w-full h-56 rounded-xl border border-rams-rule-light"
                                         title="Windy Live Rain Radar"
                                         loading="lazy"
                                     />

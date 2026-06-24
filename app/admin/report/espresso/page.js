@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "../../../../lib/supabaseClient";
-import { format, addHours, startOfDay, endOfDay } from "date-fns";
+import { format, startOfMonth, endOfMonth, parseISO } from "date-fns";
 import { th } from "date-fns/locale";
 
 function EspressoPDFReportContent() {
@@ -21,9 +21,10 @@ function EspressoPDFReportContent() {
             const { data: empData } = await supabase.from('employees').select('id, name, nickname, line_bot_id, line_user_id');
             if (empData) setEmployees(empData);
 
-            // Fetch chat history for the specific date
-            const start = startOfDay(new Date(reportDate)).toISOString();
-            const end = endOfDay(new Date(reportDate)).toISOString();
+            // Fetch chat history for the ENTIRE MONTH of the selected date
+            const dateObj = new Date(reportDate);
+            const start = startOfMonth(dateObj).toISOString();
+            const end = endOfMonth(dateObj).toISOString();
 
             const { data: chatData, error } = await supabase
                 .from('yuzu_chat_history')
@@ -91,127 +92,167 @@ function EspressoPDFReportContent() {
         return emp ? (emp.nickname || emp.name) : "บาริสต้า (ไม่ทราบชื่อ)";
     };
 
-    if (loading) return <div className="p-20 text-center font-bold tracking-widest text-slate-300">GENERATING ESPRESSO REPORT...</div>;
+    if (loading) return <div className="p-20 text-center font-bold font-mono tracking-widest text-slate-400">GENERATING ESPRESSO REPORT...</div>;
+
+    // Group reports by date
+    const reportsByDay = reports.reduce((groups, report) => {
+        const dateStr = format(new Date(report.timestamp), 'yyyy-MM-dd');
+        if (!groups[dateStr]) groups[dateStr] = [];
+        groups[dateStr].push(report);
+        return groups;
+    }, {});
+
+    // Sort dates in descending order (newest first)
+    const sortedDates = Object.keys(reportsByDay).sort((a, b) => new Date(b) - new Date(a));
+
+    const totalImages = reports.reduce((sum, r) => sum + r.photos.length, 0);
+    const selectedMonthName = format(new Date(reportDate), 'MMMM yyyy', { locale: th });
 
     return (
-        <div className="min-h-screen bg-white text-black p-8 md:p-16 font-mono selection:bg-black selection:text-white">
-            {/* Header */}
-            <div className="flex justify-between items-center border-b-2 border-black pb-8 mb-12">
+        <div className="min-h-screen bg-[#fafaf9] text-neutral-900 p-8 md:p-16 font-mono selection:bg-neutral-900 selection:text-white">
+            {/* Header / Brand Area */}
+            <div className="flex justify-between items-center border-b-2 border-neutral-900 pb-8 mb-12">
                 <div className="flex items-center gap-4">
                     <img src="/logo.png" className="h-12 w-auto object-contain" alt="In The Haus Logo" onError={(e) => e.target.style.display = 'none'} />
                     <div>
-                        <h1 className="text-2xl font-bold tracking-widest leading-none mb-1">IN THE HAUS</h1>
-                        <p className="text-[9px] font-bold tracking-[0.2em] uppercase opacity-60">Espresso Calibration Report</p>
+                        <h1 className="text-xl font-bold tracking-widest leading-none mb-1">IN THE HAUS</h1>
+                        <p className="text-[9px] font-bold tracking-[0.2em] uppercase text-neutral-500">Espresso Calibration Report (Monthly)</p>
                     </div>
                 </div>
                 <div className="text-right">
-                    <div className="text-2xl font-bold tracking-tight">{format(new Date(reportDate), 'dd MMM yyyy', { locale: th })}</div>
-                    <div className="text-[9px] font-bold tracking-widest uppercase opacity-50">Report Generated: {format(new Date(), 'HH:mm:ss')}</div>
+                    <div className="text-xl font-bold tracking-tight text-neutral-800 uppercase">{selectedMonthName}</div>
+                    <div className="text-[8px] font-bold tracking-widest uppercase text-neutral-400 mt-1">Generated: {format(new Date(), 'dd/MM/yyyy HH:mm')}</div>
                 </div>
             </div>
 
-            {/* Hero Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
-                <div className="border-2 border-black p-6 bg-white rounded-none">
-                    <p className="text-[9px] font-bold tracking-[0.2em] uppercase opacity-50 mb-2">Total Extractions Logged</p>
-                    <p className="text-3xl font-bold tracking-tight">{reports.length}</p>
+            {/* Aggregated Stats (Dieter Rams Bento style cards) */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+                <div className="border border-neutral-300 bg-white p-6 rounded-2xl flex flex-col justify-between">
+                    <p className="text-[9px] font-bold tracking-[0.2em] uppercase text-neutral-400 mb-2">Selected Month</p>
+                    <p className="text-2xl font-bold tracking-tight capitalize text-neutral-900">{format(new Date(reportDate), 'LLLL yyyy', { locale: th })}</p>
                 </div>
-                <div className="border-2 border-black p-6 bg-white rounded-none">
-                    <p className="text-[9px] font-bold tracking-[0.2em] uppercase opacity-50 mb-2">Total Supporting Images</p>
-                    <p className="text-3xl font-bold tracking-tight">
-                        {reports.reduce((sum, r) => sum + r.photos.length, 0)}
-                    </p>
+                <div className="border border-neutral-300 bg-white p-6 rounded-2xl flex flex-col justify-between">
+                    <p className="text-[9px] font-bold tracking-[0.2em] uppercase text-neutral-400 mb-2">Total Extractions Logged</p>
+                    <p className="text-3xl font-bold tracking-tight text-neutral-900">{reports.length} <span className="text-xs font-normal text-neutral-400">Shots</span></p>
+                </div>
+                <div className="border border-neutral-300 bg-white p-6 rounded-2xl flex flex-col justify-between">
+                    <p className="text-[9px] font-bold tracking-[0.2em] uppercase text-neutral-400 mb-2">Total Calibration Images</p>
+                    <p className="text-3xl font-bold tracking-tight text-neutral-900">{totalImages} <span className="text-xs font-normal text-neutral-400">Files</span></p>
                 </div>
             </div>
 
-            {/* Reports List */}
-            {reports.length === 0 ? (
-                <div className="py-20 text-center border-2 border-black border-dashed">
-                    <p className="text-slate-300 font-bold uppercase tracking-widest mb-1">No Extractions Logged</p>
-                    <p className="text-slate-400 text-xs">ไม่พบข้อมูลการสกัดกาแฟในวันที่เลือก</p>
+            {/* Monthly Logs List (Grouped by Date) */}
+            {sortedDates.length === 0 ? (
+                <div className="py-20 text-center border border-neutral-300 border-dashed rounded-2xl bg-white">
+                    <p className="text-neutral-300 font-bold uppercase tracking-widest mb-1">No Extractions Logged</p>
+                    <p className="text-neutral-400 text-xs">ไม่พบข้อมูลการสกัดกาแฟในเดือนนี้</p>
                 </div>
             ) : (
-                <div className="space-y-12">
-                    {reports.map((report, idx) => (
-                        <div key={report.id} className="border-b border-black/10 pb-12 last:border-0">
-                            <div className="flex flex-col md:flex-row md:items-center justify-between pb-3 mb-6 border-b border-black/10 gap-2">
-                                <div className="flex items-center gap-3">
-                                    <div className="bg-black text-white font-bold px-3 py-1 text-xs uppercase tracking-widest rounded-none">
-                                        SHOT #{idx + 1}
-                                    </div>
-                                    <span className="font-mono text-xs font-bold text-slate-400">
-                                        {format(new Date(report.timestamp), 'HH:mm น.')}
+                <div className="space-y-16">
+                    {sortedDates.map((dateStr) => {
+                        const dayLogs = reportsByDay[dateStr];
+                        const dateFormatted = format(new Date(dateStr), 'EEEEที่ d MMMM yyyy', { locale: th });
+                        
+                        return (
+                            <div key={dateStr} className="border border-neutral-200 bg-white rounded-3xl p-6 md:p-8 space-y-6">
+                                {/* Date Heading Banner */}
+                                <div className="border-b border-neutral-200 pb-4 flex justify-between items-baseline flex-wrap gap-2">
+                                    <h3 className="text-sm font-bold uppercase tracking-wider text-neutral-800">
+                                        📅 {dateFormatted}
+                                    </h3>
+                                    <span className="text-[9px] font-bold tracking-widest text-neutral-400 uppercase">
+                                        {dayLogs.length} LOGS
                                     </span>
                                 </div>
-                                <div className="text-xs font-bold uppercase tracking-widest text-black">
-                                    บาริสต้า: {getEmployeeDisplay(report.userId)}
-                                </div>
-                            </div>
 
-                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                                {/* Left Side: Details & Photos */}
-                                <div className="lg:col-span-7 space-y-6">
-                                    <div className="bg-white p-6 border border-black rounded-none">
-                                        <h4 className="text-[9px] font-bold tracking-widest uppercase opacity-60 mb-3">บันทึกพารามิเตอร์ (Raw Log)</h4>
-                                        <p className="text-xs font-bold leading-relaxed whitespace-pre-wrap">{report.rawText}</p>
-                                    </div>
+                                {/* Shot Lists of the Day */}
+                                <div className="divide-y divide-neutral-100">
+                                    {dayLogs.map((report, idx) => (
+                                        <div key={report.id} className="py-6 first:pt-0 last:pb-0 space-y-4">
+                                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                                <div className="flex items-center gap-3">
+                                                    <span className="bg-neutral-900 text-white font-bold px-2 py-0.5 text-[9px] tracking-widest rounded-md">
+                                                        SHOT #{idx + 1}
+                                                    </span>
+                                                    <span className="font-mono text-[10px] font-bold text-neutral-400">
+                                                        {format(new Date(report.timestamp), 'HH:mm น.')}
+                                                    </span>
+                                                </div>
+                                                <div className="text-[10px] font-bold uppercase tracking-widest text-neutral-600">
+                                                    บาริสต้า: {getEmployeeDisplay(report.userId)}
+                                                </div>
+                                            </div>
 
-                                    {report.photos.length > 0 && (
-                                        <div className="space-y-3">
-                                            <h4 className="text-[9px] font-bold tracking-widest uppercase opacity-60">ภาพประกอบการชง (Calibration Photos)</h4>
-                                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                                {report.photos.map((url, i) => (
-                                                    <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="aspect-square bg-slate-50 border border-black overflow-hidden block hover:opacity-85 transition-all relative rounded-none">
-                                                        <img src={url} alt={`Supporting photo ${i + 1}`} className="w-full h-full object-cover rounded-none" />
-                                                    </a>
-                                                ))}
+                                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                                                {/* Left Column: Raw parameters and photos */}
+                                                <div className="lg:col-span-7 space-y-4">
+                                                    <div className="bg-[#fafaf9] p-4 border border-neutral-200 rounded-xl">
+                                                        <h4 className="text-[9px] font-bold tracking-widest uppercase text-neutral-400 mb-2">บันทึกพารามิเตอร์ (Raw Log)</h4>
+                                                        <p className="text-xs leading-relaxed whitespace-pre-wrap font-semibold text-neutral-800">{report.rawText}</p>
+                                                    </div>
+
+                                                    {report.photos.length > 0 && (
+                                                        <div className="space-y-2">
+                                                            <h4 className="text-[9px] font-bold tracking-widest uppercase text-neutral-400">ภาพประกอบการชง (Calibration Photos)</h4>
+                                                            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                                                                {report.photos.map((url, i) => (
+                                                                    <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="aspect-square bg-[#fafaf9] border border-neutral-200 overflow-hidden block hover:opacity-85 transition-all relative rounded-lg">
+                                                                        <img src={url} alt={`Calibration Supporting ${i + 1}`} className="w-full h-full object-cover" />
+                                                                    </a>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Right Column: AI Analysis */}
+                                                <div className="lg:col-span-5">
+                                                    <div className="border border-neutral-200 p-5 bg-[#fafaf9] h-full flex flex-col justify-between rounded-xl">
+                                                        <div>
+                                                            <h4 className="text-[9px] font-bold tracking-widest uppercase text-neutral-400 mb-2">บทวิเคราะห์จาก Yuzu AI</h4>
+                                                            <p className="text-xs leading-relaxed text-neutral-800 italic whitespace-pre-wrap">
+                                                                "{report.recommendation}"
+                                                            </p>
+                                                        </div>
+                                                        <div className="text-[8px] font-bold text-neutral-400 mt-4 uppercase tracking-widest">
+                                                            Yuzu AI Assistant 🍊
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
-                                    )}
-                                </div>
-
-                                {/* Right Side: Analysis & Feedback */}
-                                <div className="lg:col-span-5">
-                                    <div className="border-2 border-black p-6 bg-white h-full flex flex-col justify-between rounded-none">
-                                        <div>
-                                            <h4 className="text-[9px] font-bold tracking-widest uppercase opacity-60 mb-3">บทวิเคราะห์และคำแนะนำจาก Yuzu AI</h4>
-                                            <p className="text-xs leading-relaxed text-black italic whitespace-pre-wrap">
-                                                "{report.recommendation}"
-                                            </p>
-                                        </div>
-                                        <div className="text-[8px] font-bold text-black/50 mt-6 uppercase tracking-widest">
-                                            Yuzu AI Assistant 🍊
-                                        </div>
-                                    </div>
+                                    ))}
                                 </div>
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             )}
 
-            {/* Footer */}
-            <div className="mt-20 pt-8 border-t border-black/20">
-                <div className="flex justify-between items-end">
+            {/* Footer Copyright */}
+            <div className="mt-20 pt-8 border-t border-neutral-200">
+                <div className="flex justify-between items-end flex-wrap gap-4">
                     <div className="max-w-sm">
-                        <p className="text-[9px] font-bold tracking-[0.2em] uppercase mb-3 opacity-50">Verification & Archives</p>
-                        <p className="text-[9px] leading-relaxed opacity-50">
-                            This document is an automated calibration report processed by Yuzu AI for In The Haus. 
+                        <p className="text-[9px] font-bold tracking-[0.2em] uppercase mb-2 text-neutral-400">Verification & Archives</p>
+                        <p className="text-[9px] leading-relaxed text-neutral-400">
+                            This document is an aggregated monthly calibration report processed by Yuzu AI for In The Haus. 
                             Extraction data and feedback are analyzed using Gemini 3.5 Flash.
                         </p>
                     </div>
                     <div className="text-right">
-                        <p className="text-[10px] font-bold italic tracking-widest uppercase">YUZU x IN THE HAUS</p>
-                        <p className="text-[9px] font-bold opacity-30">© {new Date().getFullYear()} All Rights Reserved</p>
+                        <p className="text-[10px] font-bold italic tracking-widest uppercase text-neutral-700">YUZU x IN THE HAUS</p>
+                        <p className="text-[9px] font-bold text-neutral-400 mt-1">ONHAUS SYSTEM © {new Date().getFullYear()} All Rights Reserved</p>
                     </div>
                 </div>
             </div>
 
             <style jsx global>{`
                 @media print {
-                    .no-print { display: none; }
+                    .no-print { display: none !important; }
                     body { 
-                        padding: 0; 
+                        padding: 0 !important; 
+                        margin: 0 !important;
+                        background: white !important;
                         -webkit-print-color-adjust: exact !important;
                         print-color-adjust: exact !important;
                     }
@@ -220,7 +261,7 @@ function EspressoPDFReportContent() {
 
             <button 
                 onClick={() => window.print()}
-                className="fixed bottom-8 right-8 no-print bg-black border border-black text-white px-8 py-4 rounded-none font-bold text-xs tracking-widest uppercase hover:bg-white hover:text-black transition-all cursor-pointer shadow-none"
+                className="fixed bottom-8 right-8 no-print bg-neutral-900 border border-neutral-900 text-white px-8 py-4 rounded-xl font-bold text-xs tracking-widest uppercase hover:bg-white hover:text-neutral-900 transition-all cursor-pointer shadow-md z-50"
             >
                 Print to PDF
             </button>
@@ -230,7 +271,7 @@ function EspressoPDFReportContent() {
 
 export default function EspressoPDFReport() {
     return (
-        <Suspense fallback={<div className="p-20 text-center font-bold tracking-widest text-slate-300 uppercase">Loading Espresso Report Engine...</div>}>
+        <Suspense fallback={<div className="p-20 text-center font-bold tracking-widest text-slate-400 uppercase font-mono">Loading Espresso Report Engine...</div>}>
             <EspressoPDFReportContent />
         </Suspense>
     );
