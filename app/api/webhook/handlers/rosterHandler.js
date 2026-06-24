@@ -5,20 +5,133 @@ import { supabase } from '../../../../lib/supabaseClient';
 
 function getShiftColorHex(shiftName, isOff, isCustomOrExtra) {
   if (isOff) return '#dc2626'; // Red
-  if (isCustomOrExtra) return '#0284c7'; // Sky/Teal
   
   const name = (shiftName || '').toLowerCase();
+  
+  // If it's custom/extra but matches one of our presets, it's not generic custom
+  const isPreset = name.includes('ผู้ช่วยครัว') || name.includes('chef') || name.includes('inthehaus') || name.includes('กลางกะ');
+  const actualCustomOrExtra = isCustomOrExtra && !isPreset;
+
+  if (actualCustomOrExtra) return '#0284c7'; // Sky/Teal
   
   if (name.includes('ควบ') || name.includes('double')) {
     return '#e11d48'; // Rose
   }
-  if (name.includes('ค่ำ') || name.includes('ดึก') || name.includes('night') || name.includes('evening')) {
+  if (name.includes('ค่ำ') || name.includes('ดึก') || name.includes('night') || name.includes('evening') || name.includes('กลาง')) {
     return '#4f46e5'; // Indigo
   }
   if (name.includes('เช้า') || name.includes('morning')) {
     return '#d97706'; // Amber
   }
+  if (name.includes('chef')) {
+    return '#15803d'; // Green
+  }
+  if (name.includes('inthehaus')) {
+    return '#ea580c'; // Orange
+  }
+  if (name.includes('ผู้ช่วยครัว')) {
+    return '#9c4221'; // Brown/Orange
+  }
   return '#ca8a04'; // Yellow
+}
+
+function getCellColorsAndLabels(empShift, isOff) {
+  if (isOff || !empShift || empShift.name === 'OFF') {
+    return {
+      bg: '#FFF5F5',
+      borderColor: '#FEB2B2',
+      textColor: '#C53030',
+      label: 'OFF',
+      timeLine1: 'หยุด',
+      timeLine2: ''
+    };
+  }
+
+  const name = empShift.name || 'Custom';
+  const start = empShift.start_time?.slice(0, 5) || '';
+  const end = empShift.end_time?.slice(0, 5) || '';
+
+  // Check presets
+  if (name.includes('เช้า') || (start === '10:00' && end === '18:00')) {
+    return {
+      bg: '#FFFDF5',
+      borderColor: '#FEF08A',
+      textColor: '#B45309',
+      label: 'เช้า ☀️',
+      timeLine1: start,
+      timeLine2: end
+    };
+  }
+  if (name.includes('ค่ำ') || name.includes('ดึก') || (start === '16:30' && end === '00:30')) {
+    return {
+      bg: '#1A202C',
+      borderColor: '#2D3748',
+      textColor: '#FFFFFF',
+      label: 'ค่ำ 🌙',
+      timeLine1: start,
+      timeLine2: end
+    };
+  }
+  if (name.includes('ควบ') || (start === '10:00' && end === '00:30')) {
+    return {
+      bg: '#FFF5F5',
+      borderColor: '#FEB2B2',
+      textColor: '#E11D48',
+      label: 'ควบ 🔥',
+      timeLine1: start,
+      timeLine2: end
+    };
+  }
+  if (name.toLowerCase().includes('haus') || (start === '18:00' && end === '22:30')) {
+    return {
+      bg: '#FFFFFF',
+      borderColor: '#FDBA74',
+      textColor: '#EA580C',
+      label: 'HAUS ⚡',
+      timeLine1: start,
+      timeLine2: end
+    };
+  }
+  if (name.toLowerCase().includes('chef') || (start === '10:00' && end === '20:30')) {
+    return {
+      bg: '#F0FDF4',
+      borderColor: '#BBF7D0',
+      textColor: '#15803D',
+      label: 'CHEF 🔍',
+      timeLine1: start,
+      timeLine2: end
+    };
+  }
+  if (name.includes('ผู้ช่วยครัว') || (start === '12:30' && end === '23:30')) {
+    return {
+      bg: '#FDF6E2',
+      borderColor: '#FDE8C4',
+      textColor: '#9C4221',
+      label: 'ครัว 🍳',
+      timeLine1: start,
+      timeLine2: end
+    };
+  }
+  if (name.includes('กลาง') || (start === '12:00' && end === '20:00')) {
+    return {
+      bg: '#1A202C',
+      borderColor: '#2D3748',
+      textColor: '#FFFFFF',
+      label: 'กลาง 🔔',
+      timeLine1: start,
+      timeLine2: end
+    };
+  }
+
+  // Fallback for custom shifts
+  return {
+    bg: '#E0F2FE',
+    borderColor: '#BAE6FD',
+    textColor: '#0369A1',
+    label: name.slice(0, 8),
+    timeLine1: start,
+    timeLine2: end
+  };
 }
 
 function formatLeaveRequestBubble(l, isHistory = false) {
@@ -176,113 +289,202 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
     const tomorrow = addDays(today, 1);
     const start = startOfWeek(tomorrow, { weekStartsOn: 1 }); // Monday of tomorrow's week
     const isNextWeek = format(start, 'yyyy-MM-dd') > format(startOfThisWeek, 'yyyy-MM-dd');
-    const titleText = isNextWeek ? '📅 ตารางงานสัปดาห์หน้า' : '📅 ตารางงานสัปดาห์นี้';
     
-    const daysTitle = ["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์"];
-    
-    const contents = [];
+    // 1. Fetch active employees
+    const { data: employees, error: empErr } = await supabase
+        .from('employees')
+        .select('id, name, nickname, position')
+        .eq('is_active', true)
+        .order('name', { ascending: true });
+
+    if (empErr) {
+        console.error("Error fetching employees:", empErr);
+        await client.replyMessage(event.replyToken, { type: 'text', text: 'เมี๊ยว~ เกิดข้อผิดพลาดในการดึงข้อมูลพนักงานค่ะ' });
+        return true;
+    }
+
+    // 2. Fetch rosters for the 7 days
+    const weeklyRosters = {}; // dateStr -> roster list
+    const dateStrings = [];
+    const daysHeader = [];
+    const shortDays = ["อา.", "จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส."];
 
     for (let i = 0; i < 7; i++) {
-      const currentDay = addDays(start, i);
-      const currentDayStr = format(currentDay, 'yyyy-MM-dd');
-      
-      // Skip past days (but keep today!)
-      if (currentDayStr < todayDateStr) {
-        continue;
-      }
-      
-      const dayIndex = currentDay.getDay();
-      const dateStr = format(currentDay, 'dd/MM');
-      const roster = await getEffectiveRoster(currentDay);
-      const workingRoster = roster.filter(emp => !emp.is_off && emp.shift?.name !== 'OFF');
+        const currentDay = addDays(start, i);
+        const dateStr = format(currentDay, 'yyyy-MM-dd');
+        dateStrings.push(dateStr);
+        daysHeader.push({
+            day: shortDays[currentDay.getDay()],
+            date: format(currentDay, 'dd/MM')
+        });
 
-      if (workingRoster.length > 0) {
-        contents.push({
-          type: 'box', layout: 'horizontal', margin: 'md',
-          contents: [
-            { type: 'text', text: `${daysTitle[dayIndex].toUpperCase()} ${dateStr}`, weight: 'bold', size: 'xs', color: '#1c1c1c', flex: 1 },
-            { type: 'text', text: `STAFF COUNT: ${workingRoster.length}`, size: 'xxs', color: '#666666', align: 'end', weight: 'bold' }
-          ]
-        });
-        workingRoster.forEach(emp => {
-          const isOff = emp.is_off || emp.shift?.name === 'OFF';
-          const isCustomOrExtra = emp.isExtra || !emp.shift?.id || emp.shift?.name?.includes('Custom') || emp.shift?.name?.includes('Extra');
-          const shiftStart = emp.shift?.start_time?.slice(0,5) || '';
-          const shiftEnd = emp.shift?.end_time?.slice(0,5) || '';
-          const shiftName = emp.shift?.name || 'Custom';
-          
-          const colorHex = getShiftColorHex(shiftName, isOff, isCustomOrExtra);
-
-          const displayTime = shiftStart && shiftEnd ? `${shiftStart}-${shiftEnd}` : shiftStart || '';
-          contents.push({
-            type: 'box', layout: 'horizontal', margin: 'xs',
-            paddingStart: '12px',
-            contents: [
-              { type: 'text', text: `${emp.nickname || emp.name}`.toUpperCase(), size: 'xs', color: '#333333', flex: 3 },
-              { type: 'text', text: displayTime ? `[${displayTime}]` : 'SHIFT NOT SET', size: 'xs', color: colorHex === '#dc2626' ? '#c62828' : '#1c1c1c', align: 'end', flex: 2, weight: 'bold' }
-            ]
-          });
-        });
-        contents.push({ type: 'separator', margin: 'md', color: '#cccccc' });
-      } else {
-         contents.push({
-          type: 'box', layout: 'horizontal', margin: 'md',
-          contents: [
-            { type: 'text', text: `${daysTitle[dayIndex].toUpperCase()} ${dateStr}`, weight: 'bold', size: 'xs', color: '#666666', flex: 1 },
-            { type: 'text', text: 'NO SCHEDULED SHIFTS', size: 'xxs', color: '#888888', align: 'end' }
-          ]
-        });
-        contents.push({ type: 'separator', margin: 'md', color: '#cccccc' });
-      }
+        const roster = await getEffectiveRoster(currentDay);
+        weeklyRosters[dateStr] = roster;
     }
 
-    if (contents.length > 0 && contents[contents.length - 1].type === 'separator') {
-      contents.pop();
-    }
+    // 3. Build roster map: employeeId -> dateStr -> shift info
+    const rosterMap = {};
+    employees.forEach(emp => {
+        rosterMap[emp.id] = {};
+        dateStrings.forEach(dateStr => {
+            const empShift = weeklyRosters[dateStr].find(r => r.id === emp.id);
+            rosterMap[emp.id][dateStr] = empShift || null;
+        });
+    });
 
-    const flexBubble = {
-      type: 'bubble',
-      size: 'mega',
-      styles: {
-        header: { backgroundColor: '#f3f3f3' },
-        body: { backgroundColor: '#f3f3f3' }
-      },
-      header: {
-        type: 'box',
-        layout: 'vertical',
-        paddingAll: '20px',
-        contents: [
-          {
-            type: 'text',
-            text: 'WEEKLY OPERATIONAL SCHEDULE',
-            weight: 'bold',
-            size: 'sm',
-            color: '#1c1c1c'
-          },
-          {
-            type: 'text',
-            text: isNextWeek ? 'PROACTIVE OPERATIONAL SCHEDULE (NEXT WEEK)' : 'OPERATIONAL SCHEDULE (CURRENT WEEK)',
-            size: 'xxs',
-            color: '#666666',
-            weight: 'bold',
-            margin: 'xs'
-          }
-        ]
-      },
-      body: {
-        type: 'box',
-        layout: 'vertical',
-        paddingAll: '20px',
-        spacing: 'md',
-        contents: contents
-      }
+    // Helper function to build a Flex Bubble for a group of employees
+    const buildBubbleForEmployees = (empGroup) => {
+        const headerContents = [
+            {
+                type: 'text',
+                text: 'พนักงาน\n/ตำแหน่ง',
+                flex: 2,
+                size: '10px',
+                weight: 'bold',
+                color: '#666666',
+                wrap: true,
+                align: 'start',
+                gravity: 'center'
+            }
+        ];
+
+        daysHeader.forEach(dh => {
+            headerContents.push({
+                type: 'text',
+                text: `${dh.day}\n${dh.date}`,
+                flex: 1,
+                size: '9px',
+                weight: 'bold',
+                color: '#666666',
+                wrap: true,
+                align: 'center',
+                gravity: 'center'
+            });
+        });
+
+        const rows = [
+            {
+                type: 'box',
+                layout: 'horizontal',
+                contents: headerContents,
+                paddingBottom: '8px',
+                borderWidth: '1px',
+                borderColor: '#e2e8f0',
+                borderBottom: '1px'
+            }
+        ];
+
+        empGroup.forEach(emp => {
+            const empRowContents = [
+                {
+                    type: 'text',
+                    text: `${emp.nickname || emp.name}\n${(emp.position || 'ทั่วไป').toUpperCase()}`,
+                    flex: 2,
+                    size: '10px',
+                    weight: 'bold',
+                    color: '#1A202C',
+                    wrap: true,
+                    align: 'start',
+                    gravity: 'center'
+                }
+            ];
+
+            dateStrings.forEach(dateStr => {
+                const empShift = rosterMap[emp.id][dateStr];
+                const isOff = !empShift || empShift.is_off;
+                const cell = getCellColorsAndLabels(empShift?.shift, isOff);
+
+                empRowContents.push({
+                    type: 'box',
+                    layout: 'vertical',
+                    flex: 1,
+                    backgroundColor: cell.bg,
+                    cornerRadius: 'sm',
+                    borderWidth: '1px',
+                    borderColor: cell.borderColor,
+                    paddingAll: '2px',
+                    height: '42px',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    contents: [
+                        {
+                            type: 'text',
+                            text: `${cell.label}\n${cell.timeLine1}${cell.timeLine2 ? '\n' + cell.timeLine2 : ''}`,
+                            wrap: true,
+                            align: 'center',
+                            size: '8px',
+                            weight: 'bold',
+                            color: cell.textColor
+                        }
+                    ]
+                });
+            });
+
+            rows.push({
+                type: 'box',
+                layout: 'horizontal',
+                contents: empRowContents,
+                paddingTop: '8px',
+                paddingBottom: '8px',
+                alignItems: 'center',
+                spacing: 'xs'
+            });
+            rows.push({
+                type: 'separator',
+                color: '#f1f5f9'
+            });
+        });
+
+        if (rows.length > 0 && rows[rows.length - 1].type === 'separator') {
+            rows.pop();
+        }
+
+        return {
+            type: 'bubble',
+            size: 'giga',
+            body: {
+                type: 'box',
+                layout: 'vertical',
+                paddingAll: '12px',
+                contents: [
+                    {
+                        type: 'text',
+                        text: isNextWeek ? '📅 ตารางงานสัปดาห์หน้า' : '📅 ตารางงานสัปดาห์นี้',
+                        weight: 'bold',
+                        size: 'md',
+                        color: '#1A202C',
+                        marginBottom: '8px'
+                    },
+                    {
+                        type: 'box',
+                        layout: 'vertical',
+                        contents: rows,
+                        spacing: 'xs'
+                    }
+                ]
+            }
+        };
     };
 
-    await client.replyMessage(event.replyToken, {
-      type: 'flex',
-      altText: isNextWeek ? 'ตารางงานสัปดาห์หน้า' : 'ตารางงานสัปดาห์นี้',
-      contents: flexBubble
-    });
+    // 4. Split employees into chunks if more than 8 to stay safe from the 150-element limit
+    const chunkSize = 5;
+    const bubbles = [];
+    if (employees.length <= 8) {
+        bubbles.push(buildBubbleForEmployees(employees));
+    } else {
+        for (let i = 0; i < employees.length; i += chunkSize) {
+            const chunk = employees.slice(i, i + chunkSize);
+            bubbles.push(buildBubbleForEmployees(chunk));
+        }
+    }
+
+    const flexMsg = {
+        type: 'flex',
+        altText: isNextWeek ? 'ตารางงานสัปดาห์หน้า' : 'ตารางงานสัปดาห์นี้',
+        contents: bubbles.length === 1 ? bubbles[0] : { type: 'carousel', contents: bubbles }
+    };
+
+    await client.replyMessage(event.replyToken, flexMsg);
     return true;
   }
 

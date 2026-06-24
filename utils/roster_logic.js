@@ -43,13 +43,30 @@ export const getEffectiveDailyRoster = (employees, schedules, overrides, shifts,
             // Note: We use custom_start_time from override (Data Freezing Principle)
             // But we might fetch shift Name for UI display
             const shiftDef = shifts.find(s => String(s.id) === String(override.shift_id));
+            const startTime = override.custom_start_time || shiftDef?.start_time || '';
+            const endTime = override.custom_end_time || shiftDef?.end_time || '';
+            
+            let shiftName = shiftDef ? shiftDef.name + ' (Sub)' : 'Extra Shift';
+            if (!shiftDef && startTime && endTime) {
+                const startClean = startTime.slice(0, 5);
+                const endClean = endTime.slice(0, 5);
+                if (startClean === '12:30' && endClean === '23:30') {
+                    shiftName = 'ผู้ช่วยครัว';
+                } else if (startClean === '18:00' && endClean === '22:30') {
+                    shiftName = 'INTHEHAUS';
+                } else if (startClean === '10:00' && endClean === '20:30') {
+                    shiftName = 'CHEF';
+                } else if (startClean === '12:00' && endClean === '20:00') {
+                    shiftName = 'กลางกะ';
+                }
+            }
 
             effectiveRoster.push({
                 employee: emp,
                 shift_id: override.shift_id,
-                shift_name: shiftDef ? shiftDef.name + ' (Sub)' : 'Extra Shift',
-                start_time: override.custom_start_time || shiftDef?.start_time || '',
-                end_time: override.custom_end_time || shiftDef?.end_time || '',
+                shift_name: shiftName,
+                start_time: startTime,
+                end_time: endTime,
                 source: 'OVERRIDE',
                 original_override: override
             });

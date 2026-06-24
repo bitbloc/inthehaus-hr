@@ -91,6 +91,21 @@ export async function getEffectiveRoster(dateObj, options = { includeDrafts: fal
             if (tx.custom_start_time) shiftData.start_time = tx.custom_start_time;
             if (tx.custom_end_time) shiftData.end_time = tx.custom_end_time;
 
+            // Match against known presets for custom slots
+            if (shiftData.name === "Custom Shift" && shiftData.start_time && shiftData.end_time) {
+                const startClean = shiftData.start_time.slice(0, 5);
+                const endClean = shiftData.end_time.slice(0, 5);
+                if (startClean === '12:30' && endClean === '23:30') {
+                    shiftData.name = 'ผู้ช่วยครัว';
+                } else if (startClean === '18:00' && endClean === '22:30') {
+                    shiftData.name = 'INTHEHAUS';
+                } else if (startClean === '10:00' && endClean === '20:30') {
+                    shiftData.name = 'CHEF';
+                } else if (startClean === '12:00' && endClean === '20:00') {
+                    shiftData.name = 'กลางกะ';
+                }
+            }
+
             // Generate precise timestamps for overnight handling
             const { start, end } = createTimeRange(dateStr, shiftData.start_time, shiftData.end_time);
 
