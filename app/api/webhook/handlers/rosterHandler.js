@@ -38,9 +38,9 @@ function getShiftColorHex(shiftName, isOff, isCustomOrExtra) {
 function getCellColorsAndLabels(empShift, isOff) {
   if (isOff || !empShift || empShift.name === 'OFF') {
     return {
-      bg: '#FFF5F5',
-      borderColor: '#FEB2B2',
-      textColor: '#C53030',
+      bg: '#F4F4F5',
+      borderColor: '#E4E4E7',
+      textColor: '#71717A',
       label: 'OFF',
       timeLine1: 'หยุด',
       timeLine2: ''
@@ -54,8 +54,8 @@ function getCellColorsAndLabels(empShift, isOff) {
   // Check presets
   if (name.includes('เช้า') || (start === '10:00' && end === '18:00')) {
     return {
-      bg: '#FFFDF5',
-      borderColor: '#FEF08A',
+      bg: '#FEF3C7',
+      borderColor: '#FDE68A',
       textColor: '#B45309',
       label: 'เช้า',
       timeLine1: start,
@@ -64,9 +64,9 @@ function getCellColorsAndLabels(empShift, isOff) {
   }
   if (name.includes('ค่ำ') || name.includes('ดึก') || (start === '16:30' && end === '00:30')) {
     return {
-      bg: '#1A202C',
-      borderColor: '#2D3748',
-      textColor: '#FFFFFF',
+      bg: '#EEF2FF',
+      borderColor: '#E0E7FF',
+      textColor: '#4F46E5',
       label: 'ค่ำ',
       timeLine1: start,
       timeLine2: end
@@ -74,9 +74,9 @@ function getCellColorsAndLabels(empShift, isOff) {
   }
   if (name.includes('ควบ') || (start === '10:00' && end === '00:30')) {
     return {
-      bg: '#FFF5F5',
-      borderColor: '#FEB2B2',
-      textColor: '#E11D48',
+      bg: '#FEE2E2',
+      borderColor: '#FECACA',
+      textColor: '#DC2626',
       label: 'ควบ',
       timeLine1: start,
       timeLine2: end
@@ -84,8 +84,8 @@ function getCellColorsAndLabels(empShift, isOff) {
   }
   if (name.toLowerCase().includes('haus') || (start === '18:00' && end === '22:30')) {
     return {
-      bg: '#FFFFFF',
-      borderColor: '#FDBA74',
+      bg: '#FFF7ED',
+      borderColor: '#FFEDD5',
       textColor: '#EA580C',
       label: 'HAUS',
       timeLine1: start,
@@ -94,9 +94,9 @@ function getCellColorsAndLabels(empShift, isOff) {
   }
   if (name.toLowerCase().includes('chef') || (start === '10:00' && end === '20:30')) {
     return {
-      bg: '#F0FDF4',
-      borderColor: '#BBF7D0',
-      textColor: '#15803D',
+      bg: '#ECFDF5',
+      borderColor: '#D1FAE5',
+      textColor: '#047857',
       label: 'CHEF',
       timeLine1: start,
       timeLine2: end
@@ -104,8 +104,8 @@ function getCellColorsAndLabels(empShift, isOff) {
   }
   if (name.includes('ผู้ช่วยครัว') || (start === '12:30' && end === '23:30')) {
     return {
-      bg: '#FDF6E2',
-      borderColor: '#FDE8C4',
+      bg: '#FFFBEB',
+      borderColor: '#FEF3C7',
       textColor: '#9C4221',
       label: 'ครัว',
       timeLine1: start,
@@ -114,9 +114,9 @@ function getCellColorsAndLabels(empShift, isOff) {
   }
   if (name.includes('กลาง') || (start === '12:00' && end === '20:00')) {
     return {
-      bg: '#1A202C',
-      borderColor: '#2D3748',
-      textColor: '#FFFFFF',
+      bg: '#F1F5F9',
+      borderColor: '#E2E8F0',
+      textColor: '#475569',
       label: 'กลาง',
       timeLine1: start,
       timeLine2: end
@@ -393,7 +393,7 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
             {
                 type: 'text',
                 text: 'พนักงาน\n/ตำแหน่ง',
-                flex: 2.2,
+                flex: 2,
                 size: '10px',
                 weight: 'bold',
                 color: '#666666',
@@ -450,7 +450,7 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
                 {
                     type: 'text',
                     text: `${emp.nickname || emp.name}\n${(emp.position || 'ทั่วไป').toUpperCase()}`,
-                    flex: 2.2,
+                    flex: 2,
                     size: '10px',
                     weight: 'bold',
                     color: '#1A202C',
