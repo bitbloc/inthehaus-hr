@@ -8,7 +8,7 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
   let isAuthorized = false;
 
   // Direct query to ensure fresh database check
-  const { data: emp, error: empErr } = await supabase
+  const { data: emp } = await supabase
      .from('employees')
      .select('line_user_id, line_bot_id, name, nickname, position')
      .eq('is_active', true)
@@ -34,7 +34,7 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
   }
 
   const fileName = `slip_${Date.now()}_${mappedDbUserId}.jpg`;
-  const { data: uploadData, error: uploadError } = await supabase.storage
+  const { error: uploadError } = await supabase.storage
     .from('yuzu-slips')
     .upload(fileName, buffer, { contentType: 'image/jpeg' });
 
@@ -71,106 +71,256 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
   if (insertError) {
      console.error("Slip Insert Error:", insertError);
      if (insertError.code === '23505') {
-         await client.replyMessage(event.replyToken, { type: 'text', text: `เมี๊ยว~ สลิปใบนี้ (อ้างอิง: ${result.transactionRef || 'ไม่ทราบ'}) ถูกบันทึกเข้าระบบไปแล้วนะคะ ห้ามส่งซ้ำและห้ามโกงค่ะ! 😾` });
+          await client.replyMessage(event.replyToken, { type: 'text', text: `เมี๊ยว~ สลิปใบนี้ (อ้างอิง: ${result.transactionRef || 'ไม่ทราบ'}) ถูกบันทึกเข้าระบบไปแล้วนะคะ ห้ามส่งซ้ำและห้ามโกงค่ะ! 😾` });
      } else {
-         await client.replyMessage(event.replyToken, { type: 'text', text: `เมี๊ยว~ บันทึกสลิปไม่สำเร็จค่ะ (Error: ${insertError.message || insertError.code || 'Unknown DB Error'})` });
+          await client.replyMessage(event.replyToken, { type: 'text', text: `เมี๊ยว~ บันทึกสลิปไม่สำเร็จค่ะ (Error: ${insertError.message || insertError.code || 'Unknown DB Error'})` });
      }
   } else {
      const slipFlexMsg = {
-       type: 'flex',
-       altText: `บันทึกยอดโอน ${parsedAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท เรียบร้อยค่ะ`,
-       contents: {
-         type: 'bubble',
-         size: 'kilo',
-         styles: {
-           header: { backgroundColor: '#f3f3f3' },
-           body: { backgroundColor: '#f3f3f3' },
-           footer: { backgroundColor: '#ebebeb' }
-         },
-         header: {
-           type: 'box',
-           layout: 'vertical',
-           paddingAll: '20px',
-           contents: [
-             { type: 'text', text: 'BANK SLIP // DEPOSIT RECORDED', color: '#1c1c1c', size: 'sm', weight: 'bold' },
-             { type: 'text', text: 'STATUS: SUCCESS', color: '#2e7d32', size: 'xxs', weight: 'bold', margin: 'xs' }
-           ]
-         },
-         body: {
-           type: 'box',
-           layout: 'vertical',
-           paddingAll: '20px',
-           contents: [
-             {
-               type: 'box',
-               layout: 'horizontal',
-               contents: [
-                 { type: 'text', text: 'TRANSFER AMOUNT', color: '#666666', size: 'xs', gravity: 'center', flex: 1 },
-                 { type: 'text', text: `฿${parsedAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})}`, align: 'end', color: '#1c1c1c', size: 'lg', weight: 'bold', flex: 2 }
-               ]
-             },
-             { type: 'separator', margin: 'lg', color: '#cccccc' },
-             {
-               type: 'box',
-               layout: 'vertical',
-               margin: 'lg',
-               spacing: 'sm',
-               contents: [
-                 {
-                   type: 'box',
-                   layout: 'horizontal',
-                   contents: [
-                     { type: 'text', text: 'BANK', size: 'xs', color: '#666666', flex: 1 },
-                     { type: 'text', text: result.bankName || 'ไม่ระบุ', size: 'xs', color: '#1c1c1c', align: 'end', flex: 2, wrap: true }
-                   ]
-                 },
-                 {
-                   type: 'box',
-                   layout: 'horizontal',
-                   contents: [
-                     { type: 'text', text: 'SENDER', size: 'xs', color: '#666666', flex: 1 },
-                     { type: 'text', text: result.senderName || 'ไม่ระบุ', size: 'xs', color: '#1c1c1c', align: 'end', flex: 2, wrap: true }
-                   ]
-                 },
-                 {
-                   type: 'box',
-                   layout: 'horizontal',
-                   contents: [
-                     { type: 'text', text: 'DATETIME', size: 'xs', color: '#666666', flex: 1 },
-                     { type: 'text', text: result.transTime || 'ไม่ระบุ', size: 'xs', color: '#1c1c1c', align: 'end', flex: 2, wrap: true }
-                   ]
-                 },
-                 {
-                   type: 'box',
-                   layout: 'horizontal',
-                   contents: [
-                     { type: 'text', text: 'REFERENCE', size: 'xs', color: '#666666', flex: 1 },
-                     { type: 'text', text: result.transactionRef || 'ไม่ระบุ', size: 'xs', color: '#1c1c1c', align: 'end', flex: 2, wrap: true }
-                   ]
-                 },
-                 {
-                   type: 'box',
-                   layout: 'horizontal',
-                   contents: [
-                     { type: 'text', text: 'OPERATOR', size: 'xs', color: '#666666', flex: 1 },
-                     { type: 'text', text: senderName, size: 'xs', color: '#1c1c1c', align: 'end', flex: 2, wrap: true }
-                   ]
-                 }
-               ]
-             }
-           ]
-         },
-         footer: {
-           type: 'box',
-           layout: 'vertical',
-           paddingAll: '20px',
-           contents: [
-             { type: 'text', text: 'บันทึกแล้ว', size: 'xs', align: 'center', color: '#b0b0b0' }
-           ]
-         }
-       }
-     };
-     await client.replyMessage(event.replyToken, slipFlexMsg);
+        type: 'flex',
+        altText: `บันทึกยอดโอน ${parsedAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท เรียบร้อยค่ะ`,
+        contents: {
+          type: 'bubble',
+          size: 'mega',
+          styles: {
+            body: {
+              backgroundColor: '#D2FF00'
+            }
+          },
+          body: {
+            type: 'box',
+            layout: 'vertical',
+            paddingAll: '24px',
+            contents: [
+              // Header Stack
+              {
+                type: 'box',
+                layout: 'vertical',
+                contents: [
+                  {
+                    type: 'text',
+                    text: 'ร้านในบ้าน - in the haus',
+                    weight: 'bold',
+                    size: 'xxs',
+                    color: '#333333'
+                  },
+                  {
+                    type: 'text',
+                    text: 'DEPOSIT RECORDED',
+                    weight: 'bold',
+                    size: 'xl',
+                    color: '#000000',
+                    margin: 'xs'
+                  }
+                ]
+              },
+              // Spacer representing open graphic region
+              {
+                type: 'box',
+                layout: 'vertical',
+                margin: 'xxl',
+                height: '40px',
+                contents: []
+              },
+              // Divider 1
+              {
+                type: 'separator',
+                color: '#000000'
+              },
+              // Row 1
+              {
+                type: 'box',
+                layout: 'horizontal',
+                margin: 'md',
+                spacing: 'md',
+                contents: [
+                  {
+                    type: 'box',
+                    layout: 'vertical',
+                    flex: 1,
+                    contents: [
+                      {
+                        type: 'text',
+                        text: result.bankName || 'ไม่ระบุ',
+                        size: 'sm',
+                        weight: 'bold',
+                        color: '#000000',
+                        wrap: true
+                      },
+                      {
+                        type: 'text',
+                        text: 'BANK',
+                        size: 'xxs',
+                        color: '#333333',
+                        margin: 'xs'
+                      }
+                    ]
+                  },
+                  {
+                    type: 'box',
+                    layout: 'vertical',
+                    flex: 1,
+                    contents: [
+                      {
+                        type: 'text',
+                        text: result.senderName || 'ไม่ระบุ',
+                        size: 'sm',
+                        weight: 'bold',
+                        color: '#000000',
+                        wrap: true
+                      },
+                      {
+                        type: 'text',
+                        text: 'SENDER',
+                        size: 'xxs',
+                        color: '#333333',
+                        margin: 'xs'
+                      }
+                    ]
+                  }
+                ]
+              },
+              // Divider 2
+              {
+                type: 'separator',
+                color: '#000000',
+                margin: 'md'
+              },
+              // Row 2
+              {
+                type: 'box',
+                layout: 'horizontal',
+                margin: 'md',
+                spacing: 'md',
+                contents: [
+                  {
+                    type: 'box',
+                    layout: 'vertical',
+                    flex: 1,
+                    contents: [
+                      {
+                        type: 'text',
+                        text: result.transTime || 'ไม่ระบุ',
+                        size: 'sm',
+                        weight: 'bold',
+                        color: '#000000',
+                        wrap: true
+                      },
+                      {
+                        type: 'text',
+                        text: 'DATE TIME',
+                        size: 'xxs',
+                        color: '#333333',
+                        margin: 'xs'
+                      }
+                    ]
+                  },
+                  {
+                    type: 'box',
+                    layout: 'vertical',
+                    flex: 1,
+                    contents: [
+                      {
+                        type: 'text',
+                        text: senderName || 'ไม่ระบุ',
+                        size: 'sm',
+                        weight: 'bold',
+                        color: '#000000',
+                        wrap: true
+                      },
+                      {
+                        type: 'text',
+                        text: 'OPERATOR',
+                        size: 'xxs',
+                        color: '#333333',
+                        margin: 'xs'
+                      }
+                    ]
+                  }
+                ]
+              },
+              // Divider 3
+              {
+                type: 'separator',
+                color: '#000000',
+                margin: 'md'
+              },
+              // Row 3
+              {
+                type: 'box',
+                layout: 'vertical',
+                margin: 'md',
+                contents: [
+                  {
+                    type: 'text',
+                    text: result.transactionRef || 'ไม่ระบุ',
+                    size: 'sm',
+                    weight: 'bold',
+                    color: '#000000',
+                    wrap: true
+                  },
+                  {
+                    type: 'text',
+                    text: 'REFERENCE NO.',
+                    size: 'xxs',
+                    color: '#333333',
+                    margin: 'xs'
+                  }
+                ]
+              },
+              // Divider 4
+              {
+                type: 'separator',
+                color: '#000000',
+                margin: 'md'
+              },
+              // Big Amount
+              {
+                type: 'text',
+                margin: 'lg',
+                contents: [
+                  {
+                    type: 'span',
+                    text: parsedAmount.toLocaleString('th-TH', {minimumFractionDigits: 2}),
+                    size: '5xl',
+                    weight: 'bold',
+                    color: '#000000'
+                  },
+                  {
+                    type: 'span',
+                    text: ' THB',
+                    size: 'md',
+                    weight: 'bold',
+                    color: '#000000'
+                  }
+                ]
+              },
+              // Divider 5
+              {
+                type: 'separator',
+                color: '#000000',
+                margin: 'lg'
+              },
+              // Footer
+              {
+                type: 'box',
+                layout: 'horizontal',
+                margin: 'md',
+                contents: [
+                  {
+                    type: 'text',
+                    text: 'ONHAUS SYSTEM©',
+                    size: 'xxs',
+                    color: '#333333',
+                    weight: 'bold'
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      };
+      await client.replyMessage(event.replyToken, slipFlexMsg);
   }
   return true;
 }

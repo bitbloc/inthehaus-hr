@@ -1,0 +1,183 @@
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { Client } from '@line/bot-sdk';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.join(__dirname, '../.env.local') });
+
+const client = new Client({
+  channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN,
+  channelSecret: process.env.CHANNEL_SECRET,
+});
+
+const groupId = 'C1210c7a0601b5a675060e312efe10bff';
+
+function appendBrandingToFlex(msg) {
+  if (!msg) return msg;
+
+  if (Array.isArray(msg)) {
+    return msg.map(m => appendBrandingToFlex(m));
+  }
+
+  if (msg.type !== 'flex' || !msg.contents) {
+    return msg;
+  }
+
+  const newMsg = JSON.parse(JSON.stringify(msg));
+  
+  const addFooterToBubble = (bubble) => {
+    if (!bubble || bubble.type !== 'bubble') return;
+
+    if (bubble.footer) {
+      if (bubble.footer.contents && Array.isArray(bubble.footer.contents)) {
+        const hasBranding = bubble.footer.contents.some(
+          c => c.type === 'text' && c.text && c.text.includes('ONHAUS SYSTEM')
+        );
+        if (!hasBranding) {
+          const hasButtons = bubble.footer.contents.some(c => c.type === 'button');
+          if (hasButtons) {
+            const originalLayout = bubble.footer.layout || 'horizontal';
+            const originalSpacing = bubble.footer.spacing || 'sm';
+            
+            const buttonsBox = {
+              type: 'box',
+              layout: originalLayout,
+              spacing: originalSpacing,
+              contents: [...bubble.footer.contents]
+            };
+
+            bubble.footer.layout = 'vertical';
+            if (bubble.footer.spacing) delete bubble.footer.spacing;
+            if (!bubble.footer.paddingAll) bubble.footer.paddingAll = '15px';
+            
+            bubble.footer.contents = [
+              buttonsBox,
+              {
+                type: 'text',
+                text: 'ONHAUS SYSTEM ©',
+                size: 'xxs',
+                color: '#aaaaaa',
+                align: 'center',
+                weight: 'bold',
+                margin: 'md'
+              }
+            ];
+          } else {
+            const textElement = bubble.footer.contents.find(c => c.type === 'text');
+            if (textElement) {
+              if (textElement.text && !textElement.text.includes('ONHAUS SYSTEM')) {
+                textElement.text = `${textElement.text.toUpperCase()} // ONHAUS SYSTEM ©`;
+              }
+            } else {
+              bubble.footer.contents.push({
+                type: 'text',
+                text: 'ONHAUS SYSTEM ©',
+                size: 'xxs',
+                color: '#aaaaaa',
+                align: 'center',
+                weight: 'bold'
+              });
+            }
+          }
+        }
+      } else {
+        bubble.footer = {
+          type: 'box',
+          layout: 'vertical',
+          paddingAll: '15px',
+          contents: [
+            {
+              type: 'text',
+              text: 'ONHAUS SYSTEM ©',
+              size: 'xxs',
+              color: '#aaaaaa',
+              align: 'center',
+              weight: 'bold'
+            }
+          ]
+        };
+      }
+    } else {
+      bubble.footer = {
+        type: 'box',
+        layout: 'vertical',
+        paddingAll: '15px',
+        contents: [
+          {
+            type: 'text',
+            text: 'ONHAUS SYSTEM ©',
+            size: 'xxs',
+            color: '#aaaaaa',
+            align: 'center',
+            weight: 'bold'
+          }
+        ]
+      };
+    }
+
+    if (!bubble.styles) bubble.styles = {};
+    if (!bubble.styles.footer) {
+      const bodyBg = bubble.styles.body?.backgroundColor;
+      if (bodyBg === '#181818') {
+        bubble.styles.footer = { backgroundColor: '#181818' };
+        const copyrightText = bubble.footer.contents.find(c => c.type === 'text' && c.text && c.text.includes('ONHAUS SYSTEM'));
+        if (copyrightText) {
+          copyrightText.color = '#666666';
+        }
+      } else {
+        bubble.styles.footer = { backgroundColor: '#ebebeb' };
+      }
+    }
+  };
+
+  if (newMsg.contents.type === 'bubble') {
+    addFooterToBubble(newMsg.contents);
+  } else if (newMsg.contents.type === 'carousel' && Array.isArray(newMsg.contents.contents)) {
+    newMsg.contents.contents.forEach(b => addFooterToBubble(b));
+  }
+
+  return newMsg;
+}
+
+import { handleRosterCommand } from './temp_roster_handler_3.mjs';
+
+async function run() {
+    let finalMessage = null;
+    const mockClient = {
+        replyMessage: async (token, message) => {
+            finalMessage = message;
+            return true;
+        }
+    };
+
+    const mockEvent = {
+        replyToken: 'test_token'
+    };
+
+    console.log("Generating stcalendar Flex message...");
+    await handleRosterCommand(mockEvent, mockClient, 'stcalendar', 'stcalendar', 'test_user');
+
+    if (!finalMessage) {
+        throw new Error("No message was generated by handleRosterCommand!");
+    }
+
+    const branded = appendBrandingToFlex(finalMessage);
+    console.log("Sending real push message to group:", groupId);
+    try {
+        const result = await client.pushMessage(groupId, branded);
+        console.log("PUSH SUCCESS! Result:", result);
+    } catch (err) {
+        console.error("PUSH ERROR:");
+        if (err.statusCode) console.error("Status:", err.statusCode);
+        if (err.statusMessage) console.error("Message:", err.statusMessage);
+        if (err.originalError && err.originalError.response) {
+            console.error("Details:", JSON.stringify(err.originalError.response.data, null, 2));
+        } else {
+            console.error(err);
+        }
+    }
+}
+
+run().catch(console.error);
