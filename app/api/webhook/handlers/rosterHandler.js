@@ -303,8 +303,7 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
         return true;
     }
 
-    // 2. Fetch rosters for the 7 days
-    const weeklyRosters = {}; // dateStr -> roster list
+    // 2. Fetch rosters for the 7 days in a single batch query
     const dateStrings = [];
     const daysHeader = [];
     const shortDays = ["อา.", "จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส."];
@@ -317,9 +316,40 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
             day: shortDays[currentDay.getDay()],
             date: format(currentDay, 'dd/MM')
         });
+    }
 
-        const roster = await getEffectiveRoster(currentDay);
-        weeklyRosters[dateStr] = roster;
+    const { data: transactions, error: txErr } = await supabase
+        .from('roster_transactions')
+        .select(`
+            employee_id,
+            date,
+            is_off,
+            slot_type,
+            custom_start_time,
+            custom_end_time,
+            shifts(id, name, start_time, end_time)
+        `)
+        .in('date', dateStrings)
+        .eq('status', 'PUBLISHED');
+
+    if (txErr) {
+        console.error("Error fetching roster transactions batch:", txErr);
+        await client.replyMessage(event.replyToken, { type: 'text', text: 'เมี๊ยว~ เกิดข้อผิดพลาดในการดึงข้อมูลตารางงานค่ะ' });
+        return true;
+    }
+
+    // Map transactions by employee_id and date
+    const txMap = {}; // employee_id -> dateStr -> tx
+    employees.forEach(emp => {
+        txMap[emp.id] = {};
+    });
+
+    if (transactions) {
+        transactions.forEach(tx => {
+            if (txMap[tx.employee_id]) {
+                txMap[tx.employee_id][tx.date] = tx;
+            }
+        });
     }
 
     // 3. Build roster map: employeeId -> dateStr -> shift info
@@ -327,8 +357,33 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
     employees.forEach(emp => {
         rosterMap[emp.id] = {};
         dateStrings.forEach(dateStr => {
-            const empShift = weeklyRosters[dateStr].find(r => r.id === emp.id);
-            rosterMap[emp.id][dateStr] = empShift || null;
+            const tx = txMap[emp.id]?.[dateStr];
+            if (!tx || tx.is_off) {
+                rosterMap[emp.id][dateStr] = { is_off: true, shift: { name: 'OFF' } };
+            } else {
+                const shiftData = tx.shifts ? { ...tx.shifts } : { name: "Custom Shift" };
+                if (tx.custom_start_time) shiftData.start_time = tx.custom_start_time;
+                if (tx.custom_end_time) shiftData.end_time = tx.custom_end_time;
+
+                if (shiftData.name === "Custom Shift" && shiftData.start_time && shiftData.end_time) {
+                    const startClean = shiftData.start_time.slice(0, 5);
+                    const endClean = shiftData.end_time.slice(0, 5);
+                    if (startClean === '12:30' && endClean === '23:30') {
+                        shiftData.name = 'ผู้ช่วยครัว';
+                    } else if (startClean === '18:00' && endClean === '22:30') {
+                        shiftData.name = 'INTHEHAUS';
+                    } else if (startClean === '10:00' && endClean === '20:30') {
+                        shiftData.name = 'CHEF';
+                    } else if (startClean === '12:00' && endClean === '20:00') {
+                        shiftData.name = 'กลางกะ';
+                    }
+                }
+
+                rosterMap[emp.id][dateStr] = {
+                    is_off: false,
+                    shift: shiftData
+                };
+            }
         });
     });
 
