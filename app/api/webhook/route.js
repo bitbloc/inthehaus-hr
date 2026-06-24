@@ -18,6 +18,9 @@ const client = new Client({
   channelSecret: process.env.CHANNEL_SECRET,
 });
 
+// Cache to prevent duplicate vision replies within the same container instance
+const lastVisionReplyTime = new Map();
+
 function appendBrandingToFlex(msg) {
   if (!msg) return msg;
 
@@ -503,11 +506,38 @@ export async function POST(request) {
                   continue;
                 }
 
+                // Vision anti-spam check: prevent multiple replies within 8 seconds
+                const now = Date.now();
+                const lastReplyTime = lastVisionReplyTime.get(groupId) || 0;
+                let hasRecentReply = (now - lastReplyTime) < 8000;
+
+                if (!hasRecentReply) {
+                  const eightSecondsAgo = new Date(now - 8000).toISOString();
+                  const { data: recentReplies } = await supabase
+                    .from('yuzu_chat_history')
+                    .select('id')
+                    .eq('group_id', groupId)
+                    .eq('role', 'model')
+                    .gte('created_at', eightSecondsAgo)
+                    .limit(1);
+                  if (recentReplies && recentReplies.length > 0) {
+                    hasRecentReply = true;
+                  }
+                }
+
+                if (hasRecentReply) {
+                  console.log("Yuzu Vision Redundancy Filter: Anti-spam triggered. Logging photo silently.");
+                  await saveMessage(groupId, userId, 'user', `[ภาพประกอบ] ${result.shortDescription || 'รูปภาพ'}`, 'image_description');
+                  handledLocally = true;
+                  continue;
+                }
+
                 // Save regular chat vision logs and reply
                 await saveMessage(groupId, userId, 'user', result.shortDescription, 'image_description');
 
                 if (result.shouldReply) {
                   handledLocally = true;
+                  lastVisionReplyTime.set(groupId, now);
                   await client.replyMessage(event.replyToken, { type: 'text', text: result.analysis });
                   await saveMessage(groupId, null, 'model', result.analysis, 'text');
                 }
