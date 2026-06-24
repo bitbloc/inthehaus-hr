@@ -57,7 +57,7 @@ function getCellColorsAndLabels(empShift, isOff) {
       bg: '#FFFDF5',
       borderColor: '#FEF08A',
       textColor: '#B45309',
-      label: 'เช้า ☀️',
+      label: 'เช้า',
       timeLine1: start,
       timeLine2: end
     };
@@ -67,7 +67,7 @@ function getCellColorsAndLabels(empShift, isOff) {
       bg: '#1A202C',
       borderColor: '#2D3748',
       textColor: '#FFFFFF',
-      label: 'ค่ำ 🌙',
+      label: 'ค่ำ',
       timeLine1: start,
       timeLine2: end
     };
@@ -77,7 +77,7 @@ function getCellColorsAndLabels(empShift, isOff) {
       bg: '#FFF5F5',
       borderColor: '#FEB2B2',
       textColor: '#E11D48',
-      label: 'ควบ 🔥',
+      label: 'ควบ',
       timeLine1: start,
       timeLine2: end
     };
@@ -87,7 +87,7 @@ function getCellColorsAndLabels(empShift, isOff) {
       bg: '#FFFFFF',
       borderColor: '#FDBA74',
       textColor: '#EA580C',
-      label: 'HAUS ⚡',
+      label: 'HAUS',
       timeLine1: start,
       timeLine2: end
     };
@@ -97,7 +97,7 @@ function getCellColorsAndLabels(empShift, isOff) {
       bg: '#F0FDF4',
       borderColor: '#BBF7D0',
       textColor: '#15803D',
-      label: 'CHEF 🔍',
+      label: 'CHEF',
       timeLine1: start,
       timeLine2: end
     };
@@ -107,7 +107,7 @@ function getCellColorsAndLabels(empShift, isOff) {
       bg: '#FDF6E2',
       borderColor: '#FDE8C4',
       textColor: '#9C4221',
-      label: 'ครัว 🍳',
+      label: 'ครัว',
       timeLine1: start,
       timeLine2: end
     };
@@ -117,7 +117,7 @@ function getCellColorsAndLabels(empShift, isOff) {
       bg: '#1A202C',
       borderColor: '#2D3748',
       textColor: '#FFFFFF',
-      label: 'กลาง 🔔',
+      label: 'กลาง',
       timeLine1: start,
       timeLine2: end
     };
@@ -338,7 +338,7 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
             {
                 type: 'text',
                 text: 'พนักงาน\n/ตำแหน่ง',
-                flex: 2,
+                flex: 2.2,
                 size: '10px',
                 weight: 'bold',
                 color: '#666666',
@@ -350,15 +350,26 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
 
         daysHeader.forEach(dh => {
             headerContents.push({
-                type: 'text',
-                text: `${dh.day}\n${dh.date}`,
+                type: 'box',
+                layout: 'vertical',
                 flex: 1,
-                size: '9px',
-                weight: 'bold',
-                color: '#666666',
-                wrap: true,
-                align: 'center',
-                gravity: 'center'
+                paddingTop: '4px',
+                paddingBottom: '4px',
+                paddingStart: '0px',
+                paddingEnd: '0px',
+                contents: [
+                    {
+                        type: 'text',
+                        text: `${dh.day}\n${dh.date}`,
+                        size: '9px',
+                        weight: 'bold',
+                        color: '#666666',
+                        wrap: true,
+                        align: 'center',
+                        gravity: 'center',
+                        lineSpacing: '2px'
+                    }
+                ]
             });
         });
 
@@ -368,6 +379,8 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
                 layout: 'horizontal',
                 contents: headerContents,
                 paddingBottom: '8px',
+                alignItems: 'center',
+                spacing: 'xs',
                 borderWidth: 'none',
                 borderColor: '#e2e8f0'
             },
@@ -382,13 +395,14 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
                 {
                     type: 'text',
                     text: `${emp.nickname || emp.name}\n${(emp.position || 'ทั่วไป').toUpperCase()}`,
-                    flex: 2,
+                    flex: 2.2,
                     size: '10px',
                     weight: 'bold',
                     color: '#1A202C',
                     wrap: true,
                     align: 'start',
-                    gravity: 'center'
+                    gravity: 'center',
+                    lineSpacing: '2px'
                 }
             ];
 
@@ -405,7 +419,10 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
                     cornerRadius: 'sm',
                     borderWidth: 'light',
                     borderColor: cell.borderColor,
-                    paddingAll: '4px',
+                    paddingTop: '4px',
+                    paddingBottom: '4px',
+                    paddingStart: '0px',
+                    paddingEnd: '0px',
                     contents: [
                         {
                             type: 'text',
@@ -415,7 +432,8 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
                             gravity: 'center',
                             size: '8px',
                             weight: 'bold',
-                            color: cell.textColor
+                            color: cell.textColor,
+                            lineSpacing: '2px'
                         }
                     ]
                 });
