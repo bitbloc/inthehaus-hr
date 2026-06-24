@@ -9,11 +9,19 @@ export function isEspressoShotReport(text) {
   
   // Regex to match typical extraction patterns like "18g", "35ml", "36s" or "36วินาที"
   const hasGrams = /\d+(\.\d+)?\s*(g|กรัม)/.test(lowerText);
-  const hasVolume = /\d+(\.\d+)?\s*(ml|มล)/.test(lowerText);
-  const hasSeconds = /\d+\s*(s|วิ|วินาที|จบ)/.test(lowerText);
+  
+  // Volume/Yield (either ml/มล or a second weight measure in grams)
+  const weightMatches = lowerText.match(/\d+(\.\d+)?\s*(g|กรัม)/g) || [];
+  const hasVolume = /\d+(\.\d+)?\s*(ml|มล|มิลลิลิตร)/.test(lowerText) || weightMatches.length >= 2;
+  
+  // Seconds/Time (e.g. "19วิ", "19 วินาที", "วินาทีที่ 19", "วิที่ 19", "จบที่ 19", "25s", "ไหลวิที่ 4")
+  const hasSeconds = /\d+\s*(s|วิ|วินาที|จบ)/.test(lowerText) || 
+                     /วินาทีที่\s*\d+/.test(lowerText) || 
+                     /วิที่\s*\d+/.test(lowerText) || 
+                     /จบที่\s*\d+/.test(lowerText);
   
   // Keywords indicating espresso shot metrics
-  const hasCoffeeJargon = /ไหล|สกัด|ช็อต|shot|ครีม่า|crema|บด|แทมป์|tamp|หยด|หยดแรก/i.test(lowerText);
+  const hasCoffeeJargon = /ไหล|สกัด|ช็อต|shot|ครีม่า|crema|บด|แทมป์|tamp|หยด|หยดแรก|ตวง|ดริป|กาแฟ/i.test(lowerText);
 
   let score = 0;
   if (hasGrams) score++;
@@ -234,7 +242,7 @@ export async function handleEspressoShotAnalysis(event, client, rawText, userId,
           contents: [
             {
               type: 'text',
-              text: 'Yuzu AI Barista Assistant 🍊🐱',
+              text: 'Yuzu AI Barista Assistant 🍊☕',
               size: 'xxs',
               align: 'center',
               color: '#aaaaaa'
