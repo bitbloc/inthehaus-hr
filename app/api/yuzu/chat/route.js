@@ -95,19 +95,44 @@ export async function POST(request) {
 
         // Dynamic Group Chat Logs today - get the most recent group chat log to answer chat summary questions
         try {
-            const { data: latestChat } = await supabase
+            const bangkokDateStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Bangkok' });
+            const startOfDay = new Date(`${bangkokDateStr}T00:00:00+07:00`);
+            const endOfDay = new Date(`${bangkokDateStr}T23:59:59.999+07:00`);
+
+            const { data: chatsToday } = await supabase
                 .from('yuzu_chat_history')
                 .select('group_id')
-                .not('group_id', 'is', null)
-                .order('created_at', { ascending: false })
-                .limit(1)
-                .maybeSingle();
+                .gte('created_at', startOfDay.toISOString())
+                .lte('created_at', endOfDay.toISOString())
+                .not('group_id', 'is', null);
 
-            const groupId = latestChat?.group_id;
-            if (groupId) {
-                const dailyLogs = await getDailyContent(groupId);
-                if (dailyLogs) {
-                    context += `\nเหตุการณ์ที่เกิดขึ้นในแชทกลุ่มวันนี้ (ใช้สำหรับอ้างอิงหรือสรุปงาน):\n${dailyLogs}\n`;
+            const uniqueGroupIds = Array.from(new Set((chatsToday || []).map(c => c.group_id)))
+                .filter(gid => gid.startsWith('C') || gid.startsWith('c'));
+
+            if (uniqueGroupIds.length > 0) {
+                context += `\nเหตุการณ์ที่เกิดขึ้นในแชทกลุ่มวันนี้ (ใช้สำหรับอ้างอิงหรือสรุปงาน):\n`;
+                for (const gid of uniqueGroupIds) {
+                    const dailyLogs = await getDailyContent(gid);
+                    if (dailyLogs) {
+                        context += `[กลุ่มแชท ID: ${gid}]\n${dailyLogs}\n\n`;
+                    }
+                }
+            } else {
+                // Fallback to latest
+                const { data: latestChat } = await supabase
+                    .from('yuzu_chat_history')
+                    .select('group_id')
+                    .not('group_id', 'is', null)
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .maybeSingle();
+
+                const groupId = latestChat?.group_id;
+                if (groupId) {
+                    const dailyLogs = await getDailyContent(groupId);
+                    if (dailyLogs) {
+                        context += `\nเหตุการณ์ที่เกิดขึ้นในแชทกลุ่มวันนี้ (ใช้สำหรับอ้างอิงหรือสรุปงาน):\n${dailyLogs}\n`;
+                    }
                 }
             }
         } catch (e) {

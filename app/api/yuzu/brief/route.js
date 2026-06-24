@@ -52,30 +52,51 @@ export async function GET(request) {
         attendanceStr += "\n";
 
         // 2. Fetch Chat Logs
-        let chatStr = "--- ล็อกการพูดคุยในร้านวันนี้ ---\n";
+        let chatStr = "";
         try {
-            const { data: latestChat } = await supabase
+            // Find all unique group IDs that had messages on this target date
+            const { data: chatsToday } = await supabase
                 .from('yuzu_chat_history')
                 .select('group_id')
-                .not('group_id', 'is', null)
-                .order('created_at', { ascending: false })
-                .limit(1)
-                .maybeSingle();
+                .gte('created_at', startOfDay.toISOString())
+                .lte('created_at', endOfDay.toISOString())
+                .not('group_id', 'is', null);
 
-            const groupId = latestChat?.group_id;
-            if (groupId) {
-                const dailyLogs = await getDailyContent(groupId, queryDateStr);
-                if (dailyLogs) {
-                    chatStr += dailyLogs;
-                } else {
-                    chatStr += "ไม่มีประวัติการพูดคุยในวันนี้\n";
+            const uniqueGroupIds = Array.from(new Set((chatsToday || []).map(c => c.group_id)))
+                .filter(gid => gid.startsWith('C') || gid.startsWith('c')); // Only group chats (starting with C)
+
+            if (uniqueGroupIds.length > 0) {
+                for (const gid of uniqueGroupIds) {
+                    const dailyLogs = await getDailyContent(gid, queryDateStr);
+                    if (dailyLogs) {
+                        chatStr += `--- ล็อกการพูดคุยในกลุ่มร้าน (${gid}) ---\n${dailyLogs}\n\n`;
+                    }
                 }
             } else {
-                chatStr += "ไม่มีประวัติการพูดคุยในวันนี้\n";
+                // Fallback to the overall latest group_id if no messages today
+                const { data: latestChat } = await supabase
+                    .from('yuzu_chat_history')
+                    .select('group_id')
+                    .not('group_id', 'is', null)
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .maybeSingle();
+
+                const groupId = latestChat?.group_id;
+                if (groupId) {
+                    const dailyLogs = await getDailyContent(groupId, queryDateStr);
+                    if (dailyLogs) {
+                        chatStr += `--- ล็อกการพูดคุยในร้านวันนี้ ---\n${dailyLogs}\n`;
+                    } else {
+                        chatStr += "--- ล็อกการพูดคุยในร้านวันนี้ ---\nไม่มีประวัติการพูดคุยในวันนี้\n";
+                    }
+                } else {
+                    chatStr += "--- ล็อกการพูดคุยในร้านวันนี้ ---\nไม่มีประวัติการพูดคุยในวันนี้\n";
+                }
             }
         } catch (chatErr) {
             console.error("Brief API: Failed to get chat logs:", chatErr);
-            chatStr += "ไม่สามารถดึงข้อมูลแชทได้\n";
+            chatStr += "--- ล็อกการพูดคุยในร้านวันนี้ ---\nไม่สามารถดึงข้อมูลแชทได้\n";
         }
 
         const combinedContent = attendanceStr + chatStr;

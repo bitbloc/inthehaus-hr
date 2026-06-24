@@ -368,9 +368,12 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
                 layout: 'horizontal',
                 contents: headerContents,
                 paddingBottom: '8px',
-                borderWidth: '1px',
-                borderColor: '#e2e8f0',
-                borderBottom: '1px'
+                borderWidth: 'none',
+                borderColor: '#e2e8f0'
+            },
+            {
+                type: 'separator',
+                color: '#e2e8f0'
             }
         ];
 
@@ -400,18 +403,16 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
                     flex: 1,
                     backgroundColor: cell.bg,
                     cornerRadius: 'sm',
-                    borderWidth: '1px',
+                    borderWidth: 'light',
                     borderColor: cell.borderColor,
-                    paddingAll: '2px',
-                    height: '42px',
-                    justifyContent: 'center',
-                    alignItems: 'center',
+                    paddingAll: '4px',
                     contents: [
                         {
                             type: 'text',
                             text: `${cell.label}\n${cell.timeLine1}${cell.timeLine2 ? '\n' + cell.timeLine2 : ''}`,
                             wrap: true,
                             align: 'center',
+                            gravity: 'center',
                             size: '8px',
                             weight: 'bold',
                             color: cell.textColor
@@ -441,19 +442,19 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
 
         return {
             type: 'bubble',
-            size: 'giga',
+            size: 'mega',
             body: {
                 type: 'box',
                 layout: 'vertical',
                 paddingAll: '12px',
+                spacing: 'md',
                 contents: [
                     {
                         type: 'text',
                         text: isNextWeek ? '📅 ตารางงานสัปดาห์หน้า' : '📅 ตารางงานสัปดาห์นี้',
                         weight: 'bold',
                         size: 'md',
-                        color: '#1A202C',
-                        marginBottom: '8px'
+                        color: '#1A202C'
                     },
                     {
                         type: 'box',
