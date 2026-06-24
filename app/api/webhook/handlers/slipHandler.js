@@ -81,7 +81,7 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
         altText: `บันทึกยอดโอน ${parsedAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท เรียบร้อยค่ะ`,
         contents: {
           type: 'bubble',
-          size: 'mega',
+          size: 'kilo',
           styles: {
             body: {
               backgroundColor: '#D2FF00'
@@ -90,7 +90,7 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
           body: {
             type: 'box',
             layout: 'vertical',
-            paddingAll: '24px',
+            paddingAll: '16px',
             contents: [
               // Header Stack
               {
@@ -108,7 +108,7 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
                     type: 'text',
                     text: 'DEPOSIT RECORDED',
                     weight: 'bold',
-                    size: 'xl',
+                    size: 'lg',
                     color: '#000000',
                     margin: 'xs'
                   }
@@ -118,8 +118,8 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
               {
                 type: 'box',
                 layout: 'vertical',
-                margin: 'xxl',
-                height: '40px',
+                margin: 'lg',
+                height: '16px',
                 contents: []
               },
               // Divider 1
@@ -131,8 +131,8 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
               {
                 type: 'box',
                 layout: 'horizontal',
-                margin: 'md',
-                spacing: 'md',
+                margin: 'sm',
+                spacing: 'sm',
                 contents: [
                   {
                     type: 'box',
@@ -142,7 +142,7 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
                       {
                         type: 'text',
                         text: result.bankName || 'ไม่ระบุ',
-                        size: 'sm',
+                        size: 'xs',
                         weight: 'bold',
                         color: '#000000',
                         wrap: true
@@ -164,7 +164,7 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
                       {
                         type: 'text',
                         text: result.senderName || 'ไม่ระบุ',
-                        size: 'sm',
+                        size: 'xs',
                         weight: 'bold',
                         color: '#000000',
                         wrap: true
@@ -184,14 +184,14 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
               {
                 type: 'separator',
                 color: '#000000',
-                margin: 'md'
+                margin: 'sm'
               },
               // Row 2
               {
                 type: 'box',
                 layout: 'horizontal',
-                margin: 'md',
-                spacing: 'md',
+                margin: 'sm',
+                spacing: 'sm',
                 contents: [
                   {
                     type: 'box',
@@ -201,7 +201,7 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
                       {
                         type: 'text',
                         text: result.transTime || 'ไม่ระบุ',
-                        size: 'sm',
+                        size: 'xs',
                         weight: 'bold',
                         color: '#000000',
                         wrap: true
@@ -223,7 +223,7 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
                       {
                         type: 'text',
                         text: senderName || 'ไม่ระบุ',
-                        size: 'sm',
+                        size: 'xs',
                         weight: 'bold',
                         color: '#000000',
                         wrap: true
@@ -243,18 +243,18 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
               {
                 type: 'separator',
                 color: '#000000',
-                margin: 'md'
+                margin: 'sm'
               },
               // Row 3
               {
                 type: 'box',
                 layout: 'vertical',
-                margin: 'md',
+                margin: 'sm',
                 contents: [
                   {
                     type: 'text',
                     text: result.transactionRef || 'ไม่ระบุ',
-                    size: 'sm',
+                    size: 'xs',
                     weight: 'bold',
                     color: '#000000',
                     wrap: true
@@ -272,47 +272,26 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
               {
                 type: 'separator',
                 color: '#000000',
-                margin: 'md'
+                margin: 'sm'
               },
               // Big Amount
               {
                 type: 'text',
-                margin: 'lg',
+                margin: 'md',
                 contents: [
                   {
                     type: 'span',
                     text: parsedAmount.toLocaleString('th-TH', {minimumFractionDigits: 2}),
-                    size: '5xl',
+                    size: '3xl',
                     weight: 'bold',
                     color: '#000000'
                   },
                   {
                     type: 'span',
                     text: ' THB',
-                    size: 'md',
+                    size: 'xs',
                     weight: 'bold',
                     color: '#000000'
-                  }
-                ]
-              },
-              // Divider 5
-              {
-                type: 'separator',
-                color: '#000000',
-                margin: 'lg'
-              },
-              // Footer
-              {
-                type: 'box',
-                layout: 'horizontal',
-                margin: 'md',
-                contents: [
-                  {
-                    type: 'text',
-                    text: 'ONHAUS SYSTEM©',
-                    size: 'xxs',
-                    color: '#333333',
-                    weight: 'bold'
                   }
                 ]
               }
