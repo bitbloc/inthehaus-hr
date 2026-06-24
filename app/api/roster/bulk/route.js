@@ -78,8 +78,8 @@ export async function POST(request) {
               { type: 'text', text: '📢 อัปเดตตารางงานใหม่!', weight: 'bold', size: 'xl', color: '#1DB446' },
               { type: 'text', text: `ระหว่างวันที่: ${startFmt} - ${endFmt}`, size: 'sm', color: '#666666', margin: 'md' },
               { type: 'separator', margin: 'md' },
-              { type: 'text', text: 'บอสได้ทำการ Publish ตารางงานของสัปดาห์นี้เรียบร้อยแล้วค่ะ', size: 'sm', wrap: true, margin: 'md' },
-              { type: 'text', text: 'พนักงานทุกคนสามารถเช็คตารางของตัวเองได้โดยพิมพ์ "ตารางทั้งสัปดาห์" หรือ "ตารางงาน" ได้เลยนะคะ เมี๊ยว~ 🐱', size: 'sm', wrap: true, margin: 'md' }
+              { type: 'text', text: 'ผู้บริหารได้ทำการเผยแพร่ (Publish) ตารางงานของสัปดาห์นี้เรียบร้อยแล้วครับ', size: 'sm', wrap: true, margin: 'md' },
+              { type: 'text', text: 'ทีมงานทุกคนสามารถตรวจสอบตารางงานของตนเองได้โดยพิมพ์คำว่า "ตารางทั้งสัปดาห์" หรือ "ตารางงาน" ในห้องแชทได้เลยครับ', size: 'sm', wrap: true, margin: 'md' }
             ]
           }
         }

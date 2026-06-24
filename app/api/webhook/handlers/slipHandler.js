@@ -29,7 +29,7 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
   }
 
   if (!isAuthorized) {
-     await client.replyMessage(event.replyToken, { type: 'text', text: `เมี๊ยว~ คุณ ${senderName} ไม่มีสิทธิ์บันทึกสลิปนะคะ (รับเฉพาะตำแหน่ง Bar&Floor และ Owner ค่ะ)\n[UID: ${userId}] 😾` });
+     await client.replyMessage(event.replyToken, { type: 'text', text: `คุณ ${senderName} ไม่มีสิทธิ์ในการบันทึกสลิปเข้าระบบครับ (จำกัดสิทธิ์เฉพาะตำแหน่ง Bar&Floor และ Owner เท่านั้น)\n[UID: ${userId}]` });
      return true;
   }
 
@@ -70,11 +70,11 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
 
   if (insertError) {
      console.error("Slip Insert Error:", insertError);
-     if (insertError.code === '23505') {
-          await client.replyMessage(event.replyToken, { type: 'text', text: `เมี๊ยว~ สลิปใบนี้ (อ้างอิง: ${result.transactionRef || 'ไม่ทราบ'}) ถูกบันทึกเข้าระบบไปแล้วนะคะ ห้ามส่งซ้ำและห้ามโกงค่ะ! 😾` });
-     } else {
-          await client.replyMessage(event.replyToken, { type: 'text', text: `เมี๊ยว~ บันทึกสลิปไม่สำเร็จค่ะ (Error: ${insertError.message || insertError.code || 'Unknown DB Error'})` });
-     }
+      if (insertError.code === '23505') {
+           await client.replyMessage(event.replyToken, { type: 'text', text: `สลิปใบนี้ (อ้างอิง: ${result.transactionRef || 'ไม่ทราบ'}) ได้ถูกบันทึกเข้าระบบเรียบร้อยแล้วครับ ระบบไม่อนุญาตให้บันทึกซ้ำซ้อน` });
+      } else {
+           await client.replyMessage(event.replyToken, { type: 'text', text: `เกิดข้อผิดพลาดในการบันทึกข้อมูลสลิปเข้าระบบครับ (Error: ${insertError.message || insertError.code || 'Unknown DB Error'})` });
+      }
   } else {
      const slipFlexMsg = {
         type: 'flex',

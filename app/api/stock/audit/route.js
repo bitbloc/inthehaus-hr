@@ -53,9 +53,9 @@ export async function POST(request) {
     }
 
     if (!changesFound) {
-      reportMsg += `✅ ตรวจสอบแล้วยอดสต็อกเป๊ะ 100% ไม่มีส่วนต่างเลย เก่งมาก เมี๊ยว~\n`;
+      reportMsg += `✅ ตรวจสอบระดับสต็อกเรียบร้อยแล้ว ยอดตรงตามระบบ 100% ไม่มีส่วนต่างครับ\n`;
     } else {
-      reportMsg += `\n"จัดการอัปเดตลงระบบเรียบร้อยค่ะ! บอสดูยอดใหม่ได้เลย เมี๊ยว~" - Yuzu`;
+      reportMsg += `\n"ดำเนินการอัปเดตยอดคงคลังเข้าระบบเรียบร้อยครับ บอสสามารถตรวจสอบระดับสต็อกล่าสุดในระบบได้เลยครับ" - ยูซุ`;
     }
 
     // Push message to the original group (can be parameterized later if multiple groups but for now this is standard)

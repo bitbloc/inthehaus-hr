@@ -184,28 +184,28 @@ export async function handleOrderAndReservationPostback(event, client, action, q
   if (action === 'confirm_phone_order') {
     const orderId = queryParams.get('id');
     await supabase.from('phone_orders').update({ status: 'CONFIRMED', confirmed_at: new Date().toISOString() }).eq('id', orderId);
-    await client.replyMessage(event.replyToken, { type: 'text', text: '✅ รับออเดอร์เรียบร้อยค่ะ! กำลังเตรียมอาหารให้ลูกค้านะคะ เมี๊ยว~ 🐾' });
+    await client.replyMessage(event.replyToken, { type: 'text', text: '✅ บันทึกออเดอร์โทรศัพท์และส่งเรื่องเข้าครัวเรียบร้อยครับ กำลังเตรียมอาหารสำหรับบริการลูกค้าครับ' });
     return true;
   }
 
   if (action === 'done_phone_order') {
     const orderId = queryParams.get('id');
     await supabase.from('phone_orders').update({ status: 'DONE', done_at: new Date().toISOString() }).eq('id', orderId);
-    await client.replyMessage(event.replyToken, { type: 'text', text: '✅ ออเดอร์เสร็จเรียบร้อย! คุ้มค่าแก่การรอยคอยค่ะ เมี๊ยว~ 🏁' });
+    await client.replyMessage(event.replyToken, { type: 'text', text: '✅ ออเดอร์โทรศัพท์ดำเนินการจัดเตรียมเสร็จสิ้นเรียบร้อยครับ' });
     return true;
   }
 
   if (action === 'confirm_table_reservation') {
     const resId = queryParams.get('id');
     await supabase.from('table_reservations').update({ status: 'CONFIRMED' }).eq('id', resId);
-    await client.replyMessage(event.replyToken, { type: 'text', text: '✅ ยืนยันการจองคืนนี้เรียบร้อยค่ะ! เตรียมจัดโต๊ะรอรับบอสและลูกค้าเลยค่ะ เมี๊ยว~ 🥂' });
+    await client.replyMessage(event.replyToken, { type: 'text', text: '✅ ยืนยันการจองโต๊ะเรียบร้อยครับ ระบบจะทำการสำรองโต๊ะสำหรับรองรับลูกค้าและผู้บริหารครับ' });
     return true;
   }
 
   if (action === 'cancel_table_reservation') {
     const resId = queryParams.get('id');
     await supabase.from('table_reservations').update({ status: 'CANCELLED' }).eq('id', resId);
-    await client.replyMessage(event.replyToken, { type: 'text', text: '🌑 ยกเลิกการจองให้แล้วนะคะ เมี๊ยว~' });
+    await client.replyMessage(event.replyToken, { type: 'text', text: '🌑 ดำเนินการยกเลิกรายการจองโต๊ะดังกล่าวเรียบร้อยครับ' });
     return true;
   }
 

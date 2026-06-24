@@ -36,7 +36,7 @@ export async function handleStockResponseTags(response, request, query = "") {
       if (actionData.action === 'CHECK_LOW') {
          const lowStockData = await fetchLowStock();
          if (lowStockData.length === 0) {
-            return { type: 'text', text: '✅ เช็คให้แล้วค่ะ ไม่มีรายการสินค้าที่เหลือน้อยเลย สบายใจได้ เมี๊ยว~' };
+            return { type: 'text', text: '✅ ตรวจสอบสต็อกเรียบร้อยครับ ไม่มีรายการสินค้าที่เหลือน้อยกว่าจุดสั่งซื้อขั้นต่ำครับ' };
          } else {
             return formatLowStockFlex(lowStockData);
          }
@@ -50,7 +50,7 @@ export async function handleStockResponseTags(response, request, query = "") {
       } else if (actionData.action === 'CHECK_ITEM') {
          const search = actionData.itemName || '';
          if (!search) {
-            return { type: 'text', text: '❌ ระบุชื่อสินค้าที่ต้องการเช็คด้วยนะ เมี๊ยว~' };
+            return { type: 'text', text: '❌ กรุณาระบุชื่อสินค้าที่ต้องการตรวจสอบด้วยครับ' };
          } else {
             const allItems = await fetchStockItems();
             let matchedItems = [];
@@ -66,7 +66,7 @@ export async function handleStockResponseTags(response, request, query = "") {
             } else if (matchedItems.length > 1) {
                return formatMultiItemsStockFlex(search, matchedItems);
             } else {
-               return { type: 'text', text: `❌ ไม่พบสินค้าชื่อ "${search}" ในคลังค่ะ เมี๊ยว~` };
+               return { type: 'text', text: `❌ ไม่พบสินค้าชื่อ "${search}" ในระบบคลังสินค้าครับ` };
             }
          }
       } else if (actionData.action === 'CHECK_HISTORY') {
@@ -90,14 +90,14 @@ export async function handleStockResponseTags(response, request, query = "") {
             } else if (matchedItems.length > 1) {
                return formatStockSelectionFlex(actionData.itemName, matchedItems);
             } else {
-               return { type: 'text', text: `❌ หาประวัติของ "${actionData.itemName}" ไม่เจอค่ะ ไม่มีสินค้านี้ในระบบ เมี๊ยว~` };
+               return { type: 'text', text: `❌ ไม่พบประวัติความเคลื่อนไหวของสินค้า "${actionData.itemName}" เนื่องจากไม่มีสินค้ารายการนี้ในคลังครับ` };
             }
          } else {
             historyData = await fetchStockHistory();
          }
          
          if (historyData.length === 0) {
-            return { type: 'text', text: `ไม่มีการเคลื่อนไหวสต็อกเลยค่ะ สงบเงียบมาก เมี๊ยว~` };
+            return { type: 'text', text: `ไม่มีประวัติความเคลื่อนไหวสำหรับสินค้าดังกล่าวในระบบครับ` };
          } else {
             return formatStockHistoryFlex(historyData, title);
          }
@@ -152,7 +152,7 @@ export async function handleStockResponseTags(response, request, query = "") {
       }
     } catch (e) {
       console.error("Stock Action Error:", e);
-      return { type: 'text', text: `เกิดข้อผิดพลาดในการดึงข้อมูลจาก API สต็อกค่ะ บอสเช็คโค้ดหรือแจ้งทีมงานทีนะคะ เมี๊ยว~ 😿\nError: ${e.message}` };
+      return { type: 'text', text: `เกิดข้อผิดพลาดในการดึงข้อมูลจากระบบสต็อกครับ บอสสามารถตรวจสอบระบบหรือแจ้งทีมงานผู้ดูแลระบบได้ครับ\nError: ${e.message}` };
     }
   }
 
@@ -208,7 +208,7 @@ export async function handleStockResponseTags(response, request, query = "") {
 
 export async function handleStockPostback(event, client, action, queryParams, userId) {
   if (action === 'cancel_stock') {
-    await client.replyMessage(event.replyToken, { type: 'text', text: '✅ ยกเลิกการจัดการสต็อกแล้วค่ะ เมี๊ยว~' });
+    await client.replyMessage(event.replyToken, { type: 'text', text: '✅ ยกเลิกการทำรายการจัดการสต็อกเรียบร้อยครับ' });
     return { handled: true };
   }
 
@@ -233,7 +233,7 @@ export async function handleStockPostback(event, client, action, queryParams, us
            current_quantity: 0,
            reorder_point: payload.reorder_point || 0
          });
-         await client.replyMessage(event.replyToken, { type: 'text', text: `✅ สร้างรายการสินค้า [${payload.itemName}] สำเร็จแล้วจ้า เมี๊ยว~` });
+         await client.replyMessage(event.replyToken, { type: 'text', text: `✅ ดำเนินการเพิ่มรายการสินค้าใหม่ [${payload.itemName}] เข้าระบบคลังสินค้าเรียบร้อยครับ` });
       } else {
          const searchItems = await fetchStockItems(payload.itemName);
          const exactMatch = searchItems.find(i => i.name === payload.itemName);
@@ -241,7 +241,7 @@ export async function handleStockPostback(event, client, action, queryParams, us
          
          if (!item) {
            const optionsText = searchItems.length > 0 ? ` เล็งตัวไหนไว้คะ: ${searchItems.slice(0,3).map(i => i.name).join(', ')}?` : "";
-           await client.replyMessage(event.replyToken, { type: 'text', text: `❌ ไม่พบรายการสินค้า "${payload.itemName}" ที่ชัดเจนในระบบค่ะ${optionsText} ลองตรวจสอบชื่อให้แม่นๆ อีกทีนะ เมี๊ยว~` });
+           await client.replyMessage(event.replyToken, { type: 'text', text: `❌ ไม่พบรายการสินค้า "${payload.itemName}" ที่ตรงกันในระบบครับ${optionsText} รบกวนตรวจสอบตัวสะกดชื่อสินค้าอีกครั้งครับ` });
            return { handled: true };
          }
 
@@ -251,7 +251,7 @@ export async function handleStockPostback(event, client, action, queryParams, us
          } else if (payload.action === 'RESTOCK' || payload.action === 'DEDUCT') {
            const tType = payload.action === 'RESTOCK' ? 'in' : 'out';
            await addStockTransaction(item.id, tType, payload.quantity, empName, payload.note || `ปรับผ่านแชท Yuzu`);
-           await client.replyMessage(event.replyToken, { type: 'text', text: `✅ บันทึกยอดคลังสินค้า [${item.name}] สำเร็จแล้วจ้า ยูซุหิวเลย! เมี๊ยว~` });
+           await client.replyMessage(event.replyToken, { type: 'text', text: `✅ บันทึกยอดคลังสินค้า [${item.name}] สำเร็จแล้วครับ การทำรายการถูกบันทึกเข้าระบบประวัติเรียบร้อย` });
          }
       }
       return { handled: true };
@@ -273,7 +273,7 @@ export async function handleStockPostback(event, client, action, queryParams, us
         const flexMsg = formatSingleItemStockFlex(exactMatch);
         await client.replyMessage(event.replyToken, flexMsg);
       } else {
-        await client.replyMessage(event.replyToken, { type: 'text', text: `❌ ไม่พบข้อมูลสต็อกสำหรับ "${itemName}" ในระบบค่ะ เมี๊ยว~` });
+        await client.replyMessage(event.replyToken, { type: 'text', text: `❌ ไม่พบข้อมูลระดับสต็อกสำหรับ "${itemName}" ในระบบครับ` });
       }
       return { handled: true };
     } catch (err) {

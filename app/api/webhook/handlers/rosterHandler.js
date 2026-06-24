@@ -299,7 +299,7 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
 
     if (empErr) {
         console.error("Error fetching employees:", empErr);
-        await client.replyMessage(event.replyToken, { type: 'text', text: 'เมี๊ยว~ เกิดข้อผิดพลาดในการดึงข้อมูลพนักงานค่ะ' });
+        await client.replyMessage(event.replyToken, { type: 'text', text: 'เกิดข้อผิดพลาดในการดึงข้อมูลพนักงานจากระบบครับ' });
         return true;
     }
 
@@ -334,7 +334,7 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
 
     if (txErr) {
         console.error("Error fetching roster transactions batch:", txErr);
-        await client.replyMessage(event.replyToken, { type: 'text', text: 'เมี๊ยว~ เกิดข้อผิดพลาดในการดึงข้อมูลตารางงานค่ะ' });
+        await client.replyMessage(event.replyToken, { type: 'text', text: 'เกิดข้อผิดพลาดในการดึงข้อมูลตารางงานจากระบบครับ' });
         return true;
     }
 
@@ -568,7 +568,7 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
     const roster = await getEffectiveRoster(targetDate);
 
     if (roster.length === 0) {
-      await client.replyMessage(event.replyToken, { type: 'text', text: `📅 ตารางงานวันที่ ${dateStr}\n\nเมี๊ยว~ ยังไม่มีใครลงเวลายังไงเลยค่ะ` });
+      await client.replyMessage(event.replyToken, { type: 'text', text: `📅 ตารางงานวันที่ ${dateStr}\n\nยังไม่มีรายงานการลงเวลาเข้างานของทีมงานในระบบครับ` });
     } else {
       const contents = [
         { type: 'text', text: 'DAILY ATTENDANCE REGISTRY', weight: 'bold', size: 'sm', color: '#1c1c1c' },
@@ -788,7 +788,7 @@ export async function handleRosterPostback(event, client, action, queryParams, u
       }
       
       if (!targetEmpId) {
-        await client.replyMessage(event.replyToken, { type: 'text', text: 'เมี๊ยว~ หาข้อมูลพนักงานไม่เจอค่ะ รบกวนแจ้งบอสให้ผูก ID ก่อนนะ' });
+        await client.replyMessage(event.replyToken, { type: 'text', text: 'ไม่พบข้อมูลพนักงานในระบบครับ รบกวนแจ้งผู้บริหาร (บอส) เพื่อทำการลงทะเบียนและผูก Line ID ในระบบก่อนครับ' });
         return true;
       }
 
@@ -821,7 +821,7 @@ export async function handleRosterPostback(event, client, action, queryParams, u
             status: 'PUBLISHED'
           }, { onConflict: 'employee_id, date, slot_type' });
         }
-        await client.replyMessage(event.replyToken, { type: 'text', text: `✅ บอสสั่งมา ยูซุจัดให้! อัปเดตตารางของ "${targetNickname}" เรียบร้อยแล้วค่ะ เมี๊ยว~` });
+        await client.replyMessage(event.replyToken, { type: 'text', text: `✅ ดำเนินการอัปเดตตารางเวลาของ "${targetNickname}" เรียบร้อยตามคำสั่งของผู้บริหารแล้วครับ` });
       } else {
         const approvalFlex = {
           type: 'bubble',
@@ -885,7 +885,7 @@ export async function handleRosterPostback(event, client, action, queryParams, u
           }
         };
 
-        await client.replyMessage(event.replyToken, { type: 'text', text: 'รับทราบค่ะ! ยูซุส่งเรื่องให้บอสพิจารณาในกลุ่มเรียบร้อยแล้วนะคะ เมี๊ยว~' });
+        await client.replyMessage(event.replyToken, { type: 'text', text: 'รับเรื่องคำขอเรียบร้อยครับ ระบบได้ส่งเรื่องเสนอให้ผู้บริหารพิจารณาอนุมัติเรียบร้อยแล้วครับ' });
         await client.pushMessage(groupId, { type: 'flex', altText: '🔔 คำขอปรับตารางใหม่', contents: approvalFlex });
       }
       return true;
@@ -901,7 +901,7 @@ export async function handleRosterPostback(event, client, action, queryParams, u
     const isBoss = await checkIsBoss(userId);
 
     if (!isBoss) {
-       await client.replyMessage(event.replyToken, { type: 'text', text: 'เมี๊ยว~ สิทธิ์ไม่พอค่ะ ต้องให้บอส (คุณพ่อ/คุณแม่) กดเท่านั้นนะคะ!' });
+       await client.replyMessage(event.replyToken, { type: 'text', text: 'ขออภัยครับ การดำเนินการนี้สงวนสิทธิ์เฉพาะผู้บริหาร (บอส) เท่านั้นครับ' });
        return true;
     }
 
@@ -923,7 +923,7 @@ export async function handleRosterPostback(event, client, action, queryParams, u
           status: 'PUBLISHED'
         }, { onConflict: 'employee_id, date, slot_type' });
       }
-      await client.replyMessage(event.replyToken, { type: 'text', text: '✅ อนุมัติเรียบร้อย! อัปเดตตารางให้แล้วค่ะ เมี๊ยว~' });
+      await client.replyMessage(event.replyToken, { type: 'text', text: '✅ การอนุมัติเสร็จสมบูรณ์ ระบบทำการอัปเดตตารางงานเรียบร้อยครับ' });
     }
     return true;
   }
@@ -942,7 +942,7 @@ export async function handleRosterPostback(event, client, action, queryParams, u
     const isBoss = await checkIsBoss(userId);
 
     if (!isBoss) {
-      await client.replyMessage(event.replyToken, { type: 'text', text: 'เมี๊ยว~ สิทธิ์ไม่พอค่ะ ต้องให้บอส (คุณพ่อ/คุณแม่) กดเท่านั้นนะคะ!' });
+      await client.replyMessage(event.replyToken, { type: 'text', text: 'ขออภัยครับ การดำเนินการนี้สงวนสิทธิ์เฉพาะผู้บริหาร (บอส) เท่านั้นครับ' });
       return true;
     }
 
@@ -956,13 +956,13 @@ export async function handleRosterPostback(event, client, action, queryParams, u
       .in('id', ids);
 
     if (fetchErr || !leaves || leaves.length === 0) {
-      await client.replyMessage(event.replyToken, { type: 'text', text: 'เมี๊ยว~ ไม่พบข้อมูลใบลาหยุดนี้ในระบบค่ะ' });
+      await client.replyMessage(event.replyToken, { type: 'text', text: 'ไม่พบข้อมูลใบลาหยุดดังกล่าวในระบบครับ' });
       return true;
     }
 
     const pendingLeaves = leaves.filter(l => l.status === 'pending');
     if (pendingLeaves.length === 0) {
-      await client.replyMessage(event.replyToken, { type: 'text', text: 'เมี๊ยว~ ใบลาหยุดเหล่านี้ได้รับการดำเนินการไปก่อนหน้านี้แล้วค่ะ' });
+      await client.replyMessage(event.replyToken, { type: 'text', text: 'รายการคำขอลาหยุดนี้ได้รับการดำเนินการเสร็จสิ้นไปก่อนหน้านี้แล้วครับ' });
       return true;
     }
 
@@ -1150,7 +1150,7 @@ export async function handleRosterPostback(event, client, action, queryParams, u
       }
     };
 
-    await client.replyMessage(event.replyToken, { type: 'text', text: `เมี๊ยว~ ยูซุดำเนินการ${isApproved ? 'อนุมัติ' : 'ปฏิเสธ'}การลางานของ ${name} เรียบร้อยแล้วค่ะ!` });
+    await client.replyMessage(event.replyToken, { type: 'text', text: `ยูซุดำเนินการ${isApproved ? 'อนุมัติ' : 'ปฏิเสธ'}คำขอลาหยุดของ ${name} เรียบร้อยแล้วครับ` });
 
     // ส่งเข้าทุกกลุ่ม
     const GROUP_IDS = [
@@ -1165,7 +1165,7 @@ export async function handleRosterPostback(event, client, action, queryParams, u
   }
 
   if (action === 'cancel_roster') {
-    await client.replyMessage(event.replyToken, { type: 'text', text: 'โอเคค่ะ ยกเลิกรายการให้นะคะ เมี๊ยว~' });
+    await client.replyMessage(event.replyToken, { type: 'text', text: 'ยกเลิกการทำรายการเรียบร้อยครับ' });
     return true;
   }
 

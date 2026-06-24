@@ -100,7 +100,7 @@ export default function StockAuditPage() {
       <div className="min-h-screen bg-neutral-900 flex flex-col items-center justify-center p-6 text-white font-sans">
         <CheckCircle className="w-20 h-20 text-green-500 mb-6 drop-shadow-[0_0_15px_rgba(34,197,94,0.5)]" />
         <h1 className="text-2xl font-bold mb-2">อัปเดตสต็อกเรียบร้อย!</h1>
-        <p className="text-neutral-400 text-center mb-8">ขอบคุณที่ช่วยนับสต็อคค่ะ เมี๊ยว~<br/>รายงานถูกส่งเข้ากลุ่ม LINE แล้ว</p>
+        <p className="text-neutral-400 text-center mb-8">ขอบคุณทีมงานที่ดำเนินการนับและตรวจสอบสต็อกระบบครับ<br/>รายงานสรุปผลต่างถูกส่งเข้ากลุ่ม LINE เรียบร้อยแล้ว</p>
         <button onClick={() => liff.closeWindow()} className="w-full max-w-xs bg-neutral-800 border border-neutral-700 py-3 rounded-xl font-bold hover:bg-neutral-700 transition">
           ปิดหน้าต่าง
         </button>

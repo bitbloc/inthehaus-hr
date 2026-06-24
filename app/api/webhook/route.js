@@ -404,7 +404,7 @@ export async function POST(request) {
                       source_message_id: event.message.id
                     });
                   }
-                  replyMsg += `\n\n📌 ยูซุจดเป็น Task ให้แล้ว ${result.tasks.length} รายการค่ะ เมี๊ยว~`;
+                  replyMsg += `\n\n📌 ยูซุบันทึกเป็นรายการงาน (Task) ให้เรียบร้อยแล้ว ${result.tasks.length} รายการครับ`;
                 }
                 
                 handledLocally = true;
@@ -568,21 +568,21 @@ export async function POST(request) {
         
         // --- Handle Follow (Add Friend) Events ---
         else if (event.type === 'follow') {
-          const welcomeText = "สวัสดีค่ะ! ยูซุยินดีต้อนรับนะคะ 🍊🐱 ยูซุเป็นผู้ช่วย AI ประจำร้าน In The Haus ค่ะ สามารถถามเรื่องตารางงาน สรุปยอดขาย เช็คสภาพอากาศ วาดรูป หรือพิมพ์คุยเล่นกับยูซุได้เลยนะคะ พิมพ์ 'yuzu คุยด้วยหน่อย' เพื่อเริ่มต้นได้เลยค่ะ เมี๊ยว~";
+          const welcomeText = "สวัสดีครับ ยูซุยินดีต้อนรับครับ 🍊 ยูซุเป็นผู้จัดการร้าน AI ประจำร้าน In The Haus ครับ สามารถสอบถามเรื่องตารางงาน สรุปยอดขาย เช็คสภาพอากาศ หรือข้อมูลระบบอื่นๆ ได้เลยครับ";
           await client.replyMessage(event.replyToken, { type: 'text', text: welcomeText });
           handledLocally = true;
         }
         
         // --- Handle Join Group Events ---
         else if (event.type === 'join') {
-          const welcomeGroupText = "สวัสดีค่าทุกคนในกลุ่ม! 🍊🐱 ยูซุเป็นผู้ช่วย AI ประจำร้าน In The Haus เข้าร่วมกลุ่มแล้วค่ะ! ทุกคนสามารถเรียกใช้ยูซุได้โดยการพิมพ์ขึ้นต้นว่า 'yuzu' หรือ 'ยูซุ' นะคะ (เช่น 'yuzu พรุ่งนี้ฝนตกไหม' หรือ 'yuzu ช่วยสลับกะให้หน่อย') ฝากเนื้อฝากตัวด้วยนะคะ เมี๊ยว~";
+          const welcomeGroupText = "สวัสดีครับทุกคนในกลุ่ม! 🍊 ยูซุเป็นผู้จัดการร้าน AI ของร้าน In The Haus เข้าร่วมกลุ่มเรียบร้อยครับ ทุกคนสามารถเรียกใช้งานยูซุได้โดยพิมพ์ขึ้นต้นว่า 'yuzu' หรือ 'ยูซุ' นะครับ (เช่น 'yuzu ขอตารางงานวันนี้' หรือ 'yuzu ยอดขายเมื่อวานเป็นอย่างไร') เพื่อให้ระบบและร้านของเราทำงานได้อย่างราบรื่นครับ";
           await client.replyMessage(event.replyToken, { type: 'text', text: welcomeGroupText });
           handledLocally = true;
         }
         
         // --- Handle Member Joined Group Events ---
         else if (event.type === 'memberJoined') {
-          const welcomeMemberText = "ยินดีต้อนรับสมาชิกใหม่เข้าสู่กลุ่มค่ะ! 🍊🐱 หนูชื่อยูซุ เป็น AI ผู้ช่วยประจำร้านนะคะ ถ้ามีอะไรให้หนูช่วยเรื่องตารางงานหรือข้อมูลร้าน เรียกใช้หนูได้ตลอดเลยค่ะ เมี๊ยว~";
+          const welcomeMemberText = "ยินดีต้อนรับสมาชิกใหม่เข้าสู่กลุ่มครับ! 🍊 ผมชื่อยูซุ เป็นผู้จัดการร้าน AI นะครับ หากมีข้อมูลตารางงานหรือการรายงานระบบจุดไหนให้ช่วยประสานงาน เรียกใช้ผมได้ตลอดเวลาเลยครับ";
           await client.replyMessage(event.replyToken, { type: 'text', text: welcomeMemberText });
           handledLocally = true;
         }

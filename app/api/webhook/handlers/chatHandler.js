@@ -11,7 +11,7 @@ export async function handleChatCommand(event, client, text, rawText, userId, gr
   if (text.startsWith('yuzu') || text.startsWith('ยูซุ')) {
     const query = text.startsWith('yuzu') ? rawText.slice(4).trim() : rawText.slice(4).trim();
     if (!query) {
-      await client.replyMessage(event.replyToken, { type: 'text', text: 'ยูซุยินดีให้บริการครับ พิมพ์ "yuzu" หรือ "ยูซุ" ตามด้วยสิ่งที่คุณอยากรู้ได้เลยครับ เมี๊ยว~' });
+      await client.replyMessage(event.replyToken, { type: 'text', text: 'ยูซุยินดีให้บริการครับ พิมพ์ "yuzu" หรือ "ยูซุ" ตามด้วยสิ่งที่คุณต้องการสอบถามหรือจัดการข้อมูลร้านได้เลยครับ' });
       return true;
     }
 
@@ -22,13 +22,13 @@ export async function handleChatCommand(event, client, text, rawText, userId, gr
       
       const isFather = userId === father_uid;
       const isMother = userId === mother_uid;
-      let identity = "ทีมงานทั่วไปค่ะ";
-      if (isFather) identity = "คุณพ่อ (บอสใหญ่) ค่ะ! 🙏";
-      if (isMother) identity = "คุณแม่ (บอสใหญ่) ค่ะ! 🙏";
+      let identity = "ทีมงานทั่วไปครับ";
+      if (isFather) identity = "คุณพ่อ (บอสใหญ่) ครับ! 🙏";
+      if (isMother) identity = "คุณแม่ (บอสใหญ่) ครับ! 🙏";
       
       await client.replyMessage(event.replyToken, { 
         type: 'text', 
-        text: `คุณคือ: ${identity}\nUser ID: ${userId || 'ไม่พบ ID ค่ะ'}\n(ข้อมูลนี้ใช้เพื่อตรวจสอบสถานะบอสเท่านั้นนะคะ เมี๊ยว~)` 
+        text: `คุณคือ: ${identity}\nUser ID: ${userId || 'ไม่พบ ID ครับ'}\n(ข้อมูลนี้ใช้เพื่อตรวจสอบสถานะบอสเท่านั้นนะครับ)` 
       });
       return true;
     }
@@ -40,7 +40,7 @@ export async function handleChatCommand(event, client, text, rawText, userId, gr
 
       if (result.success && result.imageUrl) {
         await client.replyMessage(event.replyToken, [
-          { type: 'text', text: `วาดเสร็จแล้วค๊าาา! นี่คือภาพ "${result.prompt}" สไตล์น้องยูซุนะคะ เมี๊ยว~` },
+          { type: 'text', text: `สร้างรูปภาพสำเร็จเรียบร้อยครับ นี่คือภาพ "${result.prompt}" ตามที่คุณระบุครับ` },
           { type: 'image', originalContentUrl: result.imageUrl, previewImageUrl: result.imageUrl }
         ]);
       } else {
@@ -96,7 +96,7 @@ export async function handleChatCommand(event, client, text, rawText, userId, gr
 
       const { data: slips, error } = await dbQuery;
       if (error) {
-        await client.replyMessage(event.replyToken, { type: 'text', text: 'เมี๊ยว~ เกิดข้อผิดพลาดในการดึงยอดโอนค่ะ' });
+        await client.replyMessage(event.replyToken, { type: 'text', text: 'ขออภัยครับ เกิดข้อผิดพลาดในระบบฐานข้อมูลระหว่างการดึงยอดโอนครับ' });
         return true;
       }
 
@@ -109,7 +109,7 @@ export async function handleChatCommand(event, client, text, rawText, userId, gr
           if (count > 0) {
               replyText = `💸 ยอดโอนล่าสุด:\n\nจำนวนเงิน: ${Number(slips[0].amount).toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท\nเวลา: ${format(addHours(new Date(slips[0].timestamp), 7), 'HH:mm:ss น.')}`;
           } else {
-              replyText = `เมี๊ยว~ ยังไม่มียอดโอนเลยค่ะ`;
+              replyText = `ยังไม่มีการบันทึกยอดโอนในระบบครับ`;
           }
       } else {
           replyText += `✅ จำนวนสลิป: ${count} รายการ\n`;
@@ -121,7 +121,7 @@ export async function handleChatCommand(event, client, text, rawText, userId, gr
               const timeStr = format(addHours(new Date(s.timestamp), 7), 'HH:mm');
               replyText += `- เวลา ${timeStr} น. : ${Number(s.amount).toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท\n`;
           });
-          replyText += `\n(พิมพ์ "yuzu export slips" เพื่อดาวน์โหลด Excel ค่ะ)`;
+          replyText += `\n(พิมพ์ "yuzu export slips" เพื่อดาวน์โหลดรายงานสรุปยอดโอนครับ)`;
       }
 
       const wantsImage = (text.includes('ภาพ') || text.includes('รูป')) && !text.includes('ไม่ต้อง') && !text.includes('ไม่เอา');
@@ -145,7 +145,7 @@ export async function handleChatCommand(event, client, text, rawText, userId, gr
     if (text === 'yuzu export slips' || text === 'export slips') {
        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://inthehaus-hr.vercel.app';
        const rawUrl = `${baseUrl}/admin/yuzu/slips/report`;
-       await client.replyMessage(event.replyToken, { type: 'text', text: `📥 ดาวน์โหลดรายงานสรุปยอดโอนแบบ PDF สวยๆ ได้ที่ลิงก์นี้เลยค่ะ เมี๊ยว~\n${rawUrl}` });
+       await client.replyMessage(event.replyToken, { type: 'text', text: `📥 ดาวน์โหลดรายงานสรุปยอดโอนแบบ PDF ได้ที่ลิงก์นี้เลยครับ\n${rawUrl}` });
        return true;
     }
 
@@ -222,21 +222,21 @@ ${dailyLogs || 'ไม่มีความเคลื่อนไหว'}
       context += await getIngredientPrices() + "\n";
             
       context += `\n[INSTRUCTION: คุณกำลังสรุปข่าวเด่นและข้อมูลต้นทุนที่จำเป็นสำหรับร้านอาหารประเภท Casual Dining Bistro (In The Haus นครพนม) 
-      กรุณาตอบกลับโดยใช้ภาษาพูดที่แสนกวนประสาทแต่ขี้อ้อนและขยันสไตล์แมวยูซุ โดยคุณต้องแบ่งข้อมูลออกเป็นหัวข้อหลักๆ และใช้ Tag ครอบไว้ทั้งหมดเพื่อระบบจะนำไปจัดข้อมูลแบบ Flex Message
+      กรุณาตอบกลับด้วยน้ำเสียงสุภาพ อบอุ่น ชัดเจน และตรงไปตรงมา สไตล์ผู้จัดการร้านสุดเนี๊ยบ โดยคุณต้องแบ่งข้อมูลออกเป็นหัวข้อหลักๆ และใช้ Tag ครอบไว้ทั้งหมดเพื่อระบบจะนำไปจัดข้อมูลแบบ Flex Message
       **ห้ามใส่ markdown สัญลักษณ์หนาเตอะอย่างพวกลูกสตาร์สองตัว (**) ใน Tag เป็นอันขาด**
       
       **กฎเหล็กเรื่องความสดใหม่ของข่าว:**
       - ห้ามเอาข่าวเก่าในประวัติการแชท (เช่น พายุลูกเห็บถล่มเรณูนคร, จับยาเสพติดล็อตใหญ่) มาสรุปซ้ำเด็ดขาด!
       - ให้ใช้ข่าวใหม่ของวันนี้ที่อยู่ภายใน [CRITICAL_CONTEXT_DATA] เท่านั้น
-      - หากในข่าวหมวดหมู่ใดระบุว่า "ไม่พบข่าวล่าสุด" หรือไม่มีข่าวใหม่ของวันนี้ ให้แจ้งตรงๆ ว่า "ไม่มีข่าวอัปเดตในพื้นที่นครพนมวันนี้เมี๊ยว~" หรือสลับไปดึงเฉพาะข่าวเด่นระดับประเทศล่าสุดจาก THE STANDARD ของวันนี้แทน ห้ามมโนข่าวเก่าขึ้นมาเป็นอันขาด
+      - หากในข่าวหมวดหมู่ใดระบุว่า "ไม่พบข่าวล่าสุด" หรือไม่มีข่าวใหม่ของวันนี้ ให้แจ้งตรงๆ ว่า "ไม่มีข่าวอัปเดตในพื้นที่นครพนมวันนี้ครับ" หรือสลับไปดึงเฉพาะข่าวเด่นระดับประเทศล่าสุดจาก THE STANDARD ของวันนี้แทน ห้ามมโนข่าวเก่าขึ้นมาเป็นอันขาด
       
       โปรดตอบกลับตามโครงสร้างนี้อย่างเคร่งครัด:
-      [FLEX_TITLE]หัวข้อรายงานสรุปจากยูซุ เช่น 🐱 สรุปข่าวสารและต้นทุนรายวันโดยน้องยูซุ[/FLEX_TITLE]
+      [FLEX_TITLE]รายงานสรุปสถานการณ์และข้อมูลประกอบการตัดสินใจประจำวัน[/FLEX_TITLE]
       [FLEX_SUBTITLE]รายงานเพื่อช่วยในการดำเนินงานสำหรับเจ้านายและพี่ๆ ทีมงาน[/FLEX_SUBTITLE]
       [FLEX_NEWS]สรุปข่าวเด่นนครพนมและภาคอีสานที่เกิดขึ้นช่วงนี้ (สั้นๆ กระชับ 2-3 บรรทัด)[/FLEX_NEWS]
       [FLEX_INDUSTRY]สรุปข่าวสาร/เทรนด์ธุรกิจและการแข่งขันในวงการร้านอาหารของไทยและแถบอีสาน (2-3 บรรทัด)[/FLEX_INDUSTRY]
       [FLEX_COSTS]สรุปสถานการณ์ต้นทุนปัจจุบัน: ราคาน้ำมัน (อ้างอิงค่ากลางและสถานีในนครพนม), ค่าไฟฟ้า (หน่วยละ 4.18 บาท), ราคาวัตถุดิบหลัก (ไข่ ไก่ หมู ข้าว) ที่ร้านอาหารต้องประเมิน (2-3 บรรทัด)[/FLEX_COSTS]
-      [FLEX_ADVICE]คำแนะนำจากน้องยูซุถึงร้าน In The Haus (เช่น การประหยัดไฟ การคำนวณวัตถุดิบ หรือการวางแผนขนส่ง)[/FLEX_ADVICE]
+      [FLEX_ADVICE]คำแนะนำเชิงระบบจากผู้จัดการยูซุถึงร้าน In The Haus (เช่น การประหยัดไฟ การคำนวณวัตถุดิบ หรือการวางแผนขนส่ง)[/FLEX_ADVICE]
       
       ระวัง: ห้ามพิมพ์คำพูดใดๆ นอก Tag เหล่านี้เด็ดขาด เริ่มต้นที่ [FLEX_TITLE] และจบที่ [/FLEX_ADVICE] เสมอ]\n`;
     } else {
@@ -461,7 +461,7 @@ export async function handleChatPostback(event, client, action, queryParams, use
     const isBoss = await checkIsBoss(userId);
 
     if (!isBoss) {
-      await client.replyMessage(event.replyToken, { type: 'text', text: 'เมี๊ยว~ เฉพาะบอสเท่านั้นที่อนุมัติความรู้ได้นะคะ! 🐾' });
+      await client.replyMessage(event.replyToken, { type: 'text', text: 'ขออภัยครับ สิทธิ์ในการอนุมัติข้อมูลความรู้จำกัดเฉพาะผู้บริหาร (บอส) เท่านั้นครับ' });
       return true;
     }
 
@@ -471,9 +471,9 @@ export async function handleChatPostback(event, client, action, queryParams, use
       .eq('id', insightId);
 
     if (!error) {
-      await client.replyMessage(event.replyToken, { type: 'text', text: '✅ บันทึกความรู้เข้าคลังหลักเรียบร้อยค่ะ~ บอสนี่ตาถึงจริงๆ! ✨' });
+      await client.replyMessage(event.replyToken, { type: 'text', text: '✅ บันทึกความรู้ดังกล่าวเข้าสู่ระบบคลังความรู้หลักของร้านเรียบร้อยแล้วครับบอส' });
     } else {
-       await client.replyMessage(event.replyToken, { type: 'text', text: 'เเมี๊ยว~ บันทึกไม่สำเร็จค่ะ: ' + error.message });
+       await client.replyMessage(event.replyToken, { type: 'text', text: 'ไม่สามารถบันทึกข้อมูลเข้าระบบคลังความรู้หลักได้เนื่องจาก: ' + error.message });
     }
     return true;
   }
@@ -483,13 +483,13 @@ export async function handleChatPostback(event, client, action, queryParams, use
     const isBoss = await checkIsBoss(userId);
 
     if (!isBoss) {
-      await client.replyMessage(event.replyToken, { type: 'text', text: 'เมี๊ยว~ เฉพาะบอสเท่านั้นที่สั่งลบได้นะคะ! 🐾' });
+      await client.replyMessage(event.replyToken, { type: 'text', text: 'ขออภัยครับ สิทธิ์ในการลบหรือปฏิเสธชุดความรู้จำกัดเฉพาะผู้บริหาร (บอส) เท่านั้นครับ' });
       return true;
     }
 
     const { error } = await supabase.from('yuzu_knowledge').delete().eq('id', insightId);
     if (!error) {
-      await client.replyMessage(event.replyToken, { type: 'text', text: '🗑️ ลืมข้อมูลนี้เรียบร้อยค่ะ! ยูซุก็ว่าแล้วว่ามันแปลกๆ เมี๊ยว~' });
+      await client.replyMessage(event.replyToken, { type: 'text', text: '🗑️ ลบข้อมูลดังกล่าวออกจากระบบเป็นที่เรียบร้อยตามคำสั่งครับ' });
     }
     return true;
   }
