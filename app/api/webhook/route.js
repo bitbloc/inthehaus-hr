@@ -438,11 +438,11 @@ export async function POST(request) {
               // Resolve specific boss role
               let bossRole = null;
               if (userId === configs.father_uid) {
-                bossRole = "คุณพ่อ";
-                friendlyName = friendlyName || "คุณพ่อ";
+                bossRole = "พี่ฤ (บอส)";
+                friendlyName = "พี่ฤ";
               } else if (userId === configs.mother_uid) {
-                bossRole = "คุณแม่";
-                friendlyName = friendlyName || "คุณแม่";
+                bossRole = "พี่แหม่ม (บอส)";
+                friendlyName = "พี่แหม่ม";
               } else if (isBoss) {
                 bossRole = "บอส";
                 friendlyName = friendlyName || "บอส";

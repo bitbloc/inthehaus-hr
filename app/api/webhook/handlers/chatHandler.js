@@ -23,8 +23,8 @@ export async function handleChatCommand(event, client, text, rawText, userId, gr
       const isFather = userId === father_uid;
       const isMother = userId === mother_uid;
       let identity = "ทีมงานทั่วไปครับ";
-      if (isFather) identity = "คุณพ่อ (บอสใหญ่) ครับ! 🙏";
-      if (isMother) identity = "คุณแม่ (บอสใหญ่) ครับ! 🙏";
+      if (isFather) identity = "พี่ฤ (บอสใหญ่) ครับ! 🙏";
+      if (isMother) identity = "พี่แหม่ม (บอสใหญ่) ครับ! 🙏";
       
       await client.replyMessage(event.replyToken, { 
         type: 'text', 
@@ -44,7 +44,7 @@ export async function handleChatCommand(event, client, text, rawText, userId, gr
           { type: 'image', originalContentUrl: result.imageUrl, previewImageUrl: result.imageUrl }
         ]);
       } else {
-        const errorMsg = typeof result === 'string' ? result : (result.message || "วาดไม่สำเร็จค่ะ");
+        const errorMsg = typeof result === 'string' ? result : (result.message || "วาดไม่สำเร็จครับ");
         await client.replyMessage(event.replyToken, { type: 'text', text: errorMsg });
       }
       return true;
