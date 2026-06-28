@@ -163,7 +163,7 @@ function RosterPDFReportContent() {
                                                 ) : (
                                                     slots.map((s, idx) => {
                                                         const shiftObj = shifts.find(sh => sh.id === s.shift_id);
-                                                        const matchedPreset = (!s.shift_id && s.custom_start_time && s.custom_end_time)
+                                                        const matchedPreset = (!s.is_off && !s.shift_id && s.custom_start_time && s.custom_end_time)
                                                             ? customPresets.find(p => (p.start || '').slice(0, 5) === s.custom_start_time.slice(0, 5) && (p.end || '').slice(0, 5) === s.custom_end_time.slice(0, 5))
                                                             : null;
                                                         const colorClass = matchedPreset
