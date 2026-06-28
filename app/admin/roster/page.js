@@ -766,7 +766,7 @@ export default function AdminRosterPage() {
                                                             const timeStr = s.custom_start_time ? `${s.custom_start_time.slice(0,5)}-${s.custom_end_time?.slice(0,5)}` : (shiftObj ? `${shiftObj.start_time.slice(0,5)}-${shiftObj.end_time.slice(0,5)}` : '');
 
                                                             // Match against saved presets for custom slots
-                                                            const matchedPreset = (!s.shift_id && s.custom_start_time && s.custom_end_time)
+                                                            const matchedPreset = (!s.is_off && !s.shift_id && s.custom_start_time && s.custom_end_time)
                                                                 ? customPresets.find(p => (p.start || '').slice(0, 5) === s.custom_start_time.slice(0, 5) && (p.end || '').slice(0, 5) === s.custom_end_time.slice(0, 5))
                                                                 : null;
                                                             const approvedLeave = empLeaves.find(l => l.status === 'approved');
