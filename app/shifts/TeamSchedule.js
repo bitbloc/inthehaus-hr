@@ -13,9 +13,25 @@ export default function TeamSchedule({ employees, schedules, overrides, shifts, 
         roster: getEffectiveDailyRoster(employees, schedules, overrides, shifts, date)
     }));
 
+    // Sort employees by position rank (Owner -> Cooking -> Bar & Floor -> Others)
+    const getPositionOrder = (position) => {
+        const pos = (position || '').toLowerCase().trim();
+        if (pos.includes('owner')) return 1;
+        if (pos.includes('cook') || pos.includes('kitchen')) return 2;
+        if (pos.includes('bar') || pos.includes('floor')) return 3;
+        return 4;
+    };
+
+    const sortedEmployees = [...employees].sort((a, b) => {
+        const orderA = getPositionOrder(a.position);
+        const orderB = getPositionOrder(b.position);
+        if (orderA !== orderB) return orderA - orderB;
+        return (a.nickname || a.name || '').localeCompare(b.nickname || b.name || '', 'th');
+    });
+
     return (
         <div className="space-y-6 animate-fade-in-up">
-            <div className="bg-slate-950/40 backdrop-blur-md border border-indigo-900/30 rounded-[2rem] shadow-2xl shadow-indigo-950/20 p-6 overflow-hidden">
+            <div className="bg-slate-955/40 backdrop-blur-md border border-indigo-900/30 rounded-[2rem] shadow-2xl shadow-indigo-950/20 p-6 overflow-hidden">
                 <div className="flex justify-between items-center mb-6">
                     <div>
                         <h3 className="font-extrabold text-sm text-slate-300 tracking-wide uppercase">📅 ตารางงานทีม</h3>
@@ -41,7 +57,7 @@ export default function TeamSchedule({ employees, schedules, overrides, shifts, 
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-indigo-950/20">
-                            {employees.map(emp => (
+                            {sortedEmployees.map(emp => (
                                 <tr key={emp.id} className="hover:bg-slate-900/10 transition">
                                     <td className="p-3 bg-slate-955/90 sticky left-0 z-10 border-r border-indigo-950/30 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.3)] bg-slate-950">
                                         <div className="font-bold text-slate-200">{emp.name}</div>

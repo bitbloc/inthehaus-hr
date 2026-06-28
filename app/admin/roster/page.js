@@ -104,7 +104,22 @@ export default function AdminRosterPage() {
                 .gte('leave_date', format(weekStart, 'yyyy-MM-dd'))
                 .lte('leave_date', format(weekEnd, 'yyyy-MM-dd'))
         ]);
-        if (empRes.data) setEmployees(empRes.data);
+        if (empRes.data) {
+            const getPositionOrder = (position) => {
+                const pos = (position || '').toLowerCase().trim();
+                if (pos.includes('owner')) return 1;
+                if (pos.includes('cook') || pos.includes('kitchen')) return 2;
+                if (pos.includes('bar') || pos.includes('floor')) return 3;
+                return 4;
+            };
+            const sorted = [...empRes.data].sort((a, b) => {
+                const orderA = getPositionOrder(a.position);
+                const orderB = getPositionOrder(b.position);
+                if (orderA !== orderB) return orderA - orderB;
+                return (a.nickname || a.name || '').localeCompare(b.nickname || b.name || '', 'th');
+            });
+            setEmployees(sorted);
+        }
         if (shiftRes.data) setShifts(shiftRes.data);
         if (transRes.data) setTransactions(transRes.data);
         if (leaveRes.data) setLeaveRequests(leaveRes.data);

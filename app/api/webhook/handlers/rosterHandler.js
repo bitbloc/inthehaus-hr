@@ -303,6 +303,22 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
         return true;
     }
 
+    // Sort employees by position rank (Owner -> Cooking -> Bar & Floor -> Others)
+    const getPositionOrder = (position) => {
+        const pos = (position || '').toLowerCase().trim();
+        if (pos.includes('owner')) return 1;
+        if (pos.includes('cook') || pos.includes('kitchen')) return 2;
+        if (pos.includes('bar') || pos.includes('floor')) return 3;
+        return 4;
+    };
+
+    employees.sort((a, b) => {
+        const orderA = getPositionOrder(a.position);
+        const orderB = getPositionOrder(b.position);
+        if (orderA !== orderB) return orderA - orderB;
+        return (a.nickname || a.name || '').localeCompare(b.nickname || b.name || '', 'th');
+    });
+
     // 2. Fetch rosters for the 7 days in a single batch query
     const dateStrings = [];
     const daysHeader = [];

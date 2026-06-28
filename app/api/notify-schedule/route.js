@@ -60,7 +60,7 @@ export async function POST(request) {
         shift_id,
         custom_start_time,
         custom_end_time,
-        employees(name, nickname),
+        employees(name, nickname, position),
         shifts(name, start_time, end_time)
       `)
       .gte('date', startStr)
@@ -108,12 +108,14 @@ export async function POST(request) {
       
       const empName = item.employees?.nickname || item.employees?.name || 'พนักงาน';
       const shiftName = item.shifts?.name || 'Custom';
+      const empPosition = item.employees?.position || '';
       
       if (rosterByDateStr[item.date]) {
         rosterByDateStr[item.date].push({
           name: empName,
           shift: shiftName,
-          time: timeStr
+          time: timeStr,
+          position: empPosition
         });
       }
     });
@@ -131,6 +133,22 @@ export async function POST(request) {
       const dayName = daysTitle[dayIndex];
       const dateLabel = format(date, 'dd/MM');
       const staffList = rosterByDateStr[dateStr] || [];
+
+      // Sort staffList by position rank (Owner -> Cooking -> Bar & Floor -> Others)
+      const getPositionOrder = (position) => {
+        const pos = (position || '').toLowerCase().trim();
+        if (pos.includes('owner')) return 1;
+        if (pos.includes('cook') || pos.includes('kitchen')) return 2;
+        if (pos.includes('bar') || pos.includes('floor')) return 3;
+        return 4;
+      };
+
+      staffList.sort((a, b) => {
+        const orderA = getPositionOrder(a.position);
+        const orderB = getPositionOrder(b.position);
+        if (orderA !== orderB) return orderA - orderB;
+        return (a.name || '').localeCompare(b.name || '', 'th');
+      });
 
       if (staffList.length > 0) {
         contents.push({
