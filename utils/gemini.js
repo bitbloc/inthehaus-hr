@@ -95,7 +95,7 @@ export async function getGeminiResponse(query, context = "", history = [], userI
 - เชื่อว่า “ร้านอาหารที่ดี ไม่ได้เกิดจากคนเก่งคนเดียว แต่เกิดจากระบบเล็กๆ ที่ทุกคนทำซ้ำได้ทุกวัน” และร้านต้องการคนรับผิดชอบคุณภาพงาน ไม่ใช่แค่คนมาทำงานผ่านไปวันๆ
 - น้ำเสียงหลัก: ดุ ชัด คุมมาตรฐาน และตรงไปตรงมา (เช่น “โอเคครับ แต่ยังไม่พอ”, “อันนี้ต้องทำเป็นมาตรฐาน ไม่ใช่ทำดีเป็นครั้งคราว”, “ถ้ายังไม่พร้อมใช้งาน ถือว่ายังไม่เสร็จ”, “อย่าให้ต้องตามซ้ำในเรื่องพื้นฐาน”, “ลูกค้าอาจไม่ได้พูดทุกอย่าง แต่เขาเห็นทุกอย่าง”, “ของพวกนี้ไม่ใช่แค่สะอาดตอนถ่ายรูป ต้องพร้อมใช้จริงด้วย”)
 - การพูดคุยทั่วไป: สั้น กระชับ ตรงประเด็น 1-3 ประโยค แทนตัวเองด้วย "ผม" หรือ "ยูซุ" และลงท้ายด้วยหางเสียง "ครับ" หรือ "นะครับ" เสมอ ห้ามใช้คำลงท้ายของผู้หญิง เช่น "ค่ะ", "คะ", "นะคะ" เด็ดขาด และห้ามมีบุคลิกแมว/เมี๊ยว/ปลาทู
-- การให้ข้อคิดเห็นเกี่ยวกับการรายงานงานหรือการเตรียมของ: ให้ยึดโครงสร้าง 4 บรรทัด (สูตรตอบผู้จัดการสายดุ) เสมอ:
+- การให้ข้อคิดเห็นเกี่ยวกับการรายงานงานหรือการเตรียมของ: ให้ยึดโครงสร้าง 4 บรรทัด (สูตรตอบผู้จัดการสายดุ แยกบรรทัดด้วยสัญลักษณ์ขึ้นบรรทัดใหม่ \n เท่านั้น ห้ามใช้แท็ก <br> หรือแท็ก HTML ใดๆ ในข้อความเด็ดขาด) เสมอ:
   1. รับทราบ: "รับทราบครับ พี่[ชื่อเล่น]" หรือ "รับทราบครับ"
   2. ประเมินจากสิ่งที่เห็น: "จากภาพเห็นว่า..." (ชื่นชมจุดที่ทำได้ตามมาตรฐานด้วยหลักฐาน)
   3. ชี้จุดเสี่ยง/จุดที่ยังไม่พอ: "แต่ยังต้องระวังเรื่อง..." (เช่น ดอกไม้ช้ำ, ดอกเหี่ยว, เศษดิน, วางตากลมทิ้งไว้นาน, เก็บไม่มิดชิด, โต๊ะหน้างานยังไม่พร้อมรัน, หรือของวางขวางทาง)
@@ -165,7 +165,8 @@ ${configs.staff_roster || ''}
 
         const result = await chat.sendMessage(finalPrompt);
         const response = await result.response;
-        return response.text();
+        const text = response.text();
+        return text ? text.replace(/<br\s*\/?>/gi, '\n') : '';
     } catch (error) {
         console.error("Gemini Technical Error:", error);
         return `ขออภัยครับ เกิดข้อผิดพลาดทางเทคนิคนิดหน่อยนะครับ (${error.message || 'unknown error'}) รบกวนลองใหม่อีกครั้งนะครับ`;
@@ -216,7 +217,7 @@ export async function classifyAndAnalyzeImage(imageBase64, mimeType = "image/jpe
 2. การรายงานปฏิบัติงาน (อาหาร/วัตถุดิบ/ใบเสร็จ/เครื่องชงกาแฟ/เตรียมแก้ว/พื้นที่ร้าน/สมุนไพร/garnish/รีวิวลูกค้า/ภาพโต๊ะ/ภาพหน้าร้าน/กล้องวงจรปิด/ทำความสะอาด/พัสดุหรือกล่องพัสดุ) → {"isFood": true, "isReceipt": true/false, "menuName": "...", "itemsList": ["..."], "costAnalysis": "...", "shortDescription": "คำอธิบายสั้นมาก", "shouldReply": true}
    - ห้ามปฏิเสธการวิเคราะห์ ประเมินสภาพวัตถุดิบ/ความเรียบร้อยเท่าที่เห็นในรูปทันที
    - หากส่งใบเสร็จ/บิล: costAnalysis ให้ดึงยอดรวม รายการ และบอกรับทราบ
-   - สำหรับรูปภาพรายงานงานอื่นๆ (garnish, แก้ว, โต๊ะ, กล้องวงจรปิด, ทำความสะอาด, รีวิวลูกค้า, พัสดุหรือกล่องพัสดุ): costAnalysis ต้องเขียนด้วยสไตล์ผู้จัดการสายดุแต่แฟร์ คุมมาตรฐาน โดยใช้สูตร 4 บรรทัด (แยกบรรทัดด้วย \n) ดังนี้:
+   - สำหรับรูปภาพรายงานงานอื่นๆ (garnish, แก้ว, โต๊ะ, กล้องวงจรปิด, ทำความสะอาด, รีวิวลูกค้า, พัสดุหรือกล่องพัสดุ): costAnalysis ต้องเขียนด้วยสไตล์ผู้จัดการสายดุแต่แฟร์ คุมมาตรฐาน โดยใช้สูตร 4 บรรทัด (แยกบรรทัดด้วยสัญลักษณ์ขึ้นบรรทัดใหม่ \n เท่านั้น ห้ามใช้แท็ก <br> หรือแท็ก HTML ใดๆ ในข้อความเด็ดขาด) ดังนี้:
      บรรทัดที่ 1 (รับทราบ): "รับทราบครับ ${targetPerson}" (ห้ามพิมพ์เบิ้ลเป็น พี่พี่ ให้เรียกตามตัวแปรนี้เป๊ะๆ)
      บรรทัดที่ 2 (ประเมิน): วิเคราะห์สิ่งที่ดีจากรูปภาพตามจริง (เช่น "จากภาพจัดเตรียมแยกประเภทดีและดูตั้งใจครับ" หรือ "จากภาพพื้นที่โดยรวมสะอาดดีครับ")
      บรรทัดที่ 3 (ชี้ข้อที่ยังไม่พอ/จุดเสี่ยง): มองหาสิ่งที่ต้องเฝ้าระวังหรือความไม่เรียบร้อย (เช่น ดอกไม้เหี่ยว/ใบช้ำ, เศษดินปนเปื้อน, ตั้งตากลมนอกกล่อง, แก้ววางตากฝุ่นนอกชั้นเก็บ, โต๊ะหน้างานยังไม่พร้อมรัน, หรือของวางขวางทาง)
@@ -250,12 +251,15 @@ export async function classifyAndAnalyzeImage(imageBase64, mimeType = "image/jpe
         const textResponse = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
         const data = JSON.parse(textResponse);
         
+        const cleanAnalysis = (text) => text ? text.replace(/<br\s*\/?>/gi, '\n') : '';
         if (data.shouldReply && data.isSlip) {
             return { isSlip: true, amount: data.amount, transactionRef: data.transactionRef, senderName: data.senderName, bankName: data.bankName, transTime: data.transTime || null, shortDescription: data.shortDescription, shouldReply: true };
         } else if (data.shouldReply && data.isFood) {
-            return { isFood: true, analysis: data.costAnalysis, shortDescription: data.shortDescription, shouldReply: true };
+            const cleanText = cleanAnalysis(data.costAnalysis);
+            return { isFood: true, analysis: cleanText, shortDescription: data.shortDescription, shouldReply: true };
         } else if (data.shouldReply && data.isCat) {
-            return { isCat: true, analysis: `🐱 ${data.catFeelings}`, shortDescription: data.shortDescription, shouldReply: true };
+            const cleanText = cleanAnalysis(data.catFeelings);
+            return { isCat: true, analysis: `🐱 ${cleanText}`, shortDescription: data.shortDescription, shouldReply: true };
         }
         return { isFood: false, isCat: false, isSlip: false, shouldReply: false, shortDescription: data.shortDescription || "ภาพถ่ายทั่วไป" };
     } catch (error) {
