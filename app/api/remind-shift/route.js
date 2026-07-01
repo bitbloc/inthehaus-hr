@@ -18,59 +18,174 @@ export async function POST(request) {
     const { shiftName, type } = await request.json();
     const liffUrl = "https://liff.line.me/2008567449-W868y8RY";
 
-    let title = "";
-    let subTitle = "";
-    let buttonText = "";
-    let colorHeader = "";
-    let colorButton = "";
+    let messageContents;
 
-    // กำหนดสีและข้อความ ตามประเภทการเรียก
     if (type === 'check_out') {
-      title = "🌙 เลิกงานแล้ว!";
-      subTitle = `จบกะการทำงาน "${shiftName}"`;
-      buttonText = "🔴 กดออกงาน (Check Out)";
-      colorHeader = "#333333"; // สีเทาเข้ม
-      colorButton = "#ff334b"; // สีแดง
-    } else {
-      // Default เป็น check_in
-      title = "⏰ ได้เวลาเข้างาน!";
-      subTitle = `สำหรับพนักงาน "${shiftName}"`;
-      buttonText = "🟢 กดเข้างาน (Check In)";
-      colorHeader = "#1DB446"; // สีเขียว LINE
-      colorButton = "#06c755"; // สีเขียว
-    }
-
-    const message = {
-      type: 'flex',
-      altText: `แจ้งเตือน ${type === 'check_out' ? 'ออกงาน' : 'เข้างาน'} ${shiftName}`,
-      contents: {
+      messageContents = {
         type: 'bubble',
+        size: 'mega',
+        styles: {
+          body: { backgroundColor: '#F5F5F3' },
+          footer: { backgroundColor: '#F5F5F3' }
+        },
         body: {
           type: 'box',
           layout: 'vertical',
+          paddingAll: '20px',
           contents: [
-            { type: 'text', text: title, weight: 'bold', size: 'lg', color: colorHeader },
-            { type: 'text', text: subTitle, weight: 'bold', size: 'md', margin: 'md' },
-            { type: 'text', text: 'กรุณากดปุ่มด้านล่างเพื่อบันทึกเวลา', size: 'sm', color: '#aaaaaa', margin: 'sm' }
+            {
+              type: 'box',
+              layout: 'horizontal',
+              contents: [
+                { type: 'text', text: 'ONHAUS SYSTEM', weight: 'bold', size: 'xxs', color: '#7C7C7C' },
+                { type: 'box', layout: 'vertical', width: '8px', height: '8px', cornerRadius: '4px', backgroundColor: '#E05A36' }
+              ]
+            },
+            { type: 'separator', color: '#1A1A1A', margin: 'md' },
+            {
+              type: 'text',
+              text: '🌙 อย่าลืม CHECK-OUT & STOCK',
+              weight: 'bold',
+              size: 'lg',
+              color: '#1A1A1A',
+              margin: 'lg'
+            },
+            {
+              type: 'box',
+              layout: 'vertical',
+              margin: 'lg',
+              spacing: 'xs',
+              contents: [
+                {
+                  type: 'box',
+                  layout: 'horizontal',
+                  contents: [
+                    { type: 'text', text: 'SHIFT', size: 'xs', color: '#7C7C7C', flex: 1 },
+                    { type: 'text', text: (shiftName || '').toUpperCase(), size: 'xs', weight: 'bold', color: '#1A1A1A', flex: 2 }
+                  ]
+                }
+              ]
+            },
+            { type: 'separator', color: '#CCCCCC', margin: 'md' }
           ]
         },
         footer: {
           type: 'box',
           layout: 'vertical',
+          spacing: 'sm',
+          paddingStart: '20px',
+          paddingEnd: '20px',
+          paddingBottom: '15px',
           contents: [
             {
               type: 'button',
               style: 'primary',
-              color: colorButton,
-              action: {
-                type: 'uri',
-                label: buttonText,
-                uri: liffUrl
-              }
+              color: '#ff334b',
+              height: 'sm',
+              action: { type: 'uri', label: '🔴 กดออกงาน (CHECK OUT)', uri: liffUrl }
+            },
+            {
+              type: 'button',
+              style: 'primary',
+              color: '#7C7C7C',
+              height: 'sm',
+              action: { type: 'uri', label: '📦 เช็คสต๊อก (CHECK STOCK)', uri: 'https://haustable.vercel.app/staff/stock' }
+            },
+            {
+              type: 'text',
+              text: 'ONHAUS SYSTEM ©',
+              size: 'xxs',
+              color: '#7C7C7C',
+              align: 'center',
+              weight: 'bold',
+              margin: 'md'
             }
           ]
         }
-      }
+      };
+    } else {
+      // check_in
+      messageContents = {
+        type: 'bubble',
+        size: 'mega',
+        styles: {
+          body: { backgroundColor: '#F5F5F3' },
+          footer: { backgroundColor: '#F5F5F3' }
+        },
+        body: {
+          type: 'box',
+          layout: 'vertical',
+          paddingAll: '20px',
+          contents: [
+            {
+              type: 'box',
+              layout: 'horizontal',
+              contents: [
+                { type: 'text', text: 'ONHAUS SYSTEM', weight: 'bold', size: 'xxs', color: '#7C7C7C' },
+                { type: 'box', layout: 'vertical', width: '8px', height: '8px', cornerRadius: '4px', backgroundColor: '#E05A36' }
+              ]
+            },
+            { type: 'separator', color: '#1A1A1A', margin: 'md' },
+            {
+              type: 'text',
+              text: '⏰ อย่าลืม CHECK-IN',
+              weight: 'bold',
+              size: 'xl',
+              color: '#1A1A1A',
+              margin: 'lg'
+            },
+            {
+              type: 'box',
+              layout: 'vertical',
+              margin: 'lg',
+              spacing: 'xs',
+              contents: [
+                {
+                  type: 'box',
+                  layout: 'horizontal',
+                  contents: [
+                    { type: 'text', text: 'SHIFT', size: 'xs', color: '#7C7C7C', flex: 1 },
+                    { type: 'text', text: (shiftName || '').toUpperCase(), size: 'xs', weight: 'bold', color: '#1A1A1A', flex: 2 }
+                  ]
+                }
+              ]
+            },
+            { type: 'separator', color: '#CCCCCC', margin: 'md' }
+          ]
+        },
+        footer: {
+          type: 'box',
+          layout: 'vertical',
+          spacing: 'sm',
+          paddingStart: '20px',
+          paddingEnd: '20px',
+          paddingBottom: '15px',
+          contents: [
+            {
+              type: 'button',
+              style: 'primary',
+              color: '#1A1A1A',
+              height: 'sm',
+              action: { type: 'uri', label: '🟢 กดเข้างาน (CHECK IN)', uri: liffUrl }
+            },
+            {
+              type: 'text',
+              text: 'ONHAUS SYSTEM ©',
+              size: 'xxs',
+              color: '#7C7C7C',
+              align: 'center',
+              weight: 'bold',
+              margin: 'md'
+            }
+          ]
+        }
+      };
+    }
+
+    const message = {
+      type: 'flex',
+      altText: type === 'check_out' ? `🌙 อย่าลืม check-out & check stock กะ ${shiftName}` : `⏰ อย่าลืม check-in กะ ${shiftName}`,
+      contents: messageContents
     };
 
     await Promise.all(

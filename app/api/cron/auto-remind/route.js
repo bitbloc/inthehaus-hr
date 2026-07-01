@@ -46,11 +46,90 @@ export async function GET(request) {
       // Alert In (±5 mins)
       if (diffIn <= 5) {
         messages.push({
-          type: 'flex', altText: `⏰ แจ้งเตือนเข้างาน ${shift.name}`,
+          type: 'flex',
+          altText: `⏰ อย่าลืม check-in กะ ${shift.name}`,
           contents: {
-            type: 'bubble', header: { type: 'box', layout: 'vertical', backgroundColor: '#ff9900', contents: [{ type: 'text', text: `⏰ เตรียมตัวเข้างาน`, color: '#ffffff', weight: 'bold' }] },
-            body: { type: 'box', layout: 'vertical', contents: [{ type: 'text', text: `กะ: ${shift.name}`, weight: 'bold', size: 'lg' }, { type: 'text', text: `เริ่มงาน: ${shift.start_time}`, size: 'md', color: '#555555', margin: 'md' }] },
-            footer: { type: 'box', layout: 'vertical', contents: [{ type: 'button', style: 'primary', color: '#06c755', action: { type: 'uri', label: '📍 กดลงเวลา', uri: liffUrl } }] }
+            type: 'bubble',
+            size: 'mega',
+            styles: {
+              body: { backgroundColor: '#F5F5F3' },
+              footer: { backgroundColor: '#F5F5F3' }
+            },
+            body: {
+              type: 'box',
+              layout: 'vertical',
+              paddingAll: '20px',
+              contents: [
+                {
+                  type: 'box',
+                  layout: 'horizontal',
+                  contents: [
+                    { type: 'text', text: 'ONHAUS SYSTEM', weight: 'bold', size: 'xxs', color: '#7C7C7C' },
+                    { type: 'box', layout: 'vertical', width: '8px', height: '8px', cornerRadius: '4px', backgroundColor: '#E05A36' }
+                  ]
+                },
+                { type: 'separator', color: '#1A1A1A', margin: 'md' },
+                {
+                  type: 'text',
+                  text: '⏰ อย่าลืม CHECK-IN',
+                  weight: 'bold',
+                  size: 'xl',
+                  color: '#1A1A1A',
+                  margin: 'lg'
+                },
+                {
+                  type: 'box',
+                  layout: 'vertical',
+                  margin: 'lg',
+                  spacing: 'xs',
+                  contents: [
+                    {
+                      type: 'box',
+                      layout: 'horizontal',
+                      contents: [
+                        { type: 'text', text: 'SHIFT', size: 'xs', color: '#7C7C7C', flex: 1 },
+                        { type: 'text', text: (shift.name || '').toUpperCase(), size: 'xs', weight: 'bold', color: '#1A1A1A', flex: 2 }
+                      ]
+                    },
+                    {
+                      type: 'box',
+                      layout: 'horizontal',
+                      contents: [
+                        { type: 'text', text: 'START TIME', size: 'xs', color: '#7C7C7C', flex: 1 },
+                        { type: 'text', text: `${shift.start_time || '-'} น.`, size: 'xs', weight: 'bold', color: '#1A1A1A', flex: 2 }
+                      ]
+                    }
+                  ]
+                },
+                { type: 'separator', color: '#CCCCCC', margin: 'md' }
+              ]
+            },
+            footer: {
+              type: 'box',
+              layout: 'vertical',
+              spacing: 'sm',
+              paddingStart: '20px',
+              paddingEnd: '20px',
+              paddingBottom: '15px',
+              contents: [
+                {
+                  type: 'button',
+                  style: 'primary',
+                  color: '#1A1A1A',
+                  height: 'sm',
+                  action: { type: 'uri', label: '🟢 กดเข้างาน (CHECK IN)', uri: liffUrl }
+                },
+                {
+                  type: 'text',
+                  text: 'ONHAUS SYSTEM ©',
+                  size: 'xxs',
+                  color: '#7C7C7C',
+                  align: 'center',
+                  weight: 'bold',
+                  margin: 'md'
+                }
+              ]
+            }
           }
         });
       }
@@ -58,11 +137,97 @@ export async function GET(request) {
       // Alert Out (±5 mins)
       if (diffOut <= 5) {
         messages.push({
-          type: 'flex', altText: `🌙 แจ้งเตือนเลิกงาน ${shift.name}`,
+          type: 'flex',
+          altText: `🌙 อย่าลืม check-out & check stock กะ ${shift.name}`,
           contents: {
-            type: 'bubble', header: { type: 'box', layout: 'vertical', backgroundColor: '#333333', contents: [{ type: 'text', text: `🌙 ได้เวลาเลิกงานแล้ว`, color: '#ffffff', weight: 'bold' }] },
-            body: { type: 'box', layout: 'vertical', contents: [{ type: 'text', text: `กะ: ${shift.name}`, weight: 'bold', size: 'lg' }, { type: 'text', text: `เลิกงาน: ${shift.end_time}`, size: 'md', color: '#ff334b', margin: 'md' }] },
-            footer: { type: 'box', layout: 'vertical', contents: [{ type: 'button', style: 'primary', color: '#ff334b', action: { type: 'uri', label: '🔴 กดเช็คเอาท์', uri: liffUrl } }] }
+            type: 'bubble',
+            size: 'mega',
+            styles: {
+              body: { backgroundColor: '#F5F5F3' },
+              footer: { backgroundColor: '#F5F5F3' }
+            },
+            body: {
+              type: 'box',
+              layout: 'vertical',
+              paddingAll: '20px',
+              contents: [
+                {
+                  type: 'box',
+                  layout: 'horizontal',
+                  contents: [
+                    { type: 'text', text: 'ONHAUS SYSTEM', weight: 'bold', size: 'xxs', color: '#7C7C7C' },
+                    { type: 'box', layout: 'vertical', width: '8px', height: '8px', cornerRadius: '4px', backgroundColor: '#E05A36' }
+                  ]
+                },
+                { type: 'separator', color: '#1A1A1A', margin: 'md' },
+                {
+                  type: 'text',
+                  text: '🌙 อย่าลืม CHECK-OUT & STOCK',
+                  weight: 'bold',
+                  size: 'lg',
+                  color: '#1A1A1A',
+                  margin: 'lg'
+                },
+                {
+                  type: 'box',
+                  layout: 'vertical',
+                  margin: 'lg',
+                  spacing: 'xs',
+                  contents: [
+                    {
+                      type: 'box',
+                      layout: 'horizontal',
+                      contents: [
+                        { type: 'text', text: 'SHIFT', size: 'xs', color: '#7C7C7C', flex: 1 },
+                        { type: 'text', text: (shift.name || '').toUpperCase(), size: 'xs', weight: 'bold', color: '#1A1A1A', flex: 2 }
+                      ]
+                    },
+                    {
+                      type: 'box',
+                      layout: 'horizontal',
+                      contents: [
+                        { type: 'text', text: 'END TIME', size: 'xs', color: '#7C7C7C', flex: 1 },
+                        { type: 'text', text: `${shift.end_time || '-'} น.`, size: 'xs', weight: 'bold', color: '#1A1A1A', flex: 2 }
+                      ]
+                    }
+                  ]
+                },
+                { type: 'separator', color: '#CCCCCC', margin: 'md' }
+              ]
+            },
+            footer: {
+              type: 'box',
+              layout: 'vertical',
+              spacing: 'sm',
+              paddingStart: '20px',
+              paddingEnd: '20px',
+              paddingBottom: '15px',
+              contents: [
+                {
+                  type: 'button',
+                  style: 'primary',
+                  color: '#ff334b',
+                  height: 'sm',
+                  action: { type: 'uri', label: '🔴 กดออกงาน (CHECK OUT)', uri: liffUrl }
+                },
+                {
+                  type: 'button',
+                  style: 'primary',
+                  color: '#7C7C7C',
+                  height: 'sm',
+                  action: { type: 'uri', label: '📦 เช็คสต๊อก (CHECK STOCK)', uri: 'https://haustable.vercel.app/staff/stock' }
+                },
+                {
+                  type: 'text',
+                  text: 'ONHAUS SYSTEM ©',
+                  size: 'xxs',
+                  color: '#7C7C7C',
+                  align: 'center',
+                  weight: 'bold',
+                  margin: 'md'
+                }
+              ]
+            }
           }
         });
       }

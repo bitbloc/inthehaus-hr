@@ -1500,359 +1500,288 @@ export default function YuzuKnowledgeManager() {
                         </button>
                     </div>
 
-                    {/* Dashboard Grid */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* AI Operations Briefing (Full Width) */}
+                    <Card className="p-6 space-y-4 border-t-2 border-t-rams-orange">
+                        <div className="flex justify-between items-center pb-2 border-b border-rams-rule-light">
+                            <h4 className="font-mono font-bold text-xs uppercase tracking-wider text-rams-ink flex items-center gap-2">
+                                <Icons.File size={18} />
+                                AI Operations Briefing
+                            </h4>
+                            <Badge color="orange">
+                                {briefMode === 'daily' ? 'บันทึกสรุปย้อนหลัง 3 วัน' : 'สรุปรายงานประจำเดือน'}
+                            </Badge>
+                        </div>
+
+                        {/* Brief Mode Selector */}
+                        <div className="flex border border-rams-rule-light p-1 bg-rams-bg rounded-sm gap-1">
+                            <button 
+                                onClick={() => setBriefMode('daily')}
+                                className={`flex-1 py-1 text-center rounded-sm transition-all font-mono font-bold text-[10px] uppercase cursor-pointer ${
+                                    briefMode === 'daily'
+                                    ? 'bg-rams-ink text-rams-panel'
+                                    : 'text-rams-ink-muted hover:bg-rams-bg'
+                                }`}
+                            >
+                                สรุปรายวัน (Daily)
+                            </button>
+                            <button 
+                                onClick={() => setBriefMode('monthly')}
+                                className={`flex-1 py-1 text-center rounded-sm transition-all font-mono font-bold text-[10px] uppercase cursor-pointer ${
+                                    briefMode === 'monthly'
+                                    ? 'bg-rams-ink text-rams-panel'
+                                    : 'text-rams-ink-muted hover:bg-rams-bg'
+                                }`}
+                            >
+                                สรุปรายเดือน (Monthly)
+                            </button>
+                        </div>
                         
-                        {/* Left Column: AI Daily Briefing */}
-                        <div className="space-y-6">
-                            <Card className="p-6 space-y-4 border-t-2 border-t-rams-orange">
-                                <div className="flex justify-between items-center pb-2 border-b border-rams-rule-light">
-                                    <h4 className="font-mono font-bold text-xs uppercase tracking-wider text-rams-ink flex items-center gap-2">
-                                        <Icons.File size={18} />
-                                        AI Operations Briefing
-                                    </h4>
-                                    <Badge color="orange">
-                                        {briefMode === 'daily' ? 'บันทึกสรุปย้อนหลัง 3 วัน' : 'สรุปรายงานประจำเดือน'}
-                                    </Badge>
+                        {briefMode === 'daily' && (
+                            <>
+                                {/* Date Selector Tabs */}
+                                <div className="flex border-b border-rams-rule-light pb-2 overflow-x-auto gap-1 no-scrollbar">
+                                    {recentDates.map((date, idx) => {
+                                        const isSelected = selectedBriefDate === date;
+                                        let dayLabel = "วันนี้";
+                                        if (idx === 1) dayLabel = "เมื่อวาน";
+                                        else if (idx === 2) dayLabel = "2 วันก่อน";
+                                        else if (idx === 3) dayLabel = "3 วันก่อน";
+                                        
+                                        const dateObj = new Date(date);
+                                        const formattedDate = dateObj.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
+                                        
+                                        return (
+                                            <button
+                                                key={date}
+                                                onClick={() => setSelectedBriefDate(date)}
+                                                className={`flex-1 py-1.5 px-2.5 text-center rounded-sm transition-all duration-200 whitespace-nowrap min-w-[70px] cursor-pointer ${
+                                                    isSelected 
+                                                    ? 'bg-rams-ink text-rams-panel font-mono font-bold text-xs shadow-none' 
+                                                    : 'text-rams-ink-muted hover:bg-rams-bg font-mono font-bold text-xs'
+                                                }`}
+                                            >
+                                                <div className="text-[9px] uppercase tracking-wide opacity-80">{dayLabel}</div>
+                                                <div className="text-xs">{formattedDate}</div>
+                                            </button>
+                                        );
+                                    })}
                                 </div>
 
-                                {/* Brief Mode Selector */}
-                                <div className="flex border border-rams-rule-light p-1 bg-rams-bg rounded-sm gap-1">
-                                    <button 
-                                        onClick={() => setBriefMode('daily')}
-                                        className={`flex-1 py-1 text-center rounded-sm transition-all font-mono font-bold text-[10px] uppercase cursor-pointer ${
-                                            briefMode === 'daily'
-                                            ? 'bg-rams-ink text-rams-panel'
-                                            : 'text-rams-ink-muted hover:bg-rams-bg'
-                                        }`}
+                                {briefLoading ? (
+                                    <div className="py-12 flex flex-col items-center justify-center space-y-3 text-rams-ink-muted">
+                                        <span className="animate-spin rounded-full h-8 w-8 border-4 border-rams-orange border-t-transparent" />
+                                        <p className="text-xs font-mono font-bold animate-pulse">ยูซุกำลังวิเคราะห์ข้อมูลกะงานและสรุปห้องแชท...</p>
+                                    </div>
+                                ) : dailyBriefs[selectedBriefDate] ? (
+                                    <div className="bg-rams-bg p-4 rounded-sm border border-rams-rule-light text-rams-ink text-xs font-mono whitespace-pre-wrap leading-relaxed">
+                                        {dailyBriefs[selectedBriefDate]}
+                                    </div>
+                                ) : (
+                                    <div className="py-12 text-center text-rams-ink-muted space-y-3 font-mono">
+                                        <p className="text-xs font-bold">ยังไม่มีการสร้างสรุปประจำวันนี้</p>
+                                        <button 
+                                            onClick={() => handleGenerateBrief(selectedBriefDate)}
+                                            className="text-xs font-bold text-rams-orange hover:text-rams-orange/95 underline cursor-pointer"
+                                        >
+                                            กดเพื่อสร้างสรุปเมี๊ยว~
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* PDF Actions */}
+                                {dailyBriefs[selectedBriefDate] && !briefLoading && (
+                                    <div className="flex flex-col sm:flex-row gap-2 pt-3 border-t border-rams-rule-light">
+                                        <button
+                                            onClick={() => handleExportSingleBriefPDF(selectedBriefDate)}
+                                            disabled={pdfLoading}
+                                            className="flex-1 py-2 px-3 bg-rams-panel border border-rams-rule-light text-rams-ink hover:bg-rams-bg transition-all font-mono font-bold text-xs rounded-sm flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                                        >
+                                            {pdfLoading ? (
+                                                <span className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-rams-ink border-t-transparent" />
+                                            ) : (
+                                                <Icons.File size={13} />
+                                            )}
+                                            ส่งออก PDF สรุปประจำวัน
+                                        </button>
+                                        <button
+                                            onClick={handleExportThreeDayReportPDF}
+                                            disabled={pdfLoading}
+                                            className="flex-1 py-2 px-3 bg-rams-ink text-rams-panel border border-rams-rule hover:bg-rams-ink/90 transition-all font-mono font-bold text-xs rounded-sm flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                                        >
+                                            {pdfLoading ? (
+                                                <span className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-rams-panel border-t-transparent" />
+                                            ) : (
+                                                <Icons.File size={13} />
+                                            )}
+                                            ส่งออก PDF ย้อนหลัง 3 วัน
+                                        </button>
+                                    </div>
+                                )}
+                            </>
+                        )}
+
+                        {briefMode === 'monthly' && (
+                            <>
+                                {/* Month Selector Dropdown */}
+                                <div className="flex items-center gap-2 border-b border-rams-rule-light pb-3">
+                                    <label className="text-[10px] font-mono font-bold text-rams-ink-muted uppercase tracking-wider">เลือกเดือน:</label>
+                                    <select
+                                        value={selectedBriefMonth}
+                                        onChange={(e) => setSelectedBriefMonth(e.target.value)}
+                                        className="bg-rams-bg text-rams-ink border border-rams-rule-light rounded-sm p-1 px-2 text-xs font-mono outline-none cursor-pointer flex-1"
                                     >
-                                        สรุปรายวัน (Daily)
-                                    </button>
-                                    <button 
-                                        onClick={() => setBriefMode('monthly')}
-                                        className={`flex-1 py-1 text-center rounded-sm transition-all font-mono font-bold text-[10px] uppercase cursor-pointer ${
-                                            briefMode === 'monthly'
-                                            ? 'bg-rams-ink text-rams-panel'
-                                            : 'text-rams-ink-muted hover:bg-rams-bg'
-                                        }`}
-                                    >
-                                        สรุปรายเดือน (Monthly)
-                                    </button>
+                                        {recentMonths.map(m => (
+                                            <option key={m.value} value={m.value}>{m.label}</option>
+                                        ))}
+                                    </select>
                                 </div>
-                                
-                                {briefMode === 'daily' && (
-                                    <>
-                                        {/* Date Selector Tabs */}
-                                        <div className="flex border-b border-rams-rule-light pb-2 overflow-x-auto gap-1 no-scrollbar">
-                                            {recentDates.map((date, idx) => {
-                                                const isSelected = selectedBriefDate === date;
-                                                let dayLabel = "วันนี้";
-                                                if (idx === 1) dayLabel = "เมื่อวาน";
-                                                else if (idx === 2) dayLabel = "2 วันก่อน";
-                                                else if (idx === 3) dayLabel = "3 วันก่อน";
-                                                
-                                                const dateObj = new Date(date);
-                                                const formattedDate = dateObj.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
-                                                
+
+                                {monthlyLoading ? (
+                                    <div className="py-12 flex flex-col items-center justify-center space-y-3 text-rams-ink-muted">
+                                        <span className="animate-spin rounded-full h-8 w-8 border-4 border-rams-orange border-t-transparent" />
+                                        <p className="text-xs font-mono font-bold animate-pulse">ยูซุกำลังวิเคราะห์ข้อมูลกะงานและสรุปห้องแชททั้งเดือน...</p>
+                                    </div>
+                                ) : monthlyBriefs[selectedBriefMonth] ? (
+                                    (() => {
+                                        let parsedData = {};
+                                        try {
+                                            parsedData = typeof monthlyBriefs[selectedBriefMonth] === 'string'
+                                                ? JSON.parse(monthlyBriefs[selectedBriefMonth].replace(/```json/g, '').replace(/```/g, '').trim())
+                                                : monthlyBriefs[selectedBriefMonth];
+                                        } catch(e) {
+                                            return (
+                                                <div className="bg-rams-bg p-4 rounded-sm border border-rams-rule-light text-rams-ink text-xs font-mono whitespace-pre-wrap leading-relaxed">
+                                                    {String(monthlyBriefs[selectedBriefMonth])}
+                                                </div>
+                                            );
+                                        }
+                                        return renderInfographic(parsedData);
+                                    })()
+                                ) : (
+                                    <div className="py-12 text-center text-rams-ink-muted space-y-3 font-mono">
+                                        <p className="text-xs font-bold">ยังไม่มีการสร้างสรุปประจำเดือนนี้</p>
+                                        <button 
+                                            onClick={() => handleGenerateMonthlyBrief(selectedBriefMonth)}
+                                            className="text-xs font-bold text-rams-orange hover:text-rams-orange/95 underline cursor-pointer"
+                                        >
+                                            กดเพื่อสร้างสรุปรายเดือนเมี๊ยว~
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* PDF Actions for Monthly Brief */}
+                                {monthlyBriefs[selectedBriefMonth] && !monthlyLoading && (
+                                    <div className="flex flex-col sm:flex-row gap-2 pt-3 border-t border-rams-rule-light">
+                                        <button
+                                            onClick={() => handleExportMonthlyBriefPDF(selectedBriefMonth)}
+                                            disabled={pdfLoading}
+                                            className="w-full py-2.5 px-3 bg-rams-ink text-rams-panel border border-rams-rule hover:bg-rams-ink/90 transition-all font-mono font-bold text-xs rounded-sm flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                                        >
+                                            {pdfLoading ? (
+                                                <span className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-rams-panel border-t-transparent" />
+                                            ) : (
+                                                <Icons.File size={13} />
+                                            )}
+                                            ส่งออก PDF สรุปประจำเดือน
+                                        </button>
+                                    </div>
+                                )}
+                            </>
+                        )}
+                    </Card>
+
+                    {/* Secondary Metrics: Grid Layout */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        
+                        {/* Sentiment Tracker & Mood Index */}
+                        <Card className="p-6 space-y-4 border-t-2 border-t-rams-rule">
+                            <h4 className="font-mono font-bold text-xs uppercase tracking-wider text-rams-ink flex items-center gap-2">
+                                <Icons.Alert size={18} />
+                                Sentiment Tracker (ดัชนีอารมณ์ทีมงาน)
+                            </h4>
+                            
+                            {(() => {
+                                const { stats, total } = getMoodStats();
+                                return (
+                                    <div className="space-y-4">
+                                        <div className="grid grid-cols-5 gap-2 text-center">
+                                            {Object.entries(stats).map(([mood, count]) => {
+                                                const percentage = total > 0 ? Math.round((count / total) * 100) : 0;
+                                                const label = mood === '🔥' ? 'Fired Up' : mood === '😊' ? 'Happy' : mood === '😐' ? 'Neutral' : mood === '😴' ? 'Sleepy' : 'Sick';
+                                                const color = mood === '🔥' ? 'text-rams-orange' : mood === '😊' ? 'text-rams-green' : mood === '😐' ? 'text-rams-ink-muted' : mood === '😴' ? 'text-rams-amber' : 'text-rams-red';
                                                 return (
-                                                    <button
-                                                        key={date}
-                                                        onClick={() => setSelectedBriefDate(date)}
-                                                        className={`flex-1 py-1.5 px-2.5 text-center rounded-sm transition-all duration-200 whitespace-nowrap min-w-[70px] cursor-pointer ${
-                                                            isSelected 
-                                                            ? 'bg-rams-ink text-rams-panel font-mono font-bold text-xs shadow-none' 
-                                                            : 'text-rams-ink-muted hover:bg-rams-bg font-mono font-bold text-xs'
-                                                        }`}
-                                                    >
-                                                        <div className="text-[9px] uppercase tracking-wide opacity-80">{dayLabel}</div>
-                                                        <div className="text-xs">{formattedDate}</div>
-                                                    </button>
+                                                    <div key={mood} className="bg-rams-bg p-2.5 rounded-sm border border-rams-rule-light space-y-1">
+                                                        <span className="text-2xl block">{mood}</span>
+                                                        <span className={`text-[9px] font-mono font-bold block uppercase tracking-wider ${color}`}>{label}</span>
+                                                        <span className="text-[10px] font-mono font-bold text-rams-ink">{count} คน ({percentage}%)</span>
+                                                    </div>
                                                 );
                                             })}
                                         </div>
 
-                                        {briefLoading ? (
-                                            <div className="py-12 flex flex-col items-center justify-center space-y-3 text-rams-ink-muted">
-                                                <span className="animate-spin rounded-full h-8 w-8 border-4 border-rams-orange border-t-transparent" />
-                                                <p className="text-xs font-mono font-bold animate-pulse">ยูซุกำลังวิเคราะห์ข้อมูลกะงานและสรุปห้องแชท...</p>
-                                            </div>
-                                        ) : dailyBriefs[selectedBriefDate] ? (
-                                            <div className="bg-rams-bg p-4 rounded-sm border border-rams-rule-light text-rams-ink text-xs font-mono whitespace-pre-wrap leading-relaxed">
-                                                {dailyBriefs[selectedBriefDate]}
-                                            </div>
-                                        ) : (
-                                            <div className="py-12 text-center text-rams-ink-muted space-y-3 font-mono">
-                                                <p className="text-xs font-bold">ยังไม่มีการสร้างสรุปประจำวันนี้</p>
-                                                <button 
-                                                    onClick={() => handleGenerateBrief(selectedBriefDate)}
-                                                    className="text-xs font-bold text-rams-orange hover:text-rams-orange/95 underline cursor-pointer"
-                                                >
-                                                    กดเพื่อสร้างสรุปเมี๊ยว~
-                                                </button>
-                                            </div>
-                                        )}
-
-                                        {/* PDF Actions */}
-                                        {dailyBriefs[selectedBriefDate] && !briefLoading && (
-                                            <div className="flex flex-col sm:flex-row gap-2 pt-3 border-t border-rams-rule-light">
-                                                <button
-                                                    onClick={() => handleExportSingleBriefPDF(selectedBriefDate)}
-                                                    disabled={pdfLoading}
-                                                    className="flex-1 py-2 px-3 bg-rams-panel border border-rams-rule-light text-rams-ink hover:bg-rams-bg transition-all font-mono font-bold text-xs rounded-sm flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
-                                                >
-                                                    {pdfLoading ? (
-                                                        <span className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-rams-ink border-t-transparent" />
-                                                    ) : (
-                                                        <Icons.File size={13} />
-                                                    )}
-                                                    ส่งออก PDF สรุปประจำวัน
-                                                </button>
-                                                <button
-                                                    onClick={handleExportThreeDayReportPDF}
-                                                    disabled={pdfLoading}
-                                                    className="flex-1 py-2 px-3 bg-rams-ink text-rams-panel border border-rams-rule hover:bg-rams-ink/90 transition-all font-mono font-bold text-xs rounded-sm flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
-                                                >
-                                                    {pdfLoading ? (
-                                                        <span className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-rams-panel border-t-transparent" />
-                                                    ) : (
-                                                        <Icons.File size={13} />
-                                                    )}
-                                                    ส่งออก PDF ย้อนหลัง 3 วัน
-                                                </button>
-                                            </div>
-                                        )}
-                                    </>
-                                )}
-
-                                {briefMode === 'monthly' && (
-                                    <>
-                                        {/* Month Selector Dropdown */}
-                                        <div className="flex items-center gap-2 border-b border-rams-rule-light pb-3">
-                                            <label className="text-[10px] font-mono font-bold text-rams-ink-muted uppercase tracking-wider">เลือกเดือน:</label>
-                                            <select
-                                                value={selectedBriefMonth}
-                                                onChange={(e) => setSelectedBriefMonth(e.target.value)}
-                                                className="bg-rams-bg text-rams-ink border border-rams-rule-light rounded-sm p-1 px-2 text-xs font-mono outline-none cursor-pointer flex-1"
-                                            >
-                                                {recentMonths.map(m => (
-                                                    <option key={m.value} value={m.value}>{m.label}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-
-                                        {monthlyLoading ? (
-                                            <div className="py-12 flex flex-col items-center justify-center space-y-3 text-rams-ink-muted">
-                                                <span className="animate-spin rounded-full h-8 w-8 border-4 border-rams-orange border-t-transparent" />
-                                                <p className="text-xs font-mono font-bold animate-pulse">ยูซุกำลังวิเคราะห์ข้อมูลกะงานและสรุปห้องแชททั้งเดือน...</p>
-                                            </div>
-                                        ) : monthlyBriefs[selectedBriefMonth] ? (
-                                            (() => {
-                                                let parsedData = {};
-                                                try {
-                                                    parsedData = typeof monthlyBriefs[selectedBriefMonth] === 'string'
-                                                        ? JSON.parse(monthlyBriefs[selectedBriefMonth].replace(/```json/g, '').replace(/```/g, '').trim())
-                                                        : monthlyBriefs[selectedBriefMonth];
-                                                } catch(e) {
-                                                    return (
-                                                        <div className="bg-rams-bg p-4 rounded-sm border border-rams-rule-light text-rams-ink text-xs font-mono whitespace-pre-wrap leading-relaxed">
-                                                            {String(monthlyBriefs[selectedBriefMonth])}
-                                                        </div>
-                                                    );
-                                                }
-                                                return renderInfographic(parsedData);
-                                            })()
-                                        ) : (
-                                            <div className="py-12 text-center text-rams-ink-muted space-y-3 font-mono">
-                                                <p className="text-xs font-bold">ยังไม่มีการสร้างสรุปประจำเดือนนี้</p>
-                                                <button 
-                                                    onClick={() => handleGenerateMonthlyBrief(selectedBriefMonth)}
-                                                    className="text-xs font-bold text-rams-orange hover:text-rams-orange/95 underline cursor-pointer"
-                                                >
-                                                    กดเพื่อสร้างสรุปรายเดือนเมี๊ยว~
-                                                </button>
-                                            </div>
-                                        )}
-
-                                        {/* PDF Actions for Monthly Brief */}
-                                        {monthlyBriefs[selectedBriefMonth] && !monthlyLoading && (
-                                            <div className="flex flex-col sm:flex-row gap-2 pt-3 border-t border-rams-rule-light">
-                                                <button
-                                                    onClick={() => handleExportMonthlyBriefPDF(selectedBriefMonth)}
-                                                    disabled={pdfLoading}
-                                                    className="w-full py-2.5 px-3 bg-rams-ink text-rams-panel border border-rams-rule hover:bg-rams-ink/90 transition-all font-mono font-bold text-xs rounded-sm flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
-                                                >
-                                                    {pdfLoading ? (
-                                                        <span className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-rams-panel border-t-transparent" />
-                                                    ) : (
-                                                        <Icons.File size={13} />
-                                                    )}
-                                                    ส่งออก PDF สรุปประจำเดือน
-                                                </button>
-                                            </div>
-                                        )}
-                                    </>
-                                )}
-                            </Card>
-
-                            {/* Sentiment Tracker & Mood Index */}
-                            <Card className="p-6 space-y-4 border-t-2 border-t-rams-rule">
-                                <h4 className="font-mono font-bold text-xs uppercase tracking-wider text-rams-ink flex items-center gap-2">
-                                    <Icons.Alert size={18} />
-                                    Sentiment Tracker (ดัชนีอารมณ์ทีมงาน)
-                                </h4>
-                                
-                                {(() => {
-                                    const { stats, total } = getMoodStats();
-                                    return (
-                                        <div className="space-y-4">
-                                            <div className="grid grid-cols-5 gap-2 text-center">
-                                                {Object.entries(stats).map(([mood, count]) => {
-                                                    const percentage = total > 0 ? Math.round((count / total) * 100) : 0;
-                                                    const label = mood === '🔥' ? 'Fired Up' : mood === '😊' ? 'Happy' : mood === '😐' ? 'Neutral' : mood === '😴' ? 'Sleepy' : 'Sick';
-                                                    const color = mood === '🔥' ? 'text-rams-orange' : mood === '😊' ? 'text-rams-green' : mood === '😐' ? 'text-rams-ink-muted' : mood === '😴' ? 'text-rams-amber' : 'text-rams-red';
-                                                    return (
-                                                        <div key={mood} className="bg-rams-bg p-2.5 rounded-sm border border-rams-rule-light space-y-1">
-                                                            <span className="text-2xl block">{mood}</span>
-                                                            <span className={`text-[9px] font-mono font-bold block uppercase tracking-wider ${color}`}>{label}</span>
-                                                            <span className="text-[10px] font-mono font-bold text-rams-ink">{count} คน ({percentage}%)</span>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-
-                                            {/* Beautiful horizontal bar of mood breakdown */}
-                                            <div className="w-full h-3 rounded-sm bg-rams-bg border border-rams-rule-light overflow-hidden flex">
-                                                {Object.entries(stats).map(([mood, count]) => {
-                                                    if (count === 0) return null;
-                                                    const percentage = (count / total) * 100;
-                                                    const bg = mood === '🔥' ? 'bg-rams-orange' : mood === '😊' ? 'bg-rams-green' : mood === '😐' ? 'bg-rams-ink-muted' : mood === '😴' ? 'bg-rams-amber' : 'bg-rams-red';
-                                                    return (
-                                                        <div 
-                                                            key={mood} 
-                                                            style={{ width: `${percentage}%` }} 
-                                                            className={`${bg} transition-all duration-500`}
-                                                            title={`${mood}: ${count} คน`}
-                                                        />
-                                                    );
-                                                })}
-                                            </div>
-                                            <p className="text-[9px] font-mono font-bold text-rams-ink-muted text-center uppercase tracking-widest">
-                                                Mood logs count: {total} record(s) today
-                                            </p>
-                                        </div>
-                                    );
-                                })()}
-                            </Card>
-                        </div>
-
-                        {/* Right Column: Interactive Chat & Timeline */}
-                        <div className="space-y-6">
-                            
-                            {/* Interactive Console Chat */}
-                            <Card className="p-0 border border-rams-rule bg-rams-ink rounded-sm overflow-hidden flex flex-col h-[380px] shadow-none">
-                                {/* Header */}
-                                <div className="bg-rams-ink px-4 py-3 flex justify-between items-center text-rams-panel border-b border-rams-rule">
-                                    <div className="flex items-center gap-2">
-                                        <span className="w-2.5 h-2.5 rounded-full bg-rams-green animate-ping" />
-                                        <span className="font-mono text-xs font-bold text-rams-green">YUZU_INTERACTIVE_CONSOLE v3.5</span>
-                                    </div>
-                                    <Badge color="purple" className="font-mono text-[9px]">GEMINI-3.5-FLASH</Badge>
-                                </div>
-
-                                {/* Messages list */}
-                                <div className="bg-rams-ink flex-1 p-4 overflow-y-auto space-y-3 custom-scrollbar font-mono text-xs text-rams-panel/90">
-                                    {chatMessages.map((msg, idx) => (
-                                        <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                            <div className={`max-w-[85%] p-3 rounded-sm leading-relaxed whitespace-pre-wrap ${
-                                                msg.role === 'user' 
-                                                ? 'bg-rams-panel text-rams-ink border border-rams-rule rounded-tr-none' 
-                                                : 'bg-rams-ink border border-rams-rule-light text-rams-green rounded-tl-none'
-                                            }`}>
-                                                <div className="text-[9px] font-bold font-mono uppercase tracking-widest mb-1 flex items-center gap-1">
-                                                    {msg.role === 'user' ? <span className="text-rams-orange">BOSS</span> : <span className="text-rams-green">🐱 YUZU</span>}
-                                                </div>
-                                                {msg.content}
-                                            </div>
-                                        </div>
-                                    ))}
-                                    {chatLoading && (
-                                        <div className="flex justify-start">
-                                            <div className="bg-rams-ink border border-rams-rule-light text-rams-green/70 p-3 rounded-sm rounded-tl-none flex items-center gap-2">
-                                                <span className="w-1.5 h-1.5 rounded-full bg-rams-green animate-bounce delay-100" />
-                                                <span className="w-1.5 h-1.5 rounded-full bg-rams-green animate-bounce delay-200" />
-                                                <span className="w-1.5 h-1.5 rounded-full bg-rams-green animate-bounce delay-300" />
-                                                <span className="text-[9px] font-mono font-bold">Yuzu is thinking...</span>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Form Input */}
-                                <form 
-                                    onSubmit={(e) => {
-                                        e.preventDefault();
-                                        handleSendConsoleChat();
-                                    }}
-                                    className="bg-rams-ink p-3 flex gap-2 border-t border-rams-rule"
-                                >
-                                    <input 
-                                        type="text" 
-                                        placeholder="ถามตารางกะงาน, ราคาของ, หรือประเมินพนักงาน..."
-                                        className="flex-1 bg-rams-ink border border-rams-rule-light rounded-sm px-4 py-2 text-xs font-mono text-rams-panel outline-none focus:border-rams-panel"
-                                        value={chatInput}
-                                        onChange={(e) => setChatInput(e.target.value)}
-                                        disabled={chatLoading}
-                                    />
-                                    <button 
-                                        type="submit"
-                                        disabled={chatLoading || !chatInput.trim()}
-                                        className="bg-rams-orange border border-rams-orange text-rams-panel font-mono font-bold text-xs py-2 px-4 rounded-sm hover:bg-rams-orange-active disabled:opacity-40 transition-all cursor-pointer"
-                                    >
-                                        ส่ง
-                                    </button>
-                                </form>
-                            </Card>
-
-                            {/* Staff Mood Timeline */}
-                            <Card className="p-6 space-y-4 max-h-[300px] overflow-y-auto custom-scrollbar rounded-sm bg-rams-panel border border-rams-rule-light shadow-none">
-                                <h4 className="font-mono font-bold text-xs uppercase tracking-wider text-rams-ink sticky top-0 bg-rams-panel py-1 flex items-center gap-2">
-                                    <Icons.Clock size={18} />
-                                    Staff Mood & Notes Timeline (บันทึกอารมณ์ล่าสุด)
-                                </h4>
-                                
-                                <div className="space-y-3">
-                                    {attendanceLogs.filter(log => log.mood_status || log.mood_note).length === 0 ? (
-                                        <p className="text-center text-xs font-mono font-bold text-rams-ink-muted py-6">ยังไม่มีการบันทึกอารมณ์ในขณะนี้</p>
-                                    ) : (
-                                        attendanceLogs
-                                            .filter(log => log.mood_status || log.mood_note)
-                                            .map((log) => {
-                                                const empName = log.employees?.nickname || log.employees?.name || 'พนักงาน';
-                                                const time = new Date(log.timestamp).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
-                                                const actionLabel = log.action_type === 'check_in' ? 'เข้างาน' : 'ออกงาน';
+                                        {/* Beautiful horizontal bar of mood breakdown */}
+                                        <div className="w-full h-3 rounded-sm bg-rams-bg border border-rams-rule-light overflow-hidden flex">
+                                            {Object.entries(stats).map(([mood, count]) => {
+                                                if (count === 0) return null;
+                                                const percentage = (count / total) * 100;
+                                                const bg = mood === '🔥' ? 'bg-rams-orange' : mood === '😊' ? 'bg-rams-green' : mood === '😐' ? 'bg-rams-ink-muted' : mood === '😴' ? 'bg-rams-amber' : 'bg-rams-red';
                                                 return (
-                                                    <div key={log.id} className="flex gap-3 items-start border-b border-rams-rule-light pb-2.5 last:border-0 last:pb-0">
-                                                        <span className="text-2xl bg-rams-bg p-1.5 rounded-sm border border-rams-rule-light flex-shrink-0">
-                                                            {log.mood_status || '😐'}
-                                                        </span>
-                                                        <div className="space-y-0.5 flex-1">
-                                                            <div className="flex justify-between items-center">
-                                                                <span className="font-bold text-rams-ink text-xs">{empName}</span>
-                                                                <span className="text-[9px] text-rams-ink-muted font-mono font-bold uppercase">{time} ({actionLabel})</span>
-                                                            </div>
-                                                            {log.mood_note && (
-                                                                <p className="text-xs bg-rams-bg text-rams-ink-muted p-2.5 rounded-sm border border-rams-rule-light italic font-mono">
-                                                                    "{log.mood_note}"
-                                                                </p>
-                                                            )}
-                                                        </div>
-                                                    </div>
+                                                    <div 
+                                                        key={mood} 
+                                                        style={{ width: `${percentage}%` }} 
+                                                        className={`${bg} transition-all duration-500`}
+                                                        title={`${mood}: ${count} คน`}
+                                                    />
                                                 );
-                                            })
-                                    )}
-                                </div>
-                            </Card>
-                        </div>
+                                            })}
+                                        </div>
+                                        <p className="text-[9px] font-mono font-bold text-rams-ink-muted text-center uppercase tracking-widest">
+                                            Mood logs count: {total} record(s) today
+                                        </p>
+                                    </div>
+                                );
+                            })()}
+                        </Card>
+
+                        {/* Staff Mood Timeline */}
+                        <Card className="p-6 space-y-4 max-h-[380px] overflow-y-auto custom-scrollbar rounded-sm bg-rams-panel border border-rams-rule-light shadow-none">
+                            <h4 className="font-mono font-bold text-xs uppercase tracking-wider text-rams-ink sticky top-0 bg-rams-panel py-1 flex items-center gap-2">
+                                <Icons.Clock size={18} />
+                                Staff Mood & Notes Timeline (บันทึกอารมณ์ล่าสุด)
+                            </h4>
+                            
+                            <div className="space-y-3">
+                                {attendanceLogs.filter(log => log.mood_status || log.mood_note).length === 0 ? (
+                                    <p className="text-center text-xs font-mono font-bold text-rams-ink-muted py-6">ยังไม่มีการบันทึกอารมณ์ในขณะนี้</p>
+                                ) : (
+                                    attendanceLogs
+                                        .filter(log => log.mood_status || log.mood_note)
+                                        .map((log) => {
+                                            const empName = log.employees?.nickname || log.employees?.name || 'พนักงาน';
+                                            const time = new Date(log.timestamp).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+                                            const actionLabel = log.action_type === 'check_in' ? 'เข้างาน' : 'ออกงาน';
+                                            return (
+                                                <div key={log.id} className="flex gap-3 items-start border-b border-rams-rule-light pb-2.5 last:border-0 last:pb-0">
+                                                    <span className="text-2xl bg-rams-bg p-1.5 rounded-sm border border-rams-rule-light flex-shrink-0">
+                                                        {log.mood_status || '😐'}
+                                                    </span>
+                                                    <div className="space-y-0.5 flex-1">
+                                                        <div className="flex justify-between items-center">
+                                                            <span className="font-bold text-rams-ink text-xs">{empName}</span>
+                                                            <span className="text-[9px] text-rams-ink-muted font-mono font-bold uppercase">{time} ({actionLabel})</span>
+                                                        </div>
+                                                        {log.mood_note && (
+                                                            <p className="text-xs bg-rams-bg text-rams-ink-muted p-2.5 rounded-sm border border-rams-rule-light italic font-mono">
+                                                                "{log.mood_note}"
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })
+                                )}
+                            </div>
+                        </Card>
                     </div>
 
                     {/* Collapsible Pending Facts Accordion */}
