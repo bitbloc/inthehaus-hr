@@ -35,6 +35,24 @@ export default function YuzuKnowledgeManager() {
     const [dailyBriefs, setDailyBriefs] = useState({});
     const [briefLoading, setBriefLoading] = useState(false);
     const [pdfLoading, setPdfLoading] = useState(false);
+    const [briefMode, setBriefMode] = useState('daily'); // 'daily', 'monthly'
+    const [selectedBriefMonth, setSelectedBriefMonth] = useState(format(new Date(), 'yyyy-MM'));
+    const [monthlyBriefs, setMonthlyBriefs] = useState({});
+    const [monthlyLoading, setMonthlyLoading] = useState(false);
+
+    // Calculate recent months (Current month + last 5 months)
+    const recentMonths = React.useMemo(() => {
+        const months = [];
+        const now = new Date();
+        for (let i = 0; i < 6; i++) {
+            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+            const value = format(d, 'yyyy-MM');
+            const label = d.toLocaleDateString('th-TH', { month: 'long', year: 'numeric' });
+            months.push({ value, label });
+        }
+        return months;
+    }, []);
+
     const [chatMessages, setChatMessages] = useState([
         { role: 'model', content: 'สวัสดีค่ะเจ้านาย! ยูซุ แมวส้มแสนรู้ประจำร้าน In The Haus พร้อมให้บริการแล้วค่ะ มีอะไรเกี่ยวกับข้อมูลร้าน กะงาน หรืออารมณ์ของพนักงานที่อยากคุยกับยูซุ แหลงมาได้เลยนะคะเมี๊ยว~ 🐱🍊' }
     ]);
@@ -275,6 +293,117 @@ export default function YuzuKnowledgeManager() {
         }
     }
 
+    async function handleGenerateMonthlyBrief(monthStr = null) {
+        const targetMonth = monthStr || selectedBriefMonth;
+        setMonthlyLoading(true);
+        try {
+            const res = await fetch(`/api/yuzu/monthly-brief?month=${targetMonth}`);
+            const data = await res.json();
+            if (data.success) {
+                setMonthlyBriefs(prev => ({ ...prev, [targetMonth]: data.brief }));
+            } else {
+                setMonthlyBriefs(prev => ({ ...prev, [targetMonth]: 'ไม่สามารถสรุปข้อมูลรายเดือนได้ในขณะนี้: ' + data.error }));
+            }
+        } catch (e) {
+            setMonthlyBriefs(prev => ({ ...prev, [targetMonth]: 'เกิดข้อผิดพลาดในการดึงข้อมูลสรุปรายเดือน: ' + e.message }));
+        }
+        setMonthlyLoading(false);
+    }
+
+    async function handleExportMonthlyBriefPDF(monthStr) {
+        const briefContent = monthlyBriefs[monthStr];
+        if (!briefContent) return;
+
+        setPdfLoading(true);
+        try {
+            const html2canvas = (await import('html2canvas')).default;
+            const { jsPDF } = await import('jspdf');
+
+            const monthLabel = recentMonths.find(m => m.value === monthStr)?.label || monthStr;
+
+            const element = document.createElement('div');
+            element.style.width = '800px';
+            element.style.padding = '50px';
+            element.style.background = '#fafaf9';
+            element.style.color = '#1c1c1c';
+            element.style.fontFamily = "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+            element.style.position = 'absolute';
+            element.style.left = '-9999px';
+            element.style.top = '-9999px';
+
+            element.innerHTML = `
+                <!-- Header -->
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #1c1c1c; padding-bottom: 20px; margin-bottom: 30px;">
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <img src="/logo.png" style="height: 40px; width: auto; object-fit: contain;" alt="In The Haus Logo" />
+                        <div>
+                            <div style="font-size: 18px; font-weight: 800; tracking-widest: 0.05em; line-height: 1.2;">IN THE HAUS</div>
+                            <div style="font-size: 9px; font-weight: 700; color: #737373; tracking-wider: 0.1em; text-transform: uppercase; margin-top: 2px;">Monthly Operations Report / รายงานสรุปปฏิบัติงานประจำเดือน</div>
+                        </div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="font-size: 16px; font-weight: 700; color: #1c1c1c; text-transform: uppercase;">${monthLabel}</div>
+                        <div style="font-size: 8px; font-weight: 600; color: #a3a3a3; text-transform: uppercase; margin-top: 4px;">Generated: ${new Date().toLocaleDateString('th-TH')} ${new Date().toLocaleTimeString('th-TH')}</div>
+                    </div>
+                </div>
+
+                <!-- Content Container -->
+                <div style="background: #ffffff; border: 1px solid #e5e5e7; border-radius: 16px; padding: 30px; margin-bottom: 40px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.01);">
+                    <div style="font-size: 13px; line-height: 1.8; color: #262626; white-space: pre-wrap;">${briefContent}</div>
+                </div>
+
+                <!-- Footer -->
+                <div style="border-top: 1px solid #e5e5e7; padding-top: 20px; display: flex; justify-content: space-between; align-items: flex-end;">
+                    <div style="max-width: 450px;">
+                        <div style="font-size: 8px; font-weight: 750; text-transform: uppercase; color: #a3a3a3; letter-spacing: 0.1em; margin-bottom: 5px;">Verification & Archives</div>
+                        <div style="font-size: 8px; line-height: 1.5; color: #a3a3a3;">
+                            This document is an official daily summary report compiled and verified by Yuzu AI for In The Haus Nakhon Phanom. 
+                            Any modifications must be authorized by management.
+                        </div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="font-size: 9px; font-weight: 800; color: #404040; letter-spacing: 0.05em;">YUZU x IN THE HAUS</div>
+                        <div style="font-size: 8px; font-weight: 600; color: #a3a3a3; margin-top: 3px;">ONHAUS SYSTEM © ${new Date().getFullYear()} All Rights Reserved</div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(element);
+
+            const canvas = await html2canvas(element, {
+                scale: 2,
+                useCORS: true,
+                logging: false,
+            });
+            document.body.removeChild(element);
+
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const imgWidth = 210;
+            const pageHeight = 295;
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            
+            let heightLeft = imgHeight;
+            let position = 0;
+
+            pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+            heightLeft -= pageHeight;
+
+            while (heightLeft >= 0) {
+                position = heightLeft - imgHeight;
+                pdf.addPage();
+                pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                heightLeft -= pageHeight;
+            }
+
+            pdf.save(`yuzu-monthly-brief-${monthStr}.pdf`);
+        } catch (e) {
+            console.error("PDF Export Error:", e);
+            alert("เกิดข้อผิดพลาดในการสร้าง PDF: " + e.message);
+        } finally {
+            setPdfLoading(false);
+        }
+    }
+
     async function handleSendConsoleChat() {
         if (!chatInput.trim()) return;
         const userMsg = chatInput.trim();
@@ -315,11 +444,13 @@ export default function YuzuKnowledgeManager() {
     useEffect(() => {
         fetchData();
         if (activeTab === 'insights') {
-            if (!dailyBriefs[selectedBriefDate]) {
+            if (briefMode === 'daily' && !dailyBriefs[selectedBriefDate]) {
                 handleGenerateBrief(selectedBriefDate);
+            } else if (briefMode === 'monthly' && !monthlyBriefs[selectedBriefMonth]) {
+                handleGenerateMonthlyBrief(selectedBriefMonth);
             }
         }
-    }, [activeTab, selectedDate, selectedBriefDate]);
+    }, [activeTab, selectedDate, selectedBriefDate, selectedBriefMonth, briefMode]);
 
     async function fetchData() {
         if (activeTab === 'knowledge') {
@@ -969,87 +1100,174 @@ export default function YuzuKnowledgeManager() {
                                         <Icons.File size={18} />
                                         AI Operations Briefing
                                     </h4>
-                                    <Badge color="orange">บันทึกสรุปย้อนหลัง 3 วัน</Badge>
+                                    <Badge color="orange">
+                                        {briefMode === 'daily' ? 'บันทึกสรุปย้อนหลัง 3 วัน' : 'สรุปรายงานประจำเดือน'}
+                                    </Badge>
+                                </div>
+
+                                {/* Brief Mode Selector */}
+                                <div className="flex border border-rams-rule-light p-1 bg-rams-bg rounded-sm gap-1">
+                                    <button 
+                                        onClick={() => setBriefMode('daily')}
+                                        className={`flex-1 py-1 text-center rounded-sm transition-all font-mono font-bold text-[10px] uppercase cursor-pointer ${
+                                            briefMode === 'daily'
+                                            ? 'bg-rams-ink text-rams-panel'
+                                            : 'text-rams-ink-muted hover:bg-rams-bg'
+                                        }`}
+                                    >
+                                        สรุปรายวัน (Daily)
+                                    </button>
+                                    <button 
+                                        onClick={() => setBriefMode('monthly')}
+                                        className={`flex-1 py-1 text-center rounded-sm transition-all font-mono font-bold text-[10px] uppercase cursor-pointer ${
+                                            briefMode === 'monthly'
+                                            ? 'bg-rams-ink text-rams-panel'
+                                            : 'text-rams-ink-muted hover:bg-rams-bg'
+                                        }`}
+                                    >
+                                        สรุปรายเดือน (Monthly)
+                                    </button>
                                 </div>
                                 
-                                {/* Date Selector Tabs */}
-                                <div className="flex border-b border-rams-rule-light pb-2 overflow-x-auto gap-1 no-scrollbar">
-                                    {recentDates.map((date, idx) => {
-                                        const isSelected = selectedBriefDate === date;
-                                        let dayLabel = "วันนี้";
-                                        if (idx === 1) dayLabel = "เมื่อวาน";
-                                        else if (idx === 2) dayLabel = "2 วันก่อน";
-                                        else if (idx === 3) dayLabel = "3 วันก่อน";
-                                        
-                                        const dateObj = new Date(date);
-                                        const formattedDate = dateObj.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
-                                        
-                                        return (
-                                            <button
-                                                key={date}
-                                                onClick={() => setSelectedBriefDate(date)}
-                                                className={`flex-1 py-1.5 px-2.5 text-center rounded-sm transition-all duration-200 whitespace-nowrap min-w-[70px] cursor-pointer ${
-                                                    isSelected 
-                                                    ? 'bg-rams-ink text-rams-panel font-mono font-bold text-xs shadow-none' 
-                                                    : 'text-rams-ink-muted hover:bg-rams-bg font-mono font-bold text-xs'
-                                                }`}
-                                            >
-                                                <div className="text-[9px] uppercase tracking-wide opacity-80">{dayLabel}</div>
-                                                <div className="text-xs">{formattedDate}</div>
-                                            </button>
-                                        );
-                                    })}
-                                </div>
+                                {briefMode === 'daily' && (
+                                    <>
+                                        {/* Date Selector Tabs */}
+                                        <div className="flex border-b border-rams-rule-light pb-2 overflow-x-auto gap-1 no-scrollbar">
+                                            {recentDates.map((date, idx) => {
+                                                const isSelected = selectedBriefDate === date;
+                                                let dayLabel = "วันนี้";
+                                                if (idx === 1) dayLabel = "เมื่อวาน";
+                                                else if (idx === 2) dayLabel = "2 วันก่อน";
+                                                else if (idx === 3) dayLabel = "3 วันก่อน";
+                                                
+                                                const dateObj = new Date(date);
+                                                const formattedDate = dateObj.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
+                                                
+                                                return (
+                                                    <button
+                                                        key={date}
+                                                        onClick={() => setSelectedBriefDate(date)}
+                                                        className={`flex-1 py-1.5 px-2.5 text-center rounded-sm transition-all duration-200 whitespace-nowrap min-w-[70px] cursor-pointer ${
+                                                            isSelected 
+                                                            ? 'bg-rams-ink text-rams-panel font-mono font-bold text-xs shadow-none' 
+                                                            : 'text-rams-ink-muted hover:bg-rams-bg font-mono font-bold text-xs'
+                                                        }`}
+                                                    >
+                                                        <div className="text-[9px] uppercase tracking-wide opacity-80">{dayLabel}</div>
+                                                        <div className="text-xs">{formattedDate}</div>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
 
-                                {briefLoading ? (
-                                    <div className="py-12 flex flex-col items-center justify-center space-y-3 text-rams-ink-muted">
-                                        <span className="animate-spin rounded-full h-8 w-8 border-4 border-rams-orange border-t-transparent" />
-                                        <p className="text-xs font-mono font-bold animate-pulse">ยูซุกำลังวิเคราะห์ข้อมูลกะงานและสรุปห้องแชท...</p>
-                                    </div>
-                                ) : dailyBriefs[selectedBriefDate] ? (
-                                    <div className="bg-rams-bg p-4 rounded-sm border border-rams-rule-light text-rams-ink text-xs font-mono whitespace-pre-wrap leading-relaxed">
-                                        {dailyBriefs[selectedBriefDate]}
-                                    </div>
-                                ) : (
-                                    <div className="py-12 text-center text-rams-ink-muted space-y-3 font-mono">
-                                        <p className="text-xs font-bold">ยังไม่มีการสร้างสรุปประจำวันนี้</p>
-                                        <button 
-                                            onClick={() => handleGenerateBrief(selectedBriefDate)}
-                                            className="text-xs font-bold text-rams-orange hover:text-rams-orange/95 underline cursor-pointer"
-                                        >
-                                            กดเพื่อสร้างสรุปเมี๊ยว~
-                                        </button>
-                                    </div>
+                                        {briefLoading ? (
+                                            <div className="py-12 flex flex-col items-center justify-center space-y-3 text-rams-ink-muted">
+                                                <span className="animate-spin rounded-full h-8 w-8 border-4 border-rams-orange border-t-transparent" />
+                                                <p className="text-xs font-mono font-bold animate-pulse">ยูซุกำลังวิเคราะห์ข้อมูลกะงานและสรุปห้องแชท...</p>
+                                            </div>
+                                        ) : dailyBriefs[selectedBriefDate] ? (
+                                            <div className="bg-rams-bg p-4 rounded-sm border border-rams-rule-light text-rams-ink text-xs font-mono whitespace-pre-wrap leading-relaxed">
+                                                {dailyBriefs[selectedBriefDate]}
+                                            </div>
+                                        ) : (
+                                            <div className="py-12 text-center text-rams-ink-muted space-y-3 font-mono">
+                                                <p className="text-xs font-bold">ยังไม่มีการสร้างสรุปประจำวันนี้</p>
+                                                <button 
+                                                    onClick={() => handleGenerateBrief(selectedBriefDate)}
+                                                    className="text-xs font-bold text-rams-orange hover:text-rams-orange/95 underline cursor-pointer"
+                                                >
+                                                    กดเพื่อสร้างสรุปเมี๊ยว~
+                                                </button>
+                                            </div>
+                                        )}
+
+                                        {/* PDF Actions */}
+                                        {dailyBriefs[selectedBriefDate] && !briefLoading && (
+                                            <div className="flex flex-col sm:flex-row gap-2 pt-3 border-t border-rams-rule-light">
+                                                <button
+                                                    onClick={() => handleExportSingleBriefPDF(selectedBriefDate)}
+                                                    disabled={pdfLoading}
+                                                    className="flex-1 py-2 px-3 bg-rams-panel border border-rams-rule-light text-rams-ink hover:bg-rams-bg transition-all font-mono font-bold text-xs rounded-sm flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                                                >
+                                                    {pdfLoading ? (
+                                                        <span className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-rams-ink border-t-transparent" />
+                                                    ) : (
+                                                        <Icons.File size={13} />
+                                                    )}
+                                                    ส่งออก PDF สรุปประจำวัน
+                                                </button>
+                                                <button
+                                                    onClick={handleExportThreeDayReportPDF}
+                                                    disabled={pdfLoading}
+                                                    className="flex-1 py-2 px-3 bg-rams-ink text-rams-panel border border-rams-rule hover:bg-rams-ink/90 transition-all font-mono font-bold text-xs rounded-sm flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                                                >
+                                                    {pdfLoading ? (
+                                                        <span className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-rams-panel border-t-transparent" />
+                                                    ) : (
+                                                        <Icons.File size={13} />
+                                                    )}
+                                                    ส่งออก PDF ย้อนหลัง 3 วัน
+                                                </button>
+                                            </div>
+                                        )}
+                                    </>
                                 )}
 
-                                {/* PDF Actions */}
-                                {dailyBriefs[selectedBriefDate] && !briefLoading && (
-                                    <div className="flex flex-col sm:flex-row gap-2 pt-3 border-t border-rams-rule-light">
-                                        <button
-                                            onClick={() => handleExportSingleBriefPDF(selectedBriefDate)}
-                                            disabled={pdfLoading}
-                                            className="flex-1 py-2 px-3 bg-rams-panel border border-rams-rule-light text-rams-ink hover:bg-rams-bg transition-all font-mono font-bold text-xs rounded-sm flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
-                                        >
-                                            {pdfLoading ? (
-                                                <span className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-rams-ink border-t-transparent" />
-                                            ) : (
-                                                <Icons.File size={13} />
-                                            )}
-                                            ส่งออก PDF สรุปประจำวัน
-                                        </button>
-                                        <button
-                                            onClick={handleExportThreeDayReportPDF}
-                                            disabled={pdfLoading}
-                                            className="flex-1 py-2 px-3 bg-rams-ink text-rams-panel border border-rams-rule hover:bg-rams-ink/90 transition-all font-mono font-bold text-xs rounded-sm flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
-                                        >
-                                            {pdfLoading ? (
-                                                <span className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-rams-panel border-t-transparent" />
-                                            ) : (
-                                                <Icons.File size={13} />
-                                            )}
-                                            ส่งออก PDF ย้อนหลัง 3 วัน
-                                        </button>
-                                    </div>
+                                {briefMode === 'monthly' && (
+                                    <>
+                                        {/* Month Selector Dropdown */}
+                                        <div className="flex items-center gap-2 border-b border-rams-rule-light pb-3">
+                                            <label className="text-[10px] font-mono font-bold text-rams-ink-muted uppercase tracking-wider">เลือกเดือน:</label>
+                                            <select
+                                                value={selectedBriefMonth}
+                                                onChange={(e) => setSelectedBriefMonth(e.target.value)}
+                                                className="bg-rams-bg text-rams-ink border border-rams-rule-light rounded-sm p-1 px-2 text-xs font-mono outline-none cursor-pointer flex-1"
+                                            >
+                                                {recentMonths.map(m => (
+                                                    <option key={m.value} value={m.value}>{m.label}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        {monthlyLoading ? (
+                                            <div className="py-12 flex flex-col items-center justify-center space-y-3 text-rams-ink-muted">
+                                                <span className="animate-spin rounded-full h-8 w-8 border-4 border-rams-orange border-t-transparent" />
+                                                <p className="text-xs font-mono font-bold animate-pulse">ยูซุกำลังวิเคราะห์ข้อมูลกะงานและสรุปห้องแชททั้งเดือน...</p>
+                                            </div>
+                                        ) : monthlyBriefs[selectedBriefMonth] ? (
+                                            <div className="bg-rams-bg p-4 rounded-sm border border-rams-rule-light text-rams-ink text-xs font-mono whitespace-pre-wrap leading-relaxed">
+                                                {monthlyBriefs[selectedBriefMonth]}
+                                            </div>
+                                        ) : (
+                                            <div className="py-12 text-center text-rams-ink-muted space-y-3 font-mono">
+                                                <p className="text-xs font-bold">ยังไม่มีการสร้างสรุปประจำเดือนนี้</p>
+                                                <button 
+                                                    onClick={() => handleGenerateMonthlyBrief(selectedBriefMonth)}
+                                                    className="text-xs font-bold text-rams-orange hover:text-rams-orange/95 underline cursor-pointer"
+                                                >
+                                                    กดเพื่อสร้างสรุปรายเดือนเมี๊ยว~
+                                                </button>
+                                            </div>
+                                        )}
+
+                                        {/* PDF Actions for Monthly Brief */}
+                                        {monthlyBriefs[selectedBriefMonth] && !monthlyLoading && (
+                                            <div className="flex flex-col sm:flex-row gap-2 pt-3 border-t border-rams-rule-light">
+                                                <button
+                                                    onClick={() => handleExportMonthlyBriefPDF(selectedBriefMonth)}
+                                                    disabled={pdfLoading}
+                                                    className="w-full py-2.5 px-3 bg-rams-ink text-rams-panel border border-rams-rule hover:bg-rams-ink/90 transition-all font-mono font-bold text-xs rounded-sm flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                                                >
+                                                    {pdfLoading ? (
+                                                        <span className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-rams-panel border-t-transparent" />
+                                                    ) : (
+                                                        <Icons.File size={13} />
+                                                    )}
+                                                    ส่งออก PDF สรุปประจำเดือน
+                                                </button>
+                                            </div>
+                                        )}
+                                    </>
                                 )}
                             </Card>
 

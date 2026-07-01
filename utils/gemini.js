@@ -337,6 +337,68 @@ export async function getDailySummary(content) {
 
 
 /**
+ * Get Monthly Summary
+ */
+export async function getMonthlySummary(content) {
+    if (!content) return "เดือนนี้ยังไม่มีข้อมูลครับ";
+    
+    const instance = getGenAI();
+    if (!instance) {
+        return "ขออภัยครับ เกิดข้อผิดพลาดในการเชื่อมต่อกับ AI (getGenAI failed)";
+    }
+
+    const models = ["gemini-3.5-flash", "gemini-2.5-flash", "gemini-2.5-pro", "gemini-3-flash-preview"];
+    let lastError = null;
+
+    for (const modelName of models) {
+        let retries = 3;
+        let delay = 1000;
+        
+        while (retries > 0) {
+            try {
+                const model = instance.getGenerativeModel({ 
+                    model: modelName,
+                    systemInstruction: `คุณคือระบบ AI สรุปงานประจำเดือนของร้าน In The Haus (AI Operations Monthly Report)
+หน้าที่ของคุณคือวิเคราะห์และสรุปภาพรวมการลงเวลางาน พฤติกรรม อารมณ์ และประเด็นการสื่อสารทั้งหมดของพนักงานประจำเดือน
+คุณต้องปฏิบัติตามกฎอย่างเคร่งครัดดังนี้:
+1. ห้ามใช้บุคลิกแมว ไม่มีตัวละครแมว ห้ามพูดจาเหมือนแมว (ห้ามมี เมี๊ยว, เมี๊ยวๆ, นั่งหาว, เลียอุ้งเท้า หรือกวนประสาท) และห้ามเรียกพนักงานว่า "พวกมนุษย์"
+2. เขียนสรุปในรูปแบบที่เป็นทางการ (Formal Thai) สุภาพ ชัดเจน และครอบคลุมครบถ้วนทุกประเด็น โดยแยกเนื้อหาออกเป็นประเด็นสำคัญประจำเดือน
+3. ห้ามใช้เครื่องหมายดอกจัน (*) หรือดอกจันสองตัว (**) ในการจัดตัวหนาหรือการเขียนข้อความใดๆ ทั้งสิ้นในผลลัพธ์โดยเด็ดขาด ให้แสดงข้อความปกติแบบไม่มีดอกจันปะปนเลย
+4. ห้ามใช้อีโมจิ (Emoji) หรือสัญลักษณ์รูปภาพใดๆ ทั้งสิ้น
+5. สรุปเนื้อหาเป็นข้อๆ โดยใช้เครื่องหมายขีดแดช (-) หรือตัวเลขสำหรับรายการย่อยเท่านั้น
+6. ต้องรายงานข้อมูลการดำเนินงาน ปัญหา และเหตุการณ์สำคัญประจำเดือนให้ครบถ้วน โดยแบ่งหัวข้อหลักดังนี้:
+   - สรุปสถิติและภาพรวมการทำงานของพนักงาน (สรุปพฤติกรรมเด่น การเข้ากะ ความสม่ำเสมอ การมาสาย หรือปัญหาการทำงานของพนักงานแต่ละคน)
+   - สรุปดัชนีอารมณ์และสภาพจิตใจของทีม (วิเคราะห์อารมณ์ของพนักงานในภาพรวมของเดือนนี้จากข้อมูล mood logs และโน้ต)
+   - สรุปปัญหาและการจัดการในร้านที่สำคัญ (ของเสียหาย วัตถุดิบหมด/สั่งซื้อ นโยบายราคา หรือการปรับปรุงร้านค้าที่พูดถึงในกลุ่ม)
+   - ข้อเสนอแนะเพื่อการปรับปรุงระบบและการทำงานสำหรับเดือนถัดไป`
+                });
+
+                const prompt = `วิเคราะห์และสรุป Log ของทั้งเดือนนี้ให้หน่อยครับ:\n\n${content}`;
+                const result = await model.generateContent(prompt);
+                return result.response.text();
+            } catch (error) {
+                lastError = error;
+                console.warn(`Monthly Summary Error with model ${modelName} (${retries} retries left):`, error);
+                
+                if (error.status === 503 || error.status === 429) {
+                    retries--;
+                    if (retries > 0) {
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        delay *= 2;
+                        continue;
+                    }
+                }
+                break;
+            }
+        }
+    }
+
+    console.error("All models and retries failed for Monthly Summary. Last Error:", lastError);
+    return "ขออภัยครับ สรุปไม่ได้ครับ";
+}
+
+
+/**
  * Generate image and upload to Supabase Storage
  */
 export async function generateImage(prompt) {
