@@ -172,14 +172,18 @@ export async function handleChatCommand(event, client, text, rawText, userId, gr
       return true;
     }
 
-    const newsKeywords = ['ข่าว', 'อัปเดต', 'สรุป', 'ส่อง', 'ติดตาม', 'สถานการณ์'];
-    const costKeywords = ['น้ำมัน', 'ไฟ', 'ต้นทุน', 'ราคาอาหาร', 'วัตถุดิบ'];
-    
-    const hasNewsKeyword = newsKeywords.some(kw => text.includes(kw));
-    const hasCostKeyword = costKeywords.some(kw => text.includes(kw));
-    
-    const isNewsOrCostRequest = hasNewsKeyword || hasCostKeyword;
-    const isNewsOnlyRequest = hasNewsKeyword && !hasCostKeyword;
+    // Refine news/cost checks to prevent false triggers on general queries (e.g. "หลอดไฟ", "อัปเดตงาน")
+    const briefingKeywords = ['สรุปข่าว', 'รายงานข่าว', 'อัปเดตข่าว', 'สรุปสถานการณ์', 'รายงานสถานการณ์', 'สรุปต้นทุน', 'รายงานต้นทุน', 'อัปเดตประจำวัน', 'สรุปประจำวัน', 'รายงานประจำวัน'];
+    const hasNewsBriefKeyword = briefingKeywords.some(kw => text.includes(kw)) ||
+      (text.includes('ข่าว') && (text.includes('สรุป') || text.includes('รายงาน') || text.includes('อัปเดต') || text.includes('ส่อง') || text.includes('ติดตาม') || text.includes('วันนี้'))) ||
+      (text.includes('ต้นทุน') && (text.includes('สรุป') || text.includes('รายงาน') || text.includes('อัปเดต') || text.includes('วิเคราะห์')));
+      
+    const hasCostBriefKeyword = text.includes('สรุปราคา') || text.includes('สรุปต้นทุน') || text.includes('รายงานต้นทุน') || 
+      (text.includes('ราคา') && (text.includes('น้ำมัน') || text.includes('แก๊ส') || text.includes('วัตถุดิบ') || text.includes('อาหาร'))) ||
+      (text.includes('ค่าไฟ') && (text.includes('สรุป') || text.includes('รายงาน') || text.includes('อัปเดต') || text.includes('วิเคราะห์') || text.includes('ราคา')));
+
+    const isNewsOrCostRequest = hasNewsBriefKeyword || hasCostBriefKeyword;
+    const isNewsOnlyRequest = hasNewsBriefKeyword && !hasCostBriefKeyword;
 
     const dailyLogs = await getDailyContent(groupId);
     const history = await getChatHistory(groupId);
@@ -242,7 +246,7 @@ ${dailyLogs || 'ไม่มีความเคลื่อนไหว'}
     } else {
       if (text.includes('ทอง')) context += await getGoldPrice() + "\n";
       if (text.includes('น้ำมัน')) context += await getOilPrice() + "\n";
-      if (text.includes('ไฟ')) context += await getElectricityPrice() + "\n";
+      if (text.includes('ค่าไฟ') || text.includes('ค่าไฟฟ้า')) context += await getElectricityPrice() + "\n";
       
       const ingredientKeywords = ['วัตถุดิบ', 'ราคาอาหาร', 'หมู', 'ไก่', 'เนื้อ', 'ปลา', 'ไข่', 'ผัก', 'ผลไม้', 'ข้าว'];
       if (ingredientKeywords.some(kw => text.includes(kw))) {

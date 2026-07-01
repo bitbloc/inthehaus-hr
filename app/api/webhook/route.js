@@ -21,6 +21,21 @@ const client = new Client({
 // Cache to prevent duplicate vision replies within the same container instance
 const lastVisionReplyTime = new Map();
 
+// De-duplication caches
+const inProgressEvents = new Set();
+const recentlyProcessedEvents = new Map();
+
+function cleanUpOldProcessedEvents() {
+  const now = Date.now();
+  if (recentlyProcessedEvents.size > 200) {
+    for (const [key, val] of recentlyProcessedEvents.entries()) {
+      if ((now - val) > 30000) {
+        recentlyProcessedEvents.delete(key);
+      }
+    }
+  }
+}
+
 function appendBrandingToFlex(msg) {
   if (!msg) return msg;
 
@@ -182,7 +197,49 @@ export async function POST(request) {
       cleanupOldHistory().catch(e => console.error("Cleanup Error:", e));
 
       for (const event of events) {
-        if (event.type === 'message') {
+        const eventId = event.webhookEventId || event.message?.id || event.replyToken;
+        if (eventId) {
+          const now = Date.now();
+          if (inProgressEvents.has(eventId)) {
+            console.log("Duplicate event ignored (in-progress in memory):", eventId);
+            continue;
+          }
+          const lastProcessed = recentlyProcessedEvents.get(eventId);
+          if (lastProcessed && (now - lastProcessed) < 15000) {
+            console.log("Duplicate event ignored (recently processed in memory):", eventId);
+            continue;
+          }
+          inProgressEvents.add(eventId);
+        }
+
+        try {
+          if (event.type === 'message' && event.message?.id) {
+            const messageId = event.message.id;
+            const { supabase } = await import('../../../lib/supabaseClient');
+            const { data: existingLock } = await supabase
+              .from('yuzu_chat_history')
+              .select('id')
+              .eq('content', messageId)
+              .eq('message_type', 'lock')
+              .limit(1);
+
+            if (existingLock && existingLock.length > 0) {
+              console.log("Duplicate event ignored (found lock in DB):", messageId);
+              continue;
+            }
+
+            const groupId = event.source.groupId || event.source.userId;
+            const userId = event.source.userId;
+            await supabase.from('yuzu_chat_history').insert({
+              group_id: groupId,
+              user_id: userId,
+              role: 'user',
+              content: messageId,
+              message_type: 'lock'
+            });
+          }
+
+          if (event.type === 'message') {
           const groupId = event.source.groupId || event.source.userId;
           const userId = event.source.userId;
 
@@ -615,6 +672,15 @@ export async function POST(request) {
           const welcomeMemberText = "ยินดีต้อนรับสมาชิกใหม่เข้าสู่กลุ่มครับ! 🍊 ผมชื่อยูซุ เป็นผู้จัดการร้าน AI นะครับ หากมีข้อมูลตารางงานหรือการรายงานระบบจุดไหนให้ช่วยประสานงาน เรียกใช้ผมได้ตลอดเวลาเลยครับ";
           await client.replyMessage(event.replyToken, { type: 'text', text: welcomeMemberText });
           handledLocally = true;
+        }
+        } catch (err) {
+          console.error("Error processing event:", err);
+        } finally {
+          if (eventId) {
+            inProgressEvents.delete(eventId);
+            recentlyProcessedEvents.set(eventId, Date.now());
+            cleanUpOldProcessedEvents();
+          }
         }
       }
 
