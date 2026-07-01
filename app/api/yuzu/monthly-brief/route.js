@@ -95,9 +95,23 @@ export async function GET(request) {
         // 3. Generate monthly brief using Gemini 3.5
         const briefText = await getMonthlySummary(combinedContent);
 
+        let briefObj = {};
+        try {
+            const cleanJsonText = briefText.replace(/```json/g, '').replace(/```/g, '').trim();
+            briefObj = JSON.parse(cleanJsonText);
+        } catch (jsonErr) {
+            console.error("Failed to parse monthly brief JSON:", jsonErr, "Raw Text:", briefText);
+            // fallback
+            return NextResponse.json({
+                success: false,
+                error: 'AI generated invalid JSON structure: ' + jsonErr.message,
+                rawText: briefText
+            }, { status: 500 });
+        }
+
         return NextResponse.json({
             success: true,
-            brief: briefText,
+            brief: briefObj,
             contentAnalyzedLength: combinedContent.length
         });
     } catch (error) {

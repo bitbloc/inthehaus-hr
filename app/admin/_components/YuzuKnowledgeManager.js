@@ -321,52 +321,227 @@ export default function YuzuKnowledgeManager() {
 
             const monthLabel = recentMonths.find(m => m.value === monthStr)?.label || monthStr;
 
+            let data = {};
+            try {
+                data = typeof briefContent === 'string'
+                    ? JSON.parse(briefContent.replace(/```json/g, '').replace(/```/g, '').trim())
+                    : briefContent;
+            } catch(e) {
+                console.error("JSON parse failed during PDF export", e);
+                data = null;
+            }
+
             const element = document.createElement('div');
             element.style.width = '800px';
-            element.style.padding = '50px';
-            element.style.background = '#fafaf9';
-            element.style.color = '#1c1c1c';
+            element.style.padding = '40px';
+            element.style.background = '#ffffff';
+            element.style.color = '#111827';
             element.style.fontFamily = "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
             element.style.position = 'absolute';
             element.style.left = '-9999px';
             element.style.top = '-9999px';
 
-            element.innerHTML = `
-                <!-- Header -->
-                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #1c1c1c; padding-bottom: 20px; margin-bottom: 30px;">
-                    <div style="display: flex; align-items: center; gap: 15px;">
-                        <img src="/logo.png" style="height: 40px; width: auto; object-fit: contain;" alt="In The Haus Logo" />
+            if (data) {
+                const teamSnapshot = data.teamSnapshot || [];
+                const recruitmentPolicy = data.recruitmentPolicy || "";
+                const metrics = data.metrics || {};
+                const moodIndex = data.moodIndex || {};
+                const issues = data.issues || {};
+                const nextActions = data.nextActions || [];
+                const summaryFocus = data.summaryFocus || {};
+
+                const snapshotHtml = teamSnapshot.map(emp => `
+                    <div style="display: flex; border-bottom: 1px solid #e5e7eb; padding: 10px 0; align-items: start;">
+                        <div style="width: 30%; font-weight: bold;">
+                            <div style="font-size: 11px; color: #111827;">${emp.name}</div>
+                            <div style="font-size: 9px; color: #6b7280; font-weight: 500; margin-top: 2px;">${emp.position}</div>
+                        </div>
+                        <div style="width: 70%;">
+                            <ul style="margin: 0; padding-left: 15px; font-size: 10px; color: #374151;">
+                                ${(emp.bullets || []).map(b => `<li style="margin-bottom: 3px;">${b}</li>`).join('')}
+                            </ul>
+                        </div>
+                    </div>
+                `).join('');
+
+                const issuesColsHtml = [
+                    { key: 'assets', label: 'A. อุปกรณ์ / ทรัพย์สิน' },
+                    { key: 'qc', label: 'B. วัตถุดิบเสียหาย / QC' },
+                    { key: 'hygiene', label: 'C. วัตถุดิบแห้ง / สุขอนามัย' },
+                    { key: 'recipes', label: 'D. สูตรเครื่องดื่ม / ราคา' },
+                    { key: 'service', label: 'E. บริการ / ระบบหน้าร้าน' }
+                ].map(col => `
+                    <div style="flex: 1; border: 1px solid #e5e7eb; padding: 10px; background: #fafafa; border-radius: 4px; min-width: 130px; margin-right: 6px;">
+                        <div style="font-size: 9px; font-weight: bold; color: #111827; border-bottom: 1px solid #d1d5db; padding-bottom: 4px; margin-bottom: 6px;">${col.label}</div>
+                        <ul style="margin: 0; padding-left: 10px; font-size: 8.5px; color: #374151; line-height: 1.4; list-style-type: disc;">
+                             ${(issues[col.key] || []).map(item => `<li style="margin-bottom: 3px;">${item}</li>`).join('')}
+                        </ul>
+                    </div>
+                `).join('');
+
+                const nextActionsHtml = nextActions.map(action => `
+                    <div style="flex: 1; border: 1px solid #e5e7eb; padding: 12px; background: #ffffff; border-radius: 4px; margin-right: 8px; min-width: 160px;">
+                        <div style="font-size: 10px; font-weight: 800; color: #111827; margin-bottom: 6px;">📌 ${action.title}</div>
+                        <ul style="margin: 0; padding-left: 10px; font-size: 8.5px; color: #475569; line-height: 1.4; list-style-type: disc;">
+                            ${(action.bullets || []).map(b => `<li style="margin-bottom: 2px;">${b}</li>`).join('')}
+                        </ul>
+                    </div>
+                `).join('');
+
+                element.innerHTML = `
+                    <!-- Header -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #111827; padding-bottom: 15px; margin-bottom: 25px;">
                         <div>
-                            <div style="font-size: 18px; font-weight: 800; tracking-widest: 0.05em; line-height: 1.2;">IN THE HAUS</div>
-                            <div style="font-size: 9px; font-weight: 700; color: #737373; tracking-wider: 0.1em; text-transform: uppercase; margin-top: 2px;">Monthly Operations Report / รายงานสรุปปฏิบัติงานประจำเดือน</div>
+                            <div style="font-size: 24px; font-weight: 800; tracking-tight: -0.02em; color: #111827; line-height: 1.1;">In The Haus</div>
+                            <div style="font-size: 13px; font-weight: bold; color: #374151; margin-top: 4px;">ในบ้าน นครพนม Monthly Report</div>
+                            <div style="font-size: 9px; font-weight: 600; color: #6b7280; letter-spacing: 0.05em; text-transform: uppercase; margin-top: 2px;">รายงานภาพรวมการดำเนินงานประจำเดือน</div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 12px; background: #f9fafb; border: 1px solid #e5e7eb; padding: 8px 12px; border-radius: 4px;">
+                            <div style="text-align: right;">
+                                <div style="font-size: 10px; font-weight: bold; color: #1f2937;">สรุปผลการดำเนินงานภายใน</div>
+                                <div style="font-size: 8px; color: #6b7280; margin-top: 2px;">ประจำเดือน ${monthLabel}</div>
+                            </div>
                         </div>
                     </div>
-                    <div style="text-align: right;">
-                        <div style="font-size: 16px; font-weight: 700; color: #1c1c1c; text-transform: uppercase;">${monthLabel}</div>
-                        <div style="font-size: 8px; font-weight: 600; color: #a3a3a3; text-transform: uppercase; margin-top: 4px;">Generated: ${new Date().toLocaleDateString('th-TH')} ${new Date().toLocaleTimeString('th-TH')}</div>
-                    </div>
-                </div>
 
-                <!-- Content Container -->
-                <div style="background: #ffffff; border: 1px solid #e5e5e7; border-radius: 16px; padding: 30px; margin-bottom: 40px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.01);">
-                    <div style="font-size: 13px; line-height: 1.8; color: #262626; white-space: pre-wrap;">${briefContent}</div>
-                </div>
-
-                <!-- Footer -->
-                <div style="border-top: 1px solid #e5e5e7; padding-top: 20px; display: flex; justify-content: space-between; align-items: flex-end;">
-                    <div style="max-width: 450px;">
-                        <div style="font-size: 8px; font-weight: 750; text-transform: uppercase; color: #a3a3a3; letter-spacing: 0.1em; margin-bottom: 5px;">Verification & Archives</div>
-                        <div style="font-size: 8px; line-height: 1.5; color: #a3a3a3;">
-                            This document is an official daily summary report compiled and verified by Yuzu AI for In The Haus Nakhon Phanom. 
-                            Any modifications must be authorized by management.
+                    <!-- 01 TEAM SNAPSHOT -->
+                    <div style="margin-bottom: 25px;">
+                        <div style="display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #111827; padding-bottom: 6px; margin-bottom: 12px;">
+                            <span style="font-size: 14px; font-weight: bold; color: #111827;">01</span>
+                            <span style="font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em; color: #374151;">ภาพรวมทีมงาน / TEAM SNAPSHOT</span>
+                        </div>
+                        <div style="display: flex; gap: 15px;">
+                            <!-- Left: Employee Snapshot -->
+                            <div style="width: 65%; border: 1px solid #e5e7eb; border-radius: 4px; padding: 10px;">
+                                ${snapshotHtml}
+                            </div>
+                            <!-- Right: Sidebar -->
+                            <div style="width: 35%; display: flex; flex-direction: column; gap: 12px;">
+                                <!-- Recruitment -->
+                                <div style="border: 1px solid #e5e7eb; background: #f9fafb; padding: 12px; border-radius: 4px;">
+                                    <div style="font-size: 9px; font-weight: bold; text-transform: uppercase; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; margin-bottom: 6px; color: #1f2937;">นโยบายการรับพนักงานเดือนหน้า</div>
+                                    <div style="font-size: 9px; color: #4b5563; line-height: 1.4; white-space: pre-wrap;">${recruitmentPolicy}</div>
+                                </div>
+                                <!-- Grid metrics -->
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+                                    <div style="border: 1px solid #e5e7eb; padding: 8px; text-align: center; border-radius: 4px; background: white;">
+                                        <div style="font-size: 14px; font-weight: 800; color: #111827;">${metrics.forgotClockOutCount || 0} ครั้ง</div>
+                                        <div style="font-size: 7.5px; color: #6b7280; font-weight: bold; text-transform: uppercase; margin-top: 2px;">ลืมลงเวลาออกงาน</div>
+                                    </div>
+                                    <div style="border: 1px solid #e5e7eb; padding: 8px; text-align: center; border-radius: 4px; background: white;">
+                                        <div style="font-size: 14px; font-weight: 800; color: #111827;">${metrics.probationCount || 0} คน</div>
+                                        <div style="font-size: 7.5px; color: #6b7280; font-weight: bold; text-transform: uppercase; margin-top: 2px;">พนักงานทดลองงาน</div>
+                                    </div>
+                                    <div style="border: 1px solid #e5e7eb; padding: 8px; text-align: center; border-radius: 4px; background: white;">
+                                        <div style="font-size: 14px; font-weight: 800; color: #111827;">${metrics.notReadyCount || 0} คน</div>
+                                        <div style="font-size: 7.5px; color: #6b7280; font-weight: bold; text-transform: uppercase; margin-top: 2px;">ไม่พร้อมทำงาน</div>
+                                    </div>
+                                    <div style="border: 1px solid #e5e7eb; padding: 8px; text-align: center; border-radius: 4px; background: white;">
+                                        <div style="font-size: 14px; font-weight: 800; color: #111827;">${metrics.failedProbationCount || 0} คน</div>
+                                        <div style="font-size: 7.5px; color: #6b7280; font-weight: bold; text-transform: uppercase; margin-top: 2px;">ไม่ผ่านทดลองงาน</div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <div style="text-align: right;">
-                        <div style="font-size: 9px; font-weight: 800; color: #404040; letter-spacing: 0.05em;">YUZU x IN THE HAUS</div>
-                        <div style="font-size: 8px; font-weight: 600; color: #a3a3a3; margin-top: 3px;">ONHAUS SYSTEM © ${new Date().getFullYear()} All Rights Reserved</div>
+
+                    <!-- 02 MOOD INDEX -->
+                    <div style="margin-bottom: 25px; page-break-inside: avoid;">
+                        <div style="display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #111827; padding-bottom: 6px; margin-bottom: 12px;">
+                            <span style="font-size: 14px; font-weight: bold; color: #111827;">02</span>
+                            <span style="font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em; color: #374151;">ดัชนีอารมณ์ทีม / MOOD INDEX</span>
+                        </div>
+                        <div style="display: flex; gap: 15px;">
+                            <!-- Bar & Floor -->
+                            <div style="flex: 1; border: 1px solid #e5e7eb; padding: 12px; border-radius: 4px; background: white;">
+                                <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 10px; margin-bottom: 6px; color: #111827;">
+                                    <span>🍹 Bar & Floor อารมณ์โดยรวม</span>
+                                    <span style="color: #ea580c;">${moodIndex.barAndFloor?.score || 0}/100</span>
+                                </div>
+                                <div style="width: 100%; background: #f3f4f6; height: 5px; border-radius: 3px; overflow: hidden; margin-bottom: 8px;">
+                                    <div style="background: #f97316; height: 100%; width: ${moodIndex.barAndFloor?.score || 0}%;"></div>
+                                </div>
+                                <ul style="margin: 0; padding-left: 10px; font-size: 9px; color: #4b5563; line-height: 1.4; list-style-type: disc;">
+                                    ${(moodIndex.barAndFloor?.bullets || []).map(b => `<li style="margin-bottom: 2px;">${b}</li>`).join('')}
+                                </ul>
+                            </div>
+                            <!-- Cooking -->
+                            <div style="flex: 1; border: 1px solid #e5e7eb; padding: 12px; border-radius: 4px; background: white;">
+                                <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 10px; margin-bottom: 6px; color: #111827;">
+                                    <span>🍳 Cooking/ครัว อารมณ์โดยรวม</span>
+                                    <span style="color: #ea580c;">${moodIndex.cooking?.score || 0}/100</span>
+                                </div>
+                                <div style="width: 100%; background: #f3f4f6; height: 5px; border-radius: 3px; overflow: hidden; margin-bottom: 8px;">
+                                    <div style="background: #f97316; height: 100%; width: ${moodIndex.cooking?.score || 0}%;"></div>
+                                </div>
+                                <ul style="margin: 0; padding-left: 10px; font-size: 9px; color: #4b5563; line-height: 1.4; list-style-type: disc;">
+                                    ${(moodIndex.cooking?.bullets || []).map(b => `<li style="margin-bottom: 2px;">${b}</li>`).join('')}
+                                </ul>
+                            </div>
+                        </div>
                     </div>
-                </div>
-            `;
+
+                    <!-- 03 ISSUES & RESPONSES -->
+                    <div style="margin-bottom: 25px; page-break-inside: avoid;">
+                        <div style="display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #111827; padding-bottom: 6px; margin-bottom: 12px;">
+                            <span style="font-size: 14px; font-weight: bold; color: #111827;">03</span>
+                            <span style="font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em; color: #374151;">ปัญหาและการจัดการ / ISSUES & RESPONSES</span>
+                        </div>
+                        <div style="display: flex; gap: 6px;">
+                            ${issuesColsHtml}
+                        </div>
+                    </div>
+
+                    <!-- 04 NEXT ACTIONS -->
+                    <div style="margin-bottom: 25px; page-break-inside: avoid;">
+                        <div style="display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #111827; padding-bottom: 6px; margin-bottom: 12px;">
+                            <span style="font-size: 14px; font-weight: bold; color: #111827;">04</span>
+                            <span style="font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em; color: #374151;">ข้อเสนอแนะเดือนถัดไป / NEXT ACTIONS</span>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            ${nextActionsHtml}
+                        </div>
+                    </div>
+
+                    <!-- 05 SUMMARY FOCUS -->
+                    <div style="page-break-inside: avoid;">
+                        <div style="display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #111827; padding-bottom: 6px; margin-bottom: 12px;">
+                            <span style="font-size: 14px; font-weight: bold; color: #111827;">05</span>
+                            <span style="font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em; color: #374151;">SUMMARY FOCUS</span>
+                        </div>
+                        <div style="display: flex; border: 1px solid #e5e7eb; border-radius: 4px; padding: 12px; background: #ffffff; text-align: center; justify-content: space-around;">
+                            <div style="flex: 1; border-right: 1px solid #e5e7eb;">
+                                <div style="font-size: 8.5px; font-weight: bold; color: #6b7280; text-transform: uppercase; margin-bottom: 4px;">ลงเวลาออกงาน</div>
+                                <div style="font-size: 10px; font-weight: bold; color: #111827; white-space: pre-line;">${summaryFocus.forgotClockOut || ''}</div>
+                            </div>
+                            <div style="flex: 1; border-right: 1px solid #e5e7eb; padding: 0 8px;">
+                                <div style="font-size: 8.5px; font-weight: bold; color: #6b7280; text-transform: uppercase; margin-bottom: 4px;">ทดลองงาน</div>
+                                <div style="font-size: 10px; font-weight: bold; color: #111827; white-space: pre-line;">${summaryFocus.probation || ''}</div>
+                            </div>
+                            <div style="flex: 1; border-right: 1px solid #e5e7eb; padding: 0 8px;">
+                                <div style="font-size: 8.5px; font-weight: bold; color: #6b7280; text-transform: uppercase; margin-bottom: 4px;">ของเสียหาย</div>
+                                <div style="font-size: 10px; font-weight: bold; color: #111827; white-space: pre-line;">${summaryFocus.brokenItems || ''}</div>
+                            </div>
+                            <div style="flex: 1; border-right: 1px solid #e5e7eb; padding: 0 8px;">
+                                <div style="font-size: 8.5px; font-weight: bold; color: #6b7280; text-transform: uppercase; margin-bottom: 4px;">ระบบที่ต้องซ้อม</div>
+                                <div style="font-size: 10px; font-weight: bold; color: #111827; white-space: pre-line;">${summaryFocus.systemCheck || ''}</div>
+                            </div>
+                            <div style="flex: 1; padding: 0 8px;">
+                                <div style="font-size: 8.5px; font-weight: bold; color: #6b7280; text-transform: uppercase; margin-bottom: 4px;">เป้าหมายโฟกัส</div>
+                                <div style="font-size: 10px; font-weight: bold; color: #ea580c; white-space: pre-line;">${summaryFocus.focusAreas || ''}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                element.innerHTML = `
+                    <div style="padding: 40px; text-align: center;">
+                        <h2 style="font-size: 18px; color: #b91c1c;">ข้อมูลสรุปรายเดือนไม่ได้อยู่ในรูปแบบ JSON</h2>
+                        <p style="font-size: 12px; color: #374151; white-space: pre-wrap; margin-top: 15px; text-align: left; background: #f3f4f6; padding: 15px; border-radius: 4px;">${briefContent}</p>
+                    </div>
+                `;
+            }
+
             document.body.appendChild(element);
 
             const canvas = await html2canvas(element, {
@@ -428,6 +603,242 @@ export default function YuzuKnowledgeManager() {
         }
         setChatLoading(false);
     }
+
+    const renderInfographic = (data) => {
+        if (!data) return null;
+
+        const teamSnapshot = data.teamSnapshot || [];
+        const recruitmentPolicy = data.recruitmentPolicy || "";
+        const metrics = data.metrics || {};
+        const moodIndex = data.moodIndex || {};
+        const issues = data.issues || {};
+        const nextActions = data.nextActions || [];
+        const summaryFocus = data.summaryFocus || {};
+
+        return (
+            <div className="bg-white border border-neutral-200 p-6 rounded-md text-neutral-900 font-sans space-y-8 select-text">
+                {/* Header */}
+                <div className="flex justify-between items-start border-b-2 border-neutral-900 pb-4">
+                    <div>
+                        <h2 className="text-2xl font-extrabold uppercase tracking-tight text-neutral-900">In The Haus</h2>
+                        <h3 className="text-sm font-bold text-neutral-700 mt-0.5">ในบ้าน นครพนม Monthly Report</h3>
+                        <p className="text-[10px] text-neutral-500 uppercase tracking-widest mt-1">รายงานภาพรวมการดำเนินงานประจำเดือน</p>
+                    </div>
+                    <div className="flex items-center gap-3 bg-neutral-50 p-2.5 border border-neutral-200 rounded-sm">
+                        <Icons.Calendar size={28} className="text-neutral-700" />
+                        <div>
+                            <div className="text-xs font-bold text-neutral-800">สรุปผลการดำเนินงานภายใน</div>
+                            <div className="text-[10px] text-neutral-500">ประจำเดือน {selectedBriefMonth}</div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* 01 TEAM SNAPSHOT */}
+                <div className="space-y-3">
+                    <div className="flex items-center gap-2 pb-1.5 border-b border-neutral-900">
+                        <span className="text-lg font-bold text-neutral-900">01</span>
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-800">ภาพรวมทีมงาน / TEAM SNAPSHOT</h4>
+                    </div>
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {/* Employee grid */}
+                        <div className="lg:col-span-2 border border-neutral-200 divide-y divide-neutral-200 rounded-sm overflow-hidden">
+                            {teamSnapshot.map((emp, i) => (
+                                <div key={i} className="grid grid-cols-12 gap-2 p-3 items-start hover:bg-neutral-50/50">
+                                    <div className="col-span-4 flex items-center gap-2">
+                                        <div className="w-6 h-6 rounded-full bg-neutral-100 flex items-center justify-center text-neutral-600 border border-neutral-200 shrink-0">
+                                            <Icons.User size={12} />
+                                        </div>
+                                        <div>
+                                            <div className="text-xs font-bold text-neutral-900">{emp.name}</div>
+                                            <div className="text-[9px] text-neutral-500 font-medium">{emp.position}</div>
+                                        </div>
+                                    </div>
+                                    <div className="col-span-8">
+                                        <ul className="list-disc pl-3 text-[10px] text-neutral-700 space-y-0.5 leading-relaxed">
+                                            {(emp.bullets || []).map((bullet, idx) => (
+                                                <li key={idx}>{bullet}</li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Sidebar */}
+                        <div className="space-y-4">
+                            {/* Recruitment Policy */}
+                            <div className="border border-neutral-200 p-4 bg-neutral-50/50 rounded-sm space-y-2">
+                                <div className="flex items-center gap-2 border-b border-neutral-200 pb-1.5">
+                                    <Icons.Job size={16} className="text-neutral-700" />
+                                    <h5 className="text-[10px] font-bold uppercase tracking-wider text-neutral-800">นโยบายการรับพนักงานเดือนหน้า</h5>
+                                </div>
+                                <p className="text-[10px] text-neutral-700 leading-relaxed whitespace-pre-wrap">{recruitmentPolicy}</p>
+                            </div>
+
+                            {/* 4 Stats Grid */}
+                            <div className="grid grid-cols-2 gap-2">
+                                <div className="border border-neutral-200 p-3 text-center space-y-1 bg-white rounded-sm">
+                                    <Icons.Clock size={16} className="mx-auto text-neutral-600" />
+                                    <div className="text-lg font-extrabold text-neutral-900">{metrics.forgotClockOutCount || 0} ครั้ง</div>
+                                    <div className="text-[9px] text-neutral-500 font-bold uppercase">ลืมลงเวลาออกงาน</div>
+                                </div>
+                                <div className="border border-neutral-200 p-3 text-center space-y-1 bg-white rounded-sm">
+                                    <Icons.Staff size={16} className="mx-auto text-neutral-600" />
+                                    <div className="text-lg font-extrabold text-neutral-900">{metrics.probationCount || 0} คน</div>
+                                    <div className="text-[9px] text-neutral-500 font-bold uppercase">พนักงานทดลองงาน</div>
+                                </div>
+                                <div className="border border-neutral-200 p-3 text-center space-y-1 bg-white rounded-sm">
+                                    <Icons.User size={16} className="mx-auto text-neutral-600" />
+                                    <div className="text-lg font-extrabold text-neutral-900">{metrics.notReadyCount || 0} คน</div>
+                                    <div className="text-[9px] text-neutral-500 font-bold uppercase">ไม่พร้อมทำงาน</div>
+                                </div>
+                                <div className="border border-neutral-200 p-3 text-center space-y-1 bg-white rounded-sm">
+                                    <Icons.Alert size={16} className="mx-auto text-neutral-600" />
+                                    <div className="text-lg font-extrabold text-neutral-900">{metrics.failedProbationCount || 0} คน</div>
+                                    <div className="text-[9px] text-neutral-500 font-bold uppercase">ไม่ผ่านทดลองงาน</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* 02 MOOD INDEX */}
+                <div className="space-y-3">
+                    <div className="flex items-center gap-2 pb-1.5 border-b border-neutral-900">
+                        <span className="text-lg font-bold text-neutral-900">02</span>
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-800">ดัชนีอารมณ์ทีม / MOOD INDEX</h4>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Bar & Floor */}
+                        {moodIndex.barAndFloor && (
+                            <div className="border border-neutral-200 p-4 space-y-3 rounded-sm">
+                                <div className="flex justify-between items-center">
+                                    <div className="text-xs font-bold text-neutral-800 flex items-center gap-1.5">
+                                        🍹 Bar & Floor อารมณ์โดยรวม
+                                    </div>
+                                    <span className="text-xs font-extrabold text-orange-600">{moodIndex.barAndFloor.score}/100</span>
+                                </div>
+                                {/* Slider display */}
+                                <div className="w-full bg-neutral-100 h-2 border border-neutral-200 rounded-full overflow-hidden">
+                                    <div 
+                                        className="bg-orange-500 h-full" 
+                                        style={{ width: `${Math.min(100, Math.max(0, moodIndex.barAndFloor.score || 0))}%` }} 
+                                    />
+                                </div>
+                                <ul className="list-disc pl-3 text-[10px] text-neutral-700 space-y-0.5 leading-relaxed">
+                                    {(moodIndex.barAndFloor.bullets || []).map((b, idx) => (
+                                        <li key={idx}>{b}</li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+
+                        {/* Cooking */}
+                        {moodIndex.cooking && (
+                            <div className="border border-neutral-200 p-4 space-y-3 rounded-sm">
+                                <div className="flex justify-between items-center">
+                                    <div className="text-xs font-bold text-neutral-800 flex items-center gap-1.5">
+                                        🍳 Cooking/ครัว อารมณ์โดยรวม
+                                    </div>
+                                    <span className="text-xs font-extrabold text-orange-600">{moodIndex.cooking.score}/100</span>
+                                </div>
+                                {/* Slider display */}
+                                <div className="w-full bg-neutral-100 h-2 border border-neutral-200 rounded-full overflow-hidden">
+                                    <div 
+                                        className="bg-orange-500 h-full" 
+                                        style={{ width: `${Math.min(100, Math.max(0, moodIndex.cooking.score || 0))}%` }} 
+                                    />
+                                </div>
+                                <ul className="list-disc pl-3 text-[10px] text-neutral-700 space-y-0.5 leading-relaxed">
+                                    {(moodIndex.cooking.bullets || []).map((b, idx) => (
+                                        <li key={idx}>{b}</li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* 03 ISSUES & RESPONSES */}
+                <div className="space-y-3">
+                    <div className="flex items-center gap-2 pb-1.5 border-b border-neutral-900">
+                        <span className="text-lg font-bold text-neutral-900">03</span>
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-800">ปัญหาและการจัดการ / ISSUES & RESPONSES</h4>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                        {[
+                            { key: 'assets', label: 'A. อุปกรณ์ / ทรัพย์สิน' },
+                            { key: 'qc', label: 'B. วัตถุดิบเสียหาย / QC' },
+                            { key: 'hygiene', label: 'C. วัตถุดิบแห้ง / สุขอนามัย' },
+                            { key: 'recipes', label: 'D. สูตรเครื่องดื่ม / ราคา' },
+                            { key: 'service', label: 'E. บริการ / ระบบหน้าร้าน' }
+                        ].map(col => (
+                            <div key={col.key} className="border border-neutral-200 p-3 space-y-2 bg-neutral-50/20 rounded-sm">
+                                <h5 className="text-[10px] font-bold text-neutral-800 border-b border-neutral-200 pb-1">{col.label}</h5>
+                                <ul className="list-disc pl-3 text-[9px] text-neutral-700 space-y-1 leading-relaxed">
+                                    {(issues[col.key] || []).map((item, idx) => (
+                                        <li key={idx}>{item}</li>
+                                    ))}
+                                </ul>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* 04 NEXT ACTIONS */}
+                <div className="space-y-3">
+                    <div className="flex items-center gap-2 pb-1.5 border-b border-neutral-900">
+                        <span className="text-lg font-bold text-neutral-900">04</span>
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-800">ข้อเสนอแนะเดือนถัดไป / NEXT ACTIONS</h4>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        {nextActions.map((action, i) => (
+                            <div key={i} className="border border-neutral-200 p-4 space-y-2 bg-white rounded-sm">
+                                <h5 className="text-[10px] font-extrabold text-neutral-900 flex items-center gap-1.5 uppercase">
+                                    📌 {action.title}
+                                </h5>
+                                <ul className="list-disc pl-3 text-[9px] text-neutral-700 space-y-0.5 leading-relaxed">
+                                    {(action.bullets || []).map((b, idx) => (
+                                        <li key={idx}>{b}</li>
+                                    ))}
+                                </ul>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* 05 SUMMARY FOCUS (Footer) */}
+                <div className="space-y-3">
+                    <div className="flex items-center gap-2 pb-1.5 border-b border-neutral-900">
+                        <span className="text-lg font-bold text-neutral-900">05</span>
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-800">SUMMARY FOCUS</h4>
+                    </div>
+                    <div className="border border-neutral-200 p-4 grid grid-cols-2 md:grid-cols-5 gap-4 divide-y md:divide-y-0 md:divide-x divide-neutral-200 text-center items-center rounded-sm bg-white">
+                        <div className="pt-2 md:pt-0">
+                            <div className="text-[10px] font-bold text-neutral-500 uppercase">ลงเวลาออกงาน</div>
+                            <div className="text-xs font-bold text-neutral-800 mt-1 whitespace-pre-line">{summaryFocus.forgotClockOut}</div>
+                        </div>
+                        <div className="pt-2 md:pt-0">
+                            <div className="text-[10px] font-bold text-neutral-500 uppercase">ทดลองงาน</div>
+                            <div className="text-xs font-bold text-neutral-800 mt-1 whitespace-pre-line">{summaryFocus.probation}</div>
+                        </div>
+                        <div className="pt-2 md:pt-0">
+                            <div className="text-[10px] font-bold text-neutral-500 uppercase">ของเสียหาย</div>
+                            <div className="text-xs font-bold text-neutral-800 mt-1 whitespace-pre-line">{summaryFocus.brokenItems}</div>
+                        </div>
+                        <div className="pt-2 md:pt-0">
+                            <div className="text-[10px] font-bold text-neutral-500 uppercase">ระบบที่ต้องซ้อม</div>
+                            <div className="text-xs font-bold text-neutral-800 mt-1 whitespace-pre-line">{summaryFocus.systemCheck}</div>
+                        </div>
+                        <div className="pt-2 md:pt-0 col-span-2 md:col-span-1 border-t md:border-t-0 border-neutral-200">
+                            <div className="text-[10px] font-bold text-neutral-500 uppercase">เป้าหมายโฟกัส</div>
+                            <div className="text-xs font-bold text-orange-600 mt-1">{summaryFocus.focusAreas}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    };
 
     const getMoodStats = () => {
         const stats = { '🔥': 0, '😊': 0, '😐': 0, '😴': 0, '🤒': 0 };
@@ -1235,9 +1646,21 @@ export default function YuzuKnowledgeManager() {
                                                 <p className="text-xs font-mono font-bold animate-pulse">ยูซุกำลังวิเคราะห์ข้อมูลกะงานและสรุปห้องแชททั้งเดือน...</p>
                                             </div>
                                         ) : monthlyBriefs[selectedBriefMonth] ? (
-                                            <div className="bg-rams-bg p-4 rounded-sm border border-rams-rule-light text-rams-ink text-xs font-mono whitespace-pre-wrap leading-relaxed">
-                                                {monthlyBriefs[selectedBriefMonth]}
-                                            </div>
+                                            (() => {
+                                                let parsedData = {};
+                                                try {
+                                                    parsedData = typeof monthlyBriefs[selectedBriefMonth] === 'string'
+                                                        ? JSON.parse(monthlyBriefs[selectedBriefMonth].replace(/```json/g, '').replace(/```/g, '').trim())
+                                                        : monthlyBriefs[selectedBriefMonth];
+                                                } catch(e) {
+                                                    return (
+                                                        <div className="bg-rams-bg p-4 rounded-sm border border-rams-rule-light text-rams-ink text-xs font-mono whitespace-pre-wrap leading-relaxed">
+                                                            {String(monthlyBriefs[selectedBriefMonth])}
+                                                        </div>
+                                                    );
+                                                }
+                                                return renderInfographic(parsedData);
+                                            })()
                                         ) : (
                                             <div className="py-12 text-center text-rams-ink-muted space-y-3 font-mono">
                                                 <p className="text-xs font-bold">ยังไม่มีการสร้างสรุปประจำเดือนนี้</p>
