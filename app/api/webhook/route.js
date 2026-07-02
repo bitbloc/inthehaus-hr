@@ -524,17 +524,32 @@ export async function POST(request) {
 
               const context = await getIngredientPrices();
 
-              // 1. Analyze the image first to determine what it is
-              const result = await classifyAndAnalyzeImage(base64, "image/jpeg", context, bossRole, positionInstruction, friendlyName);
+              // Wait 1.5 seconds for all images in the same batch to insert their lock rows
+              const nowTime = Date.now();
+              await new Promise(resolve => setTimeout(resolve, 1500));
 
-              // 2. If it is a slip, handle it immediately (never bypass slips!)
-              if (result.isSlip) {
-                handledLocally = true;
-                await handleSlipImage(event, client, buffer, userId, groupId, result);
-              } 
-              // 3. If it is not a slip, check the espresso shot filter
-              else {
-                const { supabase } = await import('../../../lib/supabaseClient');
+              const { supabase } = await import('../../../lib/supabaseClient');
+              const sixSecondsAgo = new Date(nowTime - 6000).toISOString();
+              const { data: recentLocks } = await supabase
+                .from('yuzu_chat_history')
+                .select('content, created_at')
+                .eq('group_id', groupId)
+                .eq('user_id', userId)
+                .eq('message_type', 'lock')
+                .gte('created_at', sixSecondsAgo);
+
+              const sortedLocks = (recentLocks || []).sort((a, b) => {
+                const timeA = new Date(a.created_at).getTime();
+                const timeB = new Date(b.created_at).getTime();
+                if (timeA !== timeB) return timeA - timeB;
+                return a.content.localeCompare(b.content);
+              });
+
+              const currentMsgId = event.message.id;
+              const isChosenOne = sortedLocks.length === 0 || sortedLocks[0].content === currentMsgId;
+
+              // Local helper to handle non-slip (operational/reports/etc.) images
+              const handleNonSlipImage = async (resVal, imgBuffer) => {
                 const oneMinuteAgo = new Date(Date.now() - 60000).toISOString();
                 const { data: recentReports } = await supabase
                   .from('yuzu_chat_history')
@@ -549,7 +564,7 @@ export async function POST(request) {
                   const fileName = `shot_${Date.now()}_${userId}_${event.message.id}.jpg`;
                   const { error: uploadError } = await supabase.storage
                     .from('yuzu-slips')
-                    .upload(fileName, buffer, { contentType: 'image/jpeg' });
+                    .upload(fileName, imgBuffer, { contentType: 'image/jpeg' });
 
                   let imageUrl = null;
                   if (!uploadError) {
@@ -557,13 +572,11 @@ export async function POST(request) {
                     imageUrl = linkData?.publicUrl;
                   }
 
-                  // Log photo in the history log with URL
                   await saveMessage(groupId, userId, 'user', `[ภาพประกอบช็อตกาแฟ] ${imageUrl || ''}`, 'image_description');
                   handledLocally = true;
-                  continue;
+                  return;
                 }
 
-                // Vision anti-spam check: prevent multiple replies within 8 seconds
                 const now = Date.now();
                 const lastReplyTime = lastVisionReplyTime.get(groupId) || 0;
                 let hasRecentReply = (now - lastReplyTime) < 8000;
@@ -584,19 +597,109 @@ export async function POST(request) {
 
                 if (hasRecentReply) {
                   console.log("Yuzu Vision Redundancy Filter: Anti-spam triggered. Logging photo silently.");
-                  await saveMessage(groupId, userId, 'user', `[ภาพประกอบ] ${result.shortDescription || 'รูปภาพ'}`, 'image_description');
+                  await saveMessage(groupId, userId, 'user', `[ภาพประกอบ] ${resVal.shortDescription || 'รูปภาพ'}`, 'image_description');
+                  handledLocally = true;
+                  return;
+                }
+
+                await saveMessage(groupId, userId, 'user', resVal.shortDescription, 'image_description');
+
+                if (resVal.shouldReply) {
+                  handledLocally = true;
+                  lastVisionReplyTime.set(groupId, now);
+                  await client.replyMessage(event.replyToken, { type: 'text', text: resVal.analysis });
+                  await saveMessage(groupId, null, 'model', resVal.analysis, 'text');
+                }
+              };
+
+              if (isChosenOne) {
+                // The chosen one: Analyze the first image to see if it is a slip
+                console.log(`Yuzu Vision Batching: Chosen one (${currentMsgId}) analyzing first image...`);
+                const result = await classifyAndAnalyzeImage(base64, "image/jpeg", context, bossRole, positionInstruction, friendlyName);
+
+                if (result.isSlip) {
+                  // Write approval flag to DB
+                  await supabase.from('yuzu_chat_history').insert({
+                    group_id: groupId,
+                    user_id: userId,
+                    role: 'system',
+                    content: currentMsgId,
+                    message_type: 'slip_batch_approved'
+                  });
+
+                  // Process slip
+                  handledLocally = true;
+                  await handleSlipImage(event, client, buffer, userId, groupId, result);
+                } else {
+                  // Write report batch taken flag to DB
+                  await supabase.from('yuzu_chat_history').insert({
+                    group_id: groupId,
+                    user_id: userId,
+                    role: 'system',
+                    content: currentMsgId,
+                    message_type: 'report_batch_taken'
+                  });
+
+                  // Gather other images
+                  const batchMsgIds = sortedLocks.map(l => l.content);
+                  console.log(`Yuzu Vision Batching: Processing batch as report:`, batchMsgIds);
+
+                  const base64Images = [];
+                  for (const msgId of batchMsgIds) {
+                    if (msgId === currentMsgId) {
+                      base64Images.push(base64);
+                    } else {
+                      try {
+                        const imgStream = await client.getMessageContent(msgId);
+                        const imgChunks = [];
+                        for await (const chunk of imgStream) imgChunks.push(chunk);
+                        const imgBuffer = Buffer.concat(imgChunks);
+                        base64Images.push(imgBuffer.toString('base64'));
+                      } catch (downloadErr) {
+                        console.error(`Failed to download image ${msgId} in batch:`, downloadErr);
+                      }
+                    }
+                  }
+
+                  let finalResult = result;
+                  if (base64Images.length > 1) {
+                    finalResult = await classifyAndAnalyzeImage(base64Images, "image/jpeg", context, bossRole, positionInstruction, friendlyName);
+                  }
+
+                  await handleNonSlipImage(finalResult, buffer);
+                }
+              } else {
+                // Not the chosen one: Sleep to allow the chosen one to decide
+                console.log(`Yuzu Vision Batching: Message ${currentMsgId} waiting for chosen one's decision...`);
+                await new Promise(resolve => setTimeout(resolve, 3500));
+
+                const { data: decision } = await supabase
+                  .from('yuzu_chat_history')
+                  .select('message_type')
+                  .eq('group_id', groupId)
+                  .eq('user_id', userId)
+                  .in('message_type', ['slip_batch_approved', 'report_batch_taken'])
+                  .gte('created_at', sixSecondsAgo);
+
+                const hasReportBatchTaken = decision && decision.some(d => d.message_type === 'report_batch_taken');
+
+                if (hasReportBatchTaken) {
+                  // Skip reply as this batch is already handled as a report batch
+                  console.log(`Yuzu Vision Batching: Message ${currentMsgId} is part of report batch. Skipping reply.`);
+                  await saveMessage(groupId, userId, 'user', `[ภาพประกอบเพิ่มเติม]`, 'image_description');
                   handledLocally = true;
                   continue;
                 }
 
-                // Save regular chat vision logs and reply
-                await saveMessage(groupId, userId, 'user', result.shortDescription, 'image_description');
+                // If it is a slip batch (or fallback to individual processing)
+                console.log(`Yuzu Vision Batching: Message ${currentMsgId} proceeding individually.`);
+                const result = await classifyAndAnalyzeImage(base64, "image/jpeg", context, bossRole, positionInstruction, friendlyName);
 
-                if (result.shouldReply) {
+                if (result.isSlip) {
                   handledLocally = true;
-                  lastVisionReplyTime.set(groupId, now);
-                  await client.replyMessage(event.replyToken, { type: 'text', text: result.analysis });
-                  await saveMessage(groupId, null, 'model', result.analysis, 'text');
+                  await handleSlipImage(event, client, buffer, userId, groupId, result);
+                } else {
+                  await handleNonSlipImage(result, buffer);
                 }
               }
             } catch (visionError) {
