@@ -39,6 +39,33 @@ export async function GET(request) {
       }
     }
 
+    // A. Hostname filtering to prevent duplicate triggers from clone/staging Vercel projects
+    const host = request.headers.get('host') || '';
+    const isProductionHost = host === 'inthehaus-hr.vercel.app';
+    const isLocalhost = host.includes('localhost') || host.includes('127.0.0.1');
+
+    if (targetType && !isProductionHost && !isLocalhost) {
+      console.log(`⚠️ Blocked cron request for ${targetType} from non-production host: ${host}`);
+      return NextResponse.json({ success: true, message: `Ignored request from host: ${host}` });
+    }
+
+    // B. Supabase lock to prevent duplicate sends on the same day for morning/evening
+    const todayStr = thaiTime.toISOString().split('T')[0]; // YYYY-MM-DD in Thai time
+    const configKey = `last_cron_${targetType}`;
+
+    if (targetType === 'morning' || targetType === 'evening') {
+      const { data: configRow } = await supabase
+        .from('yuzu_config')
+        .select('value')
+        .eq('key', configKey)
+        .maybeSingle();
+
+      if (configRow && configRow.value === todayStr) {
+        console.log(`⚠️ Cron for ${targetType} already sent today (${todayStr}). Skipping.`);
+        return NextResponse.json({ success: true, message: `Already sent today: ${todayStr}`, results: [] });
+      }
+    }
+
     // 1. Morning Reminder // Dieter Rams Design Aesthetic
     if (targetType === 'morning') {
       const message = {
@@ -231,6 +258,12 @@ export async function GET(request) {
           }
         })
       );
+
+      // Save last sent date to DB to prevent duplicate runs
+      await supabase
+        .from('yuzu_config')
+        .upsert({ key: configKey, value: todayStr, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+
       return NextResponse.json({ success: true, sent: 'morning', time: timeString, results });
     }
 
@@ -426,6 +459,12 @@ export async function GET(request) {
           }
         })
       );
+
+      // Save last sent date to DB to prevent duplicate runs
+      await supabase
+        .from('yuzu_config')
+        .upsert({ key: configKey, value: todayStr, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+
       return NextResponse.json({ success: true, sent: 'evening', time: timeString, results });
     }
 
