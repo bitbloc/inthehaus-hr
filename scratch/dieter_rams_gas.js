@@ -62,6 +62,18 @@ function onFormSubmit(e) {
   const statusText = isComplete ? "CHECKLIST COMPLETE" : "INFORMATION INCOMPLETE";
   const statusColor = isComplete ? "#1C6C38" : "#D05D00"; // Muted Braun Green vs Braun Clock Accent Orange
 
+  // Format checklist data for concise layout
+  let formattedChecklist = "—";
+  if (checklistData) {
+    const items = checklistData.split(/,\s*/).filter(item => item.trim().length > 0);
+    const count = items.length;
+    if (isComplete) {
+      formattedChecklist = `เช็คครบถ้วน (${count} รายการ)`;
+    } else {
+      formattedChecklist = `ทำแล้ว ${count} รายการ (ข้อมูลไม่ครบ)`;
+    }
+  }
+
   // Dieter Rams Flex Message Bubble Layout
   const messagePayload = {
     "type": "flex",
@@ -177,7 +189,7 @@ function onFormSubmit(e) {
                   },
                   {
                     "type": "text",
-                    "text": checklistData || "—",
+                    "text": formattedChecklist,
                     "color": "#1C1C1C",
                     "size": "sm",
                     "wrap": true,
