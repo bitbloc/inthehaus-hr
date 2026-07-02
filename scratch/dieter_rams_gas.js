@@ -105,11 +105,43 @@ function onFormSubmit(e) {
         "spacing": "md",
         "contents": [
           {
-            "type": "text",
-            "text": "SYSTEM // REPORT",
-            "size": "xxs",
-            "color": "#8C8C8C",
-            "weight": "bold"
+            "type": "box",
+            "layout": "horizontal",
+            "alignItems": "center",
+            "contents": [
+              {
+                "type": "text",
+                "text": "SYSTEM // REPORT",
+                "size": "xxs",
+                "color": "#8C8C8C",
+                "weight": "bold",
+                "flex": 1
+              },
+              {
+                "type": "box",
+                "layout": "horizontal",
+                "spacing": "xs",
+                "alignItems": "center",
+                "contents": [
+                  {
+                    "type": "box",
+                    "layout": "vertical",
+                    "backgroundColor": statusColor,
+                    "width": "8px",
+                    "height": "8px",
+                    "cornerRadius": "4px",
+                    "contents": []
+                  },
+                  {
+                    "type": "text",
+                    "text": statusText,
+                    "size": "xxs",
+                    "weight": "bold",
+                    "color": "#1C1C1C"
+                  }
+                ]
+              }
+            ]
           },
           {
             "type": "text",
@@ -117,30 +149,8 @@ function onFormSubmit(e) {
             "size": "xl",
             "weight": "bold",
             "color": "#1C1C1C",
-            "wrap": true
-          },
-          {
-            "type": "box",
-            "layout": "horizontal",
-            "spacing": "xs",
-            "alignItems": "center",
-            "contents": [
-              {
-                "type": "text",
-                "text": "●",
-                "color": statusColor,
-                "size": "xs",
-                "flex": 0
-              },
-              {
-                "type": "text",
-                "text": statusText,
-                "size": "xs",
-                "weight": "bold",
-                "color": "#1C1C1C",
-                "flex": 1
-              }
-            ]
+            "wrap": true,
+            "margin": "xs"
           },
           {
             "type": "separator",
@@ -211,7 +221,7 @@ function onFormSubmit(e) {
                   },
                   {
                     "type": "text",
-                    "text": timestamp,
+                    "text": formatTimestamp(timestamp),
                     "color": "#1C1C1C",
                     "size": "sm",
                     "flex": 7
@@ -536,8 +546,46 @@ function notifyMorningReminder() {
         "paddingAll": "xl",
         "spacing": "lg",
         "contents": [
-          { "type": "text", "text": "DAILY MISSION // PROTOCOL", "size": "xxs", "color": "#8C8C8C", "weight": "bold" },
-          { "type": "text", "text": "อรุณสวัสดิ์ทีมงาน! ☀️", "size": "xxl", "weight": "bold", "color": "#1C1C1C" },
+          {
+            "type": "box",
+            "layout": "horizontal",
+            "alignItems": "center",
+            "contents": [
+              {
+                "type": "text",
+                "text": "DAILY MISSION // PROTOCOL",
+                "size": "xxs",
+                "color": "#8C8C8C",
+                "weight": "bold",
+                "flex": 1
+              },
+              {
+                "type": "box",
+                "layout": "horizontal",
+                "spacing": "xs",
+                "alignItems": "center",
+                "contents": [
+                  {
+                    "type": "box",
+                    "layout": "vertical",
+                    "backgroundColor": "#D05D00",
+                    "width": "8px",
+                    "height": "8px",
+                    "cornerRadius": "4px",
+                    "contents": []
+                  },
+                  {
+                    "type": "text",
+                    "text": "STANDBY",
+                    "size": "xxs",
+                    "weight": "bold",
+                    "color": "#1C1C1C"
+                  }
+                ]
+              }
+            ]
+          },
+          { "type": "text", "text": "อรุณสวัสดิ์ทีมงาน! ☀️", "size": "xxl", "weight": "bold", "color": "#1C1C1C", "margin": "xs" },
           { "type": "text", "text": "ได้เวลาเปิดร้านแล้ว โปรดบันทึกเวลาเข้างาน เช็คสต๊อกประจำวัน และทำเช็คลิสต์กะเปิดร้านให้เรียบร้อยครับ", "size": "sm", "color": "#5A5A5A", "wrap": true },
           { "type": "separator", "color": "#E5E5E5" },
           {
@@ -616,8 +664,46 @@ function notifyEveningReminder() {
         "paddingAll": "xl",
         "spacing": "lg",
         "contents": [
-          { "type": "text", "text": "DAILY MISSION // PROTOCOL", "size": "xxs", "color": "#8C8C8C", "weight": "bold" },
-          { "type": "text", "text": "เตรียมปิดระบบร้าน! 🌙", "size": "xxl", "weight": "bold", "color": "#1C1C1C" },
+          {
+            "type": "box",
+            "layout": "horizontal",
+            "alignItems": "center",
+            "contents": [
+              {
+                "type": "text",
+                "text": "DAILY MISSION // PROTOCOL",
+                "size": "xxs",
+                "color": "#8C8C8C",
+                "weight": "bold",
+                "flex": 1
+              },
+              {
+                "type": "box",
+                "layout": "horizontal",
+                "spacing": "xs",
+                "alignItems": "center",
+                "contents": [
+                  {
+                    "type": "box",
+                    "layout": "vertical",
+                    "backgroundColor": "#1C1C1C",
+                    "width": "8px",
+                    "height": "8px",
+                    "cornerRadius": "4px",
+                    "contents": []
+                  },
+                  {
+                    "type": "text",
+                    "text": "STANDBY",
+                    "size": "xxs",
+                    "weight": "bold",
+                    "color": "#1C1C1C"
+                  }
+                ]
+              }
+            ]
+          },
+          { "type": "text", "text": "เตรียมปิดระบบร้าน! 🌙", "size": "xxl", "weight": "bold", "color": "#1C1C1C", "margin": "xs" },
           { "type": "text", "text": "ได้เวลาปิดกะร้านแล้ว โปรดบันทึกเวลาออกงาน เช็คสต๊อก และทำเช็คลิสต์กะปิดร้านให้เรียบร้อยครับ", "size": "sm", "color": "#5A5A5A", "wrap": true },
           { "type": "separator", "color": "#E5E5E5" },
           {
@@ -674,5 +760,41 @@ function notifyEveningReminder() {
     }
   };
   sendToLine(messagePayload);
+}
+
+/**
+ * Format timestamp to a clean, electronic-instrument style format: YYYY.MM.DD @ HH:MM
+ * @param {string} rawTS Raw timestamp string from form response
+ * @returns {string} Clean formatted timestamp
+ */
+function formatTimestamp(rawTS) {
+  if (!rawTS) return "—";
+  try {
+    const parts = rawTS.split(" ");
+    if (parts.length < 2) return rawTS;
+    
+    const datePart = parts[0];
+    const timePart = parts[1];
+    
+    const timeParts = timePart.split(":");
+    const cleanTime = timeParts.slice(0, 2).join(":");
+    
+    const dateSeparator = datePart.indexOf("/") !== -1 ? "/" : "-";
+    const dateSegments = datePart.split(dateSeparator);
+    
+    if (dateSegments.length === 3) {
+      let day = dateSegments[0];
+      let month = dateSegments[1];
+      let year = dateSegments[2];
+      
+      if (day.length === 1) day = "0" + day;
+      if (month.length === 1) month = "0" + month;
+      
+      return year + "." + month + "." + day + " @ " + cleanTime;
+    }
+    return rawTS.replace(/:\d{2}$/, "");
+  } catch (e) {
+    return rawTS;
+  }
 }
 

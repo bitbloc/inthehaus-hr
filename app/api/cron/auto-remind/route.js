@@ -58,18 +58,51 @@ export async function GET(request) {
             spacing: 'lg',
             contents: [
               {
-                type: 'text',
-                text: 'DAILY MISSION // PROTOCOL',
-                size: 'xxs',
-                color: '#8C8C8C',
-                weight: 'bold'
+                type: 'box',
+                layout: 'horizontal',
+                alignItems: 'center',
+                contents: [
+                  {
+                    type: 'text',
+                    text: 'DAILY MISSION // PROTOCOL',
+                    size: 'xxs',
+                    color: '#8C8C8C',
+                    weight: 'bold',
+                    flex: 1
+                  },
+                  {
+                    type: 'box',
+                    layout: 'horizontal',
+                    spacing: 'xs',
+                    alignItems: 'center',
+                    contents: [
+                      {
+                        type: 'box',
+                        layout: 'vertical',
+                        backgroundColor: '#D05D00',
+                        width: '8px',
+                        height: '8px',
+                        cornerRadius: '4px',
+                        contents: []
+                      },
+                      {
+                        type: 'text',
+                        text: 'STANDBY',
+                        size: 'xxs',
+                        weight: 'bold',
+                        color: '#1C1C1C'
+                      }
+                    ]
+                  }
+                ]
               },
               {
                 type: 'text',
                 text: 'อรุณสวัสดิ์ทีมงาน! ☀️',
                 size: 'xxl',
                 weight: 'bold',
-                color: '#1C1C1C'
+                color: '#1C1C1C',
+                margin: 'xs'
               },
               {
                 type: 'text',
@@ -220,18 +253,51 @@ export async function GET(request) {
             spacing: 'lg',
             contents: [
               {
-                type: 'text',
-                text: 'DAILY MISSION // PROTOCOL',
-                size: 'xxs',
-                color: '#8C8C8C',
-                weight: 'bold'
+                type: 'box',
+                layout: 'horizontal',
+                alignItems: 'center',
+                contents: [
+                  {
+                    type: 'text',
+                    text: 'DAILY MISSION // PROTOCOL',
+                    size: 'xxs',
+                    color: '#8C8C8C',
+                    weight: 'bold',
+                    flex: 1
+                  },
+                  {
+                    type: 'box',
+                    layout: 'horizontal',
+                    spacing: 'xs',
+                    alignItems: 'center',
+                    contents: [
+                      {
+                        type: 'box',
+                        layout: 'vertical',
+                        backgroundColor: '#1C1C1C',
+                        width: '8px',
+                        height: '8px',
+                        cornerRadius: '4px',
+                        contents: []
+                      },
+                      {
+                        type: 'text',
+                        text: 'STANDBY',
+                        size: 'xxs',
+                        weight: 'bold',
+                        color: '#1C1C1C'
+                      }
+                    ]
+                  }
+                ]
               },
               {
                 type: 'text',
                 text: 'เตรียมปิดระบบร้าน! 🌙',
                 size: 'xxl',
                 weight: 'bold',
-                color: '#1C1C1C'
+                color: '#1C1C1C',
+                margin: 'xs'
               },
               {
                 type: 'text',
