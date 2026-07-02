@@ -246,7 +246,7 @@ function onFormSubmit(e) {
         "contents": [
           {
             "type": "text",
-            "text": "ITH-HR // MODEL ET-2026",
+            "text": "ONHAUS SYSTEM ©",
             "size": "xxs",
             "color": "#A5A5A5",
             "weight": "bold",
@@ -423,7 +423,7 @@ function notifyDailyReminders() {
           },
           {
             "type": "text",
-            "text": "ITH-HR // MISSION CONTROL // AB1",
+            "text": "ONHAUS SYSTEM ©",
             "size": "xxs",
             "color": "#A5A5A5",
             "weight": "bold",
@@ -576,7 +576,7 @@ function notifyMorningReminder() {
             "action": { "type": "uri", "label": "📋 เปิดฟอร์ม CHECKLIST", "uri": FORM_LINK },
             "style": "primary", "color": "#7C7C7C", "height": "sm"
           },
-          { "type": "text", "text": "ITH-HR // MISSION CONTROL // AB1", "size": "xxs", "color": "#A5A5A5", "weight": "bold", "align": "center", "margin": "md" }
+          { "type": "text", "text": "ONHAUS SYSTEM ©", "size": "xxs", "color": "#A5A5A5", "weight": "bold", "align": "center", "margin": "md" }
         ]
       }
     }
@@ -656,7 +656,7 @@ function notifyEveningReminder() {
             "action": { "type": "uri", "label": "📋 เปิดฟอร์ม CHECKLIST", "uri": FORM_LINK },
             "style": "primary", "color": "#7C7C7C", "height": "sm"
           },
-          { "type": "text", "text": "ITH-HR // MISSION CONTROL // AB1", "size": "xxs", "color": "#A5A5A5", "weight": "bold", "align": "center", "margin": "md" }
+          { "type": "text", "text": "ONHAUS SYSTEM ©", "size": "xxs", "color": "#A5A5A5", "weight": "bold", "align": "center", "margin": "md" }
         ]
       }
     }

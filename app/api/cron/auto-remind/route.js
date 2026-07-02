@@ -175,7 +175,7 @@ export async function GET(request) {
               },
               {
                 type: 'text',
-                text: 'ITH-HR // MISSION CONTROL // AB1',
+                text: 'ONHAUS SYSTEM ©',
                 size: 'xxs',
                 color: '#A5A5A5',
                 weight: 'bold',
@@ -337,7 +337,7 @@ export async function GET(request) {
               },
               {
                 type: 'text',
-                text: 'ITH-HR // MISSION CONTROL // AB1',
+                text: 'ONHAUS SYSTEM ©',
                 size: 'xxs',
                 color: '#A5A5A5',
                 weight: 'bold',
