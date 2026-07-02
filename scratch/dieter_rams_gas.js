@@ -569,12 +569,12 @@ function notifyMorningReminder() {
           {
             "type": "button",
             "action": { "type": "uri", "label": "📦 เช็คสต๊อก (CHECK STOCK)", "uri": "https://haustable.vercel.app/staff/stock" },
-            "style": "secondary", "color": "#1C1C1C", "height": "sm"
+            "style": "primary", "color": "#7C7C7C", "height": "sm"
           },
           {
             "type": "button",
             "action": { "type": "uri", "label": "📋 เปิดฟอร์ม CHECKLIST", "uri": FORM_LINK },
-            "style": "secondary", "color": "#1C1C1C", "height": "sm"
+            "style": "primary", "color": "#7C7C7C", "height": "sm"
           },
           { "type": "text", "text": "ITH-HR // MISSION CONTROL // AB1", "size": "xxs", "color": "#A5A5A5", "weight": "bold", "align": "center", "margin": "md" }
         ]
@@ -649,12 +649,12 @@ function notifyEveningReminder() {
           {
             "type": "button",
             "action": { "type": "uri", "label": "📦 เช็คสต๊อก (CHECK STOCK)", "uri": "https://haustable.vercel.app/staff/stock" },
-            "style": "secondary", "color": "#1C1C1C", "height": "sm"
+            "style": "primary", "color": "#7C7C7C", "height": "sm"
           },
           {
             "type": "button",
             "action": { "type": "uri", "label": "📋 เปิดฟอร์ม CHECKLIST", "uri": FORM_LINK },
-            "style": "secondary", "color": "#1C1C1C", "height": "sm"
+            "style": "primary", "color": "#7C7C7C", "height": "sm"
           },
           { "type": "text", "text": "ITH-HR // MISSION CONTROL // AB1", "size": "xxs", "color": "#A5A5A5", "weight": "bold", "align": "center", "margin": "md" }
         ]

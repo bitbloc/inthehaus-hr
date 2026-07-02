@@ -159,8 +159,8 @@ export async function GET(request) {
                   label: '📦 เช็คสต๊อก (CHECK STOCK)',
                   uri: 'https://haustable.vercel.app/staff/stock'
                 },
-                style: 'secondary',
-                color: '#1C1C1C',
+                style: 'primary',
+                color: '#7C7C7C',
                 height: 'sm'
               },
               {
@@ -170,8 +170,8 @@ export async function GET(request) {
                   label: '📋 เปิดฟอร์ม CHECKLIST',
                   uri: 'https://forms.gle/8agnXqC7ZSojmqra6'
                 },
-                style: 'secondary',
-                color: '#1C1C1C',
+                style: 'primary',
+                color: '#7C7C7C',
                 height: 'sm'
               },
               {
@@ -188,10 +188,18 @@ export async function GET(request) {
         }
       };
 
-      await Promise.all(
-        GROUP_IDS.map(groupId => client.pushMessage(groupId, [message]))
+      const results = await Promise.all(
+        GROUP_IDS.map(async (groupId) => {
+          try {
+            await client.pushMessage(groupId, [message]);
+            return { groupId, success: true };
+          } catch (e) {
+            console.error(`Failed to push to group ${groupId}:`, e.message);
+            return { groupId, success: false, error: e.message };
+          }
+        })
       );
-      return NextResponse.json({ success: true, sent: 'morning', time: timeString });
+      return NextResponse.json({ success: true, sent: 'morning', time: timeString, results });
     }
 
     // 2. Evening Reminder // Dieter Rams Design Aesthetic
@@ -312,8 +320,8 @@ export async function GET(request) {
                   label: '📦 เช็คสต๊อก (CHECK STOCK)',
                   uri: 'https://haustable.vercel.app/staff/stock'
                 },
-                style: 'secondary',
-                color: '#1C1C1C',
+                style: 'primary',
+                color: '#7C7C7C',
                 height: 'sm'
               },
               {
@@ -323,8 +331,8 @@ export async function GET(request) {
                   label: '📋 เปิดฟอร์ม CHECKLIST',
                   uri: 'https://forms.gle/8agnXqC7ZSojmqra6'
                 },
-                style: 'secondary',
-                color: '#1C1C1C',
+                style: 'primary',
+                color: '#7C7C7C',
                 height: 'sm'
               },
               {
@@ -341,10 +349,18 @@ export async function GET(request) {
         }
       };
 
-      await Promise.all(
-        GROUP_IDS.map(groupId => client.pushMessage(groupId, [message]))
+      const results = await Promise.all(
+        GROUP_IDS.map(async (groupId) => {
+          try {
+            await client.pushMessage(groupId, [message]);
+            return { groupId, success: true };
+          } catch (e) {
+            console.error(`Failed to push to group ${groupId}:`, e.message);
+            return { groupId, success: false, error: e.message };
+          }
+        })
       );
-      return NextResponse.json({ success: true, sent: 'evening', time: timeString });
+      return NextResponse.json({ success: true, sent: 'evening', time: timeString, results });
     }
 
     // 3. Fallback to original shift database logic
