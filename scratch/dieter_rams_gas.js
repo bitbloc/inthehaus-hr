@@ -264,15 +264,28 @@ function onFormSubmit(e) {
       "footer": {
         "type": "box",
         "layout": "vertical",
-        "paddingAll": "md",
+        "spacing": "sm",
+        "paddingAll": "lg",
         "contents": [
+          {
+            "type": "button",
+            "action": {
+              "type": "uri",
+              "label": "📋 ดูสรุปข้อมูล Checklist",
+              "uri": "https://inthehaus-hr.vercel.app/checklist"
+            },
+            "style": "primary",
+            "color": "#7C7C7C",
+            "height": "sm"
+          },
           {
             "type": "text",
             "text": "ONHAUS SYSTEM ©",
             "size": "xxs",
             "color": "#A5A5A5",
             "weight": "bold",
-            "align": "center"
+            "align": "center",
+            "margin": "md"
           }
         ]
       }
