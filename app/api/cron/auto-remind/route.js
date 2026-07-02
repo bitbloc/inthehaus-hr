@@ -7,18 +7,347 @@ const GROUP_IDS = [
   'C1210c7a0601b5a675060e312efe10bff',
   'C71db3c7339b11f43dc8f1ec34bf46f43'
 ];
-const client = new Client({ channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN, channelSecret: process.env.CHANNEL_SECRET });
+const client = new Client({
+  channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN,
+  channelSecret: process.env.CHANNEL_SECRET
+});
 export const dynamic = 'force-dynamic';
 
 export async function GET(request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const queryType = searchParams.get('type');
+
     const now = new Date();
     const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
     const thaiTime = new Date(utc + (3600000 * 7));
     const currentTotalMinutes = thaiTime.getHours() * 60 + thaiTime.getMinutes();
-    const timeString = `${String(thaiTime.getHours()).padStart(2, '0')}:${String(thaiTime.getMinutes()).padStart(2, '0')}`;
-    console.log(`🕒 Cron Check at: ${timeString} (${currentTotalMinutes})`);
+    const hours = thaiTime.getHours();
+    const minutes = thaiTime.getMinutes();
+    const timeString = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+    
+    console.log(`🕒 Cron Check at: ${timeString} (${currentTotalMinutes}) | type: ${queryType}`);
 
+    let targetType = queryType;
+    if (!targetType) {
+      // Auto-detect based on Thai timezone (ICT)
+      // Check for morning reminder (10:00 AM)
+      if (hours === 10 && minutes >= 0 && minutes <= 9) {
+        targetType = 'morning';
+      }
+      // Check for evening reminder (23:00 PM / 11:00 PM)
+      else if (hours === 23 && minutes >= 0 && minutes <= 9) {
+        targetType = 'evening';
+      }
+    }
+
+    // 1. Morning Reminder // Dieter Rams Design Aesthetic
+    if (targetType === 'morning') {
+      const message = {
+        type: 'flex',
+        altText: '☀️ DAILY MISSION: อย่าลืม CHECK-IN & STOCK',
+        contents: {
+          type: 'bubble',
+          size: 'mega',
+          styles: {
+            body: { backgroundColor: '#F4F4F4' },
+            footer: { backgroundColor: '#F4F4F4', separator: true, separatorColor: '#EAEAEA' }
+          },
+          body: {
+            type: 'box',
+            layout: 'vertical',
+            paddingAll: 'xl',
+            spacing: 'lg',
+            contents: [
+              {
+                type: 'text',
+                text: 'DAILY MISSION // PROTOCOL',
+                size: 'xxs',
+                color: '#8C8C8C',
+                weight: 'bold'
+              },
+              {
+                type: 'text',
+                text: 'อรุณสวัสดิ์ทีมงาน! ☀️',
+                size: 'xxl',
+                weight: 'bold',
+                color: '#1C1C1C'
+              },
+              {
+                type: 'text',
+                text: 'ได้เวลาเปิดร้านแล้ว โปรดบันทึกเวลาเข้างาน เช็คสต๊อกประจำวัน และทำเช็คลิสต์กะเปิดร้านให้เรียบร้อยครับ',
+                size: 'sm',
+                color: '#5A5A5A',
+                wrap: true
+              },
+              {
+                type: 'separator',
+                color: '#E5E5E5'
+              },
+              {
+                type: 'box',
+                layout: 'vertical',
+                spacing: 'md',
+                contents: [
+                  {
+                    type: 'box',
+                    layout: 'horizontal',
+                    spacing: 'md',
+                    contents: [
+                      {
+                        type: 'box',
+                        layout: 'vertical',
+                        backgroundColor: '#D05D00', // Braun Amber Accent
+                        width: '4px',
+                        cornerRadius: 'xs'
+                      },
+                      {
+                        type: 'box',
+                        layout: 'vertical',
+                        spacing: 'xxs',
+                        contents: [
+                          {
+                            type: 'text',
+                            text: 'กะเปิดร้าน // 10:00',
+                            size: 'xxs',
+                            color: '#8C8C8C',
+                            weight: 'bold'
+                          },
+                          {
+                            type: 'text',
+                            text: 'Check-in เข้างาน และ เช็คสต๊อก',
+                            size: 'sm',
+                            weight: 'bold',
+                            color: '#1C1C1C'
+                          },
+                          {
+                            type: 'text',
+                            text: 'เตรียมความเรียบร้อยหน้าร้าน, อุปกรณ์, และเปิดระบบ',
+                            size: 'xs',
+                            color: '#7A7A7A',
+                            wrap: true
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          footer: {
+            type: 'box',
+            layout: 'vertical',
+            spacing: 'sm',
+            paddingAll: 'lg',
+            contents: [
+              {
+                type: 'button',
+                action: {
+                  type: 'uri',
+                  label: '🟢 บันทึกเวลาเข้างาน (CHECK IN)',
+                  uri: 'https://inthehaus-hr.vercel.app/checkin'
+                },
+                style: 'primary',
+                color: '#1C1C1C',
+                height: 'sm'
+              },
+              {
+                type: 'button',
+                action: {
+                  type: 'uri',
+                  label: '📦 เช็คสต๊อก (CHECK STOCK)',
+                  uri: 'https://haustable.vercel.app/staff/stock'
+                },
+                style: 'secondary',
+                color: '#1C1C1C',
+                height: 'sm'
+              },
+              {
+                type: 'button',
+                action: {
+                  type: 'uri',
+                  label: '📋 เปิดฟอร์ม CHECKLIST',
+                  uri: 'https://forms.gle/8agnXqC7ZSojmqra6'
+                },
+                style: 'secondary',
+                color: '#1C1C1C',
+                height: 'sm'
+              },
+              {
+                type: 'text',
+                text: 'ITH-HR // MISSION CONTROL // AB1',
+                size: 'xxs',
+                color: '#A5A5A5',
+                weight: 'bold',
+                align: 'center',
+                margin: 'md'
+              }
+            ]
+          }
+        }
+      };
+
+      await Promise.all(
+        GROUP_IDS.map(groupId => client.pushMessage(groupId, [message]))
+      );
+      return NextResponse.json({ success: true, sent: 'morning', time: timeString });
+    }
+
+    // 2. Evening Reminder // Dieter Rams Design Aesthetic
+    if (targetType === 'evening') {
+      const message = {
+        type: 'flex',
+        altText: '🌙 DAILY MISSION: อย่าลืม CHECK-OUT & STOCK',
+        contents: {
+          type: 'bubble',
+          size: 'mega',
+          styles: {
+            body: { backgroundColor: '#F4F4F4' },
+            footer: { backgroundColor: '#F4F4F4', separator: true, separatorColor: '#EAEAEA' }
+          },
+          body: {
+            type: 'box',
+            layout: 'vertical',
+            paddingAll: 'xl',
+            spacing: 'lg',
+            contents: [
+              {
+                type: 'text',
+                text: 'DAILY MISSION // PROTOCOL',
+                size: 'xxs',
+                color: '#8C8C8C',
+                weight: 'bold'
+              },
+              {
+                type: 'text',
+                text: 'เตรียมปิดระบบร้าน! 🌙',
+                size: 'xxl',
+                weight: 'bold',
+                color: '#1C1C1C'
+              },
+              {
+                type: 'text',
+                text: 'ได้เวลาปิดกะร้านแล้ว โปรดบันทึกเวลาออกงาน เช็คสต๊อก และทำเช็คลิสต์กะปิดร้านให้เรียบร้อยครับ',
+                size: 'sm',
+                color: '#5A5A5A',
+                wrap: true
+              },
+              {
+                type: 'separator',
+                color: '#E5E5E5'
+              },
+              {
+                type: 'box',
+                layout: 'vertical',
+                spacing: 'md',
+                contents: [
+                  {
+                    type: 'box',
+                    layout: 'horizontal',
+                    spacing: 'md',
+                    contents: [
+                      {
+                        type: 'box',
+                        layout: 'vertical',
+                        backgroundColor: '#1C1C1C', // Braun Charcoal
+                        width: '4px',
+                        cornerRadius: 'xs'
+                      },
+                      {
+                        type: 'box',
+                        layout: 'vertical',
+                        spacing: 'xxs',
+                        contents: [
+                          {
+                            type: 'text',
+                            text: 'กะปิดร้าน // 23:00',
+                            size: 'xxs',
+                            color: '#8C8C8C',
+                            weight: 'bold'
+                          },
+                          {
+                            type: 'text',
+                            text: 'Check-out ออกงาน และ เช็คสต๊อก',
+                            size: 'sm',
+                            weight: 'bold',
+                            color: '#1C1C1C'
+                          },
+                          {
+                            type: 'text',
+                            text: 'สรุปยอดเงินและปิดระบบไฟ, ตรวจสอบความเรียบร้อยรอบร้าน',
+                            size: 'xs',
+                            color: '#7A7A7A',
+                            wrap: true
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          footer: {
+            type: 'box',
+            layout: 'vertical',
+            spacing: 'sm',
+            paddingAll: 'lg',
+            contents: [
+              {
+                type: 'button',
+                action: {
+                  type: 'uri',
+                  label: '🔴 บันทึกเวลาออกงาน (CHECK OUT)',
+                  uri: 'https://inthehaus-hr.vercel.app/checkin'
+                },
+                style: 'primary',
+                color: '#1C1C1C',
+                height: 'sm'
+              },
+              {
+                type: 'button',
+                action: {
+                  type: 'uri',
+                  label: '📦 เช็คสต๊อก (CHECK STOCK)',
+                  uri: 'https://haustable.vercel.app/staff/stock'
+                },
+                style: 'secondary',
+                color: '#1C1C1C',
+                height: 'sm'
+              },
+              {
+                type: 'button',
+                action: {
+                  type: 'uri',
+                  label: '📋 เปิดฟอร์ม CHECKLIST',
+                  uri: 'https://forms.gle/8agnXqC7ZSojmqra6'
+                },
+                style: 'secondary',
+                color: '#1C1C1C',
+                height: 'sm'
+              },
+              {
+                type: 'text',
+                text: 'ITH-HR // MISSION CONTROL // AB1',
+                size: 'xxs',
+                color: '#A5A5A5',
+                weight: 'bold',
+                align: 'center',
+                margin: 'md'
+              }
+            ]
+          }
+        }
+      };
+
+      await Promise.all(
+        GROUP_IDS.map(groupId => client.pushMessage(groupId, [message]))
+      );
+      return NextResponse.json({ success: true, sent: 'evening', time: timeString });
+    }
+
+    // 3. Fallback to original shift database logic
     const { data: shifts } = await supabase.from('shifts').select('*');
     if (!shifts) return NextResponse.json({ message: "No shifts" });
 
@@ -29,13 +358,11 @@ export async function GET(request) {
     for (const shift of shifts) {
       let diffIn = 9999, diffOut = 9999;
 
-      // ✅ เช็คว่าเปิดใช้งานไหม (notify_in_enabled)
       if (shift.notify_in_enabled && shift.notify_time_in) {
         const [h, m] = shift.notify_time_in.split(':').map(Number);
         diffIn = Math.abs(currentTotalMinutes - (h * 60 + m));
       }
 
-      // ✅ เช็คว่าเปิดใช้งานไหม (notify_out_enabled)
       if (shift.notify_out_enabled && shift.notify_time_out) {
         const [h, m] = shift.notify_time_out.split(':').map(Number);
         diffOut = Math.abs(currentTotalMinutes - (h * 60 + m));
@@ -244,5 +571,7 @@ export async function GET(request) {
       }
     }
     return NextResponse.json({ success: true, message: "No match", debug: debugLog });
-  } catch (error) { return NextResponse.json({ error: error.message }, { status: 500 }); }
+  } catch (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 }
