@@ -99,12 +99,13 @@ export async function GET(request) {
                         layout: 'vertical',
                         backgroundColor: '#D05D00', // Braun Amber Accent
                         width: '4px',
-                        cornerRadius: 'xs'
+                        cornerRadius: 'xs',
+                        contents: []
                       },
                       {
                         type: 'box',
                         layout: 'vertical',
-                        spacing: 'xxs',
+                        spacing: 'xs',
                         contents: [
                           {
                             type: 'text',
@@ -260,12 +261,13 @@ export async function GET(request) {
                         layout: 'vertical',
                         backgroundColor: '#1C1C1C', // Braun Charcoal
                         width: '4px',
-                        cornerRadius: 'xs'
+                        cornerRadius: 'xs',
+                        contents: []
                       },
                       {
                         type: 'box',
                         layout: 'vertical',
-                        spacing: 'xxs',
+                        spacing: 'xs',
                         contents: [
                           {
                             type: 'text',

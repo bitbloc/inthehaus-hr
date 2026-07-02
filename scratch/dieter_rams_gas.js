@@ -538,11 +538,11 @@ function notifyMorningReminder() {
                 "layout": "horizontal",
                 "spacing": "md",
                 "contents": [
-                  { "type": "box", "layout": "vertical", "backgroundColor": "#D05D00", "width": "4px", "cornerRadius": "xs" },
+                  { "type": "box", "layout": "vertical", "backgroundColor": "#D05D00", "width": "4px", "cornerRadius": "xs", "contents": [] },
                   {
                     "type": "box",
                     "layout": "vertical",
-                    "spacing": "xxs",
+                    "spacing": "xs",
                     "contents": [
                       { "type": "text", "text": "กะเปิดร้าน // 10:00", "size": "xxs", "color": "#8C8C8C", "weight": "bold" },
                       { "type": "text", "text": "Check-in เข้างาน และ เช็คสต๊อก", "size": "sm", "weight": "bold", "color": "#1C1C1C" },
@@ -618,11 +618,11 @@ function notifyEveningReminder() {
                 "layout": "horizontal",
                 "spacing": "md",
                 "contents": [
-                  { "type": "box", "layout": "vertical", "backgroundColor": "#1C1C1C", "width": "4px", "cornerRadius": "xs" },
+                  { "type": "box", "layout": "vertical", "backgroundColor": "#1C1C1C", "width": "4px", "cornerRadius": "xs", "contents": [] },
                   {
                     "type": "box",
                     "layout": "vertical",
-                    "spacing": "xxs",
+                    "spacing": "xs",
                     "contents": [
                       { "type": "text", "text": "กะปิดร้าน // 23:00", "size": "xxs", "color": "#8C8C8C", "weight": "bold" },
                       { "type": "text", "text": "Check-out ออกงาน และ เช็คสต๊อก", "size": "sm", "weight": "bold", "color": "#1C1C1C" },
