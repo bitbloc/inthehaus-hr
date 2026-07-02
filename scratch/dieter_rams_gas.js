@@ -484,7 +484,9 @@ function sendToLine(payload) {
     }),
     'muteHttpExceptions': true
   };
-  UrlFetchApp.fetch(url, options);
+  const response = UrlFetchApp.fetch(url, options);
+  console.log("LINE Response Code: " + response.getResponseCode());
+  console.log("LINE Response Body: " + response.getContentText());
 }
 
 /**
