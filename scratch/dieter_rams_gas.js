@@ -39,17 +39,21 @@ function onFormSubmit(e) {
   const staffName = responses[1];
   const shiftType = responses[2] || "ไม่ระบุกะ"; 
   
-  let checklistData = "";
-  let moneyAmount = "";
-  let rawImageUrl = "";
+  let tasks = [];
   
   // Parse response fields depending on opening/closing shift
   if (shiftType.includes("เปิด")) {
-    checklistData = responses[3]; // Column D
-    rawImageUrl = responses[4];    // Column E
+    const dTasks = responses[3] ? String(responses[3]).split(/,\s*/).filter(item => item.trim().length > 0) : [];
+    const eTasks = responses[4] ? String(responses[4]).split(/,\s*/).filter(item => item.trim().length > 0) : [];
+    tasks = dTasks.concat(eTasks);
+    
     moneyAmount = responses[5];    // Column F
+    rawImageUrl = responses[6];    // Column G (Opening photo)
   } else {
-    checklistData = responses[10]; // Column K (Checklist Complete)
+    const jTasks = responses[9] ? String(responses[9]).split(/,\s*/).filter(item => item.trim().length > 0) : [];
+    const kTasks = responses[10] ? String(responses[10]).split(/,\s*/).filter(item => item.trim().length > 0) : [];
+    tasks = jTasks.concat(kTasks);
+    
     moneyAmount = responses[11];   // Column L (Cash amount)
     rawImageUrl = responses[12];   // Column M (Confirmation photo)
   }
@@ -57,20 +61,49 @@ function onFormSubmit(e) {
   // Extract direct image url
   const displayImageUrl = getGoogleDriveDirectLink(rawImageUrl);
 
+  // Dynamically count total form choices for the current shift
+  let totalItems = 26; // Default fallback count based on max found in database
+  try {
+    const formUrl = SpreadsheetApp.getActiveSpreadsheet().getFormUrl();
+    if (formUrl) {
+      const form = FormApp.openByUrl(formUrl);
+      const checkboxItems = form.getItems(FormApp.ItemType.CHECKBOX);
+      let formTotal = 0;
+      checkboxItems.forEach(item => {
+        const title = item.getTitle();
+        const isOpening = shiftType.includes("เปิด");
+        if (isOpening) {
+          if (title.includes("ก่อนเปิด") || title.includes("ระบบเงินและ POS") || title.includes("Opening Cash")) {
+            formTotal += item.asCheckboxItem().getChoices().length;
+          }
+        } else {
+          if (title.includes("ความสะอาด") || title.includes("ระบบเงินและการปิดร้าน") || title.includes("Closing")) {
+            formTotal += item.asCheckboxItem().getChoices().length;
+          }
+        }
+      });
+      if (formTotal > 0) {
+        totalItems = formTotal;
+      }
+    }
+  } catch (err) {
+    console.log("Failed to load form options dynamically: " + err.message);
+  }
+
+  const count = tasks.length;
+
   // Determine completeness
-  const isComplete = !!(checklistData && checklistData.trim().length > 2);
-  const statusText = isComplete ? "CHECKLIST COMPLETE" : "INFORMATION INCOMPLETE";
+  const isComplete = count >= totalItems;
+  const statusText = isComplete ? "CHECKLIST COMPLETE" : "CHECKLIST INCOMPLETE";
   const statusColor = isComplete ? "#1C6C38" : "#D05D00"; // Muted Braun Green vs Braun Clock Accent Orange
 
   // Format checklist data for concise layout
   let formattedChecklist = "—";
-  if (checklistData) {
-    const items = checklistData.split(/,\s*/).filter(item => item.trim().length > 0);
-    const count = items.length;
+  if (count > 0) {
     if (isComplete) {
-      formattedChecklist = `เช็คครบถ้วน (${count} รายการ)`;
+      formattedChecklist = `เช็คครบถ้วน (${count} จาก ${totalItems} รายการ)`;
     } else {
-      formattedChecklist = `ทำแล้ว ${count} รายการ (ข้อมูลไม่ครบ)`;
+      formattedChecklist = `ทำแล้ว ${count} จาก ${totalItems} รายการ (ข้อมูลไม่ครบ)`;
     }
   }
 

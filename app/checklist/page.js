@@ -1032,7 +1032,7 @@ export default function ChecklistPage() {
                                                             รายการภารกิจที่ทำเสร็จ
                                                         </span>
                                                         <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-sm bg-rams-green/10 text-rams-green border border-rams-green/20">
-                                                            {item.tasks.length} COMPLETED
+                                                            {item.tasks.length} / 26 รายการ
                                                         </span>
                                                     </div>
 
