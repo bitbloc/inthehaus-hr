@@ -58,8 +58,8 @@ function onFormSubmit(e) {
     rawImageUrl = responses[12];   // Column M (Confirmation photo)
   }
 
-  // Extract direct image url
-  const displayImageUrl = getGoogleDriveDirectLink(rawImageUrl);
+  // Extract direct image urls
+  const displayImageUrls = getGoogleDriveDirectLinks(rawImageUrl);
 
   // Dynamically count total form choices for the current shift
   let totalItems = 26; // Default fallback count based on max found in database
@@ -107,222 +107,271 @@ function onFormSubmit(e) {
     }
   }
 
+  const firstImageUrl = displayImageUrls.length > 0 ? displayImageUrls[0] : undefined;
+
   // Dieter Rams Flex Message Bubble Layout
+  const mainBubble = {
+    "type": "bubble",
+    "size": "mega",
+    "styles": {
+      "body": {
+        "backgroundColor": "#F4F4F4"
+      },
+      "footer": {
+        "backgroundColor": "#F4F4F4",
+        "separator": true,
+        "separatorColor": "#EAEAEA"
+      }
+    },
+    "hero": firstImageUrl ? {
+      "type": "image",
+      "url": firstImageUrl,
+      "size": "full",
+      "aspectRatio": "20:11",
+      "aspectMode": "cover"
+    } : undefined,
+    "body": {
+      "type": "box",
+      "layout": "vertical",
+      "paddingAll": "xl",
+      "spacing": "md",
+      "contents": [
+        {
+          "type": "box",
+          "layout": "horizontal",
+          "alignItems": "center",
+          "contents": [
+            {
+              "type": "text",
+              "text": "SYSTEM // REPORT",
+              "size": "xxs",
+              "color": "#8C8C8C",
+              "weight": "bold",
+              "flex": 1
+            },
+            {
+              "type": "box",
+              "layout": "horizontal",
+              "spacing": "xs",
+              "alignItems": "center",
+              "contents": [
+                {
+                  "type": "box",
+                  "layout": "vertical",
+                  "backgroundColor": statusColor,
+                  "width": "8px",
+                  "height": "8px",
+                  "cornerRadius": "4px",
+                  "contents": []
+                },
+                {
+                  "type": "text",
+                  "text": statusText,
+                  "size": "xxs",
+                  "weight": "bold",
+                  "color": "#1C1C1C"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "text": shiftType,
+          "size": "xl",
+          "weight": "bold",
+          "color": "#1C1C1C",
+          "wrap": true,
+          "margin": "xs"
+        },
+        {
+          "type": "separator",
+          "color": "#E5E5E5",
+          "margin": "md"
+        },
+        {
+          "type": "box",
+          "layout": "vertical",
+          "spacing": "sm",
+          "margin": "md",
+          "contents": [
+            {
+              "type": "box",
+              "layout": "horizontal",
+              "contents": [
+                {
+                  "type": "text",
+                  "text": "STAFF",
+                  "color": "#8C8C8C",
+                  "size": "xs",
+                  "weight": "bold",
+                  "flex": 3
+                },
+                {
+                  "type": "text",
+                  "text": staffName,
+                  "color": "#1C1C1C",
+                  "size": "sm",
+                  "weight": "bold",
+                  "flex": 7
+                }
+              ]
+            },
+            {
+              "type": "box",
+              "layout": "horizontal",
+              "contents": [
+                {
+                  "type": "text",
+                  "text": "CHECKLIST",
+                  "color": "#8C8C8C",
+                  "size": "xs",
+                  "weight": "bold",
+                  "flex": 3
+                },
+                {
+                  "type": "text",
+                  "text": formattedChecklist,
+                  "color": "#1C1C1C",
+                  "size": "sm",
+                  "wrap": true,
+                  "flex": 7
+                }
+              ]
+            },
+            {
+              "type": "box",
+              "layout": "horizontal",
+              "contents": [
+                {
+                  "type": "text",
+                  "text": "TIMESTAMP",
+                  "color": "#8C8C8C",
+                  "size": "xs",
+                  "weight": "bold",
+                  "flex": 3
+                },
+                {
+                  "type": "text",
+                  "text": formatTimestamp(timestamp),
+                  "color": "#1C1C1C",
+                  "size": "sm",
+                  "flex": 7
+                }
+              ]
+            }
+          ]
+        },
+        // Dieter Rams / Braun LCD-style display for cash registers
+        (moneyAmount && moneyAmount !== "0" && moneyAmount !== "") ? {
+          "type": "box",
+          "layout": "vertical",
+          "backgroundColor": "#DCE2DA", // Muted light greenish gray LCD color
+          "borderColor": "#B8BFB5",
+          "borderWidth": "semi-bold",
+          "cornerRadius": "md",
+          "paddingAll": "lg",
+          "margin": "lg",
+          "contents": [
+            {
+              "type": "text",
+              "text": "REGISTER TOTAL // CASH",
+              "size": "xxs",
+              "color": "#5E6659",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "text": formatCurrency(moneyAmount),
+              "size": "xxl",
+              "weight": "bold",
+              "color": "#1C2118",
+              "align": "end",
+              "margin": "xs"
+            }
+          ]
+        } : null
+      ].filter(Boolean)
+    },
+    "footer": {
+      "type": "box",
+      "layout": "vertical",
+      "spacing": "sm",
+      "paddingAll": "lg",
+      "contents": [
+        {
+          "type": "button",
+          "action": {
+            "type": "uri",
+            "label": "📋 ดูสรุปข้อมูล Checklist",
+            "uri": "https://inthehaus-hr.vercel.app/checklist"
+          },
+          "style": "primary",
+          "color": "#7C7C7C",
+          "height": "sm"
+        },
+        {
+          "type": "text",
+          "text": "ONHAUS SYSTEM ©",
+          "size": "xxs",
+          "color": "#A5A5A5",
+          "weight": "bold",
+          "align": "center",
+          "margin": "md"
+        }
+      ]
+    }
+  };
+
+  let flexContents;
+  if (displayImageUrls.length <= 1) {
+    flexContents = mainBubble;
+  } else {
+    const bubbles = [mainBubble];
+    // LINE supports up to 10 bubbles in a carousel
+    const extraImages = displayImageUrls.slice(1, 10);
+    extraImages.forEach((imgUrl, idx) => {
+      bubbles.push({
+        "type": "bubble",
+        "size": "mega",
+        "styles": {
+          "body": {
+            "backgroundColor": "#F4F4F4"
+          }
+        },
+        "hero": {
+          "type": "image",
+          "url": imgUrl,
+          "size": "full",
+          "aspectRatio": "20:11",
+          "aspectMode": "cover"
+        },
+        "body": {
+          "type": "box",
+          "layout": "vertical",
+          "paddingAll": "md",
+          "contents": [
+            {
+              "type": "text",
+              "text": `ATTACHMENT // PHOTO ${idx + 2}`,
+              "size": "xxs",
+              "color": "#8C8C8C",
+              "weight": "bold"
+            }
+          ]
+        }
+      });
+    });
+    flexContents = {
+      "type": "carousel",
+      "contents": bubbles
+    };
+  }
+
   const messagePayload = {
     "type": "flex",
     "altText": `REPORT // ${shiftType.toUpperCase()} BY ${staffName.toUpperCase()}`,
-    "contents": {
-      "type": "bubble",
-      "size": "mega",
-      "styles": {
-        "body": {
-          "backgroundColor": "#F4F4F4"
-        },
-        "footer": {
-          "backgroundColor": "#F4F4F4",
-          "separator": true,
-          "separatorColor": "#EAEAEA"
-        }
-      },
-      "hero": displayImageUrl ? {
-        "type": "image",
-        "url": displayImageUrl,
-        "size": "full",
-        "aspectRatio": "20:11",
-        "aspectMode": "cover"
-      } : undefined,
-      "body": {
-        "type": "box",
-        "layout": "vertical",
-        "paddingAll": "xl",
-        "spacing": "md",
-        "contents": [
-          {
-            "type": "box",
-            "layout": "horizontal",
-            "alignItems": "center",
-            "contents": [
-              {
-                "type": "text",
-                "text": "SYSTEM // REPORT",
-                "size": "xxs",
-                "color": "#8C8C8C",
-                "weight": "bold",
-                "flex": 1
-              },
-              {
-                "type": "box",
-                "layout": "horizontal",
-                "spacing": "xs",
-                "alignItems": "center",
-                "contents": [
-                  {
-                    "type": "box",
-                    "layout": "vertical",
-                    "backgroundColor": statusColor,
-                    "width": "8px",
-                    "height": "8px",
-                    "cornerRadius": "4px",
-                    "contents": []
-                  },
-                  {
-                    "type": "text",
-                    "text": statusText,
-                    "size": "xxs",
-                    "weight": "bold",
-                    "color": "#1C1C1C"
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "type": "text",
-            "text": shiftType,
-            "size": "xl",
-            "weight": "bold",
-            "color": "#1C1C1C",
-            "wrap": true,
-            "margin": "xs"
-          },
-          {
-            "type": "separator",
-            "color": "#E5E5E5",
-            "margin": "md"
-          },
-          {
-            "type": "box",
-            "layout": "vertical",
-            "spacing": "sm",
-            "margin": "md",
-            "contents": [
-              {
-                "type": "box",
-                "layout": "horizontal",
-                "contents": [
-                  {
-                    "type": "text",
-                    "text": "STAFF",
-                    "color": "#8C8C8C",
-                    "size": "xs",
-                    "weight": "bold",
-                    "flex": 3
-                  },
-                  {
-                    "type": "text",
-                    "text": staffName,
-                    "color": "#1C1C1C",
-                    "size": "sm",
-                    "weight": "bold",
-                    "flex": 7
-                  }
-                ]
-              },
-              {
-                "type": "box",
-                "layout": "horizontal",
-                "contents": [
-                  {
-                    "type": "text",
-                    "text": "CHECKLIST",
-                    "color": "#8C8C8C",
-                    "size": "xs",
-                    "weight": "bold",
-                    "flex": 3
-                  },
-                  {
-                    "type": "text",
-                    "text": formattedChecklist,
-                    "color": "#1C1C1C",
-                    "size": "sm",
-                    "wrap": true,
-                    "flex": 7
-                  }
-                ]
-              },
-              {
-                "type": "box",
-                "layout": "horizontal",
-                "contents": [
-                  {
-                    "type": "text",
-                    "text": "TIMESTAMP",
-                    "color": "#8C8C8C",
-                    "size": "xs",
-                    "weight": "bold",
-                    "flex": 3
-                  },
-                  {
-                    "type": "text",
-                    "text": formatTimestamp(timestamp),
-                    "color": "#1C1C1C",
-                    "size": "sm",
-                    "flex": 7
-                  }
-                ]
-              }
-            ]
-          },
-          // Dieter Rams / Braun LCD-style display for cash registers
-          (moneyAmount && moneyAmount !== "0" && moneyAmount !== "") ? {
-            "type": "box",
-            "layout": "vertical",
-            "backgroundColor": "#DCE2DA", // Muted light greenish gray LCD color
-            "borderColor": "#B8BFB5",
-            "borderWidth": "semi-bold",
-            "cornerRadius": "md",
-            "paddingAll": "lg",
-            "margin": "lg",
-            "contents": [
-              {
-                "type": "text",
-                "text": "REGISTER TOTAL // CASH",
-                "size": "xxs",
-                "color": "#5E6659",
-                "weight": "bold"
-              },
-              {
-                "type": "text",
-                "text": formatCurrency(moneyAmount),
-                "size": "xxl",
-                "weight": "bold",
-                "color": "#1C2118",
-                "align": "end",
-                "margin": "xs"
-              }
-            ]
-          } : null
-        ].filter(Boolean)
-      },
-      "footer": {
-        "type": "box",
-        "layout": "vertical",
-        "spacing": "sm",
-        "paddingAll": "lg",
-        "contents": [
-          {
-            "type": "button",
-            "action": {
-              "type": "uri",
-              "label": "📋 ดูสรุปข้อมูล Checklist",
-              "uri": "https://inthehaus-hr.vercel.app/checklist"
-            },
-            "style": "primary",
-            "color": "#7C7C7C",
-            "height": "sm"
-          },
-          {
-            "type": "text",
-            "text": "ONHAUS SYSTEM ©",
-            "size": "xxs",
-            "color": "#A5A5A5",
-            "weight": "bold",
-            "align": "center",
-            "margin": "md"
-          }
-        ]
-      }
-    }
+    "contents": flexContents
   };
 
   sendToLine(messagePayload);
@@ -520,18 +569,33 @@ function formatCurrency(val) {
 }
 
 /**
+ * Robustly extract file IDs from Google Drive link list and format as direct access images
+ * @param {string} urlStr Comma-separated string of drive URLs
+ * @returns {Array<string>} Array of direct image links
+ */
+function getGoogleDriveDirectLinks(urlStr) {
+  if (!urlStr) return [];
+  const urls = urlStr.split(/[\s,]+/).filter(Boolean);
+  const directLinks = [];
+  urls.forEach(url => {
+    const match = url.match(/(?:id=|\/d\/)([a-zA-Z0-9_-]+)/);
+    if (match && match[1]) {
+      directLinks.push("https://lh3.googleusercontent.com/d/" + match[1] + "=s1600");
+    } else if (url.indexOf("http") === 0) {
+      directLinks.push(url);
+    }
+  });
+  return directLinks;
+}
+
+/**
  * Robustly extract file ID from Google Drive link and format as direct access image
  * @param {string} url Raw upload URL from Google Forms
  * @returns {string} Direct web preview URL, or original url if not drive, or empty string
  */
 function getGoogleDriveDirectLink(url) {
-  if (!url) return "";
-  // Matches both ?id=FILE_ID and /d/FILE_ID/ formats
-  const match = url.match(/(?:id=|\/d\/)([a-zA-Z0-9_-]+)/);
-  if (match && match[1]) {
-    return "https://lh3.googleusercontent.com/d/" + match[1] + "=s1600";
-  }
-  return url.indexOf("http") === 0 ? url : "";
+  const links = getGoogleDriveDirectLinks(url);
+  return links.length > 0 ? links[0] : "";
 }
 
 /**
