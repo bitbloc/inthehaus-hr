@@ -334,11 +334,6 @@ function onFormSubmit(e) {
       bubbles.push({
         "type": "bubble",
         "size": "mega",
-        "styles": {
-          "body": {
-            "backgroundColor": "#F4F4F4"
-          }
-        },
         "hero": {
           "type": "image",
           "url": imgUrl,
@@ -349,13 +344,21 @@ function onFormSubmit(e) {
         "body": {
           "type": "box",
           "layout": "vertical",
-          "paddingAll": "md",
+          "position": "absolute",
+          "offsetTop": "12px",
+          "offsetStart": "12px",
+          "backgroundColor": "#1C1C1CCC",
+          "cornerRadius": "sm",
+          "paddingTop": "xs",
+          "paddingBottom": "xs",
+          "paddingStart": "sm",
+          "paddingEnd": "sm",
           "contents": [
             {
               "type": "text",
               "text": `ATTACHMENT // PHOTO ${idx + 2}`,
               "size": "xxs",
-              "color": "#8C8C8C",
+              "color": "#FFFFFF",
               "weight": "bold"
             }
           ]
