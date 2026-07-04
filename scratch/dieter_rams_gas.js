@@ -343,7 +343,7 @@ function onFormSubmit(e) {
           "type": "image",
           "url": imgUrl,
           "size": "full",
-          "aspectRatio": "20:11",
+          "aspectRatio": "20:20",
           "aspectMode": "cover"
         },
         "body": {
