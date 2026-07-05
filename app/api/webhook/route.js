@@ -524,19 +524,19 @@ export async function POST(request) {
 
               const context = await getIngredientPrices();
 
-              // Wait 1.5 seconds for all images in the same batch to insert their lock rows
+              // Wait 4.0 seconds for all images in the same batch to insert their lock rows
               const nowTime = Date.now();
-              await new Promise(resolve => setTimeout(resolve, 1500));
+              await new Promise(resolve => setTimeout(resolve, 4000));
 
               const { supabase } = await import('../../../lib/supabaseClient');
-              const sixSecondsAgo = new Date(nowTime - 6000).toISOString();
+              const tenSecondsAgo = new Date(nowTime - 10000).toISOString();
               const { data: recentLocks } = await supabase
                 .from('yuzu_chat_history')
                 .select('content, created_at')
                 .eq('group_id', groupId)
                 .eq('user_id', userId)
                 .eq('message_type', 'lock')
-                .gte('created_at', sixSecondsAgo);
+                .gte('created_at', tenSecondsAgo);
 
               const sortedLocks = (recentLocks || []).sort((a, b) => {
                 const timeA = new Date(a.created_at).getTime();
@@ -671,15 +671,16 @@ export async function POST(request) {
               } else {
                 // Not the chosen one: Sleep to allow the chosen one to decide
                 console.log(`Yuzu Vision Batching: Message ${currentMsgId} waiting for chosen one's decision...`);
-                await new Promise(resolve => setTimeout(resolve, 3500));
+                await new Promise(resolve => setTimeout(resolve, 4500));
 
+                const twelveSecondsAgo = new Date(nowTime - 12000).toISOString();
                 const { data: decision } = await supabase
                   .from('yuzu_chat_history')
                   .select('message_type')
                   .eq('group_id', groupId)
                   .eq('user_id', userId)
                   .in('message_type', ['slip_batch_approved', 'report_batch_taken'])
-                  .gte('created_at', sixSecondsAgo);
+                  .gte('created_at', twelveSecondsAgo);
 
                 const hasReportBatchTaken = decision && decision.some(d => d.message_type === 'report_batch_taken');
 
