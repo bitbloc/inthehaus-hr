@@ -922,3 +922,28 @@ function formatTimestamp(rawTS) {
   }
 }
 
+/**
+ * Test function to pull the absolute latest checklist submission from the spreadsheet
+ * and send it directly into the LINE group chat.
+ */
+function testLatestSubmission() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheets()[0];
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) {
+    Logger.log("No data found in the spreadsheet.");
+    return;
+  }
+  const lastRowValues = sheet.getRange(lastRow, 1, 1, sheet.getLastColumn()).getValues()[0];
+  
+  // Format values nicely to match the form submit event values array
+  const formattedValues = lastRowValues.map((val) => {
+    if (val instanceof Date) {
+      // Format timestamp to standard form submission format: "dd/MM/yyyy HH:mm:ss"
+      return Utilities.formatDate(val, Session.getScriptTimeZone() || "GMT+7", "dd/MM/yyyy HH:mm:ss");
+    }
+    return val === null || val === undefined ? "" : String(val);
+  });
+  
+  Logger.log("Testing with Row " + lastRow + ": " + JSON.stringify(formattedValues));
+  onFormSubmit({ values: formattedValues });
+}
