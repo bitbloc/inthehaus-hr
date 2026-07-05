@@ -334,32 +334,43 @@ function onFormSubmit(e) {
       bubbles.push({
         "type": "bubble",
         "size": "mega",
-        "hero": {
-          "type": "image",
-          "url": imgUrl,
-          "size": "full",
-          "aspectRatio": "20:20",
-          "aspectMode": "cover"
-        },
         "body": {
           "type": "box",
           "layout": "vertical",
-          "position": "absolute",
-          "offsetTop": "12px",
-          "offsetStart": "12px",
-          "backgroundColor": "#1C1C1CCC",
-          "cornerRadius": "sm",
-          "paddingTop": "xs",
-          "paddingBottom": "xs",
-          "paddingStart": "sm",
-          "paddingEnd": "sm",
+          "paddingAll": "none",
           "contents": [
             {
-              "type": "text",
-              "text": `ATTACHMENT // PHOTO ${idx + 2}`,
-              "size": "xxs",
-              "color": "#FFFFFF",
-              "weight": "bold"
+              "type": "image",
+              "url": imgUrl,
+              "size": "full",
+              "aspectMode": "cover",
+              "position": "absolute",
+              "offsetTop": "0px",
+              "offsetBottom": "0px",
+              "offsetStart": "0px",
+              "offsetEnd": "0px"
+            },
+            {
+              "type": "box",
+              "layout": "vertical",
+              "position": "absolute",
+              "offsetTop": "12px",
+              "offsetStart": "12px",
+              "backgroundColor": "#1C1C1CCC",
+              "cornerRadius": "sm",
+              "paddingTop": "xs",
+              "paddingBottom": "xs",
+              "paddingStart": "sm",
+              "paddingEnd": "sm",
+              "contents": [
+                {
+                  "type": "text",
+                  "text": `ATTACHMENT // PHOTO ${idx + 2}`,
+                  "size": "xxs",
+                  "color": "#FFFFFF",
+                  "weight": "bold"
+                }
+              ]
             }
           ]
         }
