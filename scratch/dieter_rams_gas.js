@@ -343,12 +343,8 @@ function onFormSubmit(e) {
               "type": "image",
               "url": imgUrl,
               "size": "full",
-              "aspectMode": "cover",
-              "position": "absolute",
-              "offsetTop": "0px",
-              "offsetBottom": "0px",
-              "offsetStart": "0px",
-              "offsetEnd": "0px"
+              "aspectRatio": "20:33",
+              "aspectMode": "cover"
             },
             {
               "type": "box",
