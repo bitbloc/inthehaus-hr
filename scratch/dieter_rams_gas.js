@@ -36,7 +36,7 @@ function onFormSubmit(e) {
   }
 
   const timestamp = responses[0];
-  const staffName = responses[1];
+  const staffName = responses[1] || "ไม่ระบุชื่อ";
   const shiftType = responses[2] || "ไม่ระบุกะ"; 
   
   let tasks = [];
@@ -928,12 +928,24 @@ function formatTimestamp(rawTS) {
  */
 function testLatestSubmission() {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheets()[0];
-  const lastRow = sheet.getLastRow();
-  if (lastRow < 2) {
-    Logger.log("No data found in the spreadsheet.");
+  let lastRow = sheet.getLastRow();
+  let lastRowValues = null;
+  
+  // Loop upwards to find the last row containing actual submission data (non-empty timestamp in Column A)
+  while (lastRow >= 2) {
+    const rowValues = sheet.getRange(lastRow, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const timestampVal = rowValues[0];
+    if (timestampVal !== "" && timestampVal !== null && timestampVal !== undefined) {
+      lastRowValues = rowValues;
+      break;
+    }
+    lastRow--;
+  }
+
+  if (!lastRowValues) {
+    Logger.log("No non-empty data rows found in the spreadsheet.");
     return;
   }
-  const lastRowValues = sheet.getRange(lastRow, 1, 1, sheet.getLastColumn()).getValues()[0];
   
   // Format values nicely to match the form submit event values array
   const formattedValues = lastRowValues.map((val) => {
