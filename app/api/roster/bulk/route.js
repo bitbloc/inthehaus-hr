@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabase } from '../../../../lib/supabaseClient';
 import { Client } from '@line/bot-sdk';
 import { format, parseISO } from 'date-fns';
+import { generateStCalendarFlex } from '../../webhook/handlers/rosterHandler';
 
 const client = new Client({
   channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN,
@@ -67,23 +68,32 @@ export async function POST(request) {
       const startFmt = format(parseISO(startDate), 'dd/MM/yyyy');
       const endFmt = format(parseISO(endDate), 'dd/MM/yyyy');
       
-      const flexMessage = {
-        type: 'flex',
-        altText: `📢 อัปเดตตารางงานใหม่! (${startFmt} - ${endFmt})`,
-        contents: {
-          type: 'bubble',
-          body: {
-            type: 'box', layout: 'vertical',
-            contents: [
-              { type: 'text', text: '📢 อัปเดตตารางงานใหม่!', weight: 'bold', size: 'xl', color: '#1DB446' },
-              { type: 'text', text: `ระหว่างวันที่: ${startFmt} - ${endFmt}`, size: 'sm', color: '#666666', margin: 'md' },
-              { type: 'separator', margin: 'md' },
-              { type: 'text', text: 'ผู้บริหารได้ทำการเผยแพร่ (Publish) ตารางงานของสัปดาห์นี้เรียบร้อยแล้วครับ', size: 'sm', wrap: true, margin: 'md' },
-              { type: 'text', text: 'ทีมงานทุกคนสามารถตรวจสอบตารางงานของตนเองได้โดยพิมพ์คำว่า "ตารางทั้งสัปดาห์" หรือ "ตารางงาน" ในห้องแชทได้เลยครับ', size: 'sm', wrap: true, margin: 'md' }
-            ]
+      let flexMessage = null;
+      try {
+        flexMessage = await generateStCalendarFlex(parseISO(startDate));
+      } catch (err) {
+        console.error("Failed to generate stcalendar flex message:", err);
+      }
+
+      if (!flexMessage) {
+        flexMessage = {
+          type: 'flex',
+          altText: `📢 อัปเดตตารางงานใหม่! (${startFmt} - ${endFmt})`,
+          contents: {
+            type: 'bubble',
+            body: {
+              type: 'box', layout: 'vertical',
+              contents: [
+                { type: 'text', text: '📢 อัปเดตตารางงานใหม่!', weight: 'bold', size: 'xl', color: '#1DB446' },
+                { type: 'text', text: `ระหว่างวันที่: ${startFmt} - ${endFmt}`, size: 'sm', color: '#666666', margin: 'md' },
+                { type: 'separator', margin: 'md' },
+                { type: 'text', text: 'ผู้บริหารได้ทำการเผยแพร่ (Publish) ตารางงานของสัปดาห์นี้เรียบร้อยแล้วครับ', size: 'sm', wrap: true, margin: 'md' },
+                { type: 'text', text: 'ทีมงานทุกคนสามารถตรวจสอบตารางงานของตนเองได้โดยพิมพ์คำว่า "ตารางทั้งสัปดาห์" หรือ "ตารางงาน" ในห้องแชทได้เลยครับ', size: 'sm', wrap: true, margin: 'md' }
+              ]
+            }
           }
-        }
-      };
+        };
+      }
 
       await Promise.all(
         GROUP_IDS.map(groupId => client.pushMessage(groupId, [flexMessage]).catch(e => console.error("Line Push Error:", e)))
