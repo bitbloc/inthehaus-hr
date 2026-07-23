@@ -454,22 +454,117 @@ export async function POST(request) {
               
               if (result.transcript) {
                 await saveMessage(groupId, userId, 'user', `[Audio Transcribed] ${result.transcript}`, 'audio_transcript');
-                let replyMsg = `👂 ยูซุฟังแล้ว สรุปได้ว่า:\n"${result.transcript}"`;
                 
                 if (result.hasTasks && result.tasks.length > 0) {
                   const { supabase } = await import('../../../lib/supabaseClient');
-                  for (const task of result.tasks) {
-                    await supabase.from('staff_tasks').insert({
-                      description: task,
-                      source_message_id: event.message.id
-                    });
+                  const empData = await getEmployeeByLineId(userId);
+                  const senderName = empData ? (empData.nickname || empData.name) : 'ทีมงาน';
+
+                  for (const taskItem of result.tasks) {
+                    try {
+                      await supabase.from('staff_tasks').insert({
+                        description: taskItem,
+                        assigned_to: senderName,
+                        source_user_id: userId,
+                        source_group_id: groupId,
+                        source_message_id: event.message.id,
+                        status: 'TODO',
+                        created_at: new Date().toISOString()
+                      });
+                    } catch (tErr) {
+                      console.warn("staff_tasks insert error:", tErr.message);
+                    }
                   }
-                  replyMsg += `\n\n📌 ยูซุบันทึกเป็นรายการงาน (Task) ให้เรียบร้อยแล้ว ${result.tasks.length} รายการครับ`;
+
+                  // Build Task Ingestion Flex Message
+                  const taskBubbleContents = result.tasks.map((tText, i) => ({
+                    type: 'box',
+                    layout: 'horizontal',
+                    spacing: 'sm',
+                    margin: 'xs',
+                    contents: [
+                      { type: 'text', text: `[ ]`, size: 'xs', color: '#16a34a', weight: 'bold', flex: 1 },
+                      { type: 'text', text: `${i + 1}. ${tText}`, size: 'xs', color: '#1f2937', wrap: true, flex: 9 }
+                    ]
+                  }));
+
+                  const taskFlexMsg = {
+                    type: 'flex',
+                    altText: `📌 บันทึก Task จากเสียงเรียบร้อยแล้ว (${result.tasks.length} รายการ)`,
+                    contents: {
+                      type: 'bubble',
+                      size: 'mega',
+                      styles: {
+                        header: { backgroundColor: '#f0fdf4' },
+                        body: { backgroundColor: '#ffffff' }
+                      },
+                      header: {
+                        type: 'box',
+                        layout: 'vertical',
+                        contents: [
+                          {
+                            type: 'text',
+                            text: '🎙️ AUTO-TASK INGESTION (VOICE NOTE)',
+                            color: '#15803d',
+                            weight: 'bold',
+                            size: 'xs'
+                          },
+                          {
+                            type: 'text',
+                            text: `สกัดงานจากเสียงสำเร็จ ${result.tasks.length} รายการ`,
+                            color: '#166534',
+                            weight: 'bold',
+                            size: 'md',
+                            margin: 'xs'
+                          }
+                        ]
+                      },
+                      body: {
+                        type: 'box',
+                        layout: 'vertical',
+                        spacing: 'sm',
+                        contents: [
+                          {
+                            type: 'text',
+                            text: `ข้อความเสียง: "${result.transcript}"`,
+                            size: 'xxs',
+                            color: '#6b7280',
+                            style: 'italic',
+                            wrap: true
+                          },
+                          { type: 'separator', margin: 'sm', color: '#e5e7eb' },
+                          {
+                            type: 'text',
+                            text: `📋 รายการงานที่บันทึกเข้าระบบ (โดย: พี่${senderName}):`,
+                            size: 'xs',
+                            weight: 'bold',
+                            color: '#111827',
+                            margin: 'sm'
+                          },
+                          ...taskBubbleContents,
+                          { type: 'separator', margin: 'md', color: '#e5e7eb' },
+                          {
+                            type: 'text',
+                            text: '✨ บันทึกลงระบบ staff_tasks เรียบร้อยแล้ว ทีมงานสามารถเข้าตรวจสอบและเช็คลิสต์ในระบบได้ทันทีครับ',
+                            size: 'xxs',
+                            color: '#059669',
+                            wrap: true,
+                            margin: 'xs'
+                          }
+                        ]
+                      }
+                    }
+                  };
+
+                  handledLocally = true;
+                  await client.replyMessage(event.replyToken, taskFlexMsg);
+                  await saveMessage(groupId, null, 'model', `[Auto Task Ingestion] ${result.tasks.join(', ')}`, 'text');
+                } else {
+                  let replyMsg = `👂 ยูซุฟังเสียงแล้ว สรุปได้ว่า:\n"${result.transcript}"\n(ไม่พบรายการคำสั่งงานในข้อความเสียงครับ)`;
+                  handledLocally = true;
+                  await client.replyMessage(event.replyToken, { type: 'text', text: replyMsg });
+                  await saveMessage(groupId, null, 'model', replyMsg, 'text');
                 }
-                
-                handledLocally = true;
-                await client.replyMessage(event.replyToken, { type: 'text', text: replyMsg });
-                await saveMessage(groupId, null, 'model', replyMsg, 'text');
               }
             } catch (audioError) {
               console.error("Audio Processing Error:", audioError);

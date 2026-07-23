@@ -615,3 +615,68 @@ export async function getCompactWeather() {
         return "";
     }
 }
+
+/**
+ * Calculates Coffee Bean & Extraction Drift Prediction based on Real-time Weather
+ */
+export async function getWeatherGrindPrediction(lat = SHOP_LAT, lon = SHOP_LONG) {
+    try {
+        const weather = await getSchemaWeather(lat, lon);
+        if (!weather || !weather.current) {
+            return {
+                hasData: false,
+                summary: "ไม่พบข้อมูลสภาพอากาศเพื่อทำนายการสกัด",
+                recommendation: "สกัดกาแฟตามมาตรฐานเดิม (Dose 18-20g, Yield 36-40ml)"
+            };
+        }
+
+        const temp = weather.current.temp || 30;
+        const humidity = weather.current.humidity || 50;
+        const conditionText = weather.current.condition || "แจ่มใส";
+
+        let driftRisk = "BALANCED"; // BALANCED, HIGH_HUMIDITY, LOW_HUMIDITY
+        let riskTitle = `สภาพอากาศสมดุล ⚖️ (อุณหภูมิ ${temp}°C / ความชื้น ${humidity}%)`;
+        let riskDescription = `ความชื้น ${humidity}% อยู่ในเกณฑ์สมดุล ปัจจัยสภาพแวดล้อมไม่ทำให้ความเร็วการสกัดกาแฟเปลี่ยนแปลงอย่างมีนัยสำคัญ`;
+        let grindAction = "สกัดตามมาตรฐานปกติ (Dose 18-20g, Yield 36-40ml, Time 25-30s)";
+        let statusColor = "#2e7d32";
+
+        if (humidity >= 70) {
+            driftRisk = "HIGH_HUMIDITY";
+            riskTitle = `ความชื้นสัมพัทธ์สูง (${humidity}%) 🌧️`;
+            riskDescription = `ผงกาแฟจะดูดซับความชื้นในอากาศและพองตัว สร้างแรงต้านในด้ามชงสูงขึ้น ส่งผลให้ช็อตเสี่ยงไหลชะลอลง (Over-extraction Risk)`;
+            grindAction = "แนะนำปรับเบอร์บดให้หยาบขึ้น (Coarser) 0.5 - 1 คลิก เพื่อรักษาสปีดการไหล";
+            statusColor = "#ef6c00";
+        } else if (humidity <= 42) {
+            driftRisk = "LOW_HUMIDITY";
+            riskTitle = `ความชื้นสัมพัทธ์ต่ำ (${humidity}%) ☀️`;
+            riskDescription = `อากาศแห้ง ผงกาแฟคายความชื้นไว เสี่ยงเกิด Channeling และช็อตกาแฟจะไหลเร็วกว่าปกติ (Under-extraction Risk)`;
+            grindAction = "แนะนำปรับเบอร์บดให้รายละเอียดขึ้น (Fine) 0.5 - 1 คลิก เพื่อเพิ่มแรงต้านการไหล";
+            statusColor = "#3b82f6";
+        }
+
+        if (temp >= 35) {
+            riskDescription += `\n*หมายเหตุ: อุณหภูมิร้านค่อนข้างสูง (${temp}°C) เมล็ดกาแฟในโถบดเสี่ยงคายน้ำมันและก๊าซไวขึ้น`;
+        }
+
+        return {
+            hasData: true,
+            temp,
+            humidity,
+            conditionText,
+            driftRisk,
+            riskTitle,
+            riskDescription,
+            grindAction,
+            statusColor,
+            formattedNotice: `🌤️ Weather & Bean Drift Prediction (${temp}°C | ความชื้น ${humidity}%):\n${riskTitle}\n💡 ${grindAction}`
+        };
+    } catch (error) {
+        console.error("getWeatherGrindPrediction error:", error);
+        return {
+            hasData: false,
+            summary: "เกิดข้อผิดพลาดในการดึงสภาพอากาศ",
+            recommendation: "สกัดตามมาตรฐานปกติ"
+        };
+    }
+}
+

@@ -33,6 +33,137 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
      return true;
   }
 
+  // Parse amount safely
+  let parsedAmount = 0;
+  if (typeof result.amount === 'number') {
+    parsedAmount = result.amount;
+  } else if (typeof result.amount === 'string') {
+    parsedAmount = parseFloat(result.amount.replace(/,/g, ''));
+  }
+
+  // --- Duplicate Slip Detection (ระบบป้องกันสลิปซ้ำ) ---
+  if (result.transactionRef) {
+    const { data: existingSlip } = await supabase
+      .from('slip_transactions')
+      .select('id, amount, date, timestamp, sender_name, bank_name, transaction_ref, user_id')
+      .eq('transaction_ref', result.transactionRef)
+      .eq('is_deleted', false)
+      .maybeSingle();
+
+    if (existingSlip) {
+      console.log(`[Slip Duplicate Prevention] Found existing slip ref: ${result.transactionRef}`);
+
+      let originalOperator = existingSlip.sender_name || "พนักงานในระบบ";
+      if (existingSlip.user_id) {
+        const { data: origEmp } = await supabase
+          .from('employees')
+          .select('nickname, name')
+          .eq('line_user_id', existingSlip.user_id)
+          .maybeSingle();
+        if (origEmp) {
+          originalOperator = origEmp.nickname || origEmp.name;
+        }
+      }
+
+      const origTime = existingSlip.timestamp 
+        ? new Date(existingSlip.timestamp).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
+        : existingSlip.date;
+
+      const duplicateFlexMsg = {
+        type: 'flex',
+        altText: `⚠️ แจ้งเตือนสลิปซ้ำ: ${result.transactionRef}`,
+        contents: {
+          type: 'bubble',
+          size: 'mega',
+          styles: {
+            header: { backgroundColor: '#fee2e2' },
+            body: { backgroundColor: '#ffffff' }
+          },
+          header: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'text',
+                text: '⚠️ DUPLICATE TRANSACTION DETECTED',
+                color: '#dc2626',
+                weight: 'bold',
+                size: 'xs'
+              },
+              {
+                type: 'text',
+                text: 'ปฏิเสธการบันทึกสลิปซ้ำซ้อน',
+                color: '#991b1b',
+                weight: 'bold',
+                size: 'md',
+                margin: 'xs'
+              }
+            ]
+          },
+          body: {
+            type: 'box',
+            layout: 'vertical',
+            spacing: 'sm',
+            contents: [
+              {
+                type: 'text',
+                text: `สลิปเลขอ้างอิง "${result.transactionRef}" เคยถูกบันทึกเข้าระบบไปแล้วครับ`,
+                size: 'xs',
+                color: '#374151',
+                wrap: true
+              },
+              { type: 'separator', margin: 'md', color: '#f3f4f6' },
+              {
+                type: 'box',
+                layout: 'horizontal',
+                contents: [
+                  { type: 'text', text: 'เลขอ้างอิง (REF):', size: 'xxs', color: '#6b7280', flex: 4 },
+                  { type: 'text', text: result.transactionRef, size: 'xxs', color: '#111827', weight: 'bold', flex: 6, align: 'end' }
+                ]
+              },
+              {
+                type: 'box',
+                layout: 'horizontal',
+                contents: [
+                  { type: 'text', text: 'ยอดเงินเดิม:', size: 'xxs', color: '#6b7280', flex: 4 },
+                  { type: 'text', text: `${Number(existingSlip.amount).toLocaleString('th-TH', {minimumFractionDigits: 2})} THB`, size: 'xxs', color: '#dc2626', weight: 'bold', flex: 6, align: 'end' }
+                ]
+              },
+              {
+                type: 'box',
+                layout: 'horizontal',
+                contents: [
+                  { type: 'text', text: 'บันทึกครั้งแรกเมื่อ:', size: 'xxs', color: '#6b7280', flex: 4 },
+                  { type: 'text', text: origTime, size: 'xxs', color: '#111827', flex: 6, align: 'end' }
+                ]
+              },
+              {
+                type: 'box',
+                layout: 'horizontal',
+                contents: [
+                  { type: 'text', text: 'ผู้ลงบันทึกเดิม:', size: 'xxs', color: '#6b7280', flex: 4 },
+                  { type: 'text', text: originalOperator, size: 'xxs', color: '#111827', weight: 'bold', flex: 6, align: 'end' }
+                ]
+              },
+              { type: 'separator', margin: 'md', color: '#fee2e2' },
+              {
+                type: 'text',
+                text: `🛑 พยายามบันทึกซ้ำโดย: พี่${senderName} | ยูซุไม่อนุญาตให้ใช้สลิปเดิมซ้ำเพื่อความถูกต้องทางการเงินของร้านครับ`,
+                size: 'xxs',
+                color: '#b91c1c',
+                wrap: true,
+                margin: 'sm'
+              }
+            ]
+          }
+        }
+      };
+
+      await client.replyMessage(event.replyToken, duplicateFlexMsg);
+      return true;
+    }
+  }
+
   const fileName = `slip_${Date.now()}_${mappedDbUserId}.jpg`;
   const { error: uploadError } = await supabase.storage
     .from('yuzu-slips')
@@ -44,14 +175,6 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
     slipUrl = publicUrl;
   } else {
     console.error("Slip Upload Error:", uploadError);
-  }
-
-  // Parse amount safely
-  let parsedAmount = 0;
-  if (typeof result.amount === 'number') {
-    parsedAmount = result.amount;
-  } else if (typeof result.amount === 'string') {
-    parsedAmount = parseFloat(result.amount.replace(/,/g, ''));
   }
 
   const today = new Date();
@@ -71,7 +194,7 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
   if (insertError) {
      console.error("Slip Insert Error:", insertError);
       if (insertError.code === '23505') {
-           await client.replyMessage(event.replyToken, { type: 'text', text: `สลิปใบนี้ (อ้างอิง: ${result.transactionRef || 'ไม่ทราบ'}) ได้ถูกบันทึกเข้าระบบเรียบร้อยแล้วครับ ระบบไม่อนุญาตให้บันทึกซ้ำซ้อน` });
+           await client.replyMessage(event.replyToken, { type: 'text', text: `⚠️ สลิปใบนี้ (อ้างอิง: ${result.transactionRef || 'ไม่ทราบ'}) ได้ถูกบันทึกเข้าระบบเรียบร้อยแล้วครับ ระบบปฏิเสธการบันทึกซ้ำซ้อน` });
       } else {
            await client.replyMessage(event.replyToken, { type: 'text', text: `เกิดข้อผิดพลาดในการบันทึกข้อมูลสลิปเข้าระบบครับ (Error: ${insertError.message || insertError.code || 'Unknown DB Error'})` });
       }

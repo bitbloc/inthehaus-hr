@@ -92,7 +92,7 @@ export async function GET(request) {
 
         const combinedContent = attendanceStr + "--- ประวัติการสนทนาในกลุ่มร้านเดือนนี้ ---\n" + (formattedChats || "ไม่มีประวัติการพูดคุยในเดือนนี้\n");
 
-        // 3. Generate monthly brief using Gemini 3.5
+        // 3. Generate monthly brief using Gemini 3.6
         const briefText = await getMonthlySummary(combinedContent);
 
         let briefObj = {};

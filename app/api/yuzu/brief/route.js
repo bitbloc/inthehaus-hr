@@ -101,7 +101,7 @@ export async function GET(request) {
 
         const combinedContent = attendanceStr + chatStr;
 
-        // 3. Generate Brief using Gemini 3.5
+        // 3. Generate Brief using Gemini 3.6
         const briefText = await getDailySummary(combinedContent);
 
         return NextResponse.json({

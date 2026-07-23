@@ -236,7 +236,7 @@ function EspressoPDFReportContent() {
                         <p className="text-[9px] font-bold tracking-[0.2em] uppercase mb-2 text-neutral-400">Verification & Archives</p>
                         <p className="text-[9px] leading-relaxed text-neutral-400">
                             This document is an aggregated monthly calibration report processed by Yuzu AI for In The Haus. 
-                            Extraction data and feedback are analyzed using Gemini 3.5 Flash.
+                            Extraction data and feedback are analyzed using Gemini 3.6 Flash.
                         </p>
                     </div>
                     <div className="text-right">

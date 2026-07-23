@@ -97,7 +97,7 @@ export async function POST(request) {
             return NextResponse.json({ success: false, error: "Failed to initialize Gemini instance" }, { status: 500 });
         }
 
-        const model = instance.getGenerativeModel({ model: "gemini-3.5-flash" });
+        const model = instance.getGenerativeModel({ model: "gemini-3.6-flash" });
         const systemPrompt = `คุณคือ "ยูซุ" AI แมววิเคราะห์ศักยภาพทีมงานของร้าน In The Haus นครพนม
 วิเคราะห์ข้อมูลล็อกการทำงาน อารมณ์ และประวัติการแชทของพนักงานคนนี้
 สรุปข้อมูลโดยเน้นย้ำ:
