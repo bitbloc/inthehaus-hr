@@ -912,6 +912,14 @@ export default function YuzuKnowledgeManager() {
         } else if (activeTab === 'slips') {
             setSlipLoading(true);
             
+            // Fetch config if not loaded
+            const { data: cfgData } = await supabase.from('yuzu_config').select('*');
+            if (cfgData) {
+                const cfg = {};
+                cfgData.forEach(item => cfg[item.key] = item.value);
+                setConfig(prev => ({ ...prev, ...cfg }));
+            }
+            
             // Fetch employees if not already loaded to support mapping
             if (employees.length === 0) {
                 const { data: empData } = await supabase
@@ -1889,6 +1897,92 @@ export default function YuzuKnowledgeManager() {
             {/* TAB: CONFIG */}
             {activeTab === 'config' && (
                 <div className="space-y-6">
+                    {/* Card: Slip Submission Permissions */}
+                    <Card className="space-y-6">
+                        <div className="flex flex-col md:flex-row justify-between md:items-center gap-2 border-b border-rams-rule-light pb-3">
+                            <div>
+                                <h3 className="font-mono font-bold text-xs uppercase tracking-wider text-rams-ink flex items-center gap-2">
+                                    <Icons.Money size={18} />
+                                    Slip Submission Permissions (ตั้งค่าสิทธิ์การส่งสลิปโอนเงิน)
+                                </h3>
+                                <p className="text-xs font-mono text-rams-ink-muted mt-1">
+                                    กำหนดตำแหน่งพนักงานที่มีสิทธิ์ส่ง/บันทึกสลิปโอนเงินเข้าไลน์กลุ่ม (หากตำแหน่งอื่นส่ง ระบบจะปฏิเสธและแจ้งเตือน)
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => handleUpdateConfig('allowed_slip_positions', config.allowed_slip_positions !== undefined ? config.allowed_slip_positions : 'Bar & Floor, Owner, CEO, Manager')}
+                                className="px-4 py-2 bg-rams-ink text-rams-panel border border-rams-rule rounded-sm text-xs font-mono font-bold uppercase tracking-widest hover:bg-rams-ink/90 transition-all cursor-pointer w-fit self-start md:self-auto"
+                            >
+                                Save Permissions
+                            </button>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="text-[10px] font-mono font-bold text-rams-ink-muted uppercase tracking-wider mb-2 block">
+                                    เลือกตำแหน่งที่อนุญาต (Quick Toggle)
+                                </label>
+                                <div className="flex flex-wrap gap-2">
+                                    {['Bar & Floor', 'Cooking', 'Owner', 'Manager', 'CEO'].map(pos => {
+                                        const currentStr = config.allowed_slip_positions !== undefined ? config.allowed_slip_positions : 'Bar & Floor, Owner, CEO, Manager';
+                                        const currentAllowed = currentStr.split(',').map(s => s.trim()).filter(Boolean);
+                                        const isSelected = currentAllowed.some(p => p.toLowerCase() === pos.toLowerCase());
+
+                                        const togglePos = () => {
+                                            let newAllowed;
+                                            if (isSelected) {
+                                                newAllowed = currentAllowed.filter(p => p.toLowerCase() !== pos.toLowerCase());
+                                            } else {
+                                                newAllowed = [...currentAllowed, pos];
+                                            }
+                                            const newStr = newAllowed.join(', ');
+                                            setConfig(prev => ({ ...prev, allowed_slip_positions: newStr }));
+                                        };
+
+                                        return (
+                                            <button
+                                                key={pos}
+                                                type="button"
+                                                onClick={togglePos}
+                                                className={`px-3 py-1.5 rounded-sm font-mono text-xs border transition-all cursor-pointer flex items-center gap-1.5 ${
+                                                    isSelected 
+                                                        ? 'bg-rams-ink text-rams-panel border-rams-ink font-bold' 
+                                                        : 'bg-rams-bg text-rams-ink-muted border-rams-rule-light hover:border-rams-rule'
+                                                }`}
+                                            >
+                                                <span>{isSelected ? '✓' : '+'}</span>
+                                                <span>{pos}</span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="text-[10px] font-mono font-bold text-rams-ink-muted uppercase tracking-wider mb-1 block">
+                                    หรือพิมพ์ระบุตำแหน่งเพิ่มเติม (คั่นด้วยเครื่องหมายจุลภาค , )
+                                </label>
+                                <input
+                                    type="text"
+                                    className="w-full p-3 bg-rams-bg border border-rams-rule-light rounded-sm text-xs font-mono text-rams-ink outline-none focus:border-rams-rule transition-all"
+                                    value={config.allowed_slip_positions !== undefined ? config.allowed_slip_positions : 'Bar & Floor, Owner, CEO, Manager'}
+                                    onChange={(e) => setConfig({ ...config, allowed_slip_positions: e.target.value })}
+                                    placeholder="เช่น Bar & Floor, Owner, Manager, Cooking"
+                                />
+                                <p className="text-[11px] font-mono text-rams-ink-muted mt-1.5">
+                                    💡 ตัวอย่างข้อความตอบกลับเมื่อไม่มีสิทธิ์: &quot;คุณ [ชื่อ] ไม่มีสิทธิ์ในการบันทึกสลิปเข้าระบบครับ (จำกัดสิทธิ์เฉพาะตำแหน่ง {
+                                        (() => {
+                                            const str = config.allowed_slip_positions !== undefined ? config.allowed_slip_positions : 'Bar & Floor, Owner, CEO, Manager';
+                                            const arr = str.split(',').map(s => s.trim()).filter(Boolean);
+                                            if (arr.length <= 1) return arr[0] || 'Bar & Floor';
+                                            return `${arr.slice(0, -1).join(', ')} และ ${arr[arr.length - 1]}`;
+                                        })()
+                                    } เท่านั้น)&quot;
+                                </p>
+                            </div>
+                        </div>
+                    </Card>
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <Card className="space-y-6">
                             <h3 className="font-mono font-bold text-xs uppercase tracking-wider text-rams-ink flex items-center gap-2">
@@ -2205,6 +2299,22 @@ export default function YuzuKnowledgeManager() {
                         >
                             <Icons.File size={14} /> PDF REPORT
                         </a>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-rams-panel p-3 px-4 rounded-sm border border-rams-rule-light text-xs font-mono gap-2">
+                        <div className="flex flex-wrap items-center gap-2 text-rams-ink">
+                            <Icons.Lock size={14} className="text-rams-ink-muted" />
+                            <span className="text-rams-ink-muted">สิทธิ์ตำแหน่งที่ส่งสลิปได้:</span>
+                            <span className="font-bold text-rams-ink bg-rams-bg px-2 py-0.5 rounded-sm border border-rams-rule-light">
+                                {config.allowed_slip_positions !== undefined ? config.allowed_slip_positions : 'Bar & Floor, Owner, CEO, Manager'}
+                            </span>
+                        </div>
+                        <button 
+                            onClick={() => setActiveTab('config')}
+                            className="text-[10px] uppercase font-bold text-rams-ink hover:underline cursor-pointer flex items-center gap-1 shrink-0"
+                        >
+                            <Icons.Settings size={12} /> ตั้งค่าสิทธิ์ (System Config)
+                        </button>
                     </div>
 
                     <Card className="p-0 overflow-hidden">

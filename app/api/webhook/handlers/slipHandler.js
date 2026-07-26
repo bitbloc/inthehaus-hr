@@ -15,6 +15,26 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
      .or(`line_bot_id.eq.${userId},line_user_id.eq.${userId}`)
      .maybeSingle();
 
+  // Fetch allowed slip positions from yuzu_config
+  let allowedPositions = ['Bar & Floor', 'Owner', 'CEO', 'Manager'];
+  const { data: configData } = await supabase
+     .from('yuzu_config')
+     .select('value')
+     .eq('key', 'allowed_slip_positions')
+     .maybeSingle();
+
+  if (configData && configData.value) {
+     try {
+        if (configData.value.trim().startsWith('[')) {
+           allowedPositions = JSON.parse(configData.value);
+        } else {
+           allowedPositions = configData.value.split(',').map(s => s.trim()).filter(Boolean);
+        }
+     } catch (e) {
+        allowedPositions = configData.value.split(',').map(s => s.trim()).filter(Boolean);
+     }
+  }
+
   if (emp) {
      if (emp.line_user_id) {
        mappedDbUserId = emp.line_user_id;
@@ -22,14 +42,21 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
      if (emp.nickname || emp.name) {
        senderName = emp.nickname || emp.name;
      }
-     const position = emp.position ? emp.position.toLowerCase().replace(/\s/g, '') : '';
-     if (position.includes('bar&floor') || position.includes('owner') || position.includes('ceo') || position.includes('manager')) {
-        isAuthorized = true;
-     }
+     const empPosClean = emp.position ? emp.position.toLowerCase().replace(/\s/g, '') : '';
+     isAuthorized = allowedPositions.some(p => {
+        const pClean = p.toLowerCase().replace(/\s/g, '');
+        return empPosClean.includes(pClean) || pClean.includes(empPosClean);
+     });
   }
 
   if (!isAuthorized) {
-     await client.replyMessage(event.replyToken, { type: 'text', text: `คุณ ${senderName} ไม่มีสิทธิ์ในการบันทึกสลิปเข้าระบบครับ (จำกัดสิทธิ์เฉพาะตำแหน่ง Bar&Floor และ Owner เท่านั้น)\n[UID: ${userId}]` });
+     let formattedAllowed = 'Bar & Floor และ Owner';
+     if (allowedPositions.length === 1) {
+        formattedAllowed = allowedPositions[0];
+     } else if (allowedPositions.length > 1) {
+        formattedAllowed = `${allowedPositions.slice(0, -1).join(', ')} และ ${allowedPositions[allowedPositions.length - 1]}`;
+     }
+     await client.replyMessage(event.replyToken, { type: 'text', text: `คุณ ${senderName} ไม่มีสิทธิ์ในการบันทึกสลิปเข้าระบบครับ (จำกัดสิทธิ์เฉพาะตำแหน่ง ${formattedAllowed} เท่านั้น)\n[UID: ${userId}]` });
      return true;
   }
 
