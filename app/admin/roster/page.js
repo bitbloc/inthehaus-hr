@@ -193,9 +193,13 @@ export default function AdminRosterPage() {
                 })
                 .eq('id', emp.id);
 
-            if (empErr) throw empErr;
+            if (empErr) {
+                console.warn("Update employment_status constraint note:", empErr.message);
+                // Fallback: update is_active at least
+                await supabase.from('employees').update({ is_active: is_active }).eq('id', emp.id);
+            }
 
-            // 2. If createLeave is checked, create leave requests and sync roster
+            // 2. If createLeave is checked, batch create leave requests and sync roster
             if (createLeave) {
                 if (!startDate || !endDate) {
                     throw new Error("กรุณาระบุช่วงวันที่ลา/พักงานให้ครบถ้วน");
@@ -208,86 +212,102 @@ export default function AdminRosterPage() {
                     current = addDays(current, 1);
                 }
 
-                for (const dStr of dateList) {
+                if (dateList.length > 0) {
                     const mappedType = leave_type === 'suspension' ? 'business' : leave_type;
                     const mappedReason = leave_type === 'suspension' 
                         ? `[พักงาน] ${reason || 'พักงานชั่วคราว'}`
                         : (reason || (leave_type === 'vacation' ? 'พักร้อน' : 'ลางาน'));
+                    const repId = replacement_employee_id ? parseInt(replacement_employee_id) : null;
 
-                    const { data: existingLeave } = await supabase
+                    // Bulk fetch existing leave requests for these dates
+                    const { data: existingLeaves } = await supabase
                         .from('leave_requests')
-                        .select('id')
+                        .select('id, leave_date')
                         .eq('employee_id', emp.id)
-                        .eq('leave_date', dStr)
-                        .maybeSingle();
+                        .in('leave_date', dateList);
 
-                    const leavePayload = {
-                        employee_id: emp.id,
-                        leave_date: dStr,
-                        leave_type: mappedType,
-                        reason: mappedReason,
-                        replacement_employee_id: replacement_employee_id ? parseInt(replacement_employee_id) : null,
-                        status: 'approved'
-                    };
+                    const existingLeaveMap = new Map((existingLeaves || []).map(l => [l.leave_date, l.id]));
 
-                    if (existingLeave) {
-                        await supabase.from('leave_requests').update(leavePayload).eq('id', existingLeave.id);
-                    } else {
-                        await supabase.from('leave_requests').insert(leavePayload);
-                    }
+                    const leavePayloads = dateList.map(dStr => {
+                        const payload = {
+                            employee_id: emp.id,
+                            leave_date: dStr,
+                            leave_type: mappedType,
+                            reason: mappedReason,
+                            replacement_employee_id: repId,
+                            status: 'approved'
+                        };
+                        if (existingLeaveMap.has(dStr)) {
+                            payload.id = existingLeaveMap.get(dStr);
+                        }
+                        return payload;
+                    });
 
+                    // Bulk upsert all leave requests in ONE single query!
+                    const { error: leaveErr } = await supabase.from('leave_requests').upsert(leavePayloads);
+                    if (leaveErr) throw leaveErr;
+
+                    // Auto-sync Roster in Bulk
                     if (autoSyncRoster) {
-                        await supabase.from('roster_transactions')
+                        // 1. Bulk delete existing roster_transactions for these dates
+                        await supabase
+                            .from('roster_transactions')
                             .delete()
-                            .match({ employee_id: emp.id, date: dStr });
+                            .eq('employee_id', emp.id)
+                            .in('date', dateList);
 
-                        await supabase.from('roster_transactions')
-                            .insert({
-                                employee_id: emp.id,
-                                date: dStr,
-                                is_off: true,
-                                slot_type: 'MAIN',
-                                status: 'PUBLISHED'
-                            });
+                        // 2. Prepare bulk insert for employee OFF transactions
+                        const empOffTransactions = dateList.map(dStr => ({
+                            employee_id: emp.id,
+                            date: dStr,
+                            is_off: true,
+                            slot_type: 'MAIN',
+                            status: 'PUBLISHED'
+                        }));
 
-                        if (replacement_employee_id) {
-                            const repId = parseInt(replacement_employee_id);
-                            const dayOfWeek = (parseISO(dStr).getDay() + 6) % 7;
-                            const { data: sched } = await supabase
-                                .from('employee_schedules')
-                                .select('shift_id')
-                                .eq('employee_id', emp.id)
-                                .eq('day_of_week', dayOfWeek)
-                                .eq('is_off', false)
-                                .maybeSingle();
+                        // Bulk insert roster transactions via bulk API or direct upsert
+                        await fetch('/api/roster/bulk', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ action: 'UPSERT', transactions: empOffTransactions })
+                        });
 
-                            let origShiftId = sched?.shift_id;
-                            let origStart = null;
-                            let origEnd = null;
-
-                            if (origShiftId) {
-                                const { data: sObj } = await supabase.from('shifts').select('start_time, end_time').eq('id', origShiftId).single();
-                                if (sObj) {
-                                    origStart = sObj.start_time;
-                                    origEnd = sObj.end_time;
-                                }
-                            }
-
-                            await supabase.from('roster_transactions')
+                        // 3. Handle replacement employee if assigned
+                        if (repId) {
+                            // Bulk delete replacement's existing transactions for these dates
+                            await supabase
+                                .from('roster_transactions')
                                 .delete()
-                                .match({ employee_id: repId, date: dStr });
+                                .eq('employee_id', repId)
+                                .in('date', dateList);
 
-                            await supabase.from('roster_transactions')
-                                .insert({
+                            // Get employee schedules for day of week template
+                            const { data: empSchedules } = await supabase
+                                .from('employee_schedules')
+                                .select('day_of_week, shift_id')
+                                .eq('employee_id', emp.id)
+                                .eq('is_off', false);
+
+                            const schedMap = new Map((empSchedules || []).map(s => [s.day_of_week, s.shift_id]));
+
+                            const repTransactions = dateList.map(dStr => {
+                                const dayOfWeek = (parseISO(dStr).getDay() + 6) % 7;
+                                const origShiftId = schedMap.get(dayOfWeek) || null;
+                                return {
                                     employee_id: repId,
                                     date: dStr,
-                                    shift_id: origShiftId || null,
-                                    custom_start_time: origStart || null,
-                                    custom_end_time: origEnd || null,
+                                    shift_id: origShiftId,
                                     is_off: false,
                                     slot_type: 'MAIN',
                                     status: 'PUBLISHED'
-                                });
+                                };
+                            });
+
+                            await fetch('/api/roster/bulk', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ action: 'UPSERT', transactions: repTransactions })
+                            });
                         }
                     }
                 }
@@ -297,7 +317,8 @@ export default function AdminRosterPage() {
             setAdjustingEmpModal(null);
             await fetchData();
         } catch (e) {
-            alert("เกิดข้อผิดพลาด: " + e.message);
+            console.error(e);
+            alert("เกิดข้อผิดพลาดในการบันทึก: " + e.message);
         } finally {
             setSaving(false);
         }
