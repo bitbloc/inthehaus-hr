@@ -35,7 +35,44 @@ function getShiftColorHex(shiftName, isOff, isCustomOrExtra) {
   return '#ca8a04'; // Yellow
 }
 
-function getCellColorsAndLabels(empShift, isOff) {
+function getCellColorsAndLabels(empShift, isOff, leaveRequest) {
+  if (leaveRequest) {
+    let label = 'ลา';
+    let time1 = 'ลาหยุด';
+    let bg = '#FFF7ED';
+    let text = '#EA580C';
+    let border = '#FFEDD5';
+
+    if (leaveRequest.leave_type === 'vacation') {
+      label = '🏖️พัก';
+      time1 = 'พักร้อน';
+      bg = '#E0F2FE';
+      text = '#0369A1';
+      border = '#BAE6FD';
+    } else if (leaveRequest.leave_type === 'sick') {
+      label = '😷ป่วย';
+      time1 = 'ลาป่วย';
+      bg = '#FEF3C7';
+      text = '#B45309';
+      border = '#FDE68A';
+    } else if (leaveRequest.leave_type === 'business') {
+      label = '💼กิจ';
+      time1 = 'ลากิจ';
+      bg = '#FFF7ED';
+      text = '#EA580C';
+      border = '#FFEDD5';
+    }
+
+    return {
+      bg,
+      borderColor: border,
+      textColor: text,
+      label,
+      timeLine1: time1,
+      timeLine2: ''
+    };
+  }
+
   if (isOff || !empShift || empShift.name === 'OFF') {
     return {
       bg: '#F4F4F5',
@@ -112,7 +149,7 @@ function getCellColorsAndLabels(empShift, isOff) {
       timeLine2: end
     };
   }
-  if (name.includes('กลาง') || (start === '12:00' && end === '20:00')) {
+  if (name.includes('กลาง') || (start === '12:00' && end === '20:00') || (start === '12:00' && end === '21:00') || (start === '11:00' && end === '20:00')) {
     return {
       bg: '#F1F5F9',
       borderColor: '#E2E8F0',
@@ -123,12 +160,16 @@ function getCellColorsAndLabels(empShift, isOff) {
     };
   }
 
-  // Fallback for custom shifts
+  // Smart fallback for custom presets and custom times (e.g. 12-21 instead of Custom S)
+  const customLabel = (start && end)
+    ? `${start.slice(0, 2)}-${end.slice(0, 2)}`
+    : (name.toLowerCase().startsWith('custom') ? 'กะ' : name.slice(0, 6));
+
   return {
     bg: '#E0F2FE',
     borderColor: '#BAE6FD',
     textColor: '#0369A1',
-    label: name.slice(0, 8),
+    label: customLabel,
     timeLine1: start,
     timeLine2: end
   };
@@ -289,7 +330,7 @@ export async function generateStCalendarFlex(start) {
   // 1. Fetch active employees
   const { data: employees, error: empErr } = await supabase
       .from('employees')
-      .select('id, name, nickname, position')
+      .select('id, name, nickname, position, employment_status, is_active')
       .eq('is_active', true)
       .order('name', { ascending: true });
 
@@ -329,35 +370,50 @@ export async function generateStCalendarFlex(start) {
       });
   }
 
-  const { data: transactions, error: txErr } = await supabase
-      .from('roster_transactions')
-      .select(`
-          employee_id,
-          date,
-          is_off,
-          slot_type,
-          custom_start_time,
-          custom_end_time,
-          shifts(id, name, start_time, end_time)
-      `)
-      .in('date', dateStrings)
-      .eq('status', 'PUBLISHED');
+  const [txRes, leaveRes] = await Promise.all([
+      supabase
+          .from('roster_transactions')
+          .select(`
+              employee_id,
+              date,
+              is_off,
+              slot_type,
+              custom_start_time,
+              custom_end_time,
+              shifts(id, name, start_time, end_time)
+          `)
+          .in('date', dateStrings)
+          .eq('status', 'PUBLISHED'),
+      supabase
+          .from('leave_requests')
+          .select('id, employee_id, leave_date, leave_type, reason, status')
+          .in('leave_date', dateStrings)
+          .eq('status', 'approved')
+  ]);
 
-  if (txErr) {
-      console.error("Error fetching roster transactions batch:", txErr);
-      return null;
-  }
+  const transactions = txRes.data;
+  const weekLeaves = leaveRes.data;
 
-  // Map transactions by employee_id and date
+  // Map transactions and leave requests by employee_id and date
   const txMap = {}; // employee_id -> dateStr -> tx
+  const leaveMap = {}; // employee_id -> dateStr -> leaveObj
   employees.forEach(emp => {
       txMap[emp.id] = {};
+      leaveMap[emp.id] = {};
   });
 
   if (transactions) {
       transactions.forEach(tx => {
           if (txMap[tx.employee_id]) {
               txMap[tx.employee_id][tx.date] = tx;
+          }
+      });
+  }
+
+  if (weekLeaves) {
+      weekLeaves.forEach(l => {
+          if (leaveMap[l.employee_id]) {
+              leaveMap[l.employee_id][l.leave_date] = l;
           }
       });
   }
@@ -397,8 +453,23 @@ export async function generateStCalendarFlex(start) {
       });
   });
 
-  // Helper function to build a Flex Bubble for a group of employees
-  const buildBubbleForEmployees = (empGroup) => {
+  // Separate employees into working vs off/on-leave all week
+  const workingEmployees = [];
+  const offOrLeaveEmployees = [];
+
+  employees.forEach(emp => {
+      const workingDaysCount = dateStrings.filter(d => !rosterMap[emp.id][d]?.is_off).length;
+      const isSuspended = emp.employment_status === 'Suspended';
+
+      if (workingDaysCount > 0 && !isSuspended) {
+          workingEmployees.push(emp);
+      } else {
+          offOrLeaveEmployees.push(emp);
+      }
+  });
+
+  // Helper function to build a Flex Bubble for working employees
+  const buildBubbleForEmployees = (empGroup, offGroup = []) => {
       const headerContents = [
           {
               type: 'text',
@@ -474,7 +545,8 @@ export async function generateStCalendarFlex(start) {
           dateStrings.forEach(dateStr => {
               const empShift = rosterMap[emp.id][dateStr];
               const isOff = !empShift || empShift.is_off;
-              const cell = getCellColorsAndLabels(empShift?.shift, isOff);
+              const leaveReq = leaveMap[emp.id]?.[dateStr];
+              const cell = getCellColorsAndLabels(empShift?.shift, isOff, leaveReq);
 
               empRowContents.push({
                   type: 'box',
@@ -523,6 +595,114 @@ export async function generateStCalendarFlex(start) {
           rows.pop();
       }
 
+      // Compact summary bar for employees on leave / vacation / suspended / off all week
+      let offGroupContents = null;
+      if (offGroup && offGroup.length > 0) {
+          const summaryItems = [
+              { type: 'separator', color: '#e2e8f0', margin: 'md' },
+              {
+                  type: 'text',
+                  text: '🏖️ พนักงานพักงาน / ลาหยุด / พักร้อน สัปดาห์นี้',
+                  weight: 'bold',
+                  size: '10px',
+                  color: '#475569',
+                  margin: 'sm'
+              }
+          ];
+
+          offGroup.forEach(emp => {
+              const empLeaves = (weekLeaves || []).filter(l => l.employee_id === emp.id);
+              let statusText = 'หยุดตลอดสัปดาห์ (OFF)';
+              let statusColor = '#64748B'; // slate
+              let icon = '⚪';
+
+              if (emp.employment_status === 'Suspended') {
+                  statusText = '🛑 พักงาน (Suspended)';
+                  statusColor = '#DC2626'; // red
+                  icon = '🛑';
+              } else if (emp.employment_status === 'Vacation') {
+                  statusText = '🏖️ พักร้อน (Vacation)';
+                  statusColor = '#0284C7'; // sky
+                  icon = '🏖️';
+              } else if (empLeaves.length > 0) {
+                  const types = Array.from(new Set(empLeaves.map(l => {
+                      if (l.leave_type === 'vacation') return 'พักร้อน';
+                      if (l.leave_type === 'sick') return 'ลาป่วย';
+                      if (l.leave_type === 'business') return 'ลากิจ';
+                      return 'ลาหยุด';
+                  }))).join(', ');
+                  
+                  const datesSorted = empLeaves.map(l => l.leave_date).sort();
+                  const firstDate = format(parseISO(datesSorted[0]), 'dd/MM');
+                  const lastDate = format(parseISO(datesSorted[datesSorted.length - 1]), 'dd/MM');
+                  const dateRangeStr = datesSorted.length > 1 ? `${firstDate} - ${lastDate}` : firstDate;
+                  
+                  statusText = `ลา (${types}) ${dateRangeStr}`;
+                  statusColor = '#D97706'; // amber
+                  icon = '📝';
+              }
+
+              summaryItems.push({
+                  type: 'box',
+                  layout: 'horizontal',
+                  backgroundColor: '#F8FAFC',
+                  cornerRadius: 'sm',
+                  paddingTop: '4px',
+                  paddingBottom: '4px',
+                  paddingStart: '8px',
+                  paddingEnd: '8px',
+                  margin: 'xs',
+                  alignItems: 'center',
+                  contents: [
+                      {
+                          type: 'text',
+                          text: `${icon} ${emp.nickname || emp.name} (${(emp.position || 'ทั่วไป').toUpperCase()})`,
+                          size: '10px',
+                          weight: 'bold',
+                          color: '#1E293B',
+                          flex: 4
+                      },
+                      {
+                          type: 'text',
+                          text: statusText,
+                          size: '9px',
+                          weight: 'bold',
+                          color: statusColor,
+                          align: 'end',
+                          flex: 5
+                      }
+                  ]
+              });
+          });
+
+          offGroupContents = {
+              type: 'box',
+              layout: 'vertical',
+              contents: summaryItems,
+              spacing: 'xs'
+          };
+      }
+
+      const bodyContents = [
+          {
+              type: 'text',
+              text: isNextWeek ? '📅 ตารางงานสัปดาห์หน้า' : '📅 ตารางงานสัปดาห์นี้',
+              weight: 'bold',
+              size: 'md',
+              color: '#1A202C'
+          },
+          {
+              type: 'box',
+              layout: 'vertical',
+              contents: rows,
+              spacing: 'xs'
+          }
+      ];
+
+      if (offGroupContents) {
+          bodyContents.push(offGroupContents);
+      }
+
       return {
           type: 'bubble',
           size: 'mega',
@@ -531,34 +711,23 @@ export async function generateStCalendarFlex(start) {
               layout: 'vertical',
               paddingAll: '12px',
               spacing: 'md',
-              contents: [
-                  {
-                      type: 'text',
-                      text: isNextWeek ? '📅 ตารางงานสัปดาห์หน้า' : '📅 ตารางงานสัปดาห์นี้',
-                      weight: 'bold',
-                      size: 'md',
-                      color: '#1A202C'
-                  },
-                  {
-                      type: 'box',
-                      layout: 'vertical',
-                      contents: rows,
-                      spacing: 'xs'
-                  }
-              ]
+              contents: bodyContents
           }
       };
   };
 
-  // 4. Split employees into chunks if more than 8 to stay safe from the 150-element limit
+  // 4. Split working employees into chunks if more than 8 to stay safe from the 150-element limit
   const chunkSize = 5;
   const bubbles = [];
-  if (employees.length <= 8) {
-      bubbles.push(buildBubbleForEmployees(employees));
+  const targetList = workingEmployees.length > 0 ? workingEmployees : employees;
+
+  if (targetList.length <= 8) {
+      bubbles.push(buildBubbleForEmployees(targetList, offOrLeaveEmployees));
   } else {
-      for (let i = 0; i < employees.length; i += chunkSize) {
-          const chunk = employees.slice(i, i + chunkSize);
-          bubbles.push(buildBubbleForEmployees(chunk));
+      for (let i = 0; i < targetList.length; i += chunkSize) {
+          const chunk = targetList.slice(i, i + chunkSize);
+          const isLastChunk = i + chunkSize >= targetList.length;
+          bubbles.push(buildBubbleForEmployees(chunk, isLastChunk ? offOrLeaveEmployees : []));
       }
   }
 
