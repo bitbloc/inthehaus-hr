@@ -1,4 +1,4 @@
-import { differenceInMinutes, parseISO, addDays, isAfter, isBefore } from "date-fns";
+import { differenceInMinutes, addDays, isAfter } from "date-fns";
 
 /**
  * Combine a date and a time string into a full Date object.
@@ -143,7 +143,6 @@ export const calculatePayroll = (employees, logs, transactions, shifts, payrollC
                     let dailyOT = 0;
 
                     if (checkIn && checkOut) {
-                        isAbsent = false;
                         if (isAfter(checkIn, scheduledStart)) {
                             lateMins = differenceInMinutes(checkIn, scheduledStart);
                             if (lateMins > 15) lateCount++; // Grace period of 15 minutes

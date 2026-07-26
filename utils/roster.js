@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabaseClient.js';
-import { format, parseISO, startOfDay, addDays, isAfter, isBefore } from 'date-fns';
+import { format, parseISO, startOfDay, addDays } from 'date-fns';
 
 /**
  * Combine a date and a time string into a full Date object.

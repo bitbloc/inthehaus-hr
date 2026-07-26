@@ -15,6 +15,20 @@ export default function StockAuditPage() {
 
   const LIFF_ID = process.env.NEXT_PUBLIC_LIFF_ID;
 
+  const fetchItems = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/stock/items');
+      const json = await res.json();
+      if (json.success) {
+        setItems(json.items);
+      }
+    } catch {
+      setErrorMsg("Failed to load inventory items.");
+    }
+    setLoading(false);
+  };
+
   useEffect(() => {
     const initLiff = async () => {
       try {
@@ -36,22 +50,6 @@ export default function StockAuditPage() {
     };
     initLiff();
   }, [LIFF_ID]);
-
-  const fetchItems = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch('/api/stock/items');
-      const json = await res.json();
-      if (json.success) {
-        setItems(json.data);
-      } else {
-        setErrorMsg(json.error || "Failed to fetch stock load.");
-      }
-    } catch (err) {
-      setErrorMsg("Network error fetching items.");
-    }
-    setLoading(false);
-  };
 
   const handleInputChange = (id, value) => {
     setCounts(prev => ({ ...prev, [id]: value }));

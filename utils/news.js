@@ -97,7 +97,7 @@ export async function getAccurateNews(categories = ['latest', 'thailand', 'nakho
                 const minute = parseInt(match[5]);
                 return new Date(year, monthIdx, day, hour, minute);
             }
-        } catch (e) {}
+        } catch {}
         return null;
     }
 
@@ -111,7 +111,7 @@ export async function getAccurateNews(categories = ['latest', 'thailand', 'nakho
             if (dcDateMatch) {
                 return new Date(dcDateMatch[1].trim());
             }
-        } catch (e) {}
+        } catch {}
         return null;
     }
     

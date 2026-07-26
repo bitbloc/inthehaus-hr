@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Lifestyle, Habit, HabitLog, DailyMetric, ProtocolActivity } from '../types/banff';
+import { Lifestyle, Habit, HabitLog, DailyMetric, ProtocolActivity, VaultTransaction } from '../types/banff';
 import { getTodayDateString } from '../utils/date';
 
 interface BanffState {
@@ -46,9 +46,9 @@ interface BanffState {
     checkTimer: () => void; // Helper to check completion
 
     // Vault State
-    vaultTransactions: any[]; // VaultTransaction[]
+    vaultTransactions: VaultTransaction[]; // VaultTransaction[]
     vaultBalance: number;
-    setVaultTransactions: (txs: any[]) => void;
+    setVaultTransactions: (txs: VaultTransaction[]) => void;
     redeemVault: (amount: number, description: string) => Promise<void>;
 
     toggleHabitOptimistic: (habitId: string) => void;
@@ -121,7 +121,7 @@ export const useBanffStore = create<BanffState>((set, get) => ({
                 type: 'REDEEM',
                 description,
                 created_at: new Date().toISOString()
-            } as any, ...state.vaultTransactions],
+            } as VaultTransaction, ...state.vaultTransactions],
             vaultBalance: state.vaultBalance - amount
         }));
 

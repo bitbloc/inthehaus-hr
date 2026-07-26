@@ -2,7 +2,7 @@
  * Price Scraper Utility for Talaad Thai and Makro Pro
  */
 
-import { getGenAI } from './gemini-client.js';
+
 
 const INGREDIENTS = [
     { name: 'หมู', search: 'เนื้อหมูสะโพก' },
@@ -32,7 +32,6 @@ async function scrapeTalaadThai(keyword) {
 
         // Extract using basic regex for speed, or Gemini for accuracy if regex fails
         // Pattern: <div class="productName">...</div> ... <div class="minPrice">...</div>
-        const nameMatch = html.match(/class="productName">([^<]+)</);
         const minPriceMatch = html.match(/class="minPrice">([^<]+)</);
         const maxPriceMatch = html.match(/class="maxPrice">([^<]+)</);
         const unitMatch = html.match(/class="unit">([^<]+)</);
@@ -146,7 +145,7 @@ export async function getPriceComparison() {
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     
-    const { data: previous, error: err2 } = await supabase
+    const { data: previous } = await supabase
         .from('ingredient_prices')
         .select('*')
         .lt('recorded_at', sevenDaysAgo.toISOString())

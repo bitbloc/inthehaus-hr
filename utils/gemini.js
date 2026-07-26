@@ -1,11 +1,6 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import { saveMessage, getChatHistory } from './memory.js';
 import { searchKnowledge } from './rag.js';
-import { getGenAI, genAI } from './gemini-client.js';
+import { getGenAI } from './gemini-client.js';
 
-/**
- * Get Gemini response with short-term memory (history)
- */
 export async function getGeminiResponse(query, context = "", history = [], userId = "") {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {

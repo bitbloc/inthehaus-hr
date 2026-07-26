@@ -1,4 +1,4 @@
-import { format, startOfDay } from 'date-fns';
+import { format } from 'date-fns';
 
 // Returns consistent YYYY-MM-DD for the current user's local time
 export const getTodayDateString = (): string => {

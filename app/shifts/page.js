@@ -20,10 +20,6 @@ export default function ShiftsPage() {
 
     const [activeTab, setActiveTab] = useState('my-shifts');
 
-    useEffect(() => {
-        fetchData();
-    }, []);
-
     const fetchData = async () => {
         setLoading(true);
         // 1. Fetch Master Data
@@ -77,6 +73,10 @@ export default function ShiftsPage() {
 
         setLoading(false);
     };
+
+    useEffect(() => {
+        fetchData();
+    }, []);
 
     const handleUserSwitch = (e) => {
         const user = employees.find(emp => String(emp.id) === String(e.target.value));
