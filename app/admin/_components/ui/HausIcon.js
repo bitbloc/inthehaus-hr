@@ -23,7 +23,9 @@ import {
     AlertCircle,
     CheckCircle2,
     Trash,
-    Sparkles
+    Sparkles,
+    Lock,
+    Coffee
 } from "lucide-react";
 
 // Re-export specific icons to keep the main code clean and consistent
@@ -52,5 +54,7 @@ export const Icons = {
     Alert: AlertCircle,
     Success: CheckCircle2,
     Trash,
-    Yuzu: Sparkles
+    Yuzu: Sparkles,
+    Lock,
+    Coffee
 };
