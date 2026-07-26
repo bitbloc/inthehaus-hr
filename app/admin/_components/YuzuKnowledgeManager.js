@@ -53,6 +53,25 @@ export default function YuzuKnowledgeManager() {
         return months;
     }, []);
 
+    // Dynamic position list combining base, DB employee positions, and current config
+    const availablePositions = React.useMemo(() => {
+        const base = ['Bar & Floor', 'Cooking', 'Owner', 'Manager', 'CEO', 'Part-time'];
+        const empPositions = employees.map(e => e.position?.trim()).filter(Boolean);
+        const currentConfigPositions = (config.allowed_slip_positions || '')
+            .split(',')
+            .map(s => s.trim())
+            .filter(Boolean);
+        
+        const map = new Map();
+        [...base, ...empPositions, ...currentConfigPositions].forEach(pos => {
+            const key = pos.toLowerCase();
+            if (!map.has(key)) {
+                map.set(key, pos);
+            }
+        });
+        return Array.from(map.values());
+    }, [employees, config.allowed_slip_positions]);
+
     const [chatMessages, setChatMessages] = useState([
         { role: 'model', content: 'สวัสดีค่ะเจ้านาย! ยูซุ แมวส้มแสนรู้ประจำร้าน In The Haus พร้อมให้บริการแล้วค่ะ มีอะไรเกี่ยวกับข้อมูลร้าน กะงาน หรืออารมณ์ของพนักงานที่อยากคุยกับยูซุ แหลงมาได้เลยนะคะเมี๊ยว~ 🐱🍊' }
     ]);
@@ -898,6 +917,13 @@ export default function YuzuKnowledgeManager() {
                 const cfg = {};
                 data.forEach(item => cfg[item.key] = item.value);
                 setConfig(prev => ({ ...prev, ...cfg }));
+            }
+            if (employees.length === 0) {
+                const { data: empData } = await supabase
+                    .from('employees')
+                    .select('id, name, nickname, position, line_bot_id, line_user_id, is_active')
+                    .eq('is_active', true);
+                if (empData) setEmployees(empData);
             }
             setLoading(false);
         } else if (activeTab === 'employees') {
@@ -1923,7 +1949,7 @@ export default function YuzuKnowledgeManager() {
                                     เลือกตำแหน่งที่อนุญาต (Quick Toggle)
                                 </label>
                                 <div className="flex flex-wrap gap-2">
-                                    {['Bar & Floor', 'Cooking', 'Owner', 'Manager', 'CEO'].map(pos => {
+                                    {availablePositions.map(pos => {
                                         const currentStr = config.allowed_slip_positions !== undefined ? config.allowed_slip_positions : 'Bar & Floor, Owner, CEO, Manager';
                                         const currentAllowed = currentStr.split(',').map(s => s.trim()).filter(Boolean);
                                         const isSelected = currentAllowed.some(p => p.toLowerCase() === pos.toLowerCase());
