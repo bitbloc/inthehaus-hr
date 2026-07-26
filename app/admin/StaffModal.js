@@ -126,7 +126,7 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
 
                         {activeTab === 'employment' && (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <FormSelect label="Employment Status" name="employment_status" value={formData.employment_status} onChange={handleChange} options={['Probation', 'Fulltime', 'Contract', 'Resigned']} />
+                                <FormSelect label="Employment Status" name="employment_status" value={formData.employment_status} onChange={handleChange} options={['Probation', 'Fulltime', 'Contract', 'Suspended', 'Vacation', 'Resigned']} />
                                 <FormInput label="Job Title / Position" name="position" value={formData.position} onChange={handleChange} required />
                                 <FormInput label="Job Level" name="job_level" value={formData.job_level} onChange={handleChange} placeholder="Junior, Senior, Manager..." />
                                 <FormInput label="Start Date" name="start_date" type="date" value={formData.start_date} onChange={handleChange} />

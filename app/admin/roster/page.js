@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Badge } from '../_components/ui/Badge';
 import { supabase } from '../../../lib/supabaseClient';
 import { startOfWeek, endOfWeek, addDays, format, subWeeks, addWeeks, parseISO } from 'date-fns';
-import { ChevronLeft, ChevronRight, Copy, CheckCircle, Save, Plus, Trash2, Printer } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Copy, CheckCircle, Save, Plus, Trash2, Printer, Search, Settings, Filter, UserCheck, UserX, AlertCircle, Sun } from 'lucide-react';
 
 export default function AdminRosterPage() {
     const [currentDate, setCurrentDate] = useState(new Date());
@@ -23,11 +23,16 @@ export default function AdminRosterPage() {
         endDate: ''
     });
     
-    // Modal State
+    // Modal & Filter State
     const [editingCell, setEditingCell] = useState(null); // { employee, date, slots: [] }
     const [saving, setSaving] = useState(false);
     const [customPresets, setCustomPresets] = useState([]);
     const [presetModal, setPresetModal] = useState(null); // { start, end } or null
+
+    // Employee Status & Vacation Filter State
+    const [statusFilter, setStatusFilter] = useState('ALL'); // 'ALL' | 'ACTIVE' | 'SUSPENDED' | 'VACATION'
+    const [searchQuery, setSearchQuery] = useState('');
+    const [adjustingEmpModal, setAdjustingEmpModal] = useState(null);
 
     const PRESET_COLORS = [
         { id: 'sky', label: 'ฟ้า', bg: 'bg-sky-50', text: 'text-sky-800', border: 'border-sky-200', dot: 'bg-sky-500' },
@@ -125,6 +130,178 @@ export default function AdminRosterPage() {
         if (leaveRes.data) setLeaveRequests(leaveRes.data);
         setLoading(false);
     }
+
+    // Helper checks for Employee Statuses
+    const isSuspended = (emp) => emp.employment_status === 'Suspended' || emp.is_active === false;
+
+    const hasVacation = (emp) => {
+        if (emp.employment_status === 'Vacation') return true;
+        return leaveRequests.some(l => l.employee_id === emp.id && l.leave_type === 'vacation' && l.status !== 'rejected');
+    };
+
+    const hasOtherLeave = (emp) => {
+        return leaveRequests.some(l => l.employee_id === emp.id && (l.leave_type === 'sick' || l.leave_type === 'business') && l.status !== 'rejected');
+    };
+
+    // Filter calculations
+    const suspendedCount = employees.filter(isSuspended).length;
+    const vacationCount = employees.filter(hasVacation).length;
+    const activeCount = employees.filter(e => !isSuspended(e) && !hasVacation(e)).length;
+
+    const filteredEmployees = employees.filter(emp => {
+        if (searchQuery.trim()) {
+            const q = searchQuery.toLowerCase().trim();
+            const matchName = (emp.name || '').toLowerCase().includes(q);
+            const matchNick = (emp.nickname || '').toLowerCase().includes(q);
+            const matchPos = (emp.position || '').toLowerCase().includes(q);
+            if (!matchName && !matchNick && !matchPos) return false;
+        }
+        if (statusFilter === 'ACTIVE') return !isSuspended(emp) && !hasVacation(emp);
+        if (statusFilter === 'SUSPENDED') return isSuspended(emp);
+        if (statusFilter === 'VACATION') return hasVacation(emp);
+        return true;
+    });
+
+    // Employee Status Adjuster Modal handlers
+    const openAdjustingEmpModal = (emp) => {
+        setAdjustingEmpModal({
+            emp: emp,
+            employment_status: emp.employment_status || 'Fulltime',
+            is_active: emp.is_active !== false,
+            createLeave: false,
+            leave_type: emp.employment_status === 'Suspended' ? 'suspension' : 'vacation',
+            startDate: format(weekStart, 'yyyy-MM-dd'),
+            endDate: format(weekEnd, 'yyyy-MM-dd'),
+            replacement_employee_id: '',
+            reason: '',
+            autoSyncRoster: true
+        });
+    };
+
+    const handleSaveAdjustingEmp = async () => {
+        if (!adjustingEmpModal) return;
+        setSaving(true);
+        const { emp, employment_status, is_active, createLeave, leave_type, startDate, endDate, replacement_employee_id, reason, autoSyncRoster } = adjustingEmpModal;
+
+        try {
+            // 1. Update employee status in DB
+            const { error: empErr } = await supabase
+                .from('employees')
+                .update({
+                    employment_status: employment_status,
+                    is_active: is_active
+                })
+                .eq('id', emp.id);
+
+            if (empErr) throw empErr;
+
+            // 2. If createLeave is checked, create leave requests and sync roster
+            if (createLeave) {
+                if (!startDate || !endDate) {
+                    throw new Error("กรุณาระบุช่วงวันที่ลา/พักงานให้ครบถ้วน");
+                }
+                const dateList = [];
+                let current = parseISO(startDate);
+                const last = parseISO(endDate);
+                while (current <= last) {
+                    dateList.push(format(current, 'yyyy-MM-dd'));
+                    current = addDays(current, 1);
+                }
+
+                for (const dStr of dateList) {
+                    const mappedType = leave_type === 'suspension' ? 'business' : leave_type;
+                    const mappedReason = leave_type === 'suspension' 
+                        ? `[พักงาน] ${reason || 'พักงานชั่วคราว'}`
+                        : (reason || (leave_type === 'vacation' ? 'พักร้อน' : 'ลางาน'));
+
+                    const { data: existingLeave } = await supabase
+                        .from('leave_requests')
+                        .select('id')
+                        .eq('employee_id', emp.id)
+                        .eq('leave_date', dStr)
+                        .maybeSingle();
+
+                    const leavePayload = {
+                        employee_id: emp.id,
+                        leave_date: dStr,
+                        leave_type: mappedType,
+                        reason: mappedReason,
+                        replacement_employee_id: replacement_employee_id ? parseInt(replacement_employee_id) : null,
+                        status: 'approved'
+                    };
+
+                    if (existingLeave) {
+                        await supabase.from('leave_requests').update(leavePayload).eq('id', existingLeave.id);
+                    } else {
+                        await supabase.from('leave_requests').insert(leavePayload);
+                    }
+
+                    if (autoSyncRoster) {
+                        await supabase.from('roster_transactions')
+                            .delete()
+                            .match({ employee_id: emp.id, date: dStr });
+
+                        await supabase.from('roster_transactions')
+                            .insert({
+                                employee_id: emp.id,
+                                date: dStr,
+                                is_off: true,
+                                slot_type: 'MAIN',
+                                status: 'PUBLISHED'
+                            });
+
+                        if (replacement_employee_id) {
+                            const repId = parseInt(replacement_employee_id);
+                            const dayOfWeek = (parseISO(dStr).getDay() + 6) % 7;
+                            const { data: sched } = await supabase
+                                .from('employee_schedules')
+                                .select('shift_id')
+                                .eq('employee_id', emp.id)
+                                .eq('day_of_week', dayOfWeek)
+                                .eq('is_off', false)
+                                .maybeSingle();
+
+                            let origShiftId = sched?.shift_id;
+                            let origStart = null;
+                            let origEnd = null;
+
+                            if (origShiftId) {
+                                const { data: sObj } = await supabase.from('shifts').select('start_time, end_time').eq('id', origShiftId).single();
+                                if (sObj) {
+                                    origStart = sObj.start_time;
+                                    origEnd = sObj.end_time;
+                                }
+                            }
+
+                            await supabase.from('roster_transactions')
+                                .delete()
+                                .match({ employee_id: repId, date: dStr });
+
+                            await supabase.from('roster_transactions')
+                                .insert({
+                                    employee_id: repId,
+                                    date: dStr,
+                                    shift_id: origShiftId || null,
+                                    custom_start_time: origStart || null,
+                                    custom_end_time: origEnd || null,
+                                    is_off: false,
+                                    slot_type: 'MAIN',
+                                    status: 'PUBLISHED'
+                                });
+                        }
+                    }
+                }
+            }
+
+            alert(`อัปเดตข้อมูลและสถานะของ ${emp.nickname || emp.name} เรียบร้อยแล้ว!`);
+            setAdjustingEmpModal(null);
+            await fetchData();
+        } catch (e) {
+            alert("เกิดข้อผิดพลาด: " + e.message);
+        } finally {
+            setSaving(false);
+        }
+    };
 
     const prevWeek = () => setCurrentDate(subWeeks(currentDate, 1));
     const nextWeek = () => setCurrentDate(addWeeks(currentDate, 1));
@@ -701,6 +878,54 @@ export default function AdminRosterPage() {
             </div>
 
             <div className="bg-rams-panel border border-rams-rule rounded-sm overflow-hidden shadow-none">
+                {/* Status Filter Bar & Search */}
+                <div className="p-4 border-b border-rams-rule-light bg-rams-bg/20 flex flex-col md:flex-row justify-between items-stretch md:items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-[10px] font-mono font-bold text-rams-ink-muted uppercase tracking-wider flex items-center gap-1">
+                            <Filter size={12} /> กรองพนักงาน:
+                        </span>
+                        <button
+                            type="button"
+                            onClick={() => setStatusFilter('ALL')}
+                            className={`px-3 py-1.5 rounded-sm text-xs font-mono font-bold transition-all cursor-pointer ${statusFilter === 'ALL' ? 'bg-rams-ink text-rams-panel' : 'bg-rams-bg border border-rams-rule-light text-rams-ink hover:border-rams-rule'}`}
+                        >
+                            ทั้งหมด ({employees.length})
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setStatusFilter('ACTIVE')}
+                            className={`px-3 py-1.5 rounded-sm text-xs font-mono font-bold transition-all flex items-center gap-1 cursor-pointer ${statusFilter === 'ACTIVE' ? 'bg-rams-green text-rams-panel' : 'bg-rams-bg border border-rams-rule-light text-rams-ink hover:border-rams-rule'}`}
+                        >
+                            <UserCheck size={12} /> ทำงานปกติ ({activeCount})
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setStatusFilter('SUSPENDED')}
+                            className={`px-3 py-1.5 rounded-sm text-xs font-mono font-bold transition-all flex items-center gap-1 cursor-pointer ${statusFilter === 'SUSPENDED' ? 'bg-rams-red text-rams-panel' : 'bg-rams-bg border border-rams-rule-light text-rams-ink hover:border-rams-rule'}`}
+                        >
+                            <UserX size={12} /> 🛑 พักงาน ({suspendedCount})
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setStatusFilter('VACATION')}
+                            className={`px-3 py-1.5 rounded-sm text-xs font-mono font-bold transition-all flex items-center gap-1 cursor-pointer ${statusFilter === 'VACATION' ? 'bg-sky-600 text-white' : 'bg-rams-bg border border-rams-rule-light text-rams-ink hover:border-rams-rule'}`}
+                        >
+                            <Sun size={12} /> 🏖️ พักร้อน ({vacationCount})
+                        </button>
+                    </div>
+
+                    <div className="relative min-w-[200px]">
+                        <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-rams-ink-muted" />
+                        <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={e => setSearchQuery(e.target.value)}
+                            placeholder="ค้นชื่อ, ตำแหน่ง..."
+                            className="w-full pl-8 pr-3 py-1.5 text-xs font-mono bg-rams-bg border border-rams-rule-light rounded-sm text-rams-ink outline-none focus:border-rams-rule"
+                        />
+                    </div>
+                </div>
+
                 <div className="flex items-center justify-between p-4 border-b border-rams-rule-light bg-rams-bg/30">
                     <button onClick={prevWeek} className="w-8 h-8 bg-rams-panel border border-rams-rule-light hover:border-rams-rule text-rams-ink flex items-center justify-center rounded-sm transition-all cursor-pointer"><ChevronLeft size={16} /></button>
                     <h2 className="text-sm font-mono font-bold text-rams-ink uppercase tracking-wider">
@@ -712,11 +937,13 @@ export default function AdminRosterPage() {
                 <div className="overflow-x-auto">
                     {loading ? (
                         <div className="p-12 text-center font-mono text-xs text-rams-ink-muted uppercase tracking-wider">Loading roster...</div>
+                    ) : filteredEmployees.length === 0 ? (
+                        <div className="p-12 text-center font-mono text-xs text-rams-ink-muted uppercase tracking-wider">ไม่พบพนักงานในเงื่อนไขที่เลือก</div>
                     ) : (
                         <table className="w-full text-xs text-left">
                             <thead className="bg-rams-bg/50 text-rams-ink-muted border-b border-rams-rule-light font-mono text-[9px] uppercase tracking-widest">
                                 <tr>
-                                    <th className="px-4 py-3 min-w-[150px]">พนักงาน</th>
+                                    <th className="px-4 py-3 min-w-[170px]">พนักงาน</th>
                                     {dates.map((date, i) => (
                                         <th key={i} className="px-4 py-3 text-center min-w-[140px] border-l border-rams-rule-light">
                                             <div className="text-[9px] font-mono text-rams-ink-muted uppercase tracking-widest">{daysTitle[i]}</div>
@@ -726,12 +953,45 @@ export default function AdminRosterPage() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-rams-rule-light">
-                                {employees.map(emp => (
-                                    <tr key={emp.id} className="hover:bg-rams-bg/30 text-rams-ink">
-                                        <td className="px-4 py-3 font-bold border-b border-rams-rule-light">
-                                            {emp.nickname || emp.name}
-                                            <div className="text-[10px] font-mono text-rams-ink-muted uppercase tracking-wider mt-0.5">{emp.position}</div>
-                                        </td>
+                                {filteredEmployees.map(emp => {
+                                    const empSuspended = isSuspended(emp);
+                                    const empVacation = hasVacation(emp);
+                                    const empLeave = hasOtherLeave(emp);
+                                    return (
+                                        <tr key={emp.id} className={`hover:bg-rams-bg/30 text-rams-ink ${empSuspended ? 'bg-rams-red/5' : empVacation ? 'bg-sky-50/40' : ''}`}>
+                                            <td className="px-4 py-3 border-b border-rams-rule-light align-top space-y-1.5">
+                                                <div className="flex items-center justify-between gap-1">
+                                                    <span className="font-bold">{emp.nickname || emp.name}</span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => openAdjustingEmpModal(emp)}
+                                                        className="p-1 text-rams-ink-muted hover:text-rams-orange border border-rams-rule-light hover:border-rams-orange rounded-sm transition-all cursor-pointer"
+                                                        title="ปรับสถานะ/การลา"
+                                                    >
+                                                        <Settings size={12} />
+                                                    </button>
+                                                </div>
+                                                <div className="text-[10px] font-mono text-rams-ink-muted uppercase tracking-wider">{emp.position}</div>
+                                                
+                                                {/* Status Badges */}
+                                                <div className="flex flex-wrap gap-1 pt-0.5">
+                                                    {empSuspended && (
+                                                        <span className="px-1.5 py-0.5 text-[9px] font-mono font-bold bg-rams-red/10 border border-rams-red/30 text-rams-red rounded-sm">
+                                                            🛑 พักงาน
+                                                        </span>
+                                                    )}
+                                                    {empVacation && (
+                                                        <span className="px-1.5 py-0.5 text-[9px] font-mono font-bold bg-sky-50 border border-sky-300 text-sky-800 rounded-sm">
+                                                            🏖️ พักร้อน
+                                                        </span>
+                                                    )}
+                                                    {empLeave && !empVacation && (
+                                                        <span className="px-1.5 py-0.5 text-[9px] font-mono font-bold bg-amber-50 border border-amber-300 text-amber-800 rounded-sm">
+                                                            📝 มีใบลา
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </td>
                                         {dates.map((date, i) => {
                                             const slots = getCellSlots(emp.id, date);
                                             const dateStr = format(date, 'yyyy-MM-dd');
@@ -795,7 +1055,8 @@ export default function AdminRosterPage() {
                                             );
                                         })}
                                     </tr>
-                                ))}
+                                );
+                            })}
                             </tbody>
                         </table>
                     )}
@@ -1393,6 +1654,202 @@ export default function AdminRosterPage() {
                     </div>
                 </div>
             )}
+ 
+            {/* Employee Status & Leave Adjuster Modal */}
+            {adjustingEmpModal && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-rams-ink/40 backdrop-blur-[2px] p-4">
+                    <div className="bg-rams-panel border border-rams-rule rounded-sm w-full max-w-lg overflow-hidden shadow-none flex flex-col max-h-[90vh]">
+                        <div className="px-6 py-4 border-b border-rams-rule-light bg-rams-bg/30 flex justify-between items-center">
+                            <div>
+                                <h3 className="font-mono font-bold text-sm uppercase tracking-wider text-rams-ink flex items-center gap-2">
+                                    ⚙️ ปรับสถานะ & วันพักงาน/พักร้อน
+                                </h3>
+                                <p className="text-[10px] font-mono text-rams-ink-muted uppercase tracking-widest block mt-0.5">
+                                    {adjustingEmpModal.emp.name} ({adjustingEmpModal.emp.nickname || 'ไม่มีชื่อเล่น'}) - {adjustingEmpModal.emp.position || 'พนักงาน'}
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setAdjustingEmpModal(null)}
+                                className="text-rams-ink-muted hover:text-rams-ink font-mono text-sm"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        <div className="p-6 space-y-5 overflow-y-auto custom-scrollbar bg-rams-panel flex-1">
+                            {/* Section 1: Main Status */}
+                            <div className="bg-rams-bg p-4 border border-rams-rule-light rounded-sm space-y-4">
+                                <h4 className="text-xs font-mono font-bold text-rams-ink uppercase tracking-wider flex items-center gap-1.5">
+                                    👤 สถานะการทำงานของพนักงาน (Employment Status)
+                                </h4>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-[10px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1.5">
+                                            สถานะการจ้างงาน
+                                        </label>
+                                        <select
+                                            value={adjustingEmpModal.employment_status}
+                                            onChange={e => setAdjustingEmpModal(prev => ({ ...prev, employment_status: e.target.value }))}
+                                            className="w-full p-2 rounded-sm border border-rams-rule-light bg-rams-panel text-xs font-mono text-rams-ink outline-none focus:border-rams-rule cursor-pointer"
+                                        >
+                                            <option value="Fulltime">Fulltime (ประจำ)</option>
+                                            <option value="Probation">Probation (ทดลองงาน)</option>
+                                            <option value="Contract">Contract (สัญญาจ้าง / Part-time)</option>
+                                            <option value="Suspended">🛑 Suspended (พักงาน)</option>
+                                            <option value="Vacation">🏖️ Vacation (พักร้อน)</option>
+                                            <option value="Resigned">Resigned (ลาออก)</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1.5">
+                                            สถานะบัญชี (Account Active)
+                                        </label>
+                                        <label className="flex items-center gap-2 p-2 border border-rams-rule-light bg-rams-panel rounded-sm cursor-pointer select-none">
+                                            <input
+                                                type="checkbox"
+                                                checked={adjustingEmpModal.is_active}
+                                                onChange={e => setAdjustingEmpModal(prev => ({ ...prev, is_active: e.target.checked }))}
+                                                className="w-4 h-4 rounded-sm border-rams-rule bg-rams-bg accent-rams-green focus:ring-0 cursor-pointer"
+                                            />
+                                            <span className={`text-xs font-mono font-bold ${adjustingEmpModal.is_active ? 'text-rams-green' : 'text-rams-red'}`}>
+                                                {adjustingEmpModal.is_active ? '✅ เปิดใช้งาน (Active)' : '🛑 ระงับบัญชี (Inactive / พักงาน)'}
+                                            </span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Section 2: Create Leave or Suspension Range */}
+                            <div className="bg-rams-bg p-4 border border-rams-rule-light rounded-sm space-y-4">
+                                <label className="flex items-center justify-between cursor-pointer select-none">
+                                    <span className="text-xs font-mono font-bold text-rams-ink uppercase tracking-wider flex items-center gap-1.5">
+                                        📅 บันทึกวันพักงาน / พักร้อน / วันลา เข้าสู่ระบบ
+                                    </span>
+                                    <input
+                                        type="checkbox"
+                                        checked={adjustingEmpModal.createLeave}
+                                        onChange={e => setAdjustingEmpModal(prev => ({ ...prev, createLeave: e.target.checked }))}
+                                        className="w-4 h-4 rounded-sm border-rams-rule bg-rams-bg accent-rams-orange focus:ring-0 cursor-pointer"
+                                    />
+                                </label>
+
+                                {adjustingEmpModal.createLeave && (
+                                    <div className="space-y-4 pt-2 border-t border-rams-rule-light">
+                                        <div>
+                                            <label className="block text-[10px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1.5">
+                                                ประเภทการพัก/ลา
+                                            </label>
+                                            <select
+                                                value={adjustingEmpModal.leave_type}
+                                                onChange={e => setAdjustingEmpModal(prev => ({ ...prev, leave_type: e.target.value }))}
+                                                className="w-full p-2 rounded-sm border border-rams-rule-light bg-rams-panel text-xs font-mono text-rams-ink outline-none focus:border-rams-rule cursor-pointer"
+                                            >
+                                                <option value="vacation">🏖️ พักร้อน (Vacation)</option>
+                                                <option value="suspension">🛑 พักงาน (Suspension)</option>
+                                                <option value="sick">😷 ลาป่วย (Sick Leave)</option>
+                                                <option value="business">💼 ลากิจ (Business Leave)</option>
+                                            </select>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div>
+                                                <label className="block text-[10px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1.5">
+                                                    วันที่เริ่ม
+                                                </label>
+                                                <input
+                                                    type="date"
+                                                    value={adjustingEmpModal.startDate}
+                                                    onChange={e => setAdjustingEmpModal(prev => ({
+                                                        ...prev,
+                                                        startDate: e.target.value,
+                                                        endDate: prev.endDate < e.target.value ? e.target.value : prev.endDate
+                                                    }))}
+                                                    className="w-full p-2 rounded-sm border border-rams-rule-light bg-rams-panel text-xs font-mono text-rams-ink outline-none focus:border-rams-rule"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1.5">
+                                                    วันที่สิ้นสุด
+                                                </label>
+                                                <input
+                                                    type="date"
+                                                    value={adjustingEmpModal.endDate}
+                                                    min={adjustingEmpModal.startDate}
+                                                    onChange={e => setAdjustingEmpModal(prev => ({ ...prev, endDate: e.target.value }))}
+                                                    className="w-full p-2 rounded-sm border border-rams-rule-light bg-rams-panel text-xs font-mono text-rams-ink outline-none focus:border-rams-rule"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-[10px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1.5">
+                                                พนักงานปฏิบัติงานแทน (Optional)
+                                            </label>
+                                            <select
+                                                value={adjustingEmpModal.replacement_employee_id}
+                                                onChange={e => setAdjustingEmpModal(prev => ({ ...prev, replacement_employee_id: e.target.value }))}
+                                                className="w-full p-2 rounded-sm border border-rams-rule-light bg-rams-panel text-xs font-mono text-rams-ink outline-none focus:border-rams-rule cursor-pointer"
+                                            >
+                                                <option value="">-- ไม่ระบุผู้แทน --</option>
+                                                {employees.filter(e => e.id !== adjustingEmpModal.emp.id).map(emp => (
+                                                    <option key={emp.id} value={emp.id}>
+                                                        {emp.name} ({emp.nickname || '-'}) - {emp.position || 'ทั่วไป'}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-[10px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1.5">
+                                                เหตุผล / หมายเหตุ
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={adjustingEmpModal.reason}
+                                                onChange={e => setAdjustingEmpModal(prev => ({ ...prev, reason: e.target.value }))}
+                                                placeholder="เช่น พักงานทางวินัย 3 วัน, ลาพักร้อนประจำปี..."
+                                                className="w-full p-2 rounded-sm border border-rams-rule-light bg-rams-panel text-xs font-sans text-rams-ink outline-none focus:border-rams-rule"
+                                            />
+                                        </div>
+
+                                        <label className="flex items-center gap-2 pt-1 cursor-pointer select-none">
+                                            <input
+                                                type="checkbox"
+                                                checked={adjustingEmpModal.autoSyncRoster}
+                                                onChange={e => setAdjustingEmpModal(prev => ({ ...prev, autoSyncRoster: e.target.checked }))}
+                                                className="w-3.5 h-3.5 rounded-sm border-rams-rule bg-rams-bg accent-rams-orange focus:ring-0 cursor-pointer"
+                                            />
+                                            <span className="text-xs font-mono font-bold text-rams-ink">
+                                                🔄 ปรับตั้งค่าในตารางเวร Roster เป็นวันหยุด (OFF) โดยอัตโนมัติ
+                                            </span>
+                                        </label>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="px-6 py-4 border-t border-rams-rule-light flex justify-end gap-3 bg-rams-bg/30 shrink-0">
+                            <button
+                                type="button"
+                                onClick={() => setAdjustingEmpModal(null)}
+                                className="px-4 py-2 text-rams-ink hover:bg-rams-ink-muted/10 border border-rams-rule-light rounded-sm font-mono font-bold text-xs uppercase tracking-wider transition-all cursor-pointer"
+                            >
+                                ยกเลิก
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleSaveAdjustingEmp}
+                                disabled={saving}
+                                className="px-5 py-2 bg-rams-orange text-rams-panel font-mono font-bold text-xs uppercase tracking-wider rounded-sm border border-rams-rule shadow-[0_2px_0_0_var(--color-rams-rule)] hover:bg-rams-orange-active active:translate-y-[1px] active:shadow-none transition-all cursor-pointer flex items-center gap-2"
+                            >
+                                {saving ? 'กำลังบันทึก...' : <><Save size={16} /> บันทึกการเปลี่ยนแปลง</>}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* End Employee Status Adjuster Modal */}
         </div>
     );
 }
