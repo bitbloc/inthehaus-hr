@@ -1,4 +1,4 @@
-import { getGenAI } from './gemini-client.js';
+import { getGenAI, GEMINI_MODELS } from './gemini-client.js';
 import { createClient } from '@supabase/supabase-js';
 
 let PDFParse = null;
@@ -25,7 +25,7 @@ export async function getEmbedding(text, taskType = 'RETRIEVAL_QUERY', title = n
              return { error: "GEMINI_API_KEY environment variable is missing" };
         }
         
-        const modelName = "gemini-embedding-2-preview";
+        const modelName = GEMINI_MODELS.EMBEDDING || "gemini-embedding-2-preview";
         const model = instance.getGenerativeModel({ model: modelName });
         
         let result;
@@ -42,7 +42,7 @@ export async function getEmbedding(text, taskType = 'RETRIEVAL_QUERY', title = n
             
             try {
                 // Secondary Fallback: Try a different reliable model
-                const fallbackModel = instance.getGenerativeModel({ model: "gemini-embedding-001" });
+                const fallbackModel = instance.getGenerativeModel({ model: GEMINI_MODELS.EMBEDDING_FALLBACK || "gemini-embedding-001" });
                 result = await fallbackModel.embedContent({
                     content: { parts: [{ text }] },
                     outputDimensionality: 768

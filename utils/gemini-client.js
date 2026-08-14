@@ -1,5 +1,20 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
+/**
+ * Centralized Gemini Model Registry
+ */
+export const GEMINI_MODELS = {
+    FLASH: "gemini-3.7-flash",
+    FALLBACKS: [
+        "gemini-3.7-flash",
+        "gemini-2.5-flash",
+        "gemini-2.0-flash",
+        "gemini-1.5-flash"
+    ],
+    EMBEDDING: "gemini-embedding-2-preview",
+    EMBEDDING_FALLBACK: "gemini-embedding-001"
+};
+
 let genAIInstance = null;
 
 /**
@@ -21,3 +36,4 @@ export function getGenAI() {
  * Direct instance (legacy compatibility)
  */
 export const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "dummy-key");
+

@@ -1,5 +1,5 @@
 import { searchKnowledge } from './rag.js';
-import { getGenAI } from './gemini-client.js';
+import { getGenAI, GEMINI_MODELS } from './gemini-client.js';
 
 export async function getGeminiResponse(query, context = "", history = [], userId = "") {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -79,7 +79,7 @@ export async function getGeminiResponse(query, context = "", history = [], userI
         }
 
         const model = instance.getGenerativeModel({ 
-            model: "gemini-3.6-flash",
+            model: GEMINI_MODELS.FLASH,
             systemInstruction: `=== LAYER 1: ตัวตนและบทบาท ===
 คุณชื่อ "ยูซุ" (Yuzu) เพื่อนร่วมทีมที่เป็น Assistant Operations Manager ของร้าน "ในบ้าน" (หรือ "In The Haus") นครพนม
 บทบาทของคุณไม่ใช่หุ่นยนต์คุมกฎ แต่คุณคือเพื่อนร่วมงานรุ่นน้องที่โคตรเก่ง จริงจังเรื่องมาตรฐานความสะอาดและ SOP แต่คุยด้วยภาษาคนทำงานจริง สุภาพ เป็นกันเอง มีหางเสียง (ครับ/น้า) คอยให้กำลังใจทีมและใช้จิตวิทยาในการเตือนสติพนักงานไม่ให้หลุดโฟกัส
@@ -226,7 +226,7 @@ export async function classifyAndAnalyzeImage(imageBase64, mimeType = "image/jpe
         const instance = getGenAI();
         if (!instance) return { isFood: false, analysis: "AI Instance error", shortDescription: "" };
         
-        const model = instance.getGenerativeModel({ model: "gemini-3.6-flash" });
+        const model = instance.getGenerativeModel({ model: GEMINI_MODELS.FLASH });
         
         const isBoss = bossRole !== null;
         let catInstruction = "";
@@ -335,7 +335,7 @@ export async function getDailySummary(content) {
         return "ขออภัยครับ เกิดข้อผิดพลาดในการเชื่อมต่อกับ AI (getGenAI failed)";
     }
 
-    const models = ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-2.5-flash", "gemini-2.5-pro", "gemini-3-flash-preview"];
+    const models = GEMINI_MODELS.FALLBACKS;
     let lastError = null;
 
     for (const modelName of models) {
@@ -403,7 +403,7 @@ export async function getMonthlySummary(content) {
         return "{}";
     }
 
-    const models = ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-2.5-flash", "gemini-2.5-pro", "gemini-3-flash-preview"];
+    const models = GEMINI_MODELS.FALLBACKS;
     let lastError = null;
 
     for (const modelName of models) {
@@ -596,7 +596,7 @@ export async function generateImage(prompt) {
 export async function transcribeAudio(base64Audio, mimeType = "audio/m4a") {
     try {
         const instance = getGenAI();
-        const model = instance.getGenerativeModel({ model: "gemini-3.6-flash" });
+        const model = instance.getGenerativeModel({ model: GEMINI_MODELS.FLASH });
 
         const prompt = `คุณคือผู้ช่วยสรุปงานจากเสียง (Audio transcriber) ของร้าน In The Haus
         1. แปลงเสียงเป็นข้อความภาษาไทยให้แม่นยำที่สุด
@@ -623,7 +623,7 @@ export async function transcribeAudio(base64Audio, mimeType = "audio/m4a") {
 export async function extractOrderFromText(text) {
     try {
         const instance = getGenAI();
-        const model = instance.getGenerativeModel({ model: "gemini-3.6-flash" });
+        const model = instance.getGenerativeModel({ model: GEMINI_MODELS.FLASH });
 
         const prompt = `วิเคราะห์ข้อความสั่งอาหารทางโทรศัพท์ (Phone Order) สำหรับร้าน In The Haus
         1. ดึงรายการอาหารและจำนวน (items) ออกมาให้ครบถ้วน แม้จะเขียนแบบย่อหรือไม่มีลักษณนาม
@@ -654,7 +654,7 @@ export async function extractOrderFromText(text) {
 export async function extractReservationFromText(text) {
     try {
         const instance = getGenAI();
-        const model = instance.getGenerativeModel({ model: "gemini-3.6-flash" });
+        const model = instance.getGenerativeModel({ model: GEMINI_MODELS.FLASH });
 
         const now = new Date();
         const thaiTime = now.toLocaleString("th-TH", { timeZone: "Asia/Bangkok", dateStyle: "full" });
@@ -709,7 +709,7 @@ export async function analyzeEspressoShot(text, employeeName = "พี่ที�
         - หากพนักงานไม่ได้ระบุเรื่องการปรับบด หรือเวลาปกติปกติอยู่แล้ว -> ตอบ null`;
 
         const model = instance.getGenerativeModel({ 
-            model: "gemini-3.6-flash",
+            model: GEMINI_MODELS.FLASH,
             systemInstruction: systemInstruction
         });
 

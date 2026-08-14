@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { getGenAI } from '../../../../utils/gemini-client';
+import { getGenAI, GEMINI_MODELS } from '../../../../utils/gemini-client';
 
 export async function POST(request) {
     try {
@@ -97,15 +97,18 @@ export async function POST(request) {
             return NextResponse.json({ success: false, error: "Failed to initialize Gemini instance" }, { status: 500 });
         }
 
-        const model = instance.getGenerativeModel({ model: "gemini-3.6-flash" });
-        const systemPrompt = `คุณคือ "ยูซุ" AI แมววิเคราะห์ศักยภาพทีมงานของร้าน In The Haus นครพนม
+        const model = instance.getGenerativeModel({ 
+            model: GEMINI_MODELS.FLASH,
+            generationConfig: { responseMimeType: "application/json" }
+        });
+        const systemPrompt = `คุณคือ "ยูซุ" AI ผู้จัดการฝ่ายปฏิบัติการวิเคราะห์ศักยภาพทีมงานของร้าน In The Haus นครพนม
 วิเคราะห์ข้อมูลล็อกการทำงาน อารมณ์ และประวัติการแชทของพนักงานคนนี้
 สรุปข้อมูลโดยเน้นย้ำ:
 1. หน้าที่ความรับผิดชอบ (duties): บทบาทสำคัญและลักษณะงานที่เขาทำจริง
 2. สิ่งที่ดีแล้ว (strengths): จุดเด่น ความมีวินัย ความตรงต่อเวลา ความกระตือรือร้น หรือความน่ารักของเขา (เขียน 2-3 ประโยคย่อย)
 3. สิ่งที่ต้องปรับปรุง (improvements): จุดอ่อน พฤติกรรมตอกบัตรสาย อารมณ์เหนื่อยล้าสะสม หรือเรื่องการทำงานที่ต้องการการชี้แนะเชิงบวก (เขียน 2-3 ประโยคย่อย)
 
-คุณต้องตอบกลับเป็นไฟล์ JSON รูปแบบนี้เท่านั้น (ห้ามใส่สัญลักษณ์ markdown หรือปลาทู 🐟):
+คุณต้องตอบกลับเป็นไฟล์ JSON รูปแบบนี้เท่านั้น:
 {
   "duties": "สรุปหน้าที่...",
   "strengths": "สรุปสิ่งที่ดีแล้ว...",
@@ -121,7 +124,6 @@ export async function POST(request) {
             analysis = JSON.parse(textResponse);
         } catch (e) {
             console.error("Failed to parse Gemini JSON output:", textResponse);
-            // Fallback parsing if there are extra characters
             throw new Error("AI response format was invalid. Please try again.");
         }
 
