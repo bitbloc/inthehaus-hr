@@ -19,7 +19,7 @@ export async function GET(request) {
 
     const { data: slips, error } = await supabase
       .from('slip_transactions')
-      .select('id, amount, slip_url, timestamp, is_deleted, employees(name, nickname)')
+      .select('id, amount, slip_url, timestamp, is_deleted, bank_name, sender_name, transaction_ref, employees(name, nickname)')
       .eq('date', dateStr)
       .order('timestamp', { ascending: true });
 
@@ -28,7 +28,7 @@ export async function GET(request) {
     // Create CSV content
     // We add BOM \uFEFF for Excel to read Thai properly
     let csvContent = '\uFEFF';
-    csvContent += 'Transaction ID,Date,Time,Employee Name,Amount (THB),Slip URL,Status\n';
+    csvContent += 'Transaction ID,Date,Time,Bank,Sender,Staff (Operator),Amount (THB),Ref Code,Slip URL,Status\n';
 
     slips.forEach(slip => {
       const bkkTime = addHours(new Date(slip.timestamp), 7);
@@ -36,11 +36,17 @@ export async function GET(request) {
       const rowTime = format(bkkTime, 'HH:mm:ss');
       const empName = slip.employees ? (slip.employees.nickname || slip.employees.name) : 'Unknown';
       const status = slip.is_deleted ? 'Deleted' : 'Active';
+      const bank = slip.bank_name || '-';
+      const sender = slip.sender_name || '-';
+      const ref = slip.transaction_ref || '-';
       
       // Escape for CSV
       const escapedName = `"${empName.replace(/"/g, '""')}"`;
+      const escapedSender = `"${sender.replace(/"/g, '""')}"`;
+      const escapedBank = `"${bank.replace(/"/g, '""')}"`;
+      const escapedRef = `"${ref.replace(/"/g, '""')}"`;
       
-      csvContent += `${slip.id},${rowDate},${rowTime},${escapedName},${slip.amount},${slip.slip_url || ''},${status}\n`;
+      csvContent += `${slip.id},${rowDate},${rowTime},${escapedBank},${escapedSender},${escapedName},${slip.amount},${escapedRef},${slip.slip_url || ''},${status}\n`;
     });
 
     const response = new NextResponse(csvContent);

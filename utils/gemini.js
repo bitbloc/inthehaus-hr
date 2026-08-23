@@ -218,6 +218,28 @@ ${configs.staff_roster || ''}
     }
 }
 
+export function sanitizeTransactionRef(ref) {
+    if (!ref || typeof ref !== 'string') return null;
+    const trimmed = ref.trim();
+    const invalidValues = ['-', '--', '---', 'null', 'undefined', 'n/a', 'na', 'none', 'ไม่มี', 'ไม่ระบุ', 'ไม่ทราบ', 'ไม่พบ', 'unknown'];
+    if (invalidValues.includes(trimmed.toLowerCase()) || trimmed.length < 4) {
+        return null;
+    }
+    return trimmed;
+}
+
+export function sanitizeAmount(amount) {
+    if (typeof amount === 'number') {
+        return Math.abs(amount);
+    }
+    if (typeof amount === 'string') {
+        const cleaned = amount.replace(/,/g, '').replace(/[^\d.-]/g, '');
+        const parsed = parseFloat(cleaned);
+        return isNaN(parsed) ? 0 : Math.abs(parsed);
+    }
+    return 0;
+}
+
 /**
  * Handle Vision requests (Classify and Analyze)
  */
@@ -258,7 +280,25 @@ export async function classifyAndAnalyzeImage(imageBase64, mimeType = "image/jpe
         const systemPrompt = `คุณคือ "ยูซุ" เพื่อนร่วมทีมที่เป็น Assistant Operations Manager หรือบัดดี้/Hype-Man ของร้าน "ในบ้าน" (หรือ "In The Haus") ทำหน้าที่ตรวจตราและช่วยเหลือทีมงานในการจัดการร้าน หน้างาน ห้องครัว และสเตชั่นบริการ
 จำแนกรูปแล้วตอบ JSON (ห้ามครอบ markdown block):
 
-1. สลิปโอนเงิน → {"isSlip": true, "amount": ตัวเลข, "transactionRef": "...", "senderName": "...", "bankName": "ชื่อไทย", "transTime": "วันเวลาโอน เช่น 23 พ.ค. 2569 12:45 น.", "shortDescription": "สลิป...", "shouldReply": true}
+1. สลิปโอนเงิน หรือ ภาพถ่ายหน้าจอมือถือแจ้งการโอนเงินสำเร็จ (รวมถึง: สลิป e-Slip ที่บันทึกเข้าเครื่อง, ภาพถ่ายหน้าจอสมาร์ทโฟนของลูกค้าหรือพนักงานที่แสดงผลการโอนเงินสำเร็จ เช่น Krungthai NEXT, K PLUS, SCB EASY, Bangkok Bank, ttb touch, GSB, เป๋าตัง G-Wallet, TrueMoney, พร้อมเพย์, หรือสลิปเคาน์เตอร์/ATM)
+→ ตอบ JSON โครงสร้างนี้:
+{
+  "isSlip": true,
+  "amount": 658.00,
+  "transactionRef": "รหัสอ้างอิงถ้ามี หรือ null",
+  "senderName": "ชื่อผู้โอน",
+  "receiverName": "ชื่อผู้รับเงิน",
+  "bankName": "ชื่อธนาคารภาษาไทย",
+  "transTime": "วันเวลาที่ทำรายการ",
+  "transDate": "YYYY-MM-DD",
+  "shortDescription": "สลิปโอนเงิน...",
+  "shouldReply": true
+}
+* กฎเฉพาะสำหรับสลิป:
+- amount: ให้ส่งเป็นตัวเลขบวกเท่านั้น (ห้ามติดลบ แม้หน้าจอโอนเงินออกจะเขียน -658.00 บาท ก็ให้ส่ง 658 หรือ 658.00)
+- transactionRef: หากมีตัวเลขรหัสอ้างอิง/เลขที่รายการ/Txn ID บนภาพให้ใส่มา แต่หากเป็นภาพถ่ายหน้าจอที่ไม่มีตัวเลขรหัสอ้างอิงกำกับไว้ชัดเจน ให้ส่งเป็น null เท่านั้น (ห้ามส่ง "-", "N/A", "ไม่มี", "ไม่ระบุ" เด็ดขาด)
+- transDate: ให้ออกมาเป็นรูปแบบ "YYYY-MM-DD" (เช่น "2026-08-23" หากปีบนสลิปเป็น 2569 ให้แปลงเป็น ค.ศ. 2026)
+
 2. การรายงานปฏิบัติงาน หรือ ภาพถ่ายหน้างาน (รวมถึง: รูปบิลวัตถุดิบ/ใบเสร็จ, ของมาส่ง, อาหาร/วัตถุดิบ, สมุนไพร/garnish, ความสะอาด, อุปกรณ์พัง/ชำรุด, เครื่องชงกาแฟ, พื้นที่ร้าน, รีวิวลูกค้า, ภาพโต๊ะ/หน้าร้าน, กล้องวงจรปิด, ทำความสะอาด, พัสดุ) → {"isFood": true, "isReceipt": true/false, "menuName": "...", "itemsList": ["..."], "costAnalysis": "...", "shortDescription": "คำอธิบายสั้นมาก", "shouldReply": true}
 
 *** กฎเหล็กสำคัญสูงสุดสำหรับการตอบกลับภาพถ่าย (ในฟิลด์ costAnalysis และ catFeelings): ***
@@ -279,7 +319,7 @@ export async function classifyAndAnalyzeImage(imageBase64, mimeType = "image/jpe
 
    - กฎภาษา: ห้ามเขียนคำลงท้ายผู้หญิง (ค่ะ/นะคะ) เด็ดขาด แทนตัวเองด้วย "ผม" หรือ "ยูซุ" และลงท้ายสุภาพมีหางเสียง (ครับ/น้า)
 
-3. แมว → {"isCat": true, "catFeelings": "\${catInstruction}", "shortDescription": "...", "shouldReply": true}
+3. แมว → {"isCat": true, "catFeelings": "${catInstruction}", "shortDescription": "...", "shouldReply": true}
 4. อื่นๆ (เช่น อุปกรณ์เครื่องใช้ทั่วไป) → {"shouldReply": false, "shortDescription": "คำอธิบายภาพสั้นๆ เช่น ยางมัดผมที่ลูกค้าลืมไว้บนโต๊ะ"}
 
 *** ข้อกำหนดเพิ่มเติมเมื่อส่งมาหลายรูปพร้อมกัน:
@@ -309,7 +349,22 @@ export async function classifyAndAnalyzeImage(imageBase64, mimeType = "image/jpe
             return lines.length > 2 ? lines.slice(0, 2).join('\n') : lines.join('\n');
         };
         if (data.shouldReply && data.isSlip) {
-            return { isSlip: true, amount: data.amount, transactionRef: data.transactionRef, senderName: data.senderName, bankName: data.bankName, transTime: data.transTime || null, shortDescription: data.shortDescription, shouldReply: true };
+            const cleanRef = sanitizeTransactionRef(data.transactionRef);
+            const cleanAmt = sanitizeAmount(data.amount);
+            const cleanTextVal = (v) => v && !['-', 'null', 'undefined', 'ไม่ระบุ', 'ไม่มี', 'n/a'].includes(String(v).trim().toLowerCase()) ? String(v).trim() : null;
+
+            return { 
+                isSlip: true, 
+                amount: cleanAmt, 
+                transactionRef: cleanRef, 
+                senderName: cleanTextVal(data.senderName), 
+                receiverName: cleanTextVal(data.receiverName),
+                bankName: cleanTextVal(data.bankName), 
+                transTime: data.transTime || null, 
+                transDate: data.transDate || null,
+                shortDescription: data.shortDescription || 'สลิปโอนเงิน', 
+                shouldReply: true 
+            };
         } else if (data.shouldReply && data.isFood) {
             const cleanText = cleanAnalysis(data.costAnalysis);
             return { isFood: true, analysis: cleanText, shortDescription: data.shortDescription, shouldReply: true };
