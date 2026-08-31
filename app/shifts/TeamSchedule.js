@@ -104,6 +104,22 @@ export default function TeamSchedule({ employees, schedules, overrides, shifts, 
                                 </tr>
                             ))}
                         </tbody>
+                        <tfoot>
+                            <tr className="border-t-2 border-indigo-900/40 bg-slate-900/60 font-bold">
+                                <td className="p-3 bg-slate-955/90 sticky left-0 z-10 text-xs text-slate-300 uppercase tracking-wider">
+                                    รวมคนเข้างาน
+                                </td>
+                                {weekDays.map(day => {
+                                    const dayData = weeklyRoster.find(d => isSameDay(d.date, day));
+                                    const workingCount = (dayData?.roster || []).filter(r => r.shift_name).length;
+                                    return (
+                                        <td key={`total-${day.toString()}`} className={`p-2.5 text-center text-xs font-mono font-black ${workingCount === 0 ? 'text-slate-600' : 'text-indigo-300'}`}>
+                                            {workingCount > 0 ? `${workingCount} คน` : '-'}
+                                        </td>
+                                    );
+                                })}
+                            </tr>
+                        </tfoot>
                     </table>
                 </div>
             </div>

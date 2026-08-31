@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '../../../lib/supabaseClient';
 import { Client } from '@line/bot-sdk';
+import { format } from 'date-fns';
 
 // ✅ Group IDs (กลุ่มหลัก และ กลุ่มแผนกอื่น)
 const GROUP_IDS = [
@@ -15,37 +16,27 @@ const client = new Client({
 
 export async function POST(request) {
   try {
-    // 1. Get date from Query Params or Default to Today
+    // 1. รับวันที่ (Query Params หรือ วันนี้)
     const { searchParams } = new URL(request.url);
     const manualDate = searchParams.get('date'); // YYYY-MM-DD
 
     const now = manualDate ? new Date(manualDate) : new Date();
     const bangkokOffset = 7 * 60 * 60 * 1000;
 
-    // Create Date Object for BKK time
-    // If manualDate is 2024-01-02, new Date() gives 07:00 UTC if parsed as UTC, we need to be careful.
-    // Simplest: Use the date string to construct the start of day.
-
-    let startOfDayUTC, endOfDayUTC;
+    let startOfDayUTC, endOfDayUTC, dateStr;
 
     if (manualDate) {
-      // Manual Date (e.g., '2024-01-02') -> implies 00:00:00 BKK on that day
-      // 00:00:00 BKK = Previous Day 17:00:00 UTC
-      const targetDate = new Date(manualDate); // UTC 00:00
-      // Adjust to BKK midnight relative to UTC
-      const bkkMidnightInUtc = new Date(targetDate.getTime() - bangkokOffset);
-      startOfDayUTC = bkkMidnightInUtc;
+      dateStr = manualDate;
+      const targetDate = new Date(manualDate);
+      startOfDayUTC = new Date(targetDate.getTime() - bangkokOffset);
     } else {
-      // Today
       const nowBkk = new Date(now.getTime() + bangkokOffset);
+      dateStr = format(nowBkk, 'yyyy-MM-dd');
       nowBkk.setUTCHours(0, 0, 0, 0);
       startOfDayUTC = new Date(nowBkk.getTime() - bangkokOffset);
     }
 
-    // End of day in BKK -> Start + 24h
     endOfDayUTC = new Date(startOfDayUTC.getTime() + 24 * 60 * 60 * 1000);
-
-    console.log(`Generating report for: ${startOfDayUTC.toISOString()} to ${endOfDayUTC.toISOString()}`);
 
     // 2. Fetch Weather (Bangkok)
     let weatherQuote = "วันนี้อากาศดี ขอให้พักผ่อนอย่างมีความสุขครับ 🌙";
@@ -55,7 +46,6 @@ export async function POST(request) {
       const weatherData = await weatherRes.json();
       const code = weatherData.current_weather?.weathercode;
 
-      // Map WMO codes to Thai messages
       if (code === 0 || code === 1) {
         weatherQuote = "ฟ้าใสไร้ฝน กลับบ้านปลอดภัยนะครับ 🌌"; weatherIcon = "✨";
       } else if (code >= 2 && code <= 48) {
@@ -67,32 +57,60 @@ export async function POST(request) {
       }
     } catch (e) { console.error("Weather fetch failed", e); }
 
-    // 3. Fetch logs
+    // 3. ดึง Roster Transactions ของวันนี้ (Single Source of Truth)
+    const { data: rosterTxs } = await supabase
+      .from('roster_transactions')
+      .select('employee_id, shift_id, custom_start_time, custom_end_time, is_off, status, shifts(name, start_time, end_time)')
+      .eq('date', dateStr)
+      .eq('status', 'PUBLISHED');
+
+    const scheduledShiftMap = new Map();
+    (rosterTxs || []).forEach(tx => {
+      scheduledShiftMap.set(tx.employee_id, {
+        shiftName: tx.shifts?.name || (tx.is_off ? 'OFF' : 'กะงาน'),
+        startTime: tx.custom_start_time || tx.shifts?.start_time,
+        endTime: tx.custom_end_time || tx.shifts?.end_time,
+        isOff: tx.is_off
+      });
+    });
+
+    // 4. Fetch logs ของวันเป้าหมาย
     const { data: logs, error } = await supabase
       .from('attendance_logs')
-      .select('*, employees(name, shifts(name, start_time, end_time))')
+      .select('*, employees(id, name, nickname, photo_url)')
       .gte('timestamp', startOfDayUTC.toISOString())
       .lt('timestamp', endOfDayUTC.toISOString())
       .order('timestamp', { ascending: true });
 
     if (error) throw error;
 
-    // 4. Process logs by employee
+    // 5. Process logs by employee
     const empMap = {};
-    logs.forEach(log => {
+    (logs || []).forEach(log => {
       const empId = log.employee_id;
       if (!empMap[empId]) {
+        const scheduled = scheduledShiftMap.get(empId);
         empMap[empId] = {
           name: log.employees?.name || 'Unknown',
+          nickname: log.employees?.nickname ? `(${log.employees.nickname})` : '',
           checkIn: null,
           checkOut: null,
-          shift: log.employees?.shifts?.name || '-',
-          shiftStart: log.employees?.shifts?.start_time,
-          shiftEnd: log.employees?.shifts?.end_time
+          shift: scheduled?.shiftName || 'กะพิเศษ',
+          shiftStart: scheduled?.startTime,
+          shiftEnd: scheduled?.endTime,
+          isOff: scheduled?.isOff || false
         };
       }
-      if (log.action_type === 'check_in') empMap[empId].checkIn = new Date(log.timestamp);
-      if (log.action_type === 'check_out') empMap[empId].checkOut = new Date(log.timestamp);
+      if (log.action_type === 'check_in') {
+        if (!empMap[empId].checkIn || new Date(log.timestamp) < empMap[empId].checkIn) {
+          empMap[empId].checkIn = new Date(log.timestamp);
+        }
+      }
+      if (log.action_type === 'check_out') {
+        if (!empMap[empId].checkOut || new Date(log.timestamp) > empMap[empId].checkOut) {
+          empMap[empId].checkOut = new Date(log.timestamp);
+        }
+      }
     });
 
     const reportLines = [];
@@ -109,7 +127,7 @@ export async function POST(request) {
       const inTime = formatTime(emp.checkIn);
       const outTime = emp.checkOut ? formatTime(emp.checkOut) : '--:--';
 
-      // Calculate Duration
+      // Duration
       let durationStr = "";
       if (emp.checkIn && emp.checkOut) {
         const diffMs = emp.checkOut - emp.checkIn;
@@ -119,18 +137,20 @@ export async function POST(request) {
       }
 
       let status = 'ปกติ';
-      let color = '#22c55e'; // Green (Normal)
+      let color = '#22c55e'; // Green
 
-      // Late Check
+      // Late Check: เทียบกับเวลาเริ่มของกะจริงในวันนั้น
       if (emp.checkIn && emp.shiftStart) {
         const [sh, sm] = emp.shiftStart.split(':').map(Number);
         const checkInDate = new Date(emp.checkIn.toLocaleString("en-US", { timeZone: "Asia/Bangkok" }));
         const checkInMinutes = checkInDate.getHours() * 60 + checkInDate.getMinutes();
         const shiftStartMinutes = sh * 60 + sm;
 
-        if (checkInMinutes > shiftStartMinutes) {
-          status = 'สาย';
-          color = '#ef4444'; // Red (Late)
+        // อลุ้มอล่วย 5 นาที
+        if (checkInMinutes > shiftStartMinutes + 5) {
+          const lateMins = checkInMinutes - shiftStartMinutes;
+          status = `สาย ${lateMins}น.`;
+          color = '#ef4444'; // Red
         }
       }
 
@@ -141,18 +161,19 @@ export async function POST(request) {
       }
 
       reportLines.push({
-        name: emp.name,
+        name: `${emp.name} ${emp.nickname}`.trim(),
         time: `${inTime} - ${outTime}`,
         status: status,
         color: color,
-        duration: durationStr
+        duration: durationStr,
+        shiftName: emp.shift
       });
     });
 
-    // 5. Construct Beautiful Flex Message
+    // 6. Construct Beautiful Flex Message
     const message = {
       type: 'flex',
-      altText: `สรุปยอดประจำวัน: ${new Date().toLocaleDateString('th-TH')}`,
+      altText: `🏁 สรุปยอดลงเวลาประจำวัน: ${new Date(startOfDayUTC.getTime() + bangkokOffset).toLocaleDateString('th-TH')}`,
       contents: {
         type: 'bubble',
         size: 'mega',
@@ -193,15 +214,16 @@ export async function POST(request) {
                   {
                     type: 'box', layout: 'horizontal',
                     contents: [
-                      { type: 'text', text: line.name, size: 'sm', weight: 'bold', color: '#374151', flex: 3 },
+                      { type: 'text', text: line.name, size: 'sm', weight: 'bold', color: '#374151', flex: 4 },
                       { type: 'text', text: line.time, size: 'sm', color: '#111827', align: 'end', flex: 3 },
                       { type: 'text', text: line.status, size: 'xs', color: '#FFFFFF', align: 'center', weight: 'bold', backgroundColor: line.color, paddingAll: '2px', cornerRadius: 'sm', offsetBottom: '1px', flex: 2 }
                     ]
                   },
-                  // Duration Subline
                   line.duration ? {
-                    type: 'text', text: `⏱️ Total: ${line.duration}`, size: 'xxs', color: '#9CA3AF', margin: 'xs', offsetStart: '2px'
-                  } : { type: 'filler' } // Empty filler if no duration
+                    type: 'text', text: `⏱️ ${line.shiftName} | รวม: ${line.duration}`, size: 'xxs', color: '#9CA3AF', margin: 'xs', offsetStart: '2px'
+                  } : {
+                    type: 'text', text: `⏱️ ${line.shiftName}`, size: 'xxs', color: '#9CA3AF', margin: 'xs', offsetStart: '2px'
+                  }
                 ]
               }))
             }
@@ -209,17 +231,17 @@ export async function POST(request) {
         },
         footer: {
           type: 'box', layout: 'vertical', contents: [
-            { type: 'text', text: 'In the haus HR System', size: 'xxs', color: '#D1D5DB', align: 'center' }
+            { type: 'text', text: 'In The Haus HR & Realtime System', size: 'xxs', color: '#D1D5DB', align: 'center' }
           ]
         }
       }
     };
+
     if (presentCount > 0) {
-      // ส่งข้อความเข้ากลุ่ม LINE
       await Promise.all(
         GROUP_IDS.map(groupId => client.pushMessage(groupId, [message]))
       );
-      return NextResponse.json({ success: true, message: "Cut-off report sent" });
+      return NextResponse.json({ success: true, message: "Cut-off report sent", count: presentCount });
     } else {
       return NextResponse.json({ success: true, message: "No attendance data today" });
     }

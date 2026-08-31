@@ -1,1187 +1,614 @@
 "use client";
-import { useEffect, useState, useMemo, useRef } from "react";
-import { format, isValid, parse, parseISO } from "date-fns";
-import { th } from "date-fns/locale"; // Thai locale
+
+import React, { useEffect, useState, useMemo, useRef } from "react";
+import { format, parseISO, isValid } from "date-fns";
+import { th } from "date-fns/locale";
 import { motion, AnimatePresence } from "framer-motion";
-import { clsx } from "clsx";
-import { twMerge } from "tailwind-merge";
-import { 
-    CheckCircle2, 
-    AlertTriangle, 
-    Camera, 
-    User, 
-    Clock, 
-    DollarSign, 
-    AlertCircle, 
-    RefreshCw, 
-    FileText, 
-    Calendar, 
-    ArrowUpRight, 
-    ArrowDownRight, 
-    Info, 
-    X, 
-    ChevronRight, 
-    Search, 
-    Filter,
-    Check,
-    CheckSquare,
-    Play,
-    Pause
+import liff from "@line/liff";
+import { supabase } from "../../lib/supabaseClient";
+import { useRealtimeSync } from "../../lib/useRealtimeSync";
+import { resizeImage } from "../../utils/imageResizer";
+import NavigationDock from "../_components/NavigationDock";
+import {
+  CheckCircle2,
+  AlertTriangle,
+  Camera,
+  User,
+  Clock,
+  DollarSign,
+  AlertCircle,
+  RefreshCw,
+  FileText,
+  Calendar,
+  Check,
+  CheckSquare,
+  Sparkles,
+  ChevronRight,
+  Search,
+  Plus,
+  X,
+  UploadCloud,
+  Send
 } from "lucide-react";
 
-// --- Utility: Class Merger ---
-function cn(...inputs) {
-    return twMerge(clsx(inputs));
-}
+// --- Preset Checklist Templates for In The Haus ---
+const OPENING_PRESETS = [
+  { id: "op_1", text: "เปิดไฟ สวิตช์ป้ายหน้าร้าน และแอร์ทุกตัว", category: "ความพร้อมหน้าร้าน" },
+  { id: "op_2", text: "เปิดเครื่องชงกาแฟ (Espresso Machine) & ตรวจสอบแรงดัน/ระดับน้ำ", category: "บาร์กาแฟ" },
+  { id: "op_3", text: "วอร์มเครื่องบดกาแฟ และทำ Espresso Calibration (Taste Profile)", category: "บาร์กาแฟ" },
+  { id: "op_4", text: "เช็คสต็อกนมสด ไซรัป น้ำแข็ง และวัตถุดิบบาร์น้ำ", category: "สต็อก & เตรียมของ" },
+  { id: "op_5", text: "เตรียมวัตถุดิบครัว ซอส ผักสด และเปิดเตาพร้อมใช้งาน", category: "ครัว & อาหาร" },
+  { id: "op_6", text: "นับเงินทอนในลิ้นชัก POS และลงบันทึกยอดเงินเปิดร้าน", category: "ระบบเงิน & POS" },
+  { id: "op_7", text: "กวาดและถูพื้น เช็ดทำความสะอาดโต๊ะเก้าอี้หน้าร้าน", category: "ความสะอาด" },
+];
 
-// --- Configuration: Column Mapping ---
-const COLUMN_MAP = {
-    TIMESTAMP: ["Timestamp", "ประทับเวลา", "วันที่", "Group ID ของคุณคือ: C1210c7a0601b5a675060e312efe10bff"],
-    STAFF_NAME: ["ชื่อพนักงาน ( Aka )", "Staff Name"],
-    OPENING_TASKS: [
-        "เช็คความพร้อมก่อนเปิด (Opening Checklist)",
-        "ระบบเงินและ POS (Opening Cash & POS)",
-        "เช็คความพร้อมก่อนเปิด",
-        "ระบบเงินและ POS"
-    ],
-    CLOSING_TASKS: [
-        "ความสะอาดและสต็อก (Cleaning & Stock)",
-        "ระบบเงินและการปิดร้าน (Closing Money & System)",
-        "ความสะอาดและสต็อก (Cleaning & Stock)",
-        "ระบบเงินและการปิดร้าน (Closing)"
-    ],
-    CASH_OPEN: ["ระบุยอดเงินในลิ้นชักก่อนเปิด (บาท)", "Opening Cash"],
-    CASH_CLOSE: ["ระบุยอดเงินสดปิดร้าน (บาท)", "Closing Cash"],
-    NOTE: ["หมายเหตุ (Note)", "หมายเหตุ"],
-    PHOTO_OPEN: ["ถ่ายรูปหน้าร้านหลังเตรียมเสร็จ"],
-    PHOTO_CLOSE: [
-        "ถ่ายรูปพื้นที่ก่อนปิดร้าน", 
-        "ภาพ Station บาร์โดยรวมก่อนกลับบ้าน * ( อัพทุกวัน )พื้น, และบาร์ด้านหลัง pos",
-        "ถ่ายรูปสายยาง, กาง fly sheet ด้านข้าง"
-    ]
-};
-
-// --- Helper: Parentheses-aware comma splitter ---
-const splitTasks = (taskStr) => {
-    if (!taskStr) return [];
-    const result = [];
-    let current = '';
-    let depth = 0;
-    for (let i = 0; i < taskStr.length; i++) {
-        const char = taskStr[i];
-        if (char === '(' || char === '[' || char === '{') {
-            depth++;
-        } else if (char === ')' || char === ']' || char === '}') {
-            depth--;
-        }
-        
-        if (char === ',' && depth === 0) {
-            result.push(current.trim());
-            current = '';
-        } else {
-            current += char;
-        }
-    }
-    if (current.trim()) {
-        result.push(current.trim());
-    }
-    return result.filter(Boolean);
-};
-
-// --- Helper: Clean and Parse Cash Values ---
-const parseCashVal = (cashStr) => {
-    if (cashStr === undefined || cashStr === null) return null;
-    const cleaned = String(cashStr)
-        .replace(/,/g, '')
-        .replace(/บาท/g, '')
-        .replace(/\s+/g, '')
-        .trim();
-    const parsed = parseFloat(cleaned);
-    return isNaN(parsed) ? null : parsed;
-};
-
-// --- Helper: Extra Photo Extractor for specific columns ---
-const extractPhotoLinksForKeys = (row, keys) => {
-    const photos = [];
-    keys.forEach(k => {
-        const actualKey = Object.keys(row).find(rk => rk.trim().toLowerCase() === k.trim().toLowerCase());
-        const val = actualKey ? row[actualKey] : null;
-        if (typeof val === 'string' && val.includes('http')) {
-            const links = val.split(/[\s,]+/).filter(s => s.startsWith('http'));
-            links.forEach(link => {
-                let id = null;
-                const idMatch = link.match(/id=([a-zA-Z0-9_-]+)/) || link.match(/\/d\/([a-zA-Z0-9_-]+)/);
-                if (idMatch) id = idMatch[1];
-                if (id) {
-                    photos.push({
-                        thumbnail: `https://lh3.googleusercontent.com/d/${id}=s400`,
-                        full: `https://drive.google.com/file/d/${id}/preview`
-                    });
-                } else {
-                    photos.push({ thumbnail: link, full: link });
-                }
-            });
-        }
-    });
-    return photos.filter((v, i, a) => a.findIndex(v2 => (v2.full === v.full)) === i);
-};
+const CLOSING_PRESETS = [
+  { id: "cl_1", text: "ปิดยอดขายในระบบ POS สรุปยอดเงินสดและเงินโอน", category: "ระบบเงิน & POS" },
+  { id: "cl_2", text: "นับเงินสดปิดร้าน และจัดเก็บเข้าเซฟ/ซองปิดผนึก", category: "ระบบเงิน & POS" },
+  { id: "cl_3", text: "Backflush ทำความสะอาดหัวชงกาแฟและล้างด้ามชง (Portafilter)", category: "บาร์กาแฟ" },
+  { id: "cl_4", text: "ทำความสะอาดเครื่องบดกาแฟ และเก็บเมล็ดกาแฟในโหลสุญญากาศ", category: "บาร์กาแฟ" },
+  { id: "cl_5", text: "ล้างและเก็บอุปกรณ์ครัว เช็ดเตา ทิ้งขยะครัวทั้งหมด", category: "ครัว & อาหาร" },
+  { id: "cl_6", text: "เช็ด Station บาร์ ล้างซิงค์ กาง Fly Sheet ด้านข้างร้าน", category: "ความสะอาด" },
+  { id: "cl_7", text: "ตรวจเช็คปิดแก๊ส ปิดแอร์ ปิดไฟ และล็อคประตูร้านให้เรียบร้อย", category: "ความปลอดภัย" },
+];
 
 export default function ChecklistPage() {
-    // State Management
-    const [data, setData] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-    const [filter, setFilter] = useState('All');
-    const [selectedImage, setSelectedImage] = useState(null);
-    const [selectedMonth, setSelectedMonth] = useState('');
-    const [selectedDayFilter, setSelectedDayFilter] = useState(null);
-    
-    // Auto-Sync States
-    const [isAutoSync, setIsAutoSync] = useState(true);
-    const [lastSyncedTime, setLastSyncedTime] = useState(null);
-    const [countdown, setCountdown] = useState(30);
+  const [profile, setProfile] = useState(null);
+  const [activeTab, setActiveTab] = useState("form"); // 'form' | 'logs'
+  const [shiftType, setShiftType] = useState("OPENING"); // 'OPENING' | 'CLOSING'
+  const [tasks, setTasks] = useState(OPENING_PRESETS.map(t => ({ ...t, checked: false })));
+  const [cashAmount, setCashAmount] = useState("");
+  const [notes, setNotes] = useState("");
+  const [photos, setPhotos] = useState([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
 
-    const logsContainerRef = useRef(null);
+  // History State
+  const [logs, setLogs] = useState([]);
+  const [loadingLogs, setLoadingLogs] = useState(true);
+  const [searchFilter, setSearchFilter] = useState("");
+  const [selectedPhoto, setSelectedPhoto] = useState(null);
 
-    // Google Sheet CSV Endpoint
-    const SHEET_URL = "https://docs.google.com/spreadsheets/d/1AJVcXjwuzlm5U_UPD91wWPKz76jTRrW2VPsL22MR9CU/export?format=csv";
+  const fileInputRef = useRef(null);
+  const LIFF_ID = process.env.NEXT_PUBLIC_LIFF_ID;
 
-    // --- Hooks ---
-    useEffect(() => {
-        fetchData();
-    }, []);
-
-    // Handle ESC key for lightbox
-    useEffect(() => {
-        const handleEsc = (e) => {
-            if (e.key === 'Escape') setSelectedImage(null);
-        };
-        window.addEventListener('keydown', handleEsc);
-        return () => window.removeEventListener('keydown', handleEsc);
-    }, []);
-
-    // Countdown / Polling logic
-    useEffect(() => {
-        let timer;
-        if (isAutoSync && !loading) {
-            timer = setInterval(() => {
-                setCountdown(prev => {
-                    if (prev <= 1) {
-                        fetchData();
-                        return 30;
-                    }
-                    return prev - 1;
-                });
-            }, 1000);
+  // Initialize LIFF
+  useEffect(() => {
+    const init = async () => {
+      try {
+        await liff.init({ liffId: LIFF_ID });
+        if (liff.isLoggedIn()) {
+          const p = await liff.getProfile();
+          setProfile(p);
         } else {
-            setCountdown(30);
+          setProfile({ displayName: "พนักงาน (Dev Mode)" });
         }
-        return () => clearInterval(timer);
-    }, [isAutoSync, loading]);
-
-    // --- Helper: Custom CSV Parser (Bypasses XLSX assumptions) ---
-    const parseCSV = (text) => {
-        const rows = [];
-        let currentRow = [];
-        let currentVal = '';
-        let insideQuote = false;
-
-        const cleanText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-
-        for (let i = 0; i < cleanText.length; i++) {
-            const char = cleanText[i];
-            const nextChar = cleanText[i + 1];
-
-            if (char === '"') {
-                if (insideQuote && nextChar === '"') {
-                    currentVal += '"';
-                    i++; // Skip escaped quote
-                } else {
-                    insideQuote = !insideQuote;
-                }
-            } else if (char === ',' && !insideQuote) {
-                currentRow.push(currentVal);
-                currentVal = '';
-            } else if (char === '\n' && !insideQuote) {
-                currentRow.push(currentVal);
-                rows.push(currentRow);
-                currentRow = [];
-                currentVal = '';
-            } else {
-                currentVal += char;
-            }
-        }
-        if (currentVal || currentRow.length > 0) {
-            currentRow.push(currentVal);
-            rows.push(currentRow);
-        }
-        return rows;
+      } catch (err) {
+        console.warn("LIFF Init error:", err);
+        setProfile({ displayName: "พนักงาน" });
+      }
     };
+    init();
+    fetchLogs();
+  }, [LIFF_ID]);
 
-    const csvToJson = (rows) => {
-        if (rows.length < 2) return [];
-        const headers = rows[0].map(h => h.trim());
+  // Handle Shift Type Toggle
+  useEffect(() => {
+    const presets = shiftType === "OPENING" ? OPENING_PRESETS : CLOSING_PRESETS;
+    setTasks(presets.map(t => ({ ...t, checked: false })));
+  }, [shiftType]);
+
+  // Fetch Checklist History from Supabase
+  const fetchLogs = async () => {
+    setLoadingLogs(true);
+    try {
+      const { data: dbLogs, error } = await supabase
+        .from("daily_checklist_logs")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(50);
+
+      if (!error && dbLogs) {
+        setLogs(dbLogs);
+      }
+    } catch (e) {
+      console.error("Fetch checklist logs error:", e);
+    }
+    setLoadingLogs(false);
+  };
+
+  // Realtime Subscription
+  useRealtimeSync(["daily_checklist_logs"], (payload) => {
+    if (payload.eventType === "INSERT") {
+      setLogs(prev => [payload.new, ...prev]);
+    } else if (payload.eventType === "UPDATE") {
+      setLogs(prev => prev.map(l => l.id === payload.new.id ? payload.new : l));
+    } else if (payload.eventType === "DELETE") {
+      setLogs(prev => prev.filter(l => l.id === payload.old.id));
+    }
+  });
+
+  const toggleTask = (id) => {
+    setTasks(prev => prev.map(t => t.id === id ? { ...t, checked: !t.checked } : t));
+  };
+
+  const handlePhotoUpload = async (e) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsUploading(true);
+    setErrorMsg("");
+
+    try {
+      const uploadedUrls = [];
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const resizedBase64 = await resizeImage(file, 1000, 1000, 0.8);
         
-        // Handle duplicate headers cleanly
-        const seenHeaders = {};
-        const uniqueHeaders = headers.map(h => {
-            if (!h) return '';
-            if (seenHeaders[h] !== undefined) {
-                seenHeaders[h]++;
-                return `${h}_${seenHeaders[h]}`;
-            } else {
-                seenHeaders[h] = 0;
-                return h;
-            }
-        });
-
-        return rows.slice(1).map((row, idx) => {
-            const obj = {};
-            uniqueHeaders.forEach((h, i) => {
-                if (row[i] !== undefined && h !== '') {
-                    obj[h] = row[i];
-                }
-            });
-            obj._rawRow = row;
-            return obj;
-        });
-    };
-
-    // --- Core Logic: Data Fetching & Processing ---
-    const fetchData = async () => {
-        try {
-            setLoading(true);
-            const res = await fetch(SHEET_URL);
-
-            if (!res.ok) throw new Error("Failed to connect to Database (Google Sheet)");
-
-            const csvText = await res.text();
-            const rows = parseCSV(csvText);
-            const jsonData = csvToJson(rows);
-
-            const processedData = jsonData.map((row, index) => {
-                const findVal = (keyOrList) => {
-                    let possibleKeys = keyOrList;
-                    if (typeof keyOrList === 'string') {
-                        possibleKeys = COLUMN_MAP[keyOrList];
-                    }
-                    if (!possibleKeys || !Array.isArray(possibleKeys)) return undefined;
-
-                    for (const key of possibleKeys) {
-                        const actualKey = Object.keys(row).find(k => k.trim().toLowerCase() === key.toLowerCase());
-                        if (actualKey) return row[actualKey];
-                    }
-                    return undefined;
-                };
-
-                // 1. Parse Date
-                let timestampVal = findVal('TIMESTAMP');
-                if (!timestampVal) {
-                    timestampVal = row._rawRow && row._rawRow[0];
-                }
-                const timestamp = parseGenericDate(timestampVal);
-
-                // 2. Determine Type based on Check Time column or content
-                const checkTimeCol = row["ช่วงเวลาที่ตรวจสอบ"] || "";
-                let type = "Unknown";
-                
-                if (checkTimeCol.includes("เปิดร้าน")) {
-                    type = "Opening";
-                } else if (checkTimeCol.includes("ปิดร้าน")) {
-                    type = "Closing";
-                } else {
-                    // Fallback to checking specific inputs
-                    const hasOpeningData = findVal('OPENING_TASKS');
-                    const hasClosingData = findVal('CLOSING_TASKS');
-                    if (hasOpeningData) type = "Opening";
-                    else if (hasClosingData) type = "Closing";
-                    else if (isValid(timestamp)) {
-                        const hours = timestamp.getHours();
-                        type = (hours >= 5 && hours < 16) ? "Opening" : "Closing";
-                    }
-                }
-
-                const isOpening = type === "Opening";
-
-                // 3. Extract Tasks and split properly with paren-awareness
-                const taskKeys = isOpening ? COLUMN_MAP.OPENING_TASKS : COLUMN_MAP.CLOSING_TASKS;
-                let tasks = [];
-                taskKeys.forEach(keyText => {
-                    const val = findVal([keyText]);
-                    if (val) {
-                        tasks = tasks.concat(splitTasks(val));
-                    }
-                });
-
-                // Extract specific details
-                const cashStr = isOpening ? findVal(COLUMN_MAP.CASH_OPEN) : findVal(COLUMN_MAP.CASH_CLOSE);
-                const cashVal = parseCashVal(cashStr);
-
-                return {
-                    id: index,
-                    timestamp: timestamp,
-                    staffName: findVal(COLUMN_MAP.STAFF_NAME) || "Unknown Staff",
-                    type: type,
-                    tasks: tasks,
-                    cashStr: cashStr || null,
-                    cash: cashVal,
-                    photos: extractPhotoLinks(row),
-                    note: findVal(COLUMN_MAP.NOTE),
-                    raw: row
-                };
-            });
-
-            // Filter valid dates and sort oldest-to-newest to run cumulative calculations
-            const validData = processedData
-                .filter(item => isValid(item.timestamp))
-                .sort((a, b) => a.timestamp - b.timestamp);
-
-            // Compute validation warnings & running cash discrepancies
-            let lastClosingCash = null;
-            let lastClosingDateStr = null;
-
-            const validatedData = validData.map((item) => {
-                const warnings = [];
-
-                // A. Cash validation
-                if (item.type === "Opening") {
-                    if (item.cash !== null) {
-                        if (lastClosingCash !== null) {
-                            const cashDiff = item.cash - lastClosingCash;
-                            if (cashDiff !== 0) {
-                                warnings.push({
-                                    type: "cash_mismatch",
-                                    message: `ยอดเปิดร้าน (${item.cash.toLocaleString()} บ.) ไม่ตรงยอดปิดร้านกะก่อนหน้า (${lastClosingCash.toLocaleString()} บ.) ต่างกัน ${cashDiff > 0 ? '+' : ''}${cashDiff.toLocaleString()} บาท`,
-                                    diff: cashDiff,
-                                    prevVal: lastClosingCash,
-                                    prevDate: lastClosingDateStr
-                                });
-                            }
-                        }
-                    } else if (item.cashStr) {
-                        warnings.push({
-                            type: "invalid_cash_format",
-                            message: `ระบุยอดเงินแบบไม่ใช่ตัวเลข: "${item.cashStr}"`
-                        });
-                    } else {
-                        warnings.push({
-                            type: "missing_cash",
-                            message: "ไม่ได้ระบุยอดเงินสดเปิดร้าน"
-                        });
-                    }
-                } else if (item.type === "Closing") {
-                    if (item.cash !== null) {
-                        lastClosingCash = item.cash;
-                        lastClosingDateStr = format(item.timestamp, "d MMM yy • HH:mm", { locale: th });
-                    } else if (item.cashStr) {
-                        warnings.push({
-                            type: "invalid_cash_format",
-                            message: `ระบุยอดเงินแบบไม่ใช่ตัวเลข: "${item.cashStr}"`
-                        });
-                    } else {
-                        warnings.push({
-                            type: "missing_cash",
-                            message: "ไม่ได้ระบุยอดเงินสดปิดร้าน"
-                        });
-                    }
-                }
-
-                // B. Photo checks
-                if (item.photos.length === 0) {
-                    warnings.push({
-                        type: "missing_photos",
-                        message: "ไม่มีรูปภาพประกอบหลักฐาน"
-                    });
-                } else {
-                    if (item.type === "Opening") {
-                        const openPhotos = extractPhotoLinksForKeys(item.raw, COLUMN_MAP.PHOTO_OPEN);
-                        if (openPhotos.length === 0) {
-                            warnings.push({
-                                type: "missing_required_photos",
-                                message: "ขาดรูปถ่ายหน้าร้านหลักหลังเตรียมเสร็จ"
-                            });
-                        }
-                    } else if (item.type === "Closing") {
-                        const closePhotos = extractPhotoLinksForKeys(item.raw, COLUMN_MAP.PHOTO_CLOSE);
-                        if (closePhotos.length === 0) {
-                            warnings.push({
-                                type: "missing_required_photos",
-                                message: "ขาดรูปถ่ายพื้นที่บาร์หรือรูปปิดร้าน"
-                            });
-                        }
-                    }
-                }
-
-                // C. Submission time checks (Punctuality)
-                const hr = item.timestamp.getHours();
-                const min = item.timestamp.getMinutes();
-                const decimalTime = hr + min / 60;
-
-                if (item.type === "Opening" && decimalTime > 11.0) {
-                    warnings.push({
-                        type: "late_submission",
-                        message: `ส่งฟอร์มเปิดร้านล่าช้ามาก (${format(item.timestamp, "HH:mm")} น.)`
-                    });
-                } else if (item.type === "Closing" && decimalTime < 21.0) {
-                    warnings.push({
-                        type: "early_submission",
-                        message: `ส่งฟอร์มปิดร้านเร็วเกินไป (${format(item.timestamp, "HH:mm")} น.)`
-                    });
-                }
-
-                return {
-                    ...item,
-                    warnings,
-                    hasDiscrepancies: warnings.length > 0
-                };
-            });
-
-            // Sort back to newest-to-oldest for UI rendering
-            const finalData = validatedData.sort((a, b) => b.timestamp - a.timestamp);
-            setData(finalData);
-            setLastSyncedTime(new Date());
-            setError(null);
-        } catch (err) {
-            console.error("Critical Data Error:", err);
-            setError(err.message);
-        } finally {
-            setLoading(false);
+        // Upload to Supabase Storage bucket 'yuzu-images' or 'checklist-photos'
+        const byteCharacters = atob(resizedBase64.split(',')[1]);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let j = 0; j < byteCharacters.length; j++) {
+          byteNumbers[j] = byteCharacters.charCodeAt(j);
         }
-    };
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: 'image/jpeg' });
 
-    // --- Helper: Robust Date Parser ---
-    const parseGenericDate = (dateStr) => {
-        if (!dateStr) return null;
+        const fileName = `checklist_${shiftType.toLowerCase()}_${Date.now()}_${i}.jpg`;
+        const { error: uploadErr } = await supabase.storage
+          .from('yuzu-images')
+          .upload(fileName, blob, { contentType: 'image/jpeg', upsert: true });
 
-        // Case 1: Excel Serial Date (Numbers)
-        if (!isNaN(dateStr) && parseFloat(dateStr) > 30000) {
-            return new Date((parseFloat(dateStr) - 25569) * 86400 * 1000);
-        }
-
-        // Clean string
-        const str = String(dateStr).replace(/,/g, ' ').replace(/\s+/g, ' ').trim();
-
-        // Case 2: Explicit Formats
-        const formatsToTry = [
-            'd/M/yyyy H:mm:ss',
-            'd/M/yyyy HH:mm:ss',
-            'dd/MM/yyyy HH:mm:ss',
-            'yyyy-MM-dd HH:mm:ss',
-            'd/M/yyyy H:mm',
-            'd/M/yyyy',
-            'd/M/yy H:mm:ss',
-            'd/M/yy'
-        ];
-
-        for (const fmt of formatsToTry) {
-            const parsed = parse(str, fmt, new Date());
-            if (isValid(parsed)) {
-                if (parsed.getFullYear() < 100) {
-                    parsed.setFullYear(parsed.getFullYear() + 2000);
-                }
-                return parsed;
-            }
-        }
-
-        // Case 3: Native Fallback (Restricted)
-        if (!str.includes('/')) {
-            const nativeParse = new Date(str);
-            if (isValid(nativeParse)) return nativeParse;
-        }
-
-        return null;
-    };
-
-    // --- Helper: Photo Link Extractor ---
-    const extractPhotoLinks = (row) => {
-        const photos = [];
-        Object.values(row).forEach(val => {
-            if (typeof val === 'string' && val.includes('http')) {
-                const links = val.split(/[\s,]+/).filter(s => s.startsWith('http'));
-                links.forEach(link => {
-                    let id = null;
-                    const idMatch = link.match(/id=([a-zA-Z0-9_-]+)/) || link.match(/\/d\/([a-zA-Z0-9_-]+)/);
-                    if (idMatch) id = idMatch[1];
-
-                    if (id) {
-                        photos.push({
-                            thumbnail: `https://lh3.googleusercontent.com/d/${id}=s400`,
-                            full: `https://drive.google.com/file/d/${id}/preview`
-                        });
-                    } else {
-                        photos.push({ thumbnail: link, full: link });
-                    }
-                });
-            }
-        });
-        return photos.filter((v, i, a) => a.findIndex(v2 => (v2.full === v.full)) === i);
-    };
-
-    // --- Derived State: Months ---
-    const availableMonths = useMemo(() => {
-        return [...new Set(data.map(item => format(item.timestamp, 'MMMM yyyy')))];
-    }, [data]);
-
-    // Set default month on data load
-    useEffect(() => {
-        if (availableMonths.length > 0 && !selectedMonth) {
-            const current = format(new Date(), 'MMMM yyyy');
-            setSelectedMonth(availableMonths.includes(current) ? current : availableMonths[0]);
-        }
-    }, [availableMonths]);
-
-    // --- Derived State: Month Data ---
-    const currentMonthData = useMemo(() => {
-        if (!selectedMonth) return [];
-        return data.filter(item => format(item.timestamp, 'MMMM yyyy') === selectedMonth);
-    }, [data, selectedMonth]);
-
-    // --- Derived State: Days of Selected Month ---
-    const daysInMonth = useMemo(() => {
-        if (!selectedMonth) return [];
-        const parsedDate = parse(selectedMonth, 'MMMM yyyy', new Date());
-        if (!isValid(parsedDate)) return [];
-        
-        const year = parsedDate.getFullYear();
-        const month = parsedDate.getMonth();
-        const numDays = new Date(year, month + 1, 0).getDate();
-        
-        const days = [];
-        for (let d = 1; d <= numDays; d++) {
-            days.push(new Date(year, month, d));
-        }
-        return days;
-    }, [selectedMonth]);
-
-    // Map month data to dates
-    const dayStatusMap = useMemo(() => {
-        const map = {};
-        currentMonthData.forEach(item => {
-            const dateStr = format(item.timestamp, 'yyyy-MM-dd');
-            if (!map[dateStr]) {
-                map[dateStr] = {
-                    opening: null,
-                    closing: null,
-                    date: item.timestamp
-                };
-            }
-            if (item.type === 'Opening') {
-                map[dateStr].opening = item;
-            } else if (item.type === 'Closing') {
-                map[dateStr].closing = item;
-            }
-        });
-        return map;
-    }, [currentMonthData]);
-
-    const firstDayOfWeek = useMemo(() => {
-        if (daysInMonth.length === 0) return 0;
-        return daysInMonth[0].getDay(); // 0: Sun, 1: Mon...
-    }, [daysInMonth]);
-
-    // --- Derived State: Statistics Dashboard ---
-    const stats = useMemo(() => {
-        const count = currentMonthData.length;
-        const perfectCount = currentMonthData.filter(item => item.warnings.length === 0).length;
-        const mismatchShifts = currentMonthData.filter(item => item.warnings.some(w => w.type === 'cash_mismatch'));
-        const totalMismatches = mismatchShifts.length;
-        
-        let netMismatchValue = 0;
-        mismatchShifts.forEach(item => {
-            const warning = item.warnings.find(w => w.type === 'cash_mismatch');
-            if (warning && warning.diff !== undefined) {
-                netMismatchValue += warning.diff;
-            }
-        });
-
-        const complianceScore = count > 0 ? Math.round((perfectCount / count) * 100) : 100;
-
-        return {
-            total: count,
-            opening: currentMonthData.filter(item => item.type === 'Opening').length,
-            closing: currentMonthData.filter(item => item.type === 'Closing').length,
-            perfect: perfectCount,
-            mismatches: totalMismatches,
-            netMismatch: netMismatchValue,
-            complianceScore
-        };
-    }, [currentMonthData]);
-
-    // --- Derived State: Filtered List for View ---
-    const filteredData = useMemo(() => {
-        return currentMonthData.filter(item => {
-            const typeMatch = filter === 'All' ? true : item.type === filter;
-            let dayMatch = true;
-            if (selectedDayFilter) {
-                dayMatch = format(item.timestamp, 'yyyy-MM-dd') === selectedDayFilter;
-            }
-            return typeMatch && dayMatch;
-        });
-    }, [currentMonthData, filter, selectedDayFilter]);
-
-    // Scroll to logs container when clicking calendar day
-    const handleDayClick = (dateStr) => {
-        if (selectedDayFilter === dateStr) {
-            setSelectedDayFilter(null);
+        if (!uploadErr) {
+          const { data: { publicUrl } } = supabase.storage.from('yuzu-images').getPublicUrl(fileName);
+          uploadedUrls.push(publicUrl);
         } else {
-            setSelectedDayFilter(dateStr);
-            setTimeout(() => {
-                logsContainerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-            }, 100);
+          // Fallback to base64 if storage policy blocked
+          uploadedUrls.push(resizedBase64);
         }
-    };
+      }
+      setPhotos(prev => [...prev, ...uploadedUrls]);
+    } catch (err) {
+      console.error("Photo upload error:", err);
+      setErrorMsg("ไม่สามารถอัปโหลดรูปภาพได้ กรุณาลองใหม่อีกครั้ง");
+    }
+    setIsUploading(false);
+  };
 
-    // --- RENDER ---
-    return (
-        <div className="min-h-screen bg-rams-bg text-rams-ink font-sans p-4 md:p-8 font-feature-settings-['ss01'] pb-32 transition-colors">
-            <div className="max-w-6xl mx-auto space-y-6">
-                
-                {/* Header Section */}
-                <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-rams-panel p-6 border border-rams-rule-light rounded-[1.8rem] shadow-none">
-                    <div className="space-y-1">
-                        <div className="flex items-center gap-3">
-                            <img src="/logo.png" className="h-8 w-auto object-contain mr-1" alt="Logo" onError={(e) => e.target.style.display = 'none'} />
-                            <h1 className="text-2xl font-mono font-bold tracking-tight text-rams-ink uppercase">Checklist System</h1>
-                            <span className="relative flex h-2.5 w-2.5">
-                                {isAutoSync && (
-                                    <span className="animate-pulse absolute inline-flex h-full w-full rounded-full bg-rams-green opacity-75"></span>
-                                )}
-                                <span className={cn(
-                                    "relative inline-flex rounded-full h-2.5 w-2.5 border border-rams-rule-light",
-                                    isAutoSync ? "bg-rams-green" : "bg-rams-ink-muted"
-                                )}></span>
-                            </span>
-                        </div>
-                        <p className="text-rams-ink-muted text-xs font-semibold">
-                            ระบบบันทึกความถูกต้อง รายงานเปิด-ปิดร้านประจำวัน และการสรุปข้อมูลแบบ Real-time
-                        </p>
+  const completedCount = tasks.filter(t => t.checked).length;
+  const isAllChecked = completedCount === tasks.length;
+
+  const handleSubmit = async () => {
+    if (tasks.length === 0) return;
+    setIsSubmitting(true);
+    setErrorMsg("");
+
+    try {
+      const staffName = profile?.displayName || "พนักงาน In The Haus";
+      const payload = {
+        date: format(new Date(), "yyyy-MM-dd"),
+        shift_type: shiftType,
+        employee_name: staffName,
+        tasks: tasks,
+        cash_amount: cashAmount ? parseFloat(cashAmount) : null,
+        photos: photos,
+        notes: notes || null
+      };
+
+      // 1. Insert into Supabase Table
+      const { error: insertErr } = await supabase
+        .from("daily_checklist_logs")
+        .insert(payload);
+
+      if (insertErr) {
+        console.warn("Supabase insert warning:", insertErr);
+      }
+
+      // 2. Notify LINE Group via API
+      try {
+        await fetch("/api/notify-checklist", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            shiftName: shiftType === "OPENING" ? "ตรวจความพร้อมก่อนเปิดร้าน (Opening)" : "ตรวจความสะอาด & ปิดร้าน (Closing)",
+            statusDetail: `ผ่านการตรวจ ${completedCount}/${tasks.length} รายการ`,
+            staffName: staffName,
+            cashAmount: cashAmount || null,
+            timestamp: new Date().toLocaleString("th-TH", { timeZone: "Asia/Bangkok" })
+          })
+        });
+      } catch (notifyErr) {
+        console.warn("Notification error:", notifyErr);
+      }
+
+      setSubmitSuccess(true);
+      fetchLogs();
+    } catch (err) {
+      console.error("Checklist submit error:", err);
+      setErrorMsg("เกิดข้อผิดพลาดในการบันทึกข้อมูล กรุณาลองใหม่");
+    }
+    setIsSubmitting(false);
+  };
+
+  const filteredLogs = logs.filter(l => {
+    if (!searchFilter.trim()) return true;
+    const q = searchFilter.toLowerCase();
+    return l.employee_name?.toLowerCase().includes(q) ||
+           l.shift_type?.toLowerCase().includes(q) ||
+           l.date?.includes(q);
+  });
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans pb-28 selection:bg-indigo-500/30">
+      {/* Header */}
+      <div className="relative overflow-hidden bg-gradient-to-b from-indigo-950/80 via-slate-950/50 to-transparent px-5 pt-7 pb-5 border-b border-indigo-900/20">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="inline-flex items-center gap-1.5 text-[10px] tracking-widest uppercase font-extrabold text-indigo-400 bg-indigo-500/10 px-2.5 py-1 rounded-full border border-indigo-500/20">
+              <Sparkles className="w-3 h-3 text-indigo-400" />
+              In The Haus Operations
+            </div>
+            <h1 className="text-2xl font-black text-white tracking-tight mt-2">📋 รายการตรวจเช็กร้าน</h1>
+            <p className="text-xs text-slate-400 font-medium mt-0.5">
+              {profile?.displayName ? `ผู้ตรวจ: ${profile.displayName}` : "ระบบตรวจสอบเปิด/ปิดร้านประจำวัน"}
+            </p>
+          </div>
+
+          <div className="flex bg-slate-900/80 p-1 rounded-2xl border border-indigo-900/30 shadow-inner">
+            <button
+              onClick={() => setActiveTab("form")}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                activeTab === "form" ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30" : "text-slate-400 hover:text-white"
+              }`}
+            >
+              ตรวจเช็ค
+            </button>
+            <button
+              onClick={() => { setActiveTab("logs"); fetchLogs(); }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                activeTab === "logs" ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30" : "text-slate-400 hover:text-white"
+              }`}
+            >
+              ประวัติ
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="p-4 max-w-xl mx-auto space-y-4">
+        {activeTab === "form" ? (
+          submitSuccess ? (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-slate-900/70 border border-emerald-500/30 rounded-3xl p-8 text-center space-y-4 shadow-2xl"
+            >
+              <div className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto border border-emerald-500/30">
+                <CheckCircle2 className="w-10 h-10 text-emerald-400 drop-shadow-[0_0_15px_rgba(52,211,153,0.5)]" />
+              </div>
+              <h2 className="text-xl font-black text-white">บันทึก Checklist เรียบร้อย!</h2>
+              <p className="text-xs text-slate-400 leading-relaxed max-w-xs mx-auto">
+                รายงานการตรวจ {shiftType === "OPENING" ? "กะเปิดร้าน" : "กะปิดร้าน"} ถูกบันทึกเข้าฐานข้อมูล Realtime และส่งแจ้งเตือนเข้ากลุ่ม LINE แล้วครับ
+              </p>
+              <div className="pt-2 flex gap-3 justify-center">
+                <button
+                  onClick={() => {
+                    setSubmitSuccess(false);
+                    setTasks(shiftType === "OPENING" ? OPENING_PRESETS.map(t => ({ ...t, checked: false })) : CLOSING_PRESETS.map(t => ({ ...t, checked: false })));
+                    setPhotos([]);
+                    setCashAmount("");
+                    setNotes("");
+                  }}
+                  className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-5 py-3 rounded-2xl shadow-lg shadow-indigo-600/30 transition"
+                >
+                  ทำรายการใหม่
+                </button>
+                <button
+                  onClick={() => setActiveTab("logs")}
+                  className="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs px-5 py-3 rounded-2xl border border-slate-700 transition"
+                >
+                  ดูประวัติ
+                </button>
+              </div>
+            </motion.div>
+          ) : (
+            <div className="space-y-4">
+              {/* Shift Selector */}
+              <div className="grid grid-cols-2 gap-2 p-1.5 bg-slate-900/80 rounded-2xl border border-indigo-900/30 shadow-inner">
+                <button
+                  onClick={() => setShiftType("OPENING")}
+                  className={`py-3 rounded-xl font-extrabold text-xs flex items-center justify-center gap-2 transition-all ${
+                    shiftType === "OPENING"
+                      ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg shadow-amber-500/25"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  <span>☀️ กะเปิดร้าน (Opening)</span>
+                </button>
+                <button
+                  onClick={() => setShiftType("CLOSING")}
+                  className={`py-3 rounded-xl font-extrabold text-xs flex items-center justify-center gap-2 transition-all ${
+                    shiftType === "CLOSING"
+                      ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-600/25"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  <span>🌙 กะปิดร้าน (Closing)</span>
+                </button>
+              </div>
+
+              {/* Progress Tracker */}
+              <div className="bg-slate-900/60 backdrop-blur-md border border-indigo-900/30 rounded-2xl p-4 flex items-center justify-between">
+                <div>
+                  <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">ความคืบหน้าการตรวจ</div>
+                  <div className="text-lg font-black text-white mt-0.5">
+                    {completedCount} / {tasks.length} รายการ
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-28 bg-slate-800 h-2.5 rounded-full overflow-hidden border border-slate-700">
+                    <div
+                      className={`h-full transition-all duration-500 ${
+                        isAllChecked ? "bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.5)]" : "bg-indigo-500"
+                      }`}
+                      style={{ width: `${(completedCount / tasks.length) * 100}%` }}
+                    />
+                  </div>
+                  <span className="text-xs font-mono font-black text-indigo-400">
+                    {Math.round((completedCount / tasks.length) * 100)}%
+                  </span>
+                </div>
+              </div>
+
+              {/* Tasks List */}
+              <div className="space-y-2">
+                {tasks.map((task, idx) => (
+                  <motion.div
+                    key={task.id}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => toggleTask(task.id)}
+                    className={`p-3.5 rounded-2xl border cursor-pointer transition-all flex items-start gap-3.5 ${
+                      task.checked
+                        ? "bg-emerald-500/10 border-emerald-500/30 shadow-md shadow-emerald-500/5"
+                        : "bg-slate-900/60 border-indigo-900/20 hover:border-indigo-900/50"
+                    }`}
+                  >
+                    <div
+                      className={`w-6 h-6 rounded-xl flex items-center justify-center shrink-0 mt-0.5 transition-all ${
+                        task.checked
+                          ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/30"
+                          : "border-2 border-slate-700 bg-slate-800"
+                      }`}
+                    >
+                      {task.checked && <Check className="w-4 h-4 stroke-[3]" />}
                     </div>
-
-                    <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-                        {/* Month Select */}
-                        {availableMonths.length > 0 && (
-                            <div className="relative">
-                                <select
-                                    value={selectedMonth}
-                                    onChange={(e) => {
-                                        setSelectedMonth(e.target.value);
-                                        setSelectedDayFilter(null);
-                                    }}
-                                    className="appearance-none pl-3 pr-8 py-2 rounded-sm bg-rams-bg border border-rams-rule-light text-xs font-mono font-bold text-rams-ink focus:outline-none focus:border-rams-rule transition-all cursor-pointer min-w-[150px]"
-                                >
-                                    {availableMonths.map(m => (
-                                        <option key={m} value={m}>
-                                            {format(parse(m, 'MMMM yyyy', new Date()), 'MMMM yyyy', { locale: th }).toUpperCase()}
-                                        </option>
-                                    ))}
-                                </select>
-                                <div className="absolute inset-y-0 right-2 flex items-center pointer-events-none text-rams-ink-muted">
-                                    <ChevronRight size={14} className="rotate-90" />
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Auto-Sync Toggle Control */}
-                        <button
-                            onClick={() => setIsAutoSync(!isAutoSync)}
-                            className={cn(
-                                "flex items-center gap-2 px-3 py-2 rounded-sm text-[10px] font-mono font-bold uppercase transition-all border cursor-pointer select-none active:translate-y-[1px]",
-                                isAutoSync 
-                                    ? "bg-rams-green/10 text-rams-green border-rams-green/30"
-                                    : "bg-rams-bg border-rams-rule-light text-rams-ink-muted hover:text-rams-ink"
-                            )}
-                        >
-                            {isAutoSync ? <Pause size={11} className="animate-pulse" /> : <Play size={11} />}
-                            {isAutoSync ? `LIVE (Auto ${countdown}s)` : "SYNC OFF"}
-                        </button>
-
-                        {/* Refresh Button */}
-                        <button
-                            onClick={fetchData}
-                            disabled={loading}
-                            className="p-2 flex items-center justify-center rounded-sm bg-rams-bg border border-rams-rule-light hover:bg-rams-panel/50 hover:text-rams-ink text-rams-ink-muted transition-all active:translate-y-[1px] cursor-pointer disabled:opacity-50"
-                        >
-                            <RefreshCw size={14} className={cn(loading && "animate-spin")} />
-                        </button>
+                    <div className="flex-1 min-w-0">
+                      <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider block">
+                        {task.category}
+                      </span>
+                      <p className={`text-xs font-bold leading-relaxed mt-0.5 ${task.checked ? "text-slate-200" : "text-slate-300"}`}>
+                        {task.text}
+                      </p>
                     </div>
-                </header>
+                  </motion.div>
+                ))}
+              </div>
 
-                {/* Dashboard Stats */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                    {/* Stat Card 1: Score */}
-                    <div className="bg-rams-panel p-5 border border-rams-rule-light rounded-[1.8rem] shadow-none flex flex-col justify-between">
-                        <span className="text-rams-ink-muted text-[9px] font-mono font-bold tracking-widest uppercase block mb-3">ความสมบูรณ์ข้อมูล</span>
-                        <div className="flex items-end justify-between">
-                            <h2 className="text-3xl font-mono font-black tracking-tight text-rams-ink">
-                                {stats.complianceScore}%
-                            </h2>
-                            <span className={cn(
-                                "text-[9px] font-mono font-bold uppercase tracking-widest px-2 py-0.5 rounded-lg border",
-                                stats.complianceScore > 85 ? "bg-rams-green/10 text-rams-green border-rams-green/30" :
-                                stats.complianceScore > 60 ? "bg-rams-amber/10 text-rams-amber border-rams-amber/30" :
-                                "bg-rams-red/10 text-rams-red border-rams-red/30"
-                            )}>
-                                {stats.complianceScore === 100 ? "EXCELLENT" : stats.complianceScore > 85 ? "GOOD" : "WARNING"}
-                            </span>
-                        </div>
-                        <div className="h-2 w-full bg-rams-bg border border-rams-rule-light rounded-lg mt-3.5 overflow-hidden">
-                            <div 
-                                className={cn(
-                                    "h-full transition-all duration-500",
-                                    stats.complianceScore > 85 ? "bg-rams-green" :
-                                    stats.complianceScore > 60 ? "bg-rams-amber" : "bg-rams-red"
-                                )} 
-                                style={{ width: `${stats.complianceScore}%` }}
-                            />
-                        </div>
-                    </div>
+              {/* Cash Input */}
+              <div className="bg-slate-900/60 border border-indigo-900/30 rounded-2xl p-4 space-y-2">
+                <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                  <DollarSign className="w-4 h-4 text-emerald-400" />
+                  <span>{shiftType === "OPENING" ? "ระบุยอดเงินทอนในลิ้นชัก (บาท)" : "ระบุยอดเงินสดปิดร้าน (บาท)"}</span>
+                </label>
+                <input
+                  type="number"
+                  placeholder="เช่น 2000 หรือ 5480"
+                  value={cashAmount}
+                  onChange={(e) => setCashAmount(e.target.value)}
+                  className="w-full bg-slate-950 border border-indigo-900/30 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-xl px-4 py-3 text-sm font-bold text-white placeholder-slate-600 outline-none transition"
+                />
+              </div>
 
-                    {/* Stat Card 2: Submissions */}
-                    <div className="bg-rams-panel p-5 border border-rams-rule-light rounded-[1.8rem] shadow-none flex flex-col justify-between">
-                        <span className="text-rams-ink-muted text-[9px] font-mono font-bold tracking-widest uppercase block mb-3">รายงานทั้งหมด</span>
-                        <div>
-                            <h2 className="text-3xl font-mono font-black tracking-tight text-rams-ink">
-                                {stats.total} <span className="text-xs font-normal text-rams-ink-muted">REPORTS</span>
-                            </h2>
-                            <div className="flex gap-3 mt-3 text-[9px] font-mono font-bold tracking-wider text-rams-ink-muted uppercase">
-                                <span className="flex items-center gap-1 text-rams-orange">☀️ OPEN: {stats.opening}</span>
-                                <span className="flex items-center gap-1 text-rams-ink">🌙 CLOSE: {stats.closing}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Stat Card 3: Discrepancy Count */}
-                    <div className="bg-rams-panel p-5 border border-rams-rule-light rounded-[1.8rem] shadow-none flex flex-col justify-between">
-                        <span className="text-rams-ink-muted text-[9px] font-mono font-bold tracking-widest uppercase block mb-3">จุดบกพร่อง / ต่างกะ</span>
-                        <div className="flex items-end justify-between">
-                            <div>
-                                <h2 className="text-3xl font-mono font-black tracking-tight text-rams-ink">
-                                    {stats.mismatches} <span className="text-xs font-normal text-rams-ink-muted">SHIFTS</span>
-                                </h2>
-                                <p className="text-[9px] font-mono text-rams-ink-muted uppercase tracking-wider mt-1.5">ยอดข้ามกะไม่ตรงกัน</p>
-                            </div>
-                            <div className={cn(
-                                "p-2 rounded-sm border flex items-center justify-center",
-                                stats.mismatches > 0 ? "bg-rams-amber/10 border-rams-amber/30 text-rams-amber" : "bg-rams-green/10 border-rams-green/30 text-rams-green"
-                            )}>
-                                <AlertTriangle size={16} />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Stat Card 4: Accum Discrepancy */}
-                    <div className="bg-rams-panel p-5 border border-rams-rule-light rounded-[1.8rem] shadow-none flex flex-col justify-between">
-                        <span className="text-rams-ink-muted text-[9px] font-mono font-bold tracking-widest uppercase block mb-3">สะสมเงินคลาดเคลื่อน</span>
-                        <div className="flex items-end justify-between">
-                            <div>
-                                <h2 className={cn(
-                                    "text-3xl font-mono font-black tracking-tight",
-                                    stats.netMismatch > 0 ? "text-rams-green" :
-                                    stats.netMismatch < 0 ? "text-rams-red" : "text-rams-ink"
-                                )}>
-                                    {stats.netMismatch > 0 ? `+${stats.netMismatch}` : stats.netMismatch} <span className="text-xs font-normal text-rams-ink-muted">THB</span>
-                                </h2>
-                                <p className="text-[9px] font-mono text-rams-ink-muted uppercase tracking-wider mt-1.5">ดรอเวอร์ดิฟสะสม</p>
-                            </div>
-                            <div className={cn(
-                                "p-2 rounded-xl border flex items-center justify-center",
-                                stats.netMismatch > 0 ? "bg-rams-green/10 border-rams-green/30 text-rams-green" :
-                                stats.netMismatch < 0 ? "bg-rams-red/10 border-rams-red/30 text-rams-red" : "bg-rams-bg border-rams-rule-light text-rams-ink-muted"
-                            )}>
-                                {stats.netMismatch > 0 ? <ArrowUpRight size={16} /> : <ArrowDownRight size={16} />}
-                            </div>
-                        </div>
-                    </div>
+              {/* Photos Capture */}
+              <div className="bg-slate-900/60 border border-indigo-900/30 rounded-2xl p-4 space-y-3">
+                <div className="flex justify-between items-center">
+                  <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                    <Camera className="w-4 h-4 text-indigo-400" />
+                    <span>ถ่ายรูป Station บาร์ / หน้าร้าน / ลิ้นชักเงิน</span>
+                  </label>
+                  <span className="text-[10px] font-bold text-slate-500">
+                    {photos.length} รูป
+                  </span>
                 </div>
 
-                {/* Calendar View Grid */}
-                <div className="bg-rams-panel p-6 border border-rams-rule-light rounded-[1.8rem] shadow-none">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-                        <div>
-                            <h2 className="text-lg font-mono font-bold text-rams-ink uppercase tracking-wider">ปฏิทินความถูกต้อง (Monthly Activity)</h2>
-                            <p className="text-[10px] font-mono text-rams-ink-muted uppercase tracking-wider mt-0.5">กดเลือกวันที่ต้องการตรวจสอบรายการบันทึก หรือกดซ้ำเพื่อยกเลิกตัวกรอง</p>
-                        </div>
-                        
-                        {selectedDayFilter && (
-                            <button
-                                onClick={() => setSelectedDayFilter(null)}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-sm bg-rams-bg border border-rams-rule-light hover:bg-rams-panel/50 hover:text-rams-ink text-xs font-mono font-bold text-rams-ink transition-all self-start md:self-auto cursor-pointer"
-                            >
-                                <X size={12} />
-                                CLEAR FILTER: {format(parse(selectedDayFilter, 'yyyy-MM-dd', new Date()), 'd MMM yyyy', { locale: th }).toUpperCase()}
-                            </button>
-                        )}
+                <div className="flex flex-wrap gap-2">
+                  {photos.map((img, i) => (
+                    <div key={i} className="relative w-16 h-16 rounded-xl overflow-hidden border border-indigo-900/40">
+                      <img src={img} alt="preview" className="w-full h-full object-cover" />
+                      <button
+                        onClick={() => setPhotos(prev => prev.filter((_, idx) => idx !== i))}
+                        className="absolute top-0.5 right-0.5 bg-black/70 p-1 rounded-full text-white hover:bg-red-500 transition"
+                      >
+                        <X className="w-2.5 h-2.5" />
+                      </button>
                     </div>
+                  ))}
 
-                    {/* Weekday headers */}
-                    <div className="grid grid-cols-7 gap-2 mb-2 text-center text-[10px] font-mono font-extrabold uppercase text-rams-ink-muted border-b border-rams-rule-light pb-2">
-                        {['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'].map(day => (
-                            <div key={day} className="py-1">{day}</div>
-                        ))}
-                    </div>
-
-                    {/* Days grid */}
-                    <div className="grid grid-cols-7 gap-2">
-                        {/* Padding cells */}
-                        {Array.from({ length: firstDayOfWeek }).map((_, i) => (
-                            <div key={`pad-${i}`} className="aspect-square rounded-sm bg-rams-bg/30 border border-dashed border-rams-rule-light/40" />
-                        ))}
-
-                        {/* Day cells */}
-                        {daysInMonth.map((day, idx) => {
-                            const dateStr = format(day, 'yyyy-MM-dd');
-                            const status = dayStatusMap[dateStr];
-                            const isToday = format(new Date(), 'yyyy-MM-dd') === dateStr;
-                            const isSelected = selectedDayFilter === dateStr;
-
-                            // Determine status styles for dots
-                            const getDotClass = (entry) => {
-                                if (!entry) return "bg-rams-bg border border-rams-rule-light/50";
-                                return entry.hasDiscrepancies 
-                                    ? "bg-rams-amber border border-rams-amber" 
-                                    : "bg-rams-green border border-rams-green";
-                            };
-
-                            return (
-                                <div
-                                    key={dateStr}
-                                    onClick={() => handleDayClick(dateStr)}
-                                    className={cn(
-                                        "aspect-square rounded-sm p-2 flex flex-col justify-between border cursor-pointer transition-all relative overflow-hidden group select-none",
-                                        isSelected 
-                                            ? "bg-rams-orange/10 border-rams-orange"
-                                            : isToday
-                                                ? "bg-rams-bg border-rams-rule"
-                                                : "bg-rams-panel border-rams-rule-light hover:border-rams-rule"
-                                    )}
-                                >
-                                    {/* Day Number */}
-                                    <div className="flex justify-between items-start">
-                                        <span className={cn(
-                                            "text-xs font-mono font-bold",
-                                            isToday ? "text-rams-orange font-black" : "text-rams-ink",
-                                            isSelected && "text-rams-orange"
-                                        )}>
-                                            {day.getDate()}
-                                        </span>
-                                        {isToday && (
-                                            <span className="w-1.5 h-1.5 rounded-full bg-rams-orange animate-pulse" />
-                                        )}
-                                    </div>
-
-                                    {/* Shift dots */}
-                                    <div className="flex justify-center gap-1 mt-auto">
-                                        {/* Opening Dot */}
-                                        <div 
-                                            title={status?.opening ? `เปิดกะ: ${status.opening.staffName}` : "ไม่มีข้อมูลเปิดร้าน"} 
-                                            className={cn("w-1.5 h-1.5 rounded-full", getDotClass(status?.opening))}
-                                        />
-                                        {/* Closing Dot */}
-                                        <div 
-                                            title={status?.closing ? `ปิดกะ: ${status.closing.staffName}` : "ไม่มีข้อมูลปิดร้าน"} 
-                                            className={cn("w-1.5 h-1.5 rounded-full", getDotClass(status?.closing))}
-                                        />
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploading}
+                    className="w-16 h-16 rounded-xl border border-dashed border-indigo-500/40 bg-indigo-500/5 hover:bg-indigo-500/10 flex flex-col items-center justify-center gap-1 text-indigo-400 transition"
+                  >
+                    {isUploading ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
+                    <span className="text-[9px] font-bold">เพิ่มรูป</span>
+                  </button>
                 </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  capture="environment"
+                  onChange={handlePhotoUpload}
+                  className="hidden"
+                />
+              </div>
 
-                {/* Content Section: Lists & Logs */}
-                <div ref={logsContainerRef} className="space-y-6">
-                    {/* Filter and Section Header */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-rams-rule-light pb-5">
-                        <div className="space-y-0.5">
-                            <h2 className="text-xl font-mono font-bold text-rams-ink uppercase tracking-wider">
-                                {selectedDayFilter 
-                                    ? `บันทึกสำหรับวันที่ ${format(parse(selectedDayFilter, 'yyyy-MM-dd', new Date()), 'd MMMM yyyy', { locale: th }).toUpperCase()}`
-                                    : "บันทึกการตรวจงานทั้งหมด"
-                                }
-                            </h2>
-                            <p className="text-rams-ink-muted text-[10px] font-mono uppercase tracking-wider">
-                                SHOWING {filteredData.length} OF {currentMonthData.length} MONTHLY ENTRIES
-                            </p>
-                        </div>
+              {/* Notes */}
+              <div className="bg-slate-900/60 border border-indigo-900/30 rounded-2xl p-4 space-y-2">
+                <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                  <FileText className="w-4 h-4 text-slate-400" />
+                  <span>หมายเหตุเพิ่มเติม / ส่งต่อกะถัดไป</span>
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="เช่น นมสดเหลือ 2 แกลลอน, ปั๊มน้ำล้างจานเสียงดัง..."
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  className="w-full bg-slate-950 border border-indigo-900/30 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-xl p-3 text-xs text-white placeholder-slate-600 outline-none transition"
+                />
+              </div>
 
-                        {/* Filter Tabs */}
-                        <div className="flex p-0.5 bg-rams-bg border border-rams-rule-light rounded-xl max-w-fit">
-                            {['All', 'Opening', 'Closing'].map((f) => (
-                                <button
-                                    key={f}
-                                    onClick={() => setFilter(f)}
-                                    className={cn(
-                                        "px-3.5 py-1.5 rounded-sm text-[10px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer select-none",
-                                        filter === f
-                                            ? "bg-rams-ink text-rams-panel border border-rams-rule"
-                                            : "text-rams-ink-muted hover:text-rams-ink"
-                                    )}
-                                >
-                                    {f === 'All' ? 'ทั้งหมด' : f === 'Opening' ? '☀️ เปิดร้าน' : '🌙 ปิดร้าน'}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Loader */}
-                    {loading && data.length === 0 ? (
-                        <div className="space-y-6">
-                            {[1, 2, 3].map(i => (
-                                <div key={i} className="w-full h-56 bg-rams-panel rounded-sm animate-pulse border border-rams-rule-light shadow-none" />
-                            ))}
-                        </div>
-                    ) : filteredData.length === 0 ? (
-                        <div className="bg-rams-panel rounded-sm p-12 text-center border border-rams-rule-light shadow-none flex flex-col items-center justify-center">
-                            <div className="p-3 bg-rams-bg border border-rams-rule-light text-rams-ink-muted mb-4 rounded-sm">
-                                <FileText size={24} />
-                            </div>
-                            <h3 className="text-sm font-mono font-bold text-rams-ink uppercase tracking-wider">ไม่พบรายงานบันทึก</h3>
-                            <p className="text-rams-ink-muted text-xs font-mono uppercase tracking-wider mt-1 max-w-xs leading-relaxed">
-                                NO ENTRIES COMPLY WITH THE APPLIED DATE OR SHIFT FILTERS
-                            </p>
-                        </div>
-                    ) : (
-                        <div className="grid gap-6">
-                            <AnimatePresence mode="popLayout">
-                                {filteredData.map((item) => (
-                                    <motion.div
-                                        key={item.id}
-                                        layout
-                                        initial={{ opacity: 0, scale: 0.99 }}
-                                        animate={{ opacity: 1, scale: 1 }}
-                                        exit={{ opacity: 0, scale: 0.98 }}
-                                        transition={{ duration: 0.15 }}
-                                        className={cn(
-                                            "bg-rams-panel rounded-[1.8rem] p-6 md:p-8 shadow-none border transition-all overflow-hidden relative group",
-                                            item.hasDiscrepancies
-                                                ? "border-rams-amber"
-                                                : "border-rams-rule-light"
-                                        )}
-                                    >
-                                        {/* Status Accent Strip */}
-                                        <div className={cn(
-                                            "absolute left-0 top-0 bottom-0 w-1 transition-colors duration-300",
-                                            item.type === 'Opening' 
-                                                ? "bg-rams-orange" 
-                                                : "bg-rams-ink"
-                                        )} />
-
-                                        <div className="pl-2">
-                                            {/* Top Metadata Header */}
-                                            <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-6">
-                                                {/* Left Info Column */}
-                                                <div className="space-y-2">
-                                                    <div className="flex flex-wrap items-center gap-3">
-                                                        <span className={cn(
-                                                            "text-[9px] font-mono font-bold uppercase tracking-widest px-2.5 py-0.5 rounded-sm border",
-                                                            item.type === 'Opening'
-                                                                ? "bg-rams-orange/10 text-rams-orange border-rams-orange/30"
-                                                                : "bg-rams-ink text-rams-panel border border-rams-rule"
-                                                        )}>
-                                                            {item.type === 'Opening' ? '☀️ OPENING' : '🌙 CLOSING'}
-                                                        </span>
-                                                        <span className="text-rams-ink-muted text-xs font-mono font-semibold flex items-center gap-1">
-                                                            <Clock size={12} />
-                                                            {format(item.timestamp, "d MMMM yyyy • HH:mm", { locale: th })} น.
-                                                        </span>
-                                                    </div>
-                                                    <h3 className="text-2xl font-mono font-black text-rams-ink flex items-center gap-2">
-                                                        <User size={18} className="text-rams-ink-muted" />
-                                                        {item.staffName.toUpperCase()}
-                                                    </h3>
-                                                </div>
-
-                                                {/* Right Cash Badge */}
-                                                {item.cashStr && (
-                                                    <div className="flex flex-col md:items-end bg-rams-bg p-3.5 rounded-sm border border-rams-rule-light min-w-[140px] shadow-none">
-                                                        <span className="text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1.5">
-                                                            CASH IN DRAWER
-                                                        </span>
-                                                        <span className="font-mono text-xl font-black text-rams-ink tabular-nums">
-                                                            {item.cash !== null ? item.cash.toLocaleString() : item.cashStr}{' '}
-                                                            <span className="text-xs font-bold text-rams-ink-muted">THB</span>
-                                                        </span>
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            {/* Validation Warnings Panel (if any) */}
-                                            {item.warnings.length > 0 && (
-                                                <div className="mb-6 p-4 bg-rams-amber/5 rounded-sm border border-rams-amber/35 space-y-2">
-                                                    <div className="flex items-center gap-2 text-rams-amber font-mono font-bold text-xs uppercase tracking-wider">
-                                                        <AlertCircle size={14} />
-                                                        <span>พบจุดที่ต้องตรวจสอบ ({item.warnings.length} รายการ)</span>
-                                                    </div>
-                                                    <ul className="space-y-1 pl-5 list-disc text-xs text-rams-ink-muted leading-relaxed font-mono font-semibold">
-                                                        {item.warnings.map((w, idx) => (
-                                                            <li key={idx} className="marker:text-rams-amber">
-                                                                {w.message}
-                                                            </li>
-                                                        ))}
-                                                    </ul>
-                                                </div>
-                                            )}
-
-                                            {/* Main Content Sections */}
-                                            <div className="grid md:grid-cols-2 gap-6 mb-6">
-                                                {/* Left Column: Tasks Completed */}
-                                                <div className="bg-rams-bg rounded-sm p-4 border border-rams-rule-light">
-                                                    <div className="flex items-center justify-between mb-4 border-b border-rams-rule-light/60 pb-2">
-                                                        <span className="text-[10px] font-mono font-bold text-rams-ink-muted uppercase tracking-wider flex items-center gap-1.5">
-                                                            <CheckSquare size={12} className="text-rams-ink-muted" />
-                                                            รายการภารกิจที่ทำเสร็จ
-                                                        </span>
-                                                        <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-sm bg-rams-green/10 text-rams-green border border-rams-green/20">
-                                                            {item.tasks.length} / 26 รายการ
-                                                        </span>
-                                                    </div>
-
-                                                    {item.tasks.length > 0 ? (
-                                                        <div className="space-y-2 max-h-[220px] overflow-y-auto custom-scrollbar pr-1">
-                                                            {item.tasks.map((taskText, idx) => (
-                                                                <div key={idx} className="flex items-start gap-2.5">
-                                                                    <div className="mt-1 w-3 h-3 rounded-full bg-rams-green/10 flex items-center justify-center flex-shrink-0 border border-rams-green/20">
-                                                                        <Check size={8} className="text-rams-green" strokeWidth={3} />
-                                                                    </div>
-                                                                    <span className="text-rams-ink text-xs leading-relaxed font-mono font-semibold">
-                                                                        {taskText}
-                                                                    </span>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    ) : (
-                                                        <p className="text-rams-ink-muted font-mono text-xs italic py-1">
-                                                            ไม่มีการบันทึกงานภารกิจหลัก
-                                                        </p>
-                                                    )}
-                                                </div>
-
-                                                {/* Right Column: General Notes & Metadata Fields */}
-                                                <div className="flex flex-col justify-between gap-4">
-                                                    <div className="bg-rams-bg rounded-sm p-4 border border-rams-rule-light flex-1">
-                                                        <span className="text-[10px] font-mono font-bold text-rams-ink-muted uppercase tracking-wider flex items-center gap-1.5 mb-3">
-                                                            <FileText size={12} className="text-rams-ink-muted" />
-                                                            บันทึกเพิ่มเติม / หมายเหตุ
-                                                        </span>
-                                                        {item.note ? (
-                                                            <p className="text-rams-ink text-xs leading-relaxed font-mono font-semibold bg-rams-panel p-3 rounded-sm border border-rams-rule-light">
-                                                                {item.note}
-                                                            </p>
-                                                        ) : (
-                                                            <p className="text-rams-ink-muted font-mono text-xs italic py-1">
-                                                                ไม่มีหมายเหตุเพิ่มเติม
-                                                            </p>
-                                                        )}
-                                                    </div>
-
-                                                    {/* Other form fields if present (e.g. coffee clean) */}
-                                                    {(item.raw["[ เวรล้างถังน้ำเครื่องกาแฟ - ทุก 2 วัน]"] || item.raw["ใส่ชื่อผู้ล้าง ถังน้ำกาแฟ **"] || item.raw["จุดที่ไม่เรียบร้อย (จากกะกลางคืน ) เพื่อปรับปรุง ไม่มีให้เว้นว่างเอาไว้ *"]) && (
-                                                        <div className="bg-rams-bg rounded-sm p-3.5 border border-rams-rule-light text-[10px] font-mono space-y-2">
-                                                            {item.raw["ใส่ชื่อผู้ล้าง ถังน้ำกาแฟ **"] && (
-                                                                <div className="flex justify-between">
-                                                                    <span className="text-rams-ink-muted font-bold">เวรล้างถังน้ำกาแฟ:</span>
-                                                                    <span className="text-rams-ink font-semibold">{item.raw["ใส่ชื่อผู้ล้าง ถังน้ำกาแฟ **"].toUpperCase()}</span>
-                                                                </div>
-                                                            )}
-                                                            {item.raw["จุดที่ไม่เรียบร้อย (จากกะกลางคืน ) เพื่อปรับปรุง ไม่มีให้เว้นว่างเอาไว้ *"] && (
-                                                                <div className="flex flex-col gap-1.5 pt-1.5 border-t border-rams-rule-light/40">
-                                                                    <span className="text-rams-ink-muted font-bold">จุดบกพร่องจากกะก่อนหน้า:</span>
-                                                                    <span className="text-rams-ink font-semibold bg-rams-amber/5 p-2 rounded-sm border border-rams-amber/25">
-                                                                        {item.raw["จุดที่ไม่เรียบร้อย (จากกะกลางคืน ) เพื่อปรับปรุง ไม่มีให้เว้นว่างเอาไว้ *"]}
-                                                                    </span>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-
-                                            {/* Evidence Photo Gallery */}
-                                            {item.photos.length > 0 && (
-                                                <div className="space-y-3">
-                                                    <span className="text-[10px] font-mono font-bold text-rams-ink-muted uppercase tracking-wider flex items-center gap-1.5">
-                                                        <Camera size={12} />
-                                                        ภาพถ่ายหลักฐานประกอบ ({item.photos.length} รูป)
-                                                    </span>
-                                                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
-                                                        {item.photos.map((photo, i) => (
-                                                            <div
-                                                                key={i}
-                                                                onClick={() => setSelectedImage(photo.full)}
-                                                                className="aspect-square rounded-sm overflow-hidden cursor-pointer relative group border border-rams-rule-light bg-rams-bg hover:border-rams-rule transition-all duration-200"
-                                                            >
-                                                                <div className="absolute inset-0 bg-rams-ink/0 group-hover:bg-rams-ink/5 transition-colors z-10" />
-                                                                <img
-                                                                    src={photo.thumbnail}
-                                                                    alt="Checklist Evidence"
-                                                                    className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-300"
-                                                                    onError={(e) => {
-                                                                        e.target.style.display = 'none';
-                                                                    }}
-                                                                />
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </motion.div>
-                                ))}
-                            </AnimatePresence>
-                        </div>
-                    )}
+              {errorMsg && (
+                <div className="p-3.5 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{errorMsg}</span>
                 </div>
+              )}
+
+              {/* Submit Button */}
+              <button
+                onClick={handleSubmit}
+                disabled={isSubmitting || completedCount === 0}
+                className="w-full bg-gradient-to-r from-indigo-600 via-indigo-500 to-emerald-500 hover:from-indigo-500 hover:to-emerald-400 text-white font-black py-4 rounded-2xl shadow-xl shadow-indigo-600/25 flex items-center justify-center gap-2 transition-all active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSubmitting ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+                <span className="text-sm tracking-wide">
+                  {isSubmitting ? "กำลังบันทึก..." : `บันทึกส่งรายงาน (${completedCount}/${tasks.length})`}
+                </span>
+              </button>
+            </div>
+          )
+        ) : (
+          /* Logs View */
+          <div className="space-y-3">
+            <div className="relative">
+              <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="ค้นหาตามชื่อผู้ตรวจ, กะ, หรือวันที่..."
+                value={searchFilter}
+                onChange={(e) => setSearchFilter(e.target.value)}
+                className="w-full bg-slate-900 border border-indigo-900/30 focus:border-indigo-500 rounded-2xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-slate-500 outline-none"
+              />
             </div>
 
-            {/* Lightbox / Google Drive IFrame Viewer */}
-            <AnimatePresence>
-                {selectedImage && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        onClick={() => setSelectedImage(null)}
-                        className="fixed inset-0 z-[100] bg-rams-ink/90 backdrop-blur-sm flex items-center justify-center p-4 md:p-8"
-                    >
-                        <motion.div
-                            initial={{ scale: 0.98, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0.98, opacity: 0 }}
-                            onClick={(e) => e.stopPropagation()}
-                            className="w-full h-full max-w-5xl bg-rams-bg rounded-sm overflow-hidden shadow-none relative border border-rams-rule"
-                        >
-                            {/* IFrame or Image Element */}
-                            {selectedImage.includes('drive.google.com') ? (
-                                <iframe
-                                    src={selectedImage}
-                                    className="w-full h-full border-0 bg-rams-bg"
-                                    allow="autoplay"
-                                />
-                            ) : (
-                                <div className="w-full h-full flex items-center justify-center bg-rams-bg p-2">
-                                    <img 
-                                        src={selectedImage} 
-                                        alt="Evidence Full" 
-                                        className="max-w-full max-h-full object-contain rounded-sm" 
-                                    />
-                                </div>
-                            )}
+            {loadingLogs ? (
+              <div className="py-20 text-center space-y-3">
+                <RefreshCw className="w-7 h-7 animate-spin text-indigo-400 mx-auto" />
+                <p className="text-xs text-slate-400 font-medium">กำลังโหลดประวัติ Realtime...</p>
+              </div>
+            ) : filteredLogs.length > 0 ? (
+              filteredLogs.map(log => (
+                <div key={log.id} className="bg-slate-900/70 border border-indigo-900/30 rounded-2xl p-4 space-y-3 shadow-lg">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full border ${
+                          log.shift_type === 'OPENING' 
+                            ? 'bg-amber-500/10 text-amber-400 border-amber-500/25'
+                            : 'bg-purple-500/10 text-purple-400 border-purple-500/25'
+                        }`}>
+                          {log.shift_type === 'OPENING' ? '☀️ กะเปิดร้าน' : '🌙 กะปิดร้าน'}
+                        </span>
+                        <span className="text-xs font-bold text-slate-200">
+                          {log.employee_name}
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-slate-400 mt-1 flex items-center gap-1.5">
+                        <Clock className="w-3 h-3 text-indigo-400" />
+                        <span>{format(parseISO(log.created_at || log.date), "dd MMM yyyy, HH:mm น.", { locale: th })}</span>
+                      </div>
+                    </div>
 
-                            {/* Close button */}
-                            <button
-                                onClick={() => setSelectedImage(null)}
-                                className="absolute top-4 right-4 w-9 h-9 bg-rams-panel hover:bg-rams-bg text-rams-ink rounded-sm flex items-center justify-center border border-rams-rule-light transition-all active:translate-y-[1px] cursor-pointer"
-                            >
-                                <X size={16} />
-                            </button>
-                        </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
-            {/* Brand Footer */}
-            <footer className="w-full text-center py-6 mt-8 text-[9px] font-mono tracking-[0.2em] text-rams-ink-muted uppercase select-none">
-                ONHAUS SYSTEM © {new Date().getFullYear()}
-            </footer>
-        </div>
-    );
+                    {log.cash_amount && (
+                      <div className="text-right">
+                        <div className="text-[10px] text-slate-400">ยอดเงิน</div>
+                        <div className="text-xs font-bold font-mono text-emerald-400">
+                          ฿{Number(log.cash_amount).toLocaleString()}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Tasks Summary */}
+                  {Array.isArray(log.tasks) && log.tasks.length > 0 && (
+                    <div className="bg-slate-950/60 p-2.5 rounded-xl border border-indigo-900/20 text-xs text-slate-300">
+                      <div className="text-[10px] font-bold text-slate-400 mb-1">
+                        ผ่าน {log.tasks.filter(t => t.checked).length} / {log.tasks.length} รายการ
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Photos */}
+                  {Array.isArray(log.photos) && log.photos.length > 0 && (
+                    <div className="flex gap-2 overflow-x-auto pt-1 pb-1">
+                      {log.photos.map((p, idx) => (
+                        <img
+                          key={idx}
+                          src={p}
+                          alt="log-photo"
+                          onClick={() => setSelectedPhoto(p)}
+                          className="w-14 h-14 object-cover rounded-xl border border-indigo-900/30 cursor-pointer hover:opacity-80 transition"
+                        />
+                      ))}
+                    </div>
+                  )}
+
+                  {log.notes && (
+                    <div className="text-[11px] text-slate-400 bg-slate-950/40 p-2.5 rounded-xl border border-indigo-900/10 italic">
+                      "{log.notes}"
+                    </div>
+                  )}
+                </div>
+              ))
+            ) : (
+              <div className="py-16 text-center bg-slate-900/30 rounded-2xl border border-indigo-900/20">
+                <FileText className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+                <p className="text-xs text-slate-400">ยังไม่มีบันทึก Checklist ในระบบ</p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Lightbox for Photos */}
+      <AnimatePresence>
+        {selectedPhoto && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setSelectedPhoto(null)}
+            className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4"
+          >
+            <div className="relative max-w-xl max-h-[85vh] rounded-2xl overflow-hidden border border-white/20">
+              <img src={selectedPhoto} alt="Full" className="w-full h-full object-contain" />
+              <button
+                onClick={() => setSelectedPhoto(null)}
+                className="absolute top-3 right-3 bg-black/70 p-2 rounded-full text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <NavigationDock />
+    </div>
+  );
 }

@@ -1,79 +1,110 @@
-import { parseISO } from 'date-fns';
+import { parseISO, format } from 'date-fns';
 
 /**
- * The Aggregator: Merges Weekly Template with Daily Overrides
- * Returns the "Effective Schedule" for a specific date or range.
- * 
- * @param {Array} employees - List of all active employees
+ * The Unified Roster Aggregator:
+ * Resolves the "Effective Schedule" for a specific date or employee by prioritizing:
+ * 1. Published `roster_transactions` (Single Source of Truth)
+ * 2. Legacy `roster_overrides` (Backward compatibility)
+ * 3. Weekly `employee_schedules` (Template default)
+ *
+ * @param {Array} employees - List of active employees
  * @param {Object} schedules - Weekly Map { empId: { 0: schedule, 1: schedule ... } }
- * @param {Array} overrides - List of roster_overrides records for the target date(s)
+ * @param {Array} overrides - List of roster_overrides OR roster_transactions records
  * @param {Array} shifts - List of shift definitions (Master Data)
- * @param {Date|String} targetDate - The specific date to check
+ * @param {Date|String} targetDate - The target date
+ * @param {Object} options - { includeDrafts: false }
  * 
- * @returns {Array} List of effective shifts for that day
- * [{ employee_id, shift_id, shift_name, start_time, end_time, source: 'TEMPLATE'|'OVERRIDE' }]
+ * @returns {Array} List of effective shifts: [{ employee, shift_id, shift_name, start_time, end_time, slot_type, is_off, source }]
  */
-export const getEffectiveDailyRoster = (employees, schedules, overrides, shifts, targetDate) => {
+export const getEffectiveDailyRoster = (employees = [], schedules = {}, overrides = [], shifts = [], targetDate, options = { includeDrafts: false }) => {
     const dateObj = typeof targetDate === 'string' ? parseISO(targetDate) : targetDate;
     const dayOfWeek = dateObj.getDay();
-    const dateStr = dateObj.toISOString().split('T')[0];
+    const dateStr = format(dateObj, 'yyyy-MM-dd');
 
-    // precision: Create Map for Overrides for faster lookup { empId: override }
-    const overrideMap = new Map();
-    overrides.forEach(ov => {
-        if (ov.date === dateStr) {
-            overrideMap.set(String(ov.employee_id), ov);
+    // Create Map for fast lookup by employee ID
+    // Support multiple slots per employee (e.g. MAIN and SPLIT)
+    const empTransactionMap = new Map();
+    (overrides || []).forEach(item => {
+        if (item.date === dateStr) {
+            const eid = String(item.employee_id);
+            // If item has status, check if it's published or drafts are allowed
+            if (item.status && item.status !== 'PUBLISHED' && !options.includeDrafts) {
+                return;
+            }
+            if (!empTransactionMap.has(eid)) {
+                empTransactionMap.set(eid, []);
+            }
+            empTransactionMap.get(eid).push(item);
         }
     });
 
     const effectiveRoster = [];
 
-    employees.forEach(emp => {
+    (employees || []).forEach(emp => {
         const empId = String(emp.id);
-        const override = overrideMap.get(empId);
+        const txList = empTransactionMap.get(empId);
 
-        // Priority 1: Check Override
-        if (override) {
-            if (override.is_off) {
-                // Explicitly OFF
-                return;
-            }
-
-            // Working via Override
-            // Note: We use custom_start_time from override (Data Freezing Principle)
-            // But we might fetch shift Name for UI display
-            const shiftDef = shifts.find(s => String(s.id) === String(override.shift_id));
-            const startTime = override.custom_start_time || shiftDef?.start_time || '';
-            const endTime = override.custom_end_time || shiftDef?.end_time || '';
-            
-            let shiftName = shiftDef ? shiftDef.name + ' (Sub)' : 'Extra Shift';
-            if (!shiftDef && startTime && endTime) {
-                const startClean = startTime.slice(0, 5);
-                const endClean = endTime.slice(0, 5);
-                if (startClean === '12:30' && endClean === '23:30') {
-                    shiftName = 'ผู้ช่วยครัว';
-                } else if (startClean === '18:00' && endClean === '22:30') {
-                    shiftName = 'INTHEHAUS';
-                } else if (startClean === '10:00' && endClean === '20:30') {
-                    shiftName = 'CHEF';
-                } else if (startClean === '12:00' && endClean === '20:00') {
-                    shiftName = 'กลางกะ';
+        // Priority 1: Check Published Roster Transactions / Overrides
+        if (txList && txList.length > 0) {
+            txList.forEach(tx => {
+                if (tx.is_off) {
+                    // Explicit OFF record
+                    effectiveRoster.push({
+                        employee: emp,
+                        shift_id: null,
+                        shift_name: 'OFF',
+                        start_time: null,
+                        end_time: null,
+                        slot_type: tx.slot_type || 'MAIN',
+                        is_off: true,
+                        source: 'TRANSACTION',
+                        original_record: tx
+                    });
+                    return;
                 }
-            }
 
-            effectiveRoster.push({
-                employee: emp,
-                shift_id: override.shift_id,
-                shift_name: shiftName,
-                start_time: startTime,
-                end_time: endTime,
-                source: 'OVERRIDE',
-                original_override: override
+                const shiftDef = shifts.find(s => String(s.id) === String(tx.shift_id));
+                const startTime = tx.custom_start_time || shiftDef?.start_time || '';
+                const endTime = tx.custom_end_time || shiftDef?.end_time || '';
+
+                let shiftName = shiftDef ? shiftDef.name : 'กะพิเศษ (Custom)';
+                if (tx.slot_type === 'SPLIT' && !shiftName.includes('ควบ')) {
+                    shiftName = `${shiftName} (ควบ)`;
+                } else if (tx.slot_type === 'OVERTIME') {
+                    shiftName = `${shiftName} (OT)`;
+                }
+
+                // Match known preset timings
+                if ((!shiftDef || shiftName === 'กะพิเศษ (Custom)') && startTime && endTime) {
+                    const startClean = startTime.slice(0, 5);
+                    const endClean = endTime.slice(0, 5);
+                    if (startClean === '12:30' && endClean === '23:30') {
+                        shiftName = 'ผู้ช่วยครัว';
+                    } else if (startClean === '18:00' && endClean === '22:30') {
+                        shiftName = 'INTHEHAUS';
+                    } else if (startClean === '10:00' && endClean === '20:30') {
+                        shiftName = 'CHEF';
+                    } else if (startClean === '12:00' && endClean === '20:00') {
+                        shiftName = 'กลางกะ';
+                    }
+                }
+
+                effectiveRoster.push({
+                    employee: emp,
+                    shift_id: tx.shift_id,
+                    shift_name: shiftName,
+                    start_time: startTime,
+                    end_time: endTime,
+                    slot_type: tx.slot_type || 'MAIN',
+                    is_off: false,
+                    source: 'TRANSACTION',
+                    original_record: tx
+                });
             });
             return;
         }
 
-        // Priority 2: Check Weekly Template
+        // Priority 2: Check Weekly Template (Fallback if no published transaction for this date)
         const weeklySchedule = schedules[empId]?.[dayOfWeek];
         if (weeklySchedule && !weeklySchedule.is_off && weeklySchedule.shift_id) {
             const shiftDef = shifts.find(s => String(s.id) === String(weeklySchedule.shift_id));
@@ -84,6 +115,8 @@ export const getEffectiveDailyRoster = (employees, schedules, overrides, shifts,
                     shift_name: shiftDef.name,
                     start_time: shiftDef.start_time,
                     end_time: shiftDef.end_time,
+                    slot_type: 'MAIN',
+                    is_off: false,
                     source: 'TEMPLATE'
                 });
             }

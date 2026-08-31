@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useState, useMemo, useReducer } from "react";
 import { supabase } from "../../lib/supabaseClient";
+import { useRealtimeSync } from "../../lib/useRealtimeSync";
 import { format, parseISO, startOfMonth, endOfMonth, differenceInMinutes, startOfWeek, addDays } from "date-fns";
 import * as XLSX from 'xlsx';
 import { calculatePayroll } from "../../utils/payroll";
@@ -250,6 +251,24 @@ export default function AdminDashboard() {
     useEffect(() => {
         if (activeTab === 'history' && selectedEmpId !== 'ALL') fetchIndividualLogs();
     }, [selectedEmpId]);
+
+    // Realtime Sync for Admin Dashboard
+    useRealtimeSync(['attendance_logs', 'leave_requests', 'shift_swap_requests', 'roster_transactions', 'announcements'], () => {
+        if (activeTab === 'dashboard') {
+            fetchLogs();
+            fetchTransactions();
+            fetchData('leave_requests', 'leaveRequests');
+        } else if (activeTab === 'payroll') {
+            fetchLogs();
+            fetchTransactions();
+        } else if (activeTab === 'requests') {
+            fetchData('leave_requests', 'leaveRequests');
+        } else if (activeTab === 'announcements') {
+            fetchData('announcements', 'announcements');
+        } else if (activeTab === 'history') {
+            fetchIndividualLogs();
+        }
+    }, [activeTab, selectedMonth, selectedEmpId]);
 
     // --- Payroll Memoization ---
     const payrollData = useMemo(() => {

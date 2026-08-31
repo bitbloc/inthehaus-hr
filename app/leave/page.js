@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import liff from "@line/liff";
 import { supabase } from "../../lib/supabaseClient";
+import { useRealtimeSync } from "../../lib/useRealtimeSync";
 import NavigationDock from "../_components/NavigationDock";
 
 export default function LeaveRequest() {
@@ -19,12 +20,12 @@ export default function LeaveRequest() {
   const [employee, setEmployee] = useState(null);
 
   const fetchEmployeeAndHistory = async (userId) => {
-    // 1. Fetch employee data
+    // 1. Fetch employee data (support both line_user_id and line_bot_id)
     const { data: emp } = await supabase
       .from('employees')
       .select('*')
-      .eq('line_user_id', userId)
-      .single();
+      .or(`line_user_id.eq.${userId},line_bot_id.eq.${userId}`)
+      .maybeSingle();
 
     if (emp) {
       setEmployee(emp);
@@ -66,6 +67,13 @@ export default function LeaveRequest() {
     };
     init();
   }, []);
+
+  // Realtime subscription on leave requests
+  useRealtimeSync(['leave_requests', 'employees'], () => {
+    if (profile?.userId) {
+      fetchEmployeeAndHistory(profile.userId);
+    }
+  });
 
   const getDatesInRange = (startStr, endStr) => {
     if (!startStr || !endStr) return [];

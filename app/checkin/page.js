@@ -6,6 +6,7 @@
 import { useEffect, useState, useRef } from "react";
 import liff from "@line/liff";
 import { supabase } from "../../lib/supabaseClient";
+import { useRealtimeSync } from "../../lib/useRealtimeSync";
 import { resizeImage } from "../../utils/imageResizer";
 import Link from "next/link";
 import { format, isSameDay, startOfWeek, addDays } from "date-fns";
@@ -22,6 +23,7 @@ function cn(...inputs) {
 }
 
 import WeatherCard from "./components/WeatherCard";
+import QRScannerModal from "./components/QRScannerModal";
 
 export default function CheckIn() {
   // --- State ---
@@ -45,6 +47,7 @@ export default function CheckIn() {
 
   // Interaction State
   const [showCamera, setShowCamera] = useState(false);
+  const [showQRScanner, setShowQRScanner] = useState(false);
   const [showMoodSelector, setShowMoodSelector] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -52,14 +55,14 @@ export default function CheckIn() {
   const [wrapUpData, setWrapUpData] = useState(null);
   const [lastCheckInTime, setLastCheckInTime] = useState(null);
 
-  // Dev Mode State
+  // Dev Mode State (Disabled for plain security)
   const [devMode, setDevMode] = useState(false);
   const fileInputRef = useRef(null);
 
   // --- Constants ---
   const SHOP_LAT = 17.39009845004315;
   const SHOP_LONG = 104.7929558480443;
-  const ALLOWED_RADIUS_KM = 0.05;
+  const ALLOWED_RADIUS_KM = 0.08; // 80 meters (harmonized with server)
 
   // Load Acknowledged Announcements
   useEffect(() => {
@@ -103,6 +106,16 @@ export default function CheckIn() {
       if (watchId) navigator.geolocation.clearWatch(watchId);
     };
   }, []);
+
+  // --- Realtime Synchronization ---
+  useRealtimeSync(['attendance_logs', 'roster_transactions', 'leave_requests', 'announcements'], () => {
+    if (profile?.userId) {
+      fetchUserStatus(profile.userId);
+      fetchMyShift(profile.userId);
+    }
+    fetchAnnouncement();
+    fetchRecents();
+  });
 
   // --- Fetchers ---
   const fetchAnnouncement = async () => {
@@ -275,8 +288,12 @@ export default function CheckIn() {
   };
 
   const fetchUserStatus = async (userId) => {
-    // Check user existence regardless of active status
-    const { data: emp } = await supabase.from('employees').select('id, position, is_active').eq('line_user_id', userId).maybeSingle();
+    // Check user existence regardless of active status (support both line_user_id and line_bot_id)
+    const { data: emp } = await supabase
+      .from('employees')
+      .select('id, name, nickname, position, is_active, photo_url')
+      .or(`line_user_id.eq.${userId},line_bot_id.eq.${userId}`)
+      .maybeSingle();
 
     if (!emp) {
       setStatus("New User");
@@ -342,12 +359,16 @@ export default function CheckIn() {
 
   const fetchMyShift = async (userId) => {
     try {
-      const { data: emp } = await supabase.from('employees').select('id').eq('line_user_id', userId).maybeSingle();
+      const { data: emp } = await supabase
+        .from('employees')
+        .select('id')
+        .or(`line_user_id.eq.${userId},line_bot_id.eq.${userId}`)
+        .maybeSingle();
       if (!emp) return;
 
       const today = new Date();
       const dateStr = format(today, 'yyyy-MM-dd');
-      const dayOfWeek = today.getDay(); // 0 is Sunday, which matches our schedule logic usually (or 1=Mon?)
+      const dayOfWeek = today.getDay();
       // Let's assume 0=Sunday, 1=Monday. roster_weekly_schedules usually uses 0-6.
 
       // 1. Check Roster Transactions (highest priority, including DRAFT/PUBLISHED)
@@ -468,75 +489,155 @@ export default function CheckIn() {
     }
 
     if (isUploading || isSubmitting) return;
-    if (!devMode && !status.includes("Ready")) return alert("Please be at the location to check in.");
+    if (!devMode && !status.includes("Ready") && !status.includes("พร้อม")) {
+      const wantQR = confirm("คุณอยู่นอกพื้นที่ร้าน หรือ GPS ในอาคารเพี้ยน ต้องการสแกน Dynamic QR Code หน้าร้านเพื่อลงเวลาหรือไม่?");
+      if (wantQR) {
+        setShowQRScanner(true);
+      }
+      return;
+    }
     setShowCamera(true);
-    // Removed auto-click to fix mobile browser security blocking
   };
 
   const onGeoSuccess = (position) => {
-    const { latitude, longitude } = position.coords;
-    setUserPosition({ lat: latitude, lon: longitude });
+    const { latitude, longitude, accuracy } = position.coords;
+    setUserPosition({ lat: latitude, lon: longitude, accuracy });
 
     const dist = getDistanceFromLatLonInKm(latitude, longitude, SHOP_LAT, SHOP_LONG);
     if (dist <= ALLOWED_RADIUS_KM) {
-      if (!status.includes("Ready")) setStatus("Ready to Check In");
+      if (!status.includes("Ready") && !status.includes("พร้อม")) setStatus("พร้อมลงเวลา (อยู่ในพื้นที่ร้าน)");
     } else {
-      if (!devMode) setStatus(`Too far (${dist.toFixed(2)}km)`);
+      const distMeters = Math.round(dist * 1000);
+      if (!devMode) setStatus(`อยู่นอกพื้นที่ร้าน (${distMeters} ม.)`);
     }
   };
 
-  const onGeoError = (error) => {
-    console.error("Geo Error:", error);
-    // if(!devMode) setStatus("GPS Error");
+  // --- Dynamic Watermark Canvas Helper ---
+  const createWatermarkedPhoto = async (file, staffName, dateText, locText) => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const maxW = 800;
+          const maxH = 800;
+          let w = img.width;
+          let h = img.height;
+          if (w > maxW || h > maxH) {
+            if (w > h) {
+              h = Math.round((h * maxW) / w);
+              w = maxW;
+            } else {
+              w = Math.round((w * maxH) / h);
+              h = maxH;
+            }
+          }
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+
+          // Dark Watermark Bar at Bottom
+          const barH = 65;
+          ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+          ctx.fillRect(0, h - barH, w, barH);
+
+          // Text details
+          ctx.fillStyle = '#FFFFFF';
+          ctx.font = 'bold 16px sans-serif';
+          ctx.fillText(`📍 IN THE HAUS • ${staffName || 'Staff'}`, 16, h - barH + 24);
+
+          ctx.fillStyle = '#94A3B8';
+          ctx.font = '12px monospace';
+          ctx.fillText(`⏰ ${dateText} | ${locText}`, 16, h - barH + 48);
+
+          resolve(canvas.toDataURL('image/jpeg', 0.85));
+        };
+        img.onerror = reject;
+        img.src = e.target.result;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const executePunch = async ({ photoBase64 = null, qrToken = null }) => {
+    if (!profile?.userId || isSubmitting) return;
+
+    setIsSubmitting(true);
+    setIsUploading(true);
+
+    try {
+      const staffName = employeeData?.nickname ? `${employeeData.name} (${employeeData.nickname})` : (employeeData?.name || profile.displayName);
+      const res = await fetch('/api/checkins/punch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: profile.userId,
+          latitude: userPosition?.lat,
+          longitude: userPosition?.lon,
+          accuracy: userPosition?.accuracy,
+          qrToken: qrToken || null,
+          photoBase64: photoBase64 || null,
+          deviceInfo: {
+            userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+            platform: typeof navigator !== 'undefined' ? navigator.platform : ''
+          }
+        })
+      });
+
+      const json = await res.json();
+
+      if (!json.success) {
+        alert(json.error || "เกิดข้อผิดพลาดในการลงเวลา");
+        return;
+      }
+
+      setShowCamera(false);
+      setShowQRScanner(false);
+      fetchRecents();
+      fetchUserStatus(profile.userId);
+
+      // Handle Check-out Wrap up
+      if (json.action === 'check_out' && json.duration) {
+        setWrapUpData(json.duration);
+        setShowMoodSelector(true);
+      } else {
+        setWrapUpData(null);
+        setShowMoodSelector(true);
+      }
+
+    } catch (err) {
+      console.error("Punch error:", err);
+      alert("ไม่สามารถเชื่อมต่อระบบลงเวลาได้ กรุณาตรวจสอบสัญญาณเน็ต");
+    } finally {
+      setIsUploading(false);
+      setIsSubmitting(false);
+    }
   };
 
   const handleFileChange = async (e) => {
     const file = e.target.files[0];
-    if (!file) return;
+    if (!file || isUploading || isSubmitting) return;
 
-    setIsUploading(true);
     try {
-      const resized = await resizeImage(file, 600); // Optimized for speed
-      const fileName = `${profile.userId}_${Date.now()}.jpg`;
+      const nowStr = format(new Date(), 'dd/MM/yyyy HH:mm:ss');
+      const locText = status.includes('Ready') ? 'In The Haus Area' : 'GPS Verified';
+      const staffName = employeeData?.nickname || employeeData?.name || profile?.displayName;
 
-      const { error: uploadError } = await supabase.storage.from('checkin-photos').upload(fileName, resized);
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage.from('checkin-photos').getPublicUrl(fileName);
-
-      const action = lastAction === 'check_in' ? 'check_out' : 'check_in';
-
-      const { error: insertError } = await supabase.from('attendance_logs').insert({
-        employee_id: employeeData.id,
-        action_type: action,
-        timestamp: new Date().toISOString(),
-        photo_url: publicUrl,
-        location: userPosition ? `(${userPosition.lon},${userPosition.lat})` : null
-      });
-
-      if (insertError) throw insertError;
-
-      setShowCamera(false);
-      fetchRecents();
-      
-      // Calculate Wrap Up Data if checking out
-      if (action === 'check_out' && lastCheckInTime) {
-        const diffMs = new Date() - lastCheckInTime;
-        const durationHours = Math.floor(diffMs / (1000 * 60 * 60));
-        const durationMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-        setWrapUpData({ hours: durationHours, minutes: durationMinutes });
-      } else {
-        setWrapUpData(null);
-      }
-
-      fetchUserStatus(profile.userId);
-
-      setShowMoodSelector(true); // Ask for mood on both check-in and check-out
+      const watermarkedBase64 = await createWatermarkedPhoto(file, staffName, nowStr, locText);
+      await executePunch({ photoBase64: watermarkedBase64 });
     } catch (err) {
-      alert("Error: " + err.message);
-    } finally {
+      alert("Error processing photo: " + err.message);
       setIsUploading(false);
+      setIsSubmitting(false);
     }
+  };
+
+  const handleQRScanSuccess = async (scannedToken) => {
+    if (!scannedToken) return;
+    await executePunch({ qrToken: scannedToken });
   };
 
   const handleMoodSelect = async (mood) => {
@@ -552,27 +653,21 @@ export default function CheckIn() {
         await supabase.from('attendance_logs').update({ mood_status: mood }).eq('id', latestLog.id);
         fetchRecents();
         
-        if (latestLog.action_type === 'check_out') {
+        if (latestLog.action_type === 'check_out' && wrapUpData) {
            setWrapUpData(prev => ({ ...prev, mood }));
         }
       }
     } catch (e) { console.error(e); }
     setShowMoodSelector(false);
     
-    // Check if it was a checkout, show wrap up
+    // If it was a checkout, show wrap up
     if (wrapUpData) {
       setShowWrapUp(true);
     }
   };
 
   const handleDevLogin = () => {
-    // Toggle dev mode
-    const pwd = prompt("Dev Password");
-    if (pwd === "1533") {
-      setDevMode(!devMode);
-      setStatus("Ready (Dev)");
-      // alert("Dev Mode: " + (!devMode));
-    }
+    // Plaintext dev password removed for security
   };
 
   function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
@@ -719,27 +814,39 @@ export default function CheckIn() {
           )}
         </motion.div>
 
-        {/* Check-In / Check-Out Button (moved here, directly under GPS status) */}
+        {/* Check-In / Check-Out Button & QR Scanner Button */}
         {!status.includes('Checking') && (
-          <motion.button
-            initial={{ scale: 0.98, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            onClick={handleStartCheckIn}
-            className="w-full max-w-sm px-6 mb-6 z-30 transition-all active:translate-y-[4px] active:scale-[0.98]"
-          >
-            <div className={cn(
-              "w-full py-4 rounded-[2rem] flex flex-col items-center justify-center border border-rams-rule transition-all text-center select-none cursor-pointer",
-              mainButtonConfig.color
-            )}>
-              <span className="text-3xl mb-1">{mainButtonConfig.icon}</span>
-              <span className="text-lg font-mono font-bold uppercase tracking-wider">
-                {mainButtonConfig.label}
-              </span>
-              <span className="text-[10px] font-mono opacity-80 mt-0.5 font-bold uppercase tracking-widest">
-                {mainButtonConfig.sub}
-              </span>
-            </div>
-          </motion.button>
+          <div className="w-full max-w-sm px-6 mb-6 z-30 space-y-3">
+            <motion.button
+              initial={{ scale: 0.98, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              onClick={handleStartCheckIn}
+              disabled={isSubmitting}
+              className="w-full transition-all active:translate-y-[4px] active:scale-[0.98] disabled:opacity-50"
+            >
+              <div className={cn(
+                "w-full py-4 rounded-[2rem] flex flex-col items-center justify-center border border-rams-rule transition-all text-center select-none cursor-pointer",
+                mainButtonConfig.color
+              )}>
+                <span className="text-3xl mb-1">{mainButtonConfig.icon}</span>
+                <span className="text-lg font-mono font-bold uppercase tracking-wider">
+                  {isSubmitting ? "Processing..." : mainButtonConfig.label}
+                </span>
+                <span className="text-[10px] font-mono opacity-80 mt-0.5 font-bold uppercase tracking-widest">
+                  {mainButtonConfig.sub}
+                </span>
+              </div>
+            </motion.button>
+
+            {/* Shop Dynamic QR Code Option */}
+            <button
+              onClick={() => setShowQRScanner(true)}
+              className="w-full py-3 bg-rams-panel hover:bg-slate-900/90 border border-rams-rule-light rounded-2xl flex items-center justify-center gap-2 text-xs font-mono font-bold text-rams-ink transition-all active:scale-[0.99] shadow-sm"
+            >
+              <span>📱 สแกน QR หน้าร้าน</span>
+              <span className="text-[10px] text-rams-ink-muted">(หาก GPS เพี้ยน)</span>
+            </button>
+          </div>
         )}
 
         {/* Daily Bulletin & Dashboard */}
@@ -1122,6 +1229,13 @@ export default function CheckIn() {
 
       {/* 5. Navigation Dock (The "Haus" Dock) */}
       <NavigationDock />
+
+      {/* QR Scanner Modal */}
+      <QRScannerModal
+        isOpen={showQRScanner}
+        onClose={() => setShowQRScanner(false)}
+        onScanSuccess={handleQRScanSuccess}
+      />
 
 
 

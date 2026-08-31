@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Badge } from '../_components/ui/Badge';
 import { supabase } from '../../../lib/supabaseClient';
+import { useRealtimeSync } from '../../../lib/useRealtimeSync';
 import { startOfWeek, endOfWeek, addDays, format, subWeeks, addWeeks, parseISO } from 'date-fns';
 import { ChevronLeft, ChevronRight, Copy, CheckCircle, Save, Plus, Trash2, Printer, Search, Settings, Filter, UserCheck, UserX, AlertCircle, Sun } from 'lucide-react';
 
@@ -93,6 +94,11 @@ export default function AdminRosterPage() {
     const dates = Array.from({ length: 7 }).map((_, i) => addDays(weekStart, i));
 
     useEffect(() => {
+        fetchData();
+    }, [currentDate]);
+
+    // Realtime Sync on Roster, Leaves, and Attendance
+    useRealtimeSync(['roster_transactions', 'leave_requests', 'attendance_logs'], () => {
         fetchData();
     }, [currentDate]);
 
