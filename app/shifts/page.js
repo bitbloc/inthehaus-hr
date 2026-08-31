@@ -89,7 +89,8 @@ export default function ShiftsPage() {
 
                     // Fallback to localStorage or first employee
                     if (!resolvedEmp) {
-                        const storedId = localStorage.getItem('demo_user_id');
+                        let storedId = null;
+                        try { storedId = localStorage.getItem('demo_user_id'); } catch (e) {}
                         resolvedEmp = storedId ? empData.find(e => String(e.id) === String(storedId)) : empData[0];
                     }
                 }
@@ -133,7 +134,7 @@ export default function ShiftsPage() {
         const user = employees.find(emp => String(emp.id) === String(e.target.value));
         if (user) {
             setCurrentUser(user);
-            localStorage.setItem('demo_user_id', user.id);
+            try { localStorage.setItem('demo_user_id', user.id); } catch (e) {}
             setMyRequests(overrides?.filter(r => String(r.requester_id) === String(user.id) || String(r.target_peer_id) === String(user.id)) || []);
         }
     };

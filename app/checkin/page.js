@@ -64,13 +64,56 @@ export default function CheckIn() {
   const SHOP_LONG = 104.7929558480443;
   const ALLOWED_RADIUS_KM = 0.08; // 80 meters (harmonized with server)
 
+  // Safe storage helper for Tracking Prevention / Safari iframe compatibility
+  const safeStorage = {
+    getItem: (key) => {
+      try {
+        if (typeof window !== 'undefined' && window.localStorage) {
+          return window.localStorage.getItem(key);
+        }
+      } catch (e) {
+        console.warn("Storage access restricted:", e);
+      }
+      return null;
+    },
+    setItem: (key, value) => {
+      try {
+        if (typeof window !== 'undefined' && window.localStorage) {
+          window.localStorage.setItem(key, value);
+        }
+      } catch (e) {
+        console.warn("Storage write restricted:", e);
+      }
+    }
+  };
+
   // Load Acknowledged Announcements
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("acknowledged_announcements");
-      if (saved) setDismissedIds(JSON.parse(saved));
+    const saved = safeStorage.getItem("acknowledged_announcements");
+    if (saved) {
+      try { setDismissedIds(JSON.parse(saved)); } catch (e) {}
     }
   }, []);
+
+  const onGeoSuccess = (position) => {
+    const { latitude, longitude, accuracy } = position.coords;
+    setUserPosition({ lat: latitude, lon: longitude, accuracy });
+
+    const dist = getDistanceFromLatLonInKm(latitude, longitude, SHOP_LAT, SHOP_LONG);
+    if (dist <= ALLOWED_RADIUS_KM) {
+      if (!status.includes("Ready") && !status.includes("พร้อม")) setStatus("พร้อมลงเวลา (อยู่ในพื้นที่ร้าน)");
+    } else {
+      const distMeters = Math.round(dist * 1000);
+      if (!devMode) setStatus(`อยู่นอกพื้นที่ร้าน (${distMeters} ม.)`);
+    }
+  };
+
+  const onGeoError = (error) => {
+    console.warn("Geo Location warning:", error);
+    if (!status.includes("พร้อม") && !status.includes("Ready")) {
+      setStatus("GPS เพี้ยน (แนะนำสแกน QR)");
+    }
+  };
 
   // --- Init ---
   useEffect(() => {
@@ -130,7 +173,7 @@ export default function CheckIn() {
   const handleDismissAnnouncement = (id) => {
     const updated = [...dismissedIds, id];
     setDismissedIds(updated);
-    localStorage.setItem("acknowledged_announcements", JSON.stringify(updated));
+    safeStorage.setItem("acknowledged_announcements", JSON.stringify(updated));
   };
 
   const fetchDashboardData = async (empId) => {
@@ -497,19 +540,6 @@ export default function CheckIn() {
       return;
     }
     setShowCamera(true);
-  };
-
-  const onGeoSuccess = (position) => {
-    const { latitude, longitude, accuracy } = position.coords;
-    setUserPosition({ lat: latitude, lon: longitude, accuracy });
-
-    const dist = getDistanceFromLatLonInKm(latitude, longitude, SHOP_LAT, SHOP_LONG);
-    if (dist <= ALLOWED_RADIUS_KM) {
-      if (!status.includes("Ready") && !status.includes("พร้อม")) setStatus("พร้อมลงเวลา (อยู่ในพื้นที่ร้าน)");
-    } else {
-      const distMeters = Math.round(dist * 1000);
-      if (!devMode) setStatus(`อยู่นอกพื้นที่ร้าน (${distMeters} ม.)`);
-    }
   };
 
   // --- Dynamic Watermark Canvas Helper ---
