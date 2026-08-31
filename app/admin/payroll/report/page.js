@@ -160,10 +160,11 @@ function PayrollPDFReportContent() {
                     <thead className="bg-[#fafaf9] border-b border-neutral-200 text-[9px] font-bold tracking-widest uppercase text-neutral-400">
                         <tr>
                             <th className="py-3 px-4">Employee</th>
-                            <th className="py-3 px-3 text-center">Days</th>
-                            <th className="py-3 px-3 text-center">Reg/OT Hrs</th>
+                            <th className="py-3 px-2 text-center">Days</th>
+                            <th className="py-3 px-2 text-center">Reg/OT Hrs</th>
                             <th className="py-3 px-3 text-right">Base Pay</th>
                             <th className="py-3 px-3 text-right">OT Pay</th>
+                            <th className="py-3 px-3 text-right text-rams-green">Allowances</th>
                             <th className="py-3 px-3 text-right text-rams-red">Deduct</th>
                             <th className="py-3 px-4 text-right">Net Pay</th>
                             <th className="py-3 px-3 text-center">Audit Flags</th>
@@ -174,19 +175,24 @@ function PayrollPDFReportContent() {
                             <tr key={item.emp.id} className="hover:bg-neutral-50/60 transition-colors">
                                 <td className="py-3 px-4">
                                     <div className="font-bold text-neutral-800">{item.emp.nickname || item.emp.name}</div>
-                                    <div className="text-[9px] font-semibold uppercase tracking-tight text-neutral-400">{item.emp.position}</div>
+                                    <div className="text-[9px] font-semibold uppercase tracking-tight text-neutral-400">
+                                        {item.emp.position} · <span className="text-rams-orange font-bold">{item.wageType || 'daily'}</span>
+                                    </div>
                                 </td>
-                                <td className="py-3 px-3 text-center font-bold text-neutral-800">
+                                <td className="py-3 px-2 text-center font-bold text-neutral-800">
                                     {item.workDays}
                                 </td>
-                                <td className="py-3 px-3 text-center text-[10px] text-neutral-600">
+                                <td className="py-3 px-2 text-center text-[10px] text-neutral-600">
                                     {item.totalRegularHours.toFixed(1)} / {item.totalOTHours.toFixed(1)}
                                 </td>
                                 <td className="py-3 px-3 text-right font-medium text-neutral-800">
                                     {item.totalSalary.toLocaleString('th-TH', { minimumFractionDigits: 2 })}
                                 </td>
                                 <td className="py-3 px-3 text-right font-bold text-rams-orange">
-                                    {item.totalOTPay.toLocaleString('th-TH', { minimumFractionDigits: 2 })}
+                                    {item.totalOTPay > 0 ? item.totalOTPay.toLocaleString('th-TH', { minimumFractionDigits: 2 }) : '-'}
+                                </td>
+                                <td className="py-3 px-3 text-right font-bold text-rams-green">
+                                    {item.totalAllowances > 0 ? `+${item.totalAllowances.toLocaleString('th-TH', { minimumFractionDigits: 2 })}` : '-'}
                                 </td>
                                 <td className="py-3 px-3 text-right font-medium text-rams-red">
                                     {item.totalDeduct > 0 ? `-${item.totalDeduct.toLocaleString('th-TH', { minimumFractionDigits: 2 })}` : '-'}
@@ -219,12 +225,13 @@ function PayrollPDFReportContent() {
                     <tfoot className="bg-[#fafaf9] border-t-2 border-neutral-900 font-mono font-bold text-xs">
                         <tr>
                             <td className="py-3 px-4 uppercase tracking-wider">TOTAL / รวมทั้งสิ้น</td>
-                            <td className="py-3 px-3 text-center">{workingEmployees.reduce((s, i) => s + i.workDays, 0)}</td>
-                            <td className="py-3 px-3 text-center text-[10px]">
+                            <td className="py-3 px-2 text-center">{workingEmployees.reduce((s, i) => s + i.workDays, 0)}</td>
+                            <td className="py-3 px-2 text-center text-[10px]">
                                 {workingEmployees.reduce((s, i) => s + i.totalRegularHours, 0).toFixed(1)} / {workingEmployees.reduce((s, i) => s + i.totalOTHours, 0).toFixed(1)}
                             </td>
                             <td className="py-3 px-3 text-right">฿{totalSalary.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td>
                             <td className="py-3 px-3 text-right text-rams-orange">฿{totalOT.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td>
+                            <td className="py-3 px-3 text-right text-rams-green">฿{workingEmployees.reduce((s, i) => s + (i.totalAllowances || 0), 0).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td>
                             <td className="py-3 px-3 text-right text-rams-red">฿{totalDeduct.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td>
                             <td className="py-3 px-4 text-right text-sm">฿{totalNet.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td>
                             <td className="py-3 px-3"></td>
@@ -376,21 +383,47 @@ function PayrollPDFReportContent() {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="space-y-2 text-xs">
                                     <div className="flex justify-between">
-                                        <span className="font-medium text-neutral-600">Base Salary / ค่าแรงปกติ</span>
+                                        <span className="font-medium text-neutral-600">Base Wage / ค่าแรงฐาน</span>
                                         <span className="font-mono font-bold text-neutral-900">฿{item.totalSalary.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span className="font-medium text-neutral-600">Overtime Pay / ค่าล่วงเวลา (OT)</span>
+                                        <span className="font-medium text-neutral-600">Overtime Pay / ค่าล่วงเวลา (OT {item.totalOTHours.toFixed(1)} ชม.)</span>
                                         <span className="font-mono font-bold text-rams-orange">฿{item.totalOTPay.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</span>
                                     </div>
-                                    <div className="flex justify-between border-b border-neutral-200 pb-2">
-                                        <span className="font-medium text-neutral-600">Deductions / ยอดหัก</span>
+                                    {item.totalAllowances > 0 && (
+                                        <div className="flex justify-between">
+                                            <span className="font-medium text-neutral-600">
+                                                Allowances & Diligence / สวัสดิการ & เบี้ยขยัน
+                                                {item.isDiligenceEarned && <span className="text-[9px] text-rams-green ml-1 font-bold">(เบี้ยขยันผ่าน)</span>}
+                                            </span>
+                                            <span className="font-mono font-bold text-rams-green">+฿{item.totalAllowances.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</span>
+                                        </div>
+                                    )}
+                                    {item.ssoDeduct > 0 && (
+                                        <div className="flex justify-between">
+                                            <span className="font-medium text-neutral-600">Social Security / ประกันสังคม (5%)</span>
+                                            <span className="font-mono font-bold text-rams-red">-฿{item.ssoDeduct.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</span>
+                                        </div>
+                                    )}
+                                    {(item.taxDeduct + item.customDeduct) > 0 && (
+                                        <div className="flex justify-between">
+                                            <span className="font-medium text-neutral-600">Tax & Other Deductions / ภาษี & รายการหักอื่นๆ</span>
+                                            <span className="font-mono font-bold text-rams-red">-฿{(item.taxDeduct + item.customDeduct).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</span>
+                                        </div>
+                                    )}
+                                    <div className="flex justify-between border-t border-neutral-200 pt-1">
+                                        <span className="font-bold text-neutral-800">Total Deductions / ยอดหักรวม</span>
                                         <span className="font-mono font-bold text-rams-red">-฿{item.totalDeduct.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</span>
                                     </div>
                                 </div>
-                                <div className="bg-neutral-900 text-white p-5 rounded-xl flex flex-col justify-center border border-neutral-900">
-                                    <span className="text-[8px] font-bold tracking-[0.2em] uppercase opacity-70 mb-1">NET PAY / ยอดจ่ายสุทธิ</span>
-                                    <span className="text-2xl font-bold tracking-tight">฿{item.netSalary.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</span>
+                                <div className="bg-neutral-900 text-white p-5 rounded-xl flex flex-col justify-between border border-neutral-900">
+                                    <div>
+                                        <span className="text-[8px] font-bold tracking-[0.2em] uppercase opacity-70 mb-1 block">NET PAY / ยอดรับสุทธิ</span>
+                                        <span className="text-2xl font-bold tracking-tight">฿{item.netSalary.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</span>
+                                    </div>
+                                    <div className="mt-3 pt-2 border-t border-neutral-700 text-[10px] text-neutral-300 font-mono">
+                                        <span className="opacity-70">บัญชีโอนเงิน:</span> {item.emp.bank_name || 'ธนาคาร'} {item.emp.bank_account || '-'}
+                                    </div>
                                 </div>
                             </div>
 

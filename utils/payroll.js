@@ -483,26 +483,68 @@ export const calculatePayroll = (employees, logs, transactions, shifts, payrollC
             }
         }
 
-        // Deductions
+        // Deductions & Allowances Calculation
+        const wageType = rates.wage_type || (emp.employment_status === 'Fulltime' && emp.base_salary > 0 ? 'monthly' : (rates.morning || rates.evening ? 'daily' : 'hourly'));
+        const baseSalary = Number(emp.base_salary || rates.base_salary || 0);
+
+        // If Monthly staff and worked during month, set totalSalary to baseSalary
+        if (wageType === 'monthly' && baseSalary > 0) {
+            // If they worked at least 1 day, grant full base salary (standard monthly salary)
+            totalSalary = workDays > 0 ? baseSalary : 0;
+        }
+
+        // Allowances
+        const monthlyAllowance = Number(rates.monthly_allowance || 0);
+        const diligenceAllowance = Number(rates.diligence_allowance || 0);
+        const isDiligenceEarned = diligenceAllowance > 0 && workDays > 0 && absentCount === 0 && lateCount === 0 && incompleteCount === 0;
+        const totalAllowances = monthlyAllowance + (isDiligenceEarned ? diligenceAllowance : 0);
+
+        // Gross before statutory deductions
+        const grossEarnings = totalSalary + totalOTPay + totalAllowances;
+
+        // Statutory Deductions
+        let ssoDeduct = 0;
+        if (rates.social_security_enrolled) {
+            // Social security: 5% of base earnings capped at 15,000 THB (max 750 THB)
+            const ssoBase = Math.min(Math.max(grossEarnings, 0), 15000);
+            ssoDeduct = Math.round(ssoBase * 0.05);
+        }
+
+        const taxPct = Number(rates.withholding_tax_pct || 0);
+        const taxDeduct = taxPct > 0 ? (grossEarnings * (taxPct / 100)) : 0;
+
+        // Custom Deductions from table
         const empDeductions = deductionsMap.get(emp.id) || [];
-        let totalDeduct = 0;
+        let customDeduct = 0;
         empDeductions.forEach(d => {
             if (d.is_percentage) {
-                totalDeduct += (totalSalary + totalOTPay) * (parseFloat(d.amount) / 100);
+                customDeduct += (grossEarnings) * (parseFloat(d.amount) / 100);
             } else {
-                totalDeduct += parseFloat(d.amount);
+                customDeduct += parseFloat(d.amount);
             }
         });
 
+        const totalDeduct = ssoDeduct + taxDeduct + customDeduct;
+        const netSalary = Math.max(0, grossEarnings - totalDeduct);
+
         return {
             emp,
+            wageType,
             workDays,
             totalRegularHours,
             totalOTHours,
             totalSalary,
             totalOTPay,
+            monthlyAllowance,
+            diligenceAllowance,
+            isDiligenceEarned,
+            totalAllowances,
+            ssoDeduct,
+            taxDeduct,
+            customDeduct,
             totalDeduct,
-            netSalary: (totalSalary + totalOTPay) - totalDeduct,
+            grossEarnings,
+            netSalary,
             lateCount,
             absentCount,
             incompleteCount,
@@ -511,3 +553,67 @@ export const calculatePayroll = (employees, logs, transactions, shifts, payrollC
         };
     });
 };
+
+/**
+ * Helper to simulate an employee's estimated monthly take-home salary based on custom assumptions.
+ */
+export const simulateStaffPayroll = (emp, assumptions = {}) => {
+    const rates = emp?.shift_rates || {};
+    const wageType = rates.wage_type || (emp?.employment_status === 'Fulltime' && emp?.base_salary > 0 ? 'monthly' : (rates.morning || rates.evening ? 'daily' : 'hourly'));
+    const baseSalary = Number(emp?.base_salary || rates.base_salary || 0);
+    const morningRate = Number(rates.morning || 0);
+    const eveningRate = Number(rates.evening || 0);
+    const hourlyRate = Number(rates.hourly_rate || 50);
+    const otRate = Number(rates.ot_rate || (hourlyRate * 1.5));
+    
+    const morningShifts = Number(assumptions.morningShifts ?? 12);
+    const eveningShifts = Number(assumptions.eveningShifts ?? 10);
+    const otHours = Number(assumptions.otHours ?? 8);
+    const hasDiligence = assumptions.hasDiligence ?? true;
+
+    let basePay = 0;
+    if (wageType === 'monthly') {
+        basePay = baseSalary;
+    } else if (wageType === 'daily') {
+        basePay = (morningShifts * morningRate) + (eveningShifts * eveningRate);
+    } else {
+        // Hourly (approx 8 hours per shift)
+        const totalHours = (morningShifts + eveningShifts) * 8;
+        basePay = totalHours * hourlyRate;
+    }
+
+    const otPay = otHours * otRate;
+    const monthlyAllowance = Number(rates.monthly_allowance || 0);
+    const diligenceAllowance = Number(rates.diligence_allowance || 0);
+    const earnedDiligence = hasDiligence ? diligenceAllowance : 0;
+    const totalAllowances = monthlyAllowance + earnedDiligence;
+
+    const gross = basePay + otPay + totalAllowances;
+    
+    let sso = 0;
+    if (rates.social_security_enrolled) {
+        const ssoBase = Math.min(Math.max(gross, 0), 15000);
+        sso = Math.round(ssoBase * 0.05);
+    }
+
+    const taxPct = Number(rates.withholding_tax_pct || 0);
+    const tax = taxPct > 0 ? (gross * (taxPct / 100)) : 0;
+
+    const totalDeductions = sso + tax;
+    const net = Math.max(0, gross - totalDeductions);
+
+    return {
+        wageType,
+        basePay,
+        otPay,
+        monthlyAllowance,
+        earnedDiligence,
+        totalAllowances,
+        gross,
+        sso,
+        tax,
+        totalDeductions,
+        net
+    };
+};
+

@@ -15,6 +15,7 @@ import { TabButton } from "./_components/ui/TabButton";
 import { Icons } from "./_components/ui/HausIcon";
 import { LongPressButton } from "./_components/ui/LongPressButton";
 import StaffModal from "./StaffModal";
+import StaffDirectoryManager from "./_components/StaffDirectoryManager";
 import YuzuKnowledgeManager from "./_components/YuzuKnowledgeManager";
 
 // --- Reducer for Cleaner State ---
@@ -136,7 +137,7 @@ export default function AdminDashboard() {
         dispatch({ type: 'SET_DATA', payload: { [keyInState]: transform ? transform(res) : res || [] } });
     };
 
-    const fetchEmployees = () => supabase.from("employees").select("*").eq("is_active", true).order("id")
+    const fetchEmployees = () => supabase.from("employees").select("*").order("id")
         .then(({ data }) => dispatch({ type: 'SET_DATA', payload: { employees: data || [] } }));
 
     const fetchSchedules = async () => {
@@ -923,6 +924,11 @@ export default function AdminDashboard() {
         } catch (e) {
             alert("Error: " + e.message);
         }
+    };
+
+    const handleApproveStaff = (staff) => {
+        setEditingStaff(staff);
+        setShowStaffModal(true);
     };
 
     // Excel
@@ -1996,73 +2002,23 @@ export default function AdminDashboard() {
 
                     {/* --- STAFF DIRECTORY --- */}
                     {activeTab === 'employees' && (
-                        <div className="space-y-6">
-                            {/* Pending Approvals Section */}
-                            {data.pendingEmployees?.length > 0 && (
-                                <div className="space-y-4 animate-fade-in-up">
-                                    <h3 className="font-extrabold text-lg text-amber-600 flex items-center gap-2">
-                                        ⚠️ Pending Approvals <Badge color="amber">{data.pendingEmployees.length}</Badge>
-                                    </h3>
-                                    <Card className="p-0 overflow-hidden border border-amber-200 ring-4 ring-amber-50">
-                                        <table className="w-full text-sm text-left">
-                                            <thead className="bg-amber-50 text-amber-800 font-extrabold text-xs uppercase">
-                                                <tr>
-                                                    <th className="p-4">Name</th>
-                                                    <th className="p-4">Suggested Role</th>
-                                                    <th className="p-4 text-right">Action</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-amber-100 bg-white">
-                                                {data.pendingEmployees.map(emp => (
-                                                    <tr key={emp.id} className="hover:bg-amber-50/50">
-                                                        <td className="p-4 font-black text-slate-800 flex items-center gap-3">
-                                                            <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden flex items-center justify-center">
-                                                                <EmployeeAvatar employee={emp} className="w-full h-full rounded-full" textClassName="text-xs font-bold" />
-                                                            </div>
-                                                            <div>
-                                                                {emp.name}
-                                                                <div className="text-[10px] text-slate-700 font-bold font-mono tracking-tight">{emp.line_user_id}</div>
-                                                            </div>
-                                                        </td>
-                                                        <td className="p-4 text-slate-600 font-bold italic">Waiting for assignment...</td>
-                                                        <td className="p-4 text-right">
-                                                            <button
-                                                                onClick={() => { setEditingStaff(emp); setShowStaffModal(true) }}
-                                                                className="text-white bg-slate-850 font-bold text-xs hover:bg-slate-900 px-4 py-2 rounded-lg shadow-sm"
-                                                            >
-                                                                Inspect & Approve
-                                                            </button>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </Card>
-                                </div>
-                            )}
-
-                            <div className="flex justify-between items-center"><h3 className="font-extrabold text-lg text-slate-800">Staff Management</h3><button onClick={() => { setEditingStaff(null); setShowStaffModal(true) }} className="bg-slate-850 text-white px-5 py-2.5 rounded-xl font-black hover:bg-slate-900 shadow-lg">+ Add Staff</button></div>
-                            <Card className="p-0 overflow-hidden">
-                                <table className="w-full text-sm text-left">
-                                    <thead className="bg-slate-50 text-slate-500 font-extrabold text-xs uppercase">
-                                        <tr><th className="p-4">Name</th><th className="p-4">Position</th><th className="p-4">Status</th><th className="p-4 text-right">Action</th></tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {data.employees.map(emp => (
-                                            <tr key={emp.id} className="hover:bg-slate-50">
-                                                <td className="p-4 font-black text-slate-900">{emp.name}</td>
-                                                <td className="p-4 text-slate-850 font-bold">{emp.position}</td>
-                                                <td className="p-4"><Badge color={emp.employment_status === 'Fulltime' ? 'emerald' : 'slate'}>{emp.employment_status || '-'}</Badge></td>
-                                                <td className="p-4 text-right flex justify-end gap-2">
-                                                    <button onClick={() => { setEditingStaff(emp); setShowStaffModal(true) }} className="text-blue-600 font-black text-xs hover:bg-blue-50 px-2 py-1 rounded">Edit</button>
-                                                    <LongPressButton onLongPress={() => handleDeleteEmployee(emp.id)} />
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </Card>
-                            <StaffModal isOpen={showStaffModal} onClose={() => setShowStaffModal(false)} onSave={handleSaveStaff} initialData={editingStaff} isEditing={!!editingStaff} />
+                        <div className="space-y-6 animate-in fade-in duration-200">
+                            <StaffDirectoryManager
+                                employees={data.employees}
+                                pendingEmployees={data.pendingEmployees}
+                                onAddStaff={() => { setEditingStaff(null); setShowStaffModal(true); }}
+                                onEditStaff={(emp) => { setEditingStaff(emp); setShowStaffModal(true); }}
+                                onDeleteStaff={handleDeleteEmployee}
+                                onApproveStaff={handleApproveStaff}
+                                onRefresh={fetchEmployees}
+                            />
+                            <StaffModal 
+                                isOpen={showStaffModal} 
+                                onClose={() => { setShowStaffModal(false); setEditingStaff(null); }} 
+                                onSave={handleSaveStaff} 
+                                initialData={editingStaff} 
+                                isEditing={!!editingStaff} 
+                            />
                         </div>
                     )}
 
