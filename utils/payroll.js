@@ -227,26 +227,50 @@ export const calculatePayroll = (employees, logs, transactions, shifts, payrollC
                         }
 
                         actualMins = differenceInMinutes(checkOut, checkIn);
-                        regularMins = Math.min(actualMins, scheduledMins);
                         
-                        if (actualMins > scheduledMins) {
+                        // Strict Roster-bound calculation: Regular time capped at scheduled end time
+                        // Overtime (OT) = any time worked past the scheduled Roster end time
+                        if (isAfter(checkOut, scheduledEnd)) {
+                            otMins = differenceInMinutes(checkOut, scheduledEnd);
+                        } else if (actualMins > scheduledMins) {
                             otMins = actualMins - scheduledMins;
+                        } else {
+                            otMins = 0;
                         }
 
+                        regularMins = Math.max(0, actualMins - otMins);
                         const rHours = regularMins / 60;
                         const oHours = otMins / 60;
+                        const scheduledHours = scheduledMins / 60;
 
-                        // Check if they use flat shift rate or hourly
-                        let rateKey = null;
-                        const normName = (shift?.name || '').toLowerCase();
-                        if (normName.includes('เช้า') || normName.includes('morning')) rateKey = 'morning';
-                        else if (normName.includes('ค่ำ') || normName.includes('evening')) rateKey = 'evening';
-                        else if (tx.slot_type === 'SPLIT' || tx.slot_type === 'DOUBLE') rateKey = 'double';
-
-                        if (rateKey && rates[rateKey]) {
-                            dailyWage = Number(rates[rateKey]);
-                        } else {
+                        // Roster-Coupled Shift Wage Calculation
+                        if (wageType === 'monthly') {
+                            dailyWage = 0; // Base salary is fixed monthly
+                        } else if (wageType === 'hourly') {
                             dailyWage = rHours * hourlyRate;
+                        } else {
+                            // Daily Shift (รายกะ): Resolved dynamically by Roster scheduled duration
+                            if (shift?.rate && Number(shift.rate) > 0) {
+                                dailyWage = Number(shift.rate);
+                            } else if (scheduledHours >= 11 || tx.slot_type === 'DOUBLE' || tx.slot_type === 'SPLIT') {
+                                // Double Shift in Roster (>=11h e.g. 10:00-00:30)
+                                dailyWage = Number(rates.double || rates.double_shift_rate || 800);
+                            } else if (scheduledHours <= 5.5) {
+                                // Short / Part-time Shift in Roster (<=5.5h e.g. 18:00-22:30)
+                                dailyWage = rates.rush_4h ? Number(rates.rush_4h) : (rHours * hourlyRate);
+                            } else {
+                                // Standard Full Shift in Roster (6h to 10.5h e.g. 10:00-18:00, 16:30-00:30, 10:00-20:30)
+                                const normName = (shift?.name || '').toLowerCase();
+                                if ((normName.includes('ค่ำ') || normName.includes('evening') || scheduledStart.getHours() >= 15) && rates.evening) {
+                                    dailyWage = Number(rates.evening);
+                                } else if (rates.morning) {
+                                    dailyWage = Number(rates.morning);
+                                } else if (rates.daily_rate) {
+                                    dailyWage = Number(rates.daily_rate);
+                                } else {
+                                    dailyWage = 350;
+                                }
+                            }
                         }
 
                         dailyOT = oHours * otRate;
@@ -257,10 +281,12 @@ export const calculatePayroll = (employees, logs, transactions, shifts, payrollC
                         totalOTPay += dailyOT;
                         workDays++;
 
+                        const shiftLabel = `${startTimeStr}-${endTimeStr}${shift?.name ? ` (${shift.name})` : ''}`;
+
                         dailyDetails.push({
                             date: dateStr,
                             slot_type: tx.slot_type,
-                            shift: shift?.name || 'Custom',
+                            shift: shiftLabel,
                             scheduled_in: formatTime(scheduledStart),
                             scheduled_out: formatTime(scheduledEnd),
                             in: formatTime(checkIn),
@@ -275,10 +301,11 @@ export const calculatePayroll = (employees, logs, transactions, shifts, payrollC
                     } else if (checkIn && !checkOut) {
                         // Missed check-out
                         incompleteCount++;
+                        const shiftLabel = `${startTimeStr}-${endTimeStr}${shift?.name ? ` (${shift.name})` : ''}`;
                         dailyDetails.push({
                             date: dateStr,
                             slot_type: tx.slot_type,
-                            shift: shift?.name || 'Custom',
+                            shift: shiftLabel,
                             scheduled_in: formatTime(scheduledStart),
                             scheduled_out: formatTime(scheduledEnd),
                             in: formatTime(checkIn),
@@ -289,10 +316,11 @@ export const calculatePayroll = (employees, logs, transactions, shifts, payrollC
                     } else if (!checkIn && checkOut) {
                         // Missed check-in
                         incompleteCount++;
+                        const shiftLabel = `${startTimeStr}-${endTimeStr}${shift?.name ? ` (${shift.name})` : ''}`;
                         dailyDetails.push({
                             date: dateStr,
                             slot_type: tx.slot_type,
-                            shift: shift?.name || 'Custom',
+                            shift: shiftLabel,
                             scheduled_in: formatTime(scheduledStart),
                             scheduled_out: formatTime(scheduledEnd),
                             in: '-',
@@ -555,30 +583,88 @@ export const calculatePayroll = (employees, logs, transactions, shifts, payrollC
 };
 
 /**
+ * Resolves the wage for a specific shift and work hours based on:
+ * 1. Employee custom shift override (rates.custom_shifts?.[shiftId] or rates.custom_shifts?.[shiftCode])
+ * 2. Employee direct rates (rates.morning, rates.mid, rates.evening, rates.night, rates.double, rates.rush_4h)
+ * 3. Shift preset default rate from database (shift.rate)
+ * 4. Duration hours * hourlyRate
+ */
+export const resolveShiftWage = (shift, empRates, slotType, regularHours = 8, hourlyRate = 50) => {
+    const rates = empRates || {};
+    const normName = (shift?.name || '').toLowerCase();
+    const shiftCode = (shift?.code || '').toLowerCase();
+    const shiftId = shift?.id;
+
+    // 1. Employee-specific custom shift rates (by ID or code)
+    if (rates.custom_shifts && shiftId && rates.custom_shifts[shiftId] !== undefined && rates.custom_shifts[shiftId] > 0) {
+        return Number(rates.custom_shifts[shiftId]);
+    }
+    if (rates.custom_shifts && shiftCode && rates.custom_shifts[shiftCode] !== undefined && rates.custom_shifts[shiftCode] > 0) {
+        return Number(rates.custom_shifts[shiftCode]);
+    }
+
+    // 2. Direct keys in rates
+    if (shiftCode && rates[shiftCode] !== undefined && rates[shiftCode] > 0) {
+        return Number(rates[shiftCode]);
+    }
+
+    // 3. Name keyword matching against employee's rates
+    if ((normName.includes('เช้า') || normName.includes('morning')) && rates.morning > 0) {
+        return Number(rates.morning);
+    }
+    if ((normName.includes('กลางวัน') || normName.includes('บ่าย') || normName.includes('mid') || normName.includes('afternoon')) && rates.mid > 0) {
+        return Number(rates.mid);
+    }
+    if ((normName.includes('ค่ำ') || normName.includes('เย็น') || normName.includes('evening') || normName.includes('closing')) && rates.evening > 0) {
+        return Number(rates.evening);
+    }
+    if ((normName.includes('ดึก') || normName.includes('ข้ามคืน') || normName.includes('night') || normName.includes('late')) && rates.night > 0) {
+        return Number(rates.night);
+    }
+    if ((slotType === 'SPLIT' || slotType === 'DOUBLE' || normName.includes('ควบ') || normName.includes('double')) && rates.double > 0) {
+        return Number(rates.double);
+    }
+    if ((normName.includes('4h') || normName.includes('4 ชม') || normName.includes('rush')) && rates.rush_4h > 0) {
+        return Number(rates.rush_4h);
+    }
+
+    // 4. Shift's preset rate from shifts table
+    if (shift?.rate && Number(shift.rate) > 0) {
+        return Number(shift.rate);
+    }
+
+    // 5. Fallback calculation by duration * hourly rate
+    return Number(regularHours) * (hourlyRate || 50);
+};
+
+/**
  * Helper to simulate an employee's estimated monthly take-home salary based on custom assumptions.
  */
 export const simulateStaffPayroll = (emp, assumptions = {}) => {
     const rates = emp?.shift_rates || {};
-    const wageType = rates.wage_type || (emp?.employment_status === 'Fulltime' && emp?.base_salary > 0 ? 'monthly' : (rates.morning || rates.evening ? 'daily' : 'hourly'));
+    const wageType = rates.wage_type || (emp?.employment_status === 'Fulltime' && emp?.base_salary > 0 ? 'monthly' : (rates.morning || rates.evening || rates.mid ? 'daily' : 'hourly'));
     const baseSalary = Number(emp?.base_salary || rates.base_salary || 0);
-    const morningRate = Number(rates.morning || 0);
-    const eveningRate = Number(rates.evening || 0);
+    const standardShiftRate = Number(rates.morning || rates.daily_rate || 350);
+    const doubleRate = Number(rates.double || rates.double_shift_rate || 800);
     const hourlyRate = Number(rates.hourly_rate || 50);
     const otRate = Number(rates.ot_rate || (hourlyRate * 1.5));
     
-    const morningShifts = Number(assumptions.morningShifts ?? 12);
-    const eveningShifts = Number(assumptions.eveningShifts ?? 10);
-    const otHours = Number(assumptions.otHours ?? 8);
+    const regularShifts = Number(assumptions.regularShifts ?? assumptions.morningShifts ?? 20);
+    const doubleShifts = Number(assumptions.doubleShifts ?? 2);
+    const customHours = Number(assumptions.customHours ?? 0);
+    const otHours = Number(assumptions.otHours ?? 6);
     const hasDiligence = assumptions.hasDiligence ?? true;
 
     let basePay = 0;
     if (wageType === 'monthly') {
         basePay = baseSalary;
     } else if (wageType === 'daily') {
-        basePay = (morningShifts * morningRate) + (eveningShifts * eveningRate);
+        basePay = (regularShifts * standardShiftRate) + 
+                  (doubleShifts * doubleRate) + 
+                  (customHours * hourlyRate);
     } else {
-        // Hourly (approx 8 hours per shift)
-        const totalHours = (morningShifts + eveningShifts) * 8;
+        // Hourly (8 hours per regular shift + 14 hours per double shift)
+        const totalHours = (regularShifts * 8) + (doubleShifts * 14) + customHours;
         basePay = totalHours * hourlyRate;
     }
 

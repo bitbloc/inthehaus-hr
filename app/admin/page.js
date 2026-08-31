@@ -3164,21 +3164,101 @@ export default function AdminDashboard() {
                     {/* --- SHIFT CONFIGURATION (SETTINGS) --- */}
                     {activeTab === 'settings' && (
                         <div className="space-y-6">
-                            <Card>
-                                <h3 className="font-extrabold text-slate-800 mb-4">Shift Configuration</h3>
-                                <div className="space-y-4">
-                                    {data.shifts.map(s => (
-                                        <div key={s.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
-                                            <div className="font-black text-slate-800 w-1/3">{s.name}</div>
-                                            <div className="flex gap-2 items-center">
-                                                <input type="time" value={s.start_time} onChange={e => handleUpdateShift(s.id, 'start_time', e.target.value)} className="p-2 border rounded-lg font-mono text-center font-bold bg-white text-slate-900" />
-                                                <span className="text-slate-400 font-bold">➜</span>
-                                                <input type="time" value={s.end_time} onChange={e => handleUpdateShift(s.id, 'end_time', e.target.value)} className="p-2 border rounded-lg font-mono text-center font-bold bg-white text-slate-900" />
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-rams-panel p-5 rounded-sm border border-rams-rule shadow-none">
+                                <div>
+                                    <h2 className="text-base font-mono font-bold uppercase tracking-wider text-rams-ink">
+                                        ตั้งค่ากะงานและอัตราค่าจ้างมาตรฐาน (Shift Preset Configuration)
+                                    </h2>
+                                    <p className="text-[10px] font-mono text-rams-ink-muted uppercase tracking-widest mt-1">
+                                        กำหนดช่วงเวลาทำงาน (Time Window), เวลาพัก, และเรทค่าจ้างมาตรฐานเริ่มต้นสำหรับแต่ละกะ
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={async () => {
+                                        const name = prompt("ระบุชื่อกะงานใหม่ (เช่น กะพิเศษ / Prep Shift):");
+                                        if (!name) return;
+                                        const startTime = prompt("เวลาเริ่ม (HH:mm):", "12:00") || "12:00";
+                                        const endTime = prompt("เวลาสิ้นสุด (HH:mm):", "21:00") || "21:00";
+                                        const rate = Number(prompt("อัตราค่าจ้างประจำกะ (บาท):", "380")) || 380;
+                                        
+                                        const { error } = await supabase.from('shifts').insert({
+                                            name,
+                                            start_time: startTime,
+                                            end_time: endTime,
+                                            rate,
+                                            break_minutes: 60,
+                                            is_active: true
+                                        });
+                                        if (!error) fetchData('shifts', 'shifts');
+                                    }}
+                                    className="flex items-center gap-1.5 px-4 py-2 bg-rams-orange hover:bg-rams-orange-active text-rams-panel rounded-sm font-mono text-xs font-bold uppercase tracking-wider shadow-[0_2px_0_0_var(--color-rams-rule)] active:translate-y-[1px] transition-all cursor-pointer"
+                                >
+                                    + เพิ่มกะงานใหม่ (New Shift)
+                                </button>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {data.shifts.map(s => (
+                                    <div key={s.id} className="p-4 bg-rams-panel rounded-sm border border-rams-rule space-y-3 shadow-none">
+                                        <div className="flex items-center justify-between border-b border-rams-rule-light pb-2.5">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-2.5 h-2.5 rounded-full bg-rams-orange"></div>
+                                                <input 
+                                                    type="text" 
+                                                    value={s.name} 
+                                                    onChange={e => handleUpdateShift(s.id, 'name', e.target.value)} 
+                                                    className="font-mono font-bold text-sm text-rams-ink bg-transparent outline-none border-b border-transparent focus:border-rams-orange transition-all"
+                                                />
+                                            </div>
+                                            <span className="text-[10px] font-mono text-rams-ink-muted uppercase">
+                                                ID: #{s.id}
+                                            </span>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-3 text-xs font-mono">
+                                            <div>
+                                                <label className="block text-[9px] text-rams-ink-muted uppercase mb-1">เวลาเข้า - ออกงาน</label>
+                                                <div className="flex items-center gap-1.5 bg-rams-bg p-1.5 rounded-xs border border-rams-rule-light">
+                                                    <input 
+                                                        type="time" 
+                                                        value={s.start_time} 
+                                                        onChange={e => handleUpdateShift(s.id, 'start_time', e.target.value)} 
+                                                        className="w-full bg-transparent font-mono text-center font-bold text-rams-ink outline-none text-xs" 
+                                                    />
+                                                    <span className="text-rams-ink-muted text-xs">➜</span>
+                                                    <input 
+                                                        type="time" 
+                                                        value={s.end_time} 
+                                                        onChange={e => handleUpdateShift(s.id, 'end_time', e.target.value)} 
+                                                        className="w-full bg-transparent font-mono text-center font-bold text-rams-ink outline-none text-xs" 
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-[9px] text-rams-ink-muted uppercase mb-1">ค่าจ้างประจำกะ (บาท/กะ)</label>
+                                                <div className="flex items-center bg-rams-bg p-1.5 rounded-xs border border-rams-rule-light">
+                                                    <span className="text-rams-ink-muted text-[10px] mr-1">฿</span>
+                                                    <input 
+                                                        type="number" 
+                                                        value={s.rate ?? ''} 
+                                                        placeholder="350"
+                                                        onChange={e => handleUpdateShift(s.id, 'rate', Number(e.target.value))} 
+                                                        className="w-full bg-transparent font-mono font-bold text-rams-green outline-none text-xs" 
+                                                    />
+                                                </div>
                                             </div>
                                         </div>
-                                    ))}
-                                </div>
-                            </Card>
+
+                                        <div className="flex justify-between items-center text-[10px] font-mono text-rams-ink-muted pt-1">
+                                            <span>หักเวลาพัก: {s.break_minutes || 60} นาที</span>
+                                            <span className="text-rams-orange font-bold">
+                                                {s.start_time} - {s.end_time}
+                                            </span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     )}
                     

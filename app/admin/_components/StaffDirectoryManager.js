@@ -34,8 +34,11 @@ export default function StaffDirectoryManager({
     // Simulator / Inspector Drawer State
     const [inspectingStaff, setInspectingStaff] = useState(null);
     const [simAssumptions, setSimAssumptions] = useState({
-        morningShifts: 12,
-        eveningShifts: 10,
+        morningShifts: 8,
+        midShifts: 4,
+        eveningShifts: 8,
+        nightShifts: 0,
+        doubleShifts: 2,
         otHours: 6,
         hasDiligence: true
     });
@@ -777,12 +780,12 @@ export default function StaffDirectoryManager({
                                     ) : (
                                         <>
                                             <div className="bg-rams-panel p-2 rounded-xs border border-rams-rule-light">
-                                                <span className="text-[10px] text-rams-ink-muted block">กะเช้า:</span>
-                                                <span className="font-bold text-rams-ink">฿{inspectingStaff.shift_rates?.morning || 0}</span>
+                                                <span className="text-[10px] text-rams-ink-muted block">กะปกติใน Roster (6-10h):</span>
+                                                <span className="font-bold text-rams-ink">฿{inspectingStaff.shift_rates?.morning || inspectingStaff.shift_rates?.daily_rate || 350}</span>
                                             </div>
                                             <div className="bg-rams-panel p-2 rounded-xs border border-rams-rule-light">
-                                                <span className="text-[10px] text-rams-ink-muted block">กะค่ำ:</span>
-                                                <span className="font-bold text-rams-ink">฿{inspectingStaff.shift_rates?.evening || 0}</span>
+                                                <span className="text-[10px] text-rams-ink-muted block">กะควบใน Roster (11h+):</span>
+                                                <span className="font-bold text-rams-ink">฿{inspectingStaff.shift_rates?.double || 800}</span>
                                             </div>
                                         </>
                                     )}
@@ -801,14 +804,14 @@ export default function StaffDirectoryManager({
                             <div className="mt-5 space-y-4">
                                 <h4 className="font-mono font-bold text-xs uppercase tracking-wider text-rams-ink flex items-center gap-1.5">
                                     <Calculator size={14} className="text-rams-orange" />
-                                    จำลองสมมติฐานการทำงานใน 1 เดือน
+                                    จำลองสมมติฐานตาราง Roster ใน 1 เดือน
                                 </h4>
 
                                 <div className="space-y-3 font-mono text-xs">
                                     {getEmployeeWageType(inspectingStaff) === 'daily' && (
                                         <div className="grid grid-cols-2 gap-3">
                                             <div>
-                                                <label className="block text-[10px] text-rams-ink-muted uppercase mb-1">จำนวนกะเช้า (วัน)</label>
+                                                <label className="block text-[10px] text-rams-ink-muted uppercase mb-1">กะปกติใน Roster (วัน)</label>
                                                 <input
                                                     type="number"
                                                     value={simAssumptions.morningShifts}
@@ -817,11 +820,11 @@ export default function StaffDirectoryManager({
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-[10px] text-rams-ink-muted uppercase mb-1">จำนวนกะค่ำ (วัน)</label>
+                                                <label className="block text-[10px] text-rams-ink-muted uppercase mb-1">กะควบใน Roster (วัน)</label>
                                                 <input
                                                     type="number"
-                                                    value={simAssumptions.eveningShifts}
-                                                    onChange={(e) => setSimAssumptions({ ...simAssumptions, eveningShifts: Number(e.target.value) })}
+                                                    value={simAssumptions.doubleShifts || 0}
+                                                    onChange={(e) => setSimAssumptions({ ...simAssumptions, doubleShifts: Number(e.target.value) })}
                                                     className="w-full p-2 bg-rams-bg border border-rams-rule-light rounded-sm text-rams-ink font-mono text-xs outline-none"
                                                 />
                                             </div>

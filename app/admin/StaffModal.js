@@ -61,8 +61,11 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
                 shift_rates: {
                     wage_type: inferredWageType,
                     morning: rawRates.morning ?? 350,
+                    mid: rawRates.mid ?? 380,
                     evening: rawRates.evening ?? 400,
+                    night: rawRates.night ?? 500,
                     double: rawRates.double ?? 800,
+                    rush_4h: rawRates.rush_4h ?? 220,
                     hourly_rate: rawRates.hourly_rate ?? 50,
                     ot_rate: rawRates.ot_rate ?? 75,
                     monthly_allowance: rawRates.monthly_allowance ?? 0,
@@ -97,8 +100,11 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
                 shift_rates: { 
                     wage_type: "daily",
                     morning: 350, 
+                    mid: 380,
                     evening: 400, 
+                    night: 500,
                     double: 800,
+                    rush_4h: 220,
                     hourly_rate: 50,
                     ot_rate: 75,
                     monthly_allowance: 0,
@@ -518,30 +524,42 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
                                     {/* Daily Shift Rates */}
                                     {currentWageType === 'daily' && (
                                         <div className="space-y-4 animate-in fade-in duration-100">
-                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                            <div className="p-3 bg-rams-bg border border-rams-rule-light rounded-sm">
+                                                <p className="text-[11px] text-rams-ink font-bold font-mono">
+                                                    📅 ระบบจะคำนวณค่าแรงอัตโนมัติตามช่วงเวลาที่จัดไว้ในตาราง Roster:
+                                                </p>
+                                                <ul className="text-[10px] text-rams-ink-muted mt-1 space-y-0.5 font-mono list-disc list-inside">
+                                                    <li>กะงานปกติใน Roster (6-10 ชม.) ➜ คำนวณตามค่าแรงกะปกติ</li>
+                                                    <li>กะควบใน Roster (11+ ชม. เช่น 10:00-00:30) ➜ คำนวณตามค่าแรงกะควบ</li>
+                                                    <li>กะสั้น/พาร์ทไทม์ใน Roster (≤5 ชม. เช่น 18:00-22:30) ➜ คำนวณตาม ชม. จริง</li>
+                                                    <li>ทำงานเกินเวลาเลิกงานใน Roster ➜ คิดเป็นค่า OT รายชั่วโมงอัตโนมัติ</li>
+                                                </ul>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
                                                 <FormInput 
-                                                    label="ค่าแรง กะเช้า Morning (THB/กะ) *" 
+                                                    label="ค่าแรง กะปกติ (Standard Shift) ฿/กะ *" 
                                                     name="rate_morning" 
                                                     type="number" 
-                                                    value={formData.shift_rates?.morning ?? ''} 
+                                                    value={formData.shift_rates?.morning ?? 350} 
                                                     onChange={handleChange} 
                                                     placeholder="350" 
                                                     mono 
                                                 />
                                                 <FormInput 
-                                                    label="ค่าแรง กะค่ำ Evening (THB/กะ) *" 
+                                                    label="ค่าแรง กะค่ำ/ปิดร้าน (Evening Shift) ฿/กะ" 
                                                     name="rate_evening" 
                                                     type="number" 
-                                                    value={formData.shift_rates?.evening ?? ''} 
+                                                    value={formData.shift_rates?.evening ?? 400} 
                                                     onChange={handleChange} 
                                                     placeholder="400" 
                                                     mono 
                                                 />
                                                 <FormInput 
-                                                    label="ค่าแรง กะควบ Double (THB/วัน)" 
+                                                    label="ค่าแรง กะควบ (Double Shift 11+ ชม.) ฿/วัน" 
                                                     name="rate_double" 
                                                     type="number" 
-                                                    value={formData.shift_rates?.double ?? ''} 
+                                                    value={formData.shift_rates?.double ?? 800} 
                                                     onChange={handleChange} 
                                                     placeholder="800" 
                                                     mono 
@@ -549,7 +567,7 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
                                             </div>
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-rams-rule-light">
                                                 <FormInput 
-                                                    label="อัตรา OT ล่วงเวลา (บาท / ชม.)" 
+                                                    label="อัตรา OT ล่วงเวลาเกินตาราง Roster (บาท / ชม.)" 
                                                     name="rate_ot_rate" 
                                                     type="number" 
                                                     value={formData.shift_rates?.ot_rate ?? 75} 
@@ -558,7 +576,7 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
                                                     mono 
                                                 />
                                                 <FormInput 
-                                                    label="อัตราอ้างอิงรายชั่วโมง (กรณีคิดเป็นเศษ ชม.)" 
+                                                    label="อัตราค่าจ้างรายชั่วโมง (กรณีจัดกะสั้นเศษ ชม. ใน Roster)" 
                                                     name="rate_hourly_rate" 
                                                     type="number" 
                                                     value={formData.shift_rates?.hourly_rate ?? 50} 
