@@ -1,11 +1,46 @@
 "use client";
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { format, parseISO, differenceInMinutes, subDays, isToday, isFuture, isPast } from "date-fns";
 import { Card } from "./ui/Card";
 import { Badge } from "./ui/Badge";
 import { Icons } from "./ui/HausIcon";
 import { getEffectiveDailyRoster } from "../../../utils/roster_logic";
 import { formatDate, formatCurrency, formatTime } from "../../../utils/format";
+
+// Graceful Staff Avatar Component handling image loading errors & Dieter Rams initial fallbacks
+function StaffAvatar({ employee, className = "w-10 h-10", textClassName = "text-sm", isWorking = false }) {
+    const [imgError, setImgError] = useState(false);
+    const photoUrl = employee?.photo_url;
+
+    useEffect(() => {
+        setImgError(false);
+    }, [photoUrl]);
+
+    const initialChar = (employee?.name || employee?.nickname || "E").charAt(0);
+
+    return (
+        <div className="relative shrink-0">
+            {photoUrl && !imgError ? (
+                <img
+                    src={photoUrl}
+                    alt=""
+                    onError={() => setImgError(true)}
+                    referrerPolicy="no-referrer"
+                    className={`${className} rounded-sm object-cover border border-rams-rule-light bg-rams-bg`}
+                />
+            ) : (
+                <div className={`${className} rounded-sm bg-rams-ink text-rams-panel font-mono font-black ${textClassName} flex items-center justify-center border border-rams-rule select-none uppercase`}>
+                    {initialChar}
+                </div>
+            )}
+            {isWorking && (
+                <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-rams-green border-2 border-rams-panel flex items-center justify-center">
+                    <span className="w-1.5 h-1.5 rounded-full bg-rams-green animate-ping"></span>
+                </span>
+            )}
+        </div>
+    );
+}
 
 export default function DashboardOverview({
     data,
@@ -668,24 +703,12 @@ export default function DashboardOverview({
                                     >
                                         <div className="flex items-start gap-3">
                                             {/* Avatar */}
-                                            <div className="relative shrink-0">
-                                                {emp.photo_url ? (
-                                                    <img
-                                                        src={emp.photo_url}
-                                                        alt={emp.name}
-                                                        className="w-10 h-10 rounded-sm object-cover border border-rams-rule-light"
-                                                    />
-                                                ) : (
-                                                    <div className="w-10 h-10 rounded-sm bg-rams-ink text-rams-panel font-mono font-black text-sm flex items-center justify-center border border-rams-rule">
-                                                        {emp.name?.charAt(0) || 'E'}
-                                                    </div>
-                                                )}
-                                                {isWorking && (
-                                                    <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-rams-green border-2 border-rams-panel flex items-center justify-center">
-                                                        <span className="w-1.5 h-1.5 rounded-full bg-rams-green animate-ping"></span>
-                                                    </span>
-                                                )}
-                                            </div>
+                                            <StaffAvatar
+                                                employee={emp}
+                                                className="w-10 h-10"
+                                                textClassName="text-sm"
+                                                isWorking={isWorking}
+                                            />
 
                                             {/* Staff Info */}
                                             <div className="flex-1 min-w-0">
@@ -853,8 +876,11 @@ export default function DashboardOverview({
                                                             >
                                                                 <img
                                                                     src={log.photo_url}
-                                                                    alt="punch"
-                                                                    className="w-9 h-9 rounded-sm object-cover border border-rams-rule-light group-hover/photo:border-rams-rule transition-all"
+                                                                    alt=""
+                                                                    onError={(e) => {
+                                                                        e.currentTarget.style.display = 'none';
+                                                                    }}
+                                                                    className="w-9 h-9 rounded-sm object-cover border border-rams-rule-light group-hover/photo:border-rams-rule transition-all bg-rams-bg"
                                                                     referrerPolicy="no-referrer"
                                                                 />
                                                             </button>
@@ -866,9 +892,11 @@ export default function DashboardOverview({
                                                     {/* Staff */}
                                                     <td className="px-5 py-3.5 whitespace-nowrap">
                                                         <div className="flex items-center gap-2.5">
-                                                            <div className="w-7 h-7 rounded-sm bg-rams-ink border border-rams-rule flex items-center justify-center text-xs text-rams-panel font-mono font-bold shrink-0">
-                                                                {log.employees?.name?.charAt(0) || 'S'}
-                                                            </div>
+                                                            <StaffAvatar
+                                                                employee={log.employees}
+                                                                className="w-7 h-7"
+                                                                textClassName="text-xs"
+                                                            />
                                                             <div>
                                                                 <div className="font-bold text-rams-ink text-xs">
                                                                     {log.employees?.name}
@@ -1179,7 +1207,7 @@ export default function DashboardOverview({
                         <img
                             src={selectedPhoto}
                             alt="Scan"
-                            className="w-full h-80 object-cover rounded-sm border border-rams-rule-light"
+                            className="w-full h-80 object-cover rounded-sm border border-rams-rule-light bg-rams-bg"
                             referrerPolicy="no-referrer"
                         />
                         <div className="flex justify-end">

@@ -3006,12 +3006,17 @@ export default function AdminDashboard() {
 // It falls back to a text-based initial avatar if the image fails to load.
 const EmployeeAvatar = ({ employee, className = "w-9 h-9 rounded-xl", textClassName = "text-xs font-bold" }) => {
     const [imgError, setImgError] = useState(false);
+    const photoUrl = employee?.photo_url;
 
-    if (employee?.photo_url && !imgError) {
+    useEffect(() => {
+        setImgError(false);
+    }, [photoUrl]);
+
+    if (photoUrl && !imgError) {
         return (
             <img
-                src={employee.photo_url}
-                alt={employee.nickname || employee.name || ""}
+                src={photoUrl}
+                alt=""
                 onError={() => setImgError(true)}
                 className={`${className} object-cover border border-slate-200 shadow-sm`}
                 referrerPolicy="no-referrer"

@@ -321,21 +321,57 @@ export const calculatePayroll = (employees, logs, transactions, shifts, payrollC
                             status: 'MISSED CHECK-IN'
                         });
                     } else {
-                        // Absent or Draft
-                        if (tx.status === 'PUBLISHED') {
-                            absentCount++;
+                        // No punches found for this scheduled shift: Check if date is in future, today, or past
+                        const now = new Date();
+                        const todayStr = format(now, 'yyyy-MM-dd');
+                        const isFutureDate = dateStr > todayStr;
+                        const isTodayDate = dateStr === todayStr;
+                        const shiftEnded = isAfter(now, scheduledEnd);
+                        const shiftLabel = `${startTimeStr}-${endTimeStr}${shift?.name ? ` (${shift.name})` : ''}`;
+
+                        if (isFutureDate) {
+                            // Future scheduled shift (ยังไม่ถึงวัน)
+                            dailyDetails.push({
+                                date: dateStr,
+                                slot_type: tx.slot_type,
+                                shift: shiftLabel,
+                                scheduled_in: formatTime(scheduledStart),
+                                scheduled_out: formatTime(scheduledEnd),
+                                in: '-',
+                                out: '-',
+                                wage: 0, ot: 0, ot_hours: 0, regular_hours: 0,
+                                status: 'SCHEDULED'
+                            });
+                        } else if (isTodayDate && !shiftEnded) {
+                            // Today's shift in progress or upcoming today
+                            dailyDetails.push({
+                                date: dateStr,
+                                slot_type: tx.slot_type,
+                                shift: shiftLabel,
+                                scheduled_in: formatTime(scheduledStart),
+                                scheduled_out: formatTime(scheduledEnd),
+                                in: '-',
+                                out: '-',
+                                wage: 0, ot: 0, ot_hours: 0, regular_hours: 0,
+                                status: 'PENDING'
+                            });
+                        } else {
+                            // Past shift that ended without punches
+                            if (tx.status === 'PUBLISHED') {
+                                absentCount++;
+                            }
+                            dailyDetails.push({
+                                date: dateStr,
+                                slot_type: tx.slot_type,
+                                shift: shiftLabel,
+                                scheduled_in: formatTime(scheduledStart),
+                                scheduled_out: formatTime(scheduledEnd),
+                                in: '-',
+                                out: '-',
+                                wage: 0, ot: 0, ot_hours: 0, regular_hours: 0,
+                                status: tx.status === 'PUBLISHED' ? 'ABSENT' : 'DRAFT'
+                            });
                         }
-                        dailyDetails.push({
-                            date: dateStr,
-                            slot_type: tx.slot_type,
-                            shift: shift?.name || 'Custom',
-                            scheduled_in: formatTime(scheduledStart),
-                            scheduled_out: formatTime(scheduledEnd),
-                            in: '-',
-                            out: '-',
-                            wage: 0, ot: 0, ot_hours: 0, regular_hours: 0,
-                            status: tx.status === 'PUBLISHED' ? 'ABSENT' : 'DRAFT'
-                        });
                     }
                 });
 
@@ -507,10 +543,9 @@ export const calculatePayroll = (employees, logs, transactions, shifts, payrollC
         const wageType = rates.wage_type || (emp.employment_status === 'Fulltime' && emp.base_salary > 0 ? 'monthly' : (rates.morning || rates.evening ? 'daily' : 'hourly'));
         const baseSalary = Number(emp.base_salary || rates.base_salary || 0);
 
-        // If Monthly staff and worked during month, set totalSalary to baseSalary
+        // If Monthly staff and active, set totalSalary to baseSalary
         if (wageType === 'monthly' && baseSalary > 0) {
-            // If they worked at least 1 day, grant full base salary (standard monthly salary)
-            totalSalary = workDays > 0 ? baseSalary : 0;
+            totalSalary = baseSalary;
         }
 
         // Allowances
