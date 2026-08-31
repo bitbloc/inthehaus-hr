@@ -124,11 +124,13 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
         const { name, value, type, checked } = e.target;
         if (name.startsWith('rate_')) {
             const rateKey = name.replace('rate_', '');
+            const parsedVal = type === 'checkbox' ? checked : (type === 'number' ? (value === '' ? '' : Number(value)) : value);
             setFormData(prev => ({
                 ...prev,
                 shift_rates: {
                     ...prev.shift_rates,
-                    [rateKey]: type === 'checkbox' ? checked : (type === 'number' ? (value === '' ? '' : Number(value)) : value)
+                    [rateKey]: parsedVal,
+                    ...(rateKey === 'morning' ? { daily_rate: parsedVal } : {})
                 }
             }));
         } else if (name === 'wage_type') {

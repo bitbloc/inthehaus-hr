@@ -544,9 +544,10 @@ export default function StaffDirectoryManager({
                                                 {wageType === 'daily' && (
                                                     <div className="flex flex-col gap-0.5">
                                                         <div className="flex items-center gap-1.5 text-[11px] font-bold text-rams-ink">
-                                                            <span>เช้า ฿{rates.morning || 0}</span>
-                                                            <span className="text-rams-ink-muted">/</span>
-                                                            <span>ค่ำ ฿{rates.evening || 0}</span>
+                                                            <span>กะปกติ Roster: ฿{rates.morning || rates.daily_rate || 350}</span>
+                                                            {rates.evening && rates.evening !== rates.morning && (
+                                                                <span className="text-[10px] text-rams-ink-muted font-normal">(ค่ำ ฿{rates.evening})</span>
+                                                            )}
                                                         </div>
                                                         <span className="text-[9px] text-rams-ink-muted">
                                                             กะควบ: ฿{rates.double || 800} · OT: ฿{rates.ot_rate || 75}/ชม.
@@ -676,12 +677,12 @@ export default function StaffDirectoryManager({
                                     {wageType === 'daily' && (
                                         <div className="grid grid-cols-2 gap-2 pt-1">
                                             <div>
-                                                <span className="text-[9px] text-rams-ink-muted block">เช้า (Morning)</span>
-                                                <span className="font-bold text-rams-ink">฿{rates.morning || 0}</span>
+                                                <span className="text-[9px] text-rams-ink-muted block">กะปกติ (Roster)</span>
+                                                <span className="font-bold text-rams-ink">฿{rates.morning || rates.daily_rate || 350}</span>
                                             </div>
                                             <div>
-                                                <span className="text-[9px] text-rams-ink-muted block">ค่ำ (Evening)</span>
-                                                <span className="font-bold text-rams-ink">฿{rates.evening || 0}</span>
+                                                <span className="text-[9px] text-rams-ink-muted block">กะควบ (Double)</span>
+                                                <span className="font-bold text-rams-ink">฿{rates.double || 800}</span>
                                             </div>
                                         </div>
                                     )}
