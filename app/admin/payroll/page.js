@@ -257,32 +257,43 @@ export default function PayrollDashboard() {
                                                                 DAILY ATTENDANCE & PAYROLL BREAKDOWN — {item.emp.nickname || item.emp.name}
                                                             </h4>
                                                             
-                                                            {/* Filter Tabs */}
-                                                            <div className="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-wider">
-                                                                <button 
-                                                                    onClick={(e) => { e.stopPropagation(); setDailyFilter('ALL'); }}
-                                                                    className={`px-2.5 py-1 rounded-sm border transition-all cursor-pointer ${dailyFilter === 'ALL' ? 'bg-rams-ink text-rams-panel border-rams-ink font-bold' : 'bg-rams-bg text-rams-ink-muted border-rams-rule-light hover:text-rams-ink'}`}
+                                                            {/* Filter Tabs & Print Button */}
+                                                            <div className="flex flex-wrap items-center gap-2">
+                                                                <div className="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-wider">
+                                                                    <button 
+                                                                        onClick={(e) => { e.stopPropagation(); setDailyFilter('ALL'); }}
+                                                                        className={`px-2.5 py-1 rounded-sm border transition-all cursor-pointer ${dailyFilter === 'ALL' ? 'bg-rams-ink text-rams-panel border-rams-ink font-bold' : 'bg-rams-bg text-rams-ink-muted border-rams-rule-light hover:text-rams-ink'}`}
+                                                                    >
+                                                                        ALL ({item.dailyDetails.length})
+                                                                    </button>
+                                                                    <button 
+                                                                        onClick={(e) => { e.stopPropagation(); setDailyFilter('EXCEPTIONS'); }}
+                                                                        className={`px-2.5 py-1 rounded-sm border transition-all cursor-pointer ${dailyFilter === 'EXCEPTIONS' ? 'bg-rams-red text-rams-panel border-rams-red font-bold' : 'bg-rams-bg text-rams-red border-rams-rule-light hover:border-rams-red'}`}
+                                                                    >
+                                                                        EXCEPTIONS ONLY
+                                                                    </button>
+                                                                    <button 
+                                                                        onClick={(e) => { e.stopPropagation(); setDailyFilter('WORK'); }}
+                                                                        className={`px-2.5 py-1 rounded-sm border transition-all cursor-pointer ${dailyFilter === 'WORK' ? 'bg-rams-ink text-rams-panel border-rams-ink font-bold' : 'bg-rams-bg text-rams-ink-muted border-rams-rule-light hover:text-rams-ink'}`}
+                                                                    >
+                                                                        WORK DAYS
+                                                                    </button>
+                                                                    <button 
+                                                                        onClick={(e) => { e.stopPropagation(); setDailyFilter('OFF'); }}
+                                                                        className={`px-2.5 py-1 rounded-sm border transition-all cursor-pointer ${dailyFilter === 'OFF' ? 'bg-rams-ink text-rams-panel border-rams-ink font-bold' : 'bg-rams-bg text-rams-ink-muted border-rams-rule-light hover:text-rams-ink'}`}
+                                                                    >
+                                                                        OFF DAYS
+                                                                    </button>
+                                                                </div>
+
+                                                                <a
+                                                                    href={`/admin/payroll/report?month=${selectedMonth}&type=individual&emp_id=${item.emp.id}`}
+                                                                    target="_blank"
+                                                                    onClick={(e) => e.stopPropagation()}
+                                                                    className="flex items-center gap-1 px-2.5 py-1 bg-rams-bg hover:bg-rams-panel text-rams-ink border border-rams-rule-light hover:border-rams-rule rounded-sm font-mono text-[9px] font-bold uppercase tracking-wider transition-all"
                                                                 >
-                                                                    ALL ({item.dailyDetails.length})
-                                                                </button>
-                                                                <button 
-                                                                    onClick={(e) => { e.stopPropagation(); setDailyFilter('EXCEPTIONS'); }}
-                                                                    className={`px-2.5 py-1 rounded-sm border transition-all cursor-pointer ${dailyFilter === 'EXCEPTIONS' ? 'bg-rams-red text-rams-panel border-rams-red font-bold' : 'bg-rams-bg text-rams-red border-rams-rule-light hover:border-rams-red'}`}
-                                                                >
-                                                                    EXCEPTIONS ONLY
-                                                                </button>
-                                                                <button 
-                                                                    onClick={(e) => { e.stopPropagation(); setDailyFilter('WORK'); }}
-                                                                    className={`px-2.5 py-1 rounded-sm border transition-all cursor-pointer ${dailyFilter === 'WORK' ? 'bg-rams-ink text-rams-panel border-rams-ink font-bold' : 'bg-rams-bg text-rams-ink-muted border-rams-rule-light hover:text-rams-ink'}`}
-                                                                >
-                                                                    WORK DAYS
-                                                                </button>
-                                                                <button 
-                                                                    onClick={(e) => { e.stopPropagation(); setDailyFilter('OFF'); }}
-                                                                    className={`px-2.5 py-1 rounded-sm border transition-all cursor-pointer ${dailyFilter === 'OFF' ? 'bg-rams-ink text-rams-panel border-rams-ink font-bold' : 'bg-rams-bg text-rams-ink-muted border-rams-rule-light hover:text-rams-ink'}`}
-                                                                >
-                                                                    OFF DAYS
-                                                                </button>
+                                                                    <Printer size={11} /> พิมพ์สลิปคนนี้
+                                                                </a>
                                                             </div>
                                                         </div>
 
