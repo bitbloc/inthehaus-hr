@@ -1238,7 +1238,11 @@ export default function CheckIn() {
                     </div>
                     <div className="min-w-0">
                       <p className="text-xs font-bold text-rams-ink truncate">{namePart}</p>
-                      <p className="text-[10px] font-mono text-rams-ink-muted truncate">{log.action_type === 'check_in' ? 'Checked In' : 'Checked Out'}</p>
+                      <p className="text-[10px] font-mono text-rams-ink-muted truncate">
+                        {log.action_type === 'check_in' 
+                          ? 'Checked In' 
+                          : (new Date(log.timestamp).getHours() < 6 ? 'Checked Out (กะเมื่อวาน 🌙)' : 'Checked Out')}
+                      </p>
                     </div>
                   </div>
                   <div className="flex flex-col items-end shrink-0 ml-3">

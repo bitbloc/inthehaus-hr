@@ -2,7 +2,7 @@
 import React, { useEffect, useState, useMemo, useReducer } from "react";
 import { supabase } from "../../lib/supabaseClient";
 import { useRealtimeSync } from "../../lib/useRealtimeSync";
-import { format, parseISO, startOfMonth, endOfMonth, differenceInMinutes, startOfWeek, addDays } from "date-fns";
+import { format, parseISO, startOfMonth, endOfMonth, differenceInMinutes, startOfWeek, addDays, subDays } from "date-fns";
 import * as XLSX from 'xlsx';
 import { calculatePayroll } from "../../utils/payroll";
 import { getEffectiveDailyRoster } from "../../utils/roster_logic";
@@ -341,6 +341,20 @@ export default function AdminDashboard() {
         } else {
             fetchLogs();
             alert("Log deleted successfully");
+        }
+    };
+
+    const handleToggleLogAction = async (log) => {
+        const newAction = log.action_type === 'check_in' ? 'check_out' : 'check_in';
+        const actionName = newAction === 'check_out' ? 'CHECK OUT (ออกงาน)' : 'CHECK IN (เข้างาน)';
+        if (!confirm(`ต้องการเปลี่ยนสถานะของ ${log.employees?.name || 'พนักงาน'} (${formatTime(log.timestamp)}) เป็น "${actionName}" หรือไม่?`)) return;
+
+        const { error } = await supabase.from('attendance_logs').update({ action_type: newAction }).eq('id', log.id);
+        if (error) {
+            alert("Error updating log: " + error.message);
+        } else {
+            fetchLogs();
+            alert(`แก้ไขสถานะเป็น ${actionName} สำเร็จ`);
         }
     };
 
@@ -978,7 +992,32 @@ export default function AdminDashboard() {
     const getShiftStatus = (log) => {
         const date = new Date(log.timestamp);
         const logDateLocalStr = format(date, 'yyyy-MM-dd');
+        const hour = date.getHours();
         
+        // 0. Detect Overnight Check-out (punched between 00:00 and 06:00 AM)
+        if (log.action_type === 'check_out' && hour >= 0 && hour < 6) {
+            const yesterdayDate = subDays(date, 1);
+            const yesterdayStr = format(yesterdayDate, 'yyyy-MM-dd');
+            
+            // Check if there was a check-in within the last 18 hours
+            const priorCheckin = (data.logs || []).find(l => 
+                String(l.employee_id) === String(log.employee_id) && 
+                l.action_type === 'check_in' && 
+                new Date(l.timestamp) < date &&
+                (date - new Date(l.timestamp)) <= (18 * 60 * 60 * 1000)
+            );
+            
+            const targetDateStr = priorCheckin ? format(new Date(priorCheckin.timestamp), 'yyyy-MM-dd') : yesterdayStr;
+            const targetDateObj = parseISO(targetDateStr);
+
+            return {
+                label: `🌙 ออกกะเมื่อวาน (${formatDate(targetDateObj)})`,
+                color: 'purple',
+                isOvernight: true,
+                shiftDate: targetDateStr
+            };
+        }
+
         // 1. Check roster transaction override first (draft or published)
         const tx = data.transactions?.find(t => 
             String(t.employee_id) === String(log.employee_id) && 
@@ -1570,8 +1609,15 @@ export default function AdminDashboard() {
                                                     {(showAllLogs ? data.logs : data.logs.slice(0, 15)).map(log => {
                                                         const status = getShiftStatus(log);
                                                         return (
-                                                            <tr key={log.id} className="group hover:bg-rams-bg/30 transition-all duration-100">
-                                                                <td className="px-6 py-4 font-mono text-rams-ink font-bold text-xs whitespace-nowrap">{formatDate(log.timestamp)}</td>
+                                                            <tr key={log.id} className={`group transition-all duration-100 ${status.isOvernight ? 'bg-purple-50/40 hover:bg-purple-50/70 border-l-4 border-l-purple-500' : 'hover:bg-rams-bg/30'}`}>
+                                                                <td className="px-6 py-4 font-mono text-rams-ink font-bold text-xs whitespace-nowrap">
+                                                                    <div>{formatDate(log.timestamp)}</div>
+                                                                    {status.isOvernight && (
+                                                                        <div className="text-[10px] font-mono text-purple-700 font-extrabold flex items-center gap-1 mt-0.5">
+                                                                            <span>🌙 กะของเมื่อวาน ({formatDate(parseISO(status.shiftDate))})</span>
+                                                                        </div>
+                                                                    )}
+                                                                </td>
                                                                 <td className="px-6 py-4 font-mono text-rams-ink-muted font-bold text-xs whitespace-nowrap">{formatTime(log.timestamp)}</td>
                                                                 <td className="px-6 py-4">
                                                                     {log.photo_url ? (
@@ -1587,9 +1633,16 @@ export default function AdminDashboard() {
                                                                     {log.employees?.name}
                                                                 </td>
                                                                 <td className="px-6 py-4 whitespace-nowrap">
-                                                                    <Badge color={log.action_type === 'check_in' ? 'blue' : log.action_type === 'absent' ? 'rose' : 'slate'}>
-                                                                        {log.action_type === 'check_in' ? 'Check In' : log.action_type === 'check_out' ? 'Check Out' : 'Absent'}
-                                                                    </Badge>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleToggleLogAction(log)}
+                                                                        className="cursor-pointer hover:opacity-80 active:scale-95 transition-all text-left"
+                                                                        title="คลิกเพื่อสลับ Check In / Check Out"
+                                                                    >
+                                                                        <Badge color={status.isOvernight ? 'purple' : log.action_type === 'check_in' ? 'blue' : log.action_type === 'absent' ? 'rose' : 'slate'}>
+                                                                            {status.isOvernight ? 'Check Out (กะเมื่อวาน 🌙)' : log.action_type === 'check_in' ? 'Check In 🔄' : 'Check Out 🔄'}
+                                                                        </Badge>
+                                                                    </button>
                                                                 </td>
                                                                 <td className="px-6 py-4 whitespace-nowrap"><Badge color={status.color}>{status.label}</Badge></td>
                                                                 <td className="px-6 py-4 whitespace-nowrap text-right">
