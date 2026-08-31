@@ -130,7 +130,7 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
                 shift_rates: {
                     ...prev.shift_rates,
                     [rateKey]: parsedVal,
-                    ...(rateKey === 'morning' ? { daily_rate: parsedVal } : {})
+                    ...(rateKey === 'daily_rate' || rateKey === 'morning' ? { daily_rate: parsedVal, morning: parsedVal, evening: parsedVal } : {})
                 }
             }));
         } else if (name === 'wage_type') {
@@ -449,7 +449,7 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
                                             { 
                                                 id: 'daily', 
                                                 title: 'รายกะ / รายวัน (Daily Shift)', 
-                                                desc: 'คิดค่าจ้างตามกะที่ทำงานจริง (กะเช้า / กะค่ำ / กะควบ)' 
+                                                desc: 'คิดค่าจ้างตามตารางเวลาที่จัดไว้ใน Roster (กะปกติ / กะควบ / OT)' 
                                             },
                                             { 
                                                 id: 'monthly', 
@@ -523,7 +523,7 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
                                         </div>
                                     )}
 
-                                    {/* Daily Shift Rates */}
+                                    {/* Daily Shift Rates (Single Unified Shift Rate) */}
                                     {currentWageType === 'daily' && (
                                         <div className="space-y-4 animate-in fade-in duration-100">
                                             <div className="p-3 bg-rams-bg border border-rams-rule-light rounded-sm">
@@ -538,32 +538,24 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
                                                 </ul>
                                             </div>
 
-                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                                 <FormInput 
-                                                    label="ค่าแรง กะปกติ (Standard Shift) ฿/กะ *" 
-                                                    name="rate_morning" 
+                                                    label="ค่าแรง กะปกติ (Standard Shift Rate) ฿/กะ *" 
+                                                    name="rate_daily_rate" 
                                                     type="number" 
-                                                    value={formData.shift_rates?.morning ?? 350} 
+                                                    value={formData.shift_rates?.daily_rate ?? formData.shift_rates?.morning ?? 350} 
                                                     onChange={handleChange} 
                                                     placeholder="350" 
                                                     mono 
-                                                />
-                                                <FormInput 
-                                                    label="ค่าแรง กะค่ำ/ปิดร้าน (Evening Shift) ฿/กะ" 
-                                                    name="rate_evening" 
-                                                    type="number" 
-                                                    value={formData.shift_rates?.evening ?? 400} 
-                                                    onChange={handleChange} 
-                                                    placeholder="400" 
-                                                    mono 
+                                                    required
                                                 />
                                                 <FormInput 
                                                     label="ค่าแรง กะควบ (Double Shift 11+ ชม.) ฿/วัน" 
                                                     name="rate_double" 
                                                     type="number" 
-                                                    value={formData.shift_rates?.double ?? 800} 
+                                                    value={formData.shift_rates?.double ?? 700} 
                                                     onChange={handleChange} 
-                                                    placeholder="800" 
+                                                    placeholder="700" 
                                                     mono 
                                                 />
                                             </div>

@@ -260,16 +260,8 @@ export const calculatePayroll = (employees, logs, transactions, shifts, payrollC
                                 dailyWage = rates.rush_4h ? Number(rates.rush_4h) : (rHours * hourlyRate);
                             } else {
                                 // Standard Full Shift in Roster (6h to 10.5h e.g. 10:00-18:00, 16:30-00:30, 10:00-20:30)
-                                const normName = (shift?.name || '').toLowerCase();
-                                if ((normName.includes('ค่ำ') || normName.includes('evening') || scheduledStart.getHours() >= 15) && rates.evening) {
-                                    dailyWage = Number(rates.evening);
-                                } else if (rates.morning) {
-                                    dailyWage = Number(rates.morning);
-                                } else if (rates.daily_rate) {
-                                    dailyWage = Number(rates.daily_rate);
-                                } else {
-                                    dailyWage = 350;
-                                }
+                                // Uses single unified daily shift rate
+                                dailyWage = Number(rates.daily_rate || rates.morning || rates.evening || 350);
                             }
                         }
 

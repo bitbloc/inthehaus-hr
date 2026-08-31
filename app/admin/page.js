@@ -17,6 +17,7 @@ import { LongPressButton } from "./_components/ui/LongPressButton";
 import StaffModal from "./StaffModal";
 import StaffDirectoryManager from "./_components/StaffDirectoryManager";
 import YuzuKnowledgeManager from "./_components/YuzuKnowledgeManager";
+import DashboardOverview from "./_components/DashboardOverview";
 
 // --- Reducer for Cleaner State ---
 const initialState = {
@@ -226,6 +227,9 @@ export default function AdminDashboard() {
             fetchLogs();
             fetchTransactions();
             fetchData('leave_requests', 'leaveRequests');
+            fetchData('job_applications', 'jobApplications');
+            fetchReservations();
+            fetchOrders();
             supabase.from('shift_swap_requests').select('*, requester:employees!requester_id(name, position), peer:employees!target_peer_id(name), shift:shifts!old_shift_id(name, start_time, end_time)').order('created_at', { ascending: false })
                 .then(({ data }) => dispatch({ type: 'SET_DATA', payload: { swapRequests: data || [] } }));
             supabase.from("employees").select("*").eq("is_active", false).order("created_at", { ascending: false })
@@ -1448,347 +1452,36 @@ export default function AdminDashboard() {
                         </div>
                     </div>
 
-                    {/* --- DASHBOARD --- */}
+                    {/* --- DASHBOARD OVERVIEW --- */}
                     {activeTab === 'dashboard' && (
-                        <div className="space-y-6">
-                            {/* Welcome Header */}
-                            <div className="bg-rams-panel border border-rams-rule rounded-sm p-6 md:p-8 text-rams-ink shadow-none relative overflow-hidden">
-                                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative z-10">
-                                    <div>
-                                        <span className="text-[9px] tracking-widest uppercase font-mono font-bold text-rams-ink bg-rams-bg border border-rams-rule-light px-2.5 py-1 rounded-sm">Restaurant OS</span>
-                                        <h2 className="text-xl md:text-2xl font-sans font-bold tracking-tight mt-2 text-rams-ink">ยินดีต้อนรับกลับมา, บอส 👋</h2>
-                                        <p className="text-xs text-rams-ink-muted mt-1 font-sans">ภาพรวมการปฏิบัติงานและตารางงานวันนี้ของคุณ</p>
-                                    </div>
-                                    <div className="flex flex-wrap gap-2">
-                                        <button onClick={() => handleNotify('/api/notify')} className="px-4 py-2 bg-rams-bg hover:bg-rams-ink-muted/10 text-rams-ink text-xs font-mono font-bold uppercase tracking-wider rounded-sm border border-rams-rule-light transition-all cursor-pointer">Daily Summary LINE</button>
-                                        <button onClick={() => setShowManualModal(true)} className="px-4 py-2 bg-rams-orange hover:bg-rams-orange-active text-rams-panel text-xs font-mono font-bold uppercase tracking-wider rounded-sm border border-rams-rule shadow-[0_2px_0_0_var(--color-rams-rule)] active:translate-y-[2px] active:shadow-none transition-all cursor-pointer">+ Manual Entry</button>
-                                        <button onClick={handleFinalizeDay} className="px-4 py-2 bg-rams-ink text-rams-panel hover:bg-rams-ink-muted text-xs font-mono font-bold uppercase tracking-wider rounded-sm border border-rams-rule transition-all cursor-pointer">🏁 Cut-off วัน</button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Draft Schedules Warning Card */}
-                            {draftWeeks.map(week => (
-                                <div key={week.start} className="relative bg-rams-amber/10 border border-rams-rule rounded-sm p-4 pr-12 sm:pr-14 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-none animate-fade-in-up">
-                                    <div className="flex gap-3">
-                                        <div className="w-10 h-10 bg-rams-amber/20 rounded-sm flex items-center justify-center border border-rams-rule text-rams-ink shrink-0">
-                                            <Icons.Alert size={18} />
-                                        </div>
-                                        <div>
-                                            <h4 className="font-mono font-bold text-rams-ink text-xs uppercase tracking-wider">พบตารางงานร่าง (Draft Roster) ที่ยังไม่เผยแพร่</h4>
-                                            <p className="text-[11px] font-sans text-rams-ink-muted mt-1">
-                                                สัปดาห์วันที่ {formatDate(week.start)} - {formatDate(week.end)} (มีทั้งหมด {week.count} กะงานที่ยังไม่ได้เผยแพร่)
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <button 
-                                        onClick={() => handlePublishRoster(week.start, week.end)}
-                                        className="w-full sm:w-auto px-4 py-2 bg-rams-orange text-rams-panel font-mono font-bold text-xs uppercase tracking-wider rounded-sm border border-rams-rule shadow-[0_2px_0_0_var(--color-rams-rule)] hover:bg-rams-orange-active active:translate-y-[2px] active:shadow-none transition-all cursor-pointer shrink-0"
-                                    >
-                                        อนุมัติ & ประกาศ LINE
-                                    </button>
-                                    <button
-                                        onClick={() => handleDismissDraftWeek(week.start)}
-                                        className="absolute top-4 right-4 w-6 h-6 flex items-center justify-center border border-rams-rule-light hover:border-rams-rule bg-rams-panel text-rams-ink-muted hover:text-rams-ink font-mono text-[10px] transition-all cursor-pointer rounded-sm"
-                                        title="ซ่อนคำเตือนนี้"
-                                    >
-                                        <Icons.X size={12} />
-                                    </button>
-                                </div>
-                            ))}
-
-                            {/* Restore dismissed draft alerts */}
-                            {dismissedDraftWeeks.length > 0 && (
-                                <div className="flex justify-end pr-2">
-                                    <button
-                                        onClick={() => {
-                                            setDismissedDraftWeeks([]);
-                                            localStorage.removeItem("dismissed_draft_weeks");
-                                        }}
-                                        className="text-[10px] font-mono font-bold text-rams-ink bg-rams-panel border border-rams-rule shadow-[0_2px_0_0_var(--color-rams-rule)] px-3 py-1.5 rounded-sm hover:bg-rams-bg-active active:translate-y-[1px] active:shadow-none transition-all flex items-center gap-1.5 cursor-pointer uppercase tracking-wider"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3 h-3">
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
-                                        </svg>
-                                        แสดงตารางงานร่างที่ซ่อนไว้ ({dismissedDraftWeeks.length})
-                                    </button>
-                                </div>
-                            )}
-
-
-                            {/* Quick Stats */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                                <Card className="shadow-none">
-                                    <div className="flex justify-between items-start">
-                                        <div>
-                                            <p className="text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest">Active Staff</p>
-                                            <h3 className="text-3xl font-mono font-black text-rams-ink mt-2">{data.employees.length}</h3>
-                                        </div>
-                                        <div className="w-10 h-10 bg-rams-bg border border-rams-rule-light rounded-sm flex items-center justify-center text-rams-ink-muted shrink-0">
-                                            <Icons.Staff size={18} />
-                                        </div>
-                                    </div>
-                                </Card>
-
-                                <Card className="shadow-none">
-                                    {(() => {
-                                        const todayStr = format(new Date(), 'yyyy-MM-dd');
-                                        const todayLogs = data.logs.filter(log => format(new Date(log.timestamp), 'yyyy-MM-dd') === todayStr);
-                                        const todayCheckIns = todayLogs.filter(log => log.action_type === 'check_in').length;
-                                        return (
-                                            <div className="flex justify-between items-start">
-                                                <div>
-                                                    <p className="text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest">Today Check-ins</p>
-                                                    <h3 className="text-3xl font-mono font-black text-rams-orange mt-2">{todayCheckIns}</h3>
-                                                </div>
-                                                <div className="w-10 h-10 bg-rams-bg border border-rams-rule-light rounded-sm flex items-center justify-center text-rams-orange shrink-0">
-                                                    <Icons.Check size={18} />
-                                                </div>
-                                            </div>
-                                        );
-                                    })()}
-                                </Card>
-
-                                <Card className="shadow-none">
-                                    {(() => {
-                                        const todayStr = format(new Date(), 'yyyy-MM-dd');
-                                        const todayLogs = data.logs.filter(log => format(new Date(log.timestamp), 'yyyy-MM-dd') === todayStr);
-                                        const todayLates = todayLogs.filter(log => {
-                                            if (log.action_type !== 'check_in') return false;
-                                            const status = getShiftStatus(log);
-                                            return status.label.includes('Late');
-                                        }).length;
-                                        return (
-                                            <div className="flex justify-between items-start">
-                                                <div>
-                                                    <p className="text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest">Late Today</p>
-                                                    <h3 className="text-3xl font-mono font-black text-rams-amber mt-2">{todayLates}</h3>
-                                                </div>
-                                                <div className="w-10 h-10 bg-rams-bg border border-rams-rule-light rounded-sm flex items-center justify-center text-rams-amber shrink-0">
-                                                    <Icons.Alert size={18} />
-                                                </div>
-                                            </div>
-                                        );
-                                    })()}
-                                </Card>
-
-                                <Card className="shadow-none">
-                            <div className="flex justify-between items-start">
-                                        <div>
-                                            <p className="text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest">Pending Alerts</p>
-                                            <h3 className="text-3xl font-mono font-black text-rams-red mt-2">{totalAlertsCount}</h3>
-                                        </div>
-                                        <div className="w-10 h-10 bg-rams-bg border border-rams-rule-light rounded-sm flex items-center justify-center text-rams-red shrink-0">
-                                            <Icons.Bell size={18} />
-                                        </div>
-                                    </div>
-                                </Card>
-                            </div>
-
-                            {/* Main Grid: Alerts Hub & Real-time Activity */}
-                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                {/* Real-time Activity Feed */}
-                                <div className="lg:col-span-2 space-y-6">
-                                    <div className="bg-rams-panel border border-rams-rule rounded-sm overflow-hidden flex flex-col max-h-[650px]">
-                                        <div className="p-5 border-b border-rams-rule-light flex justify-between items-center shrink-0 bg-rams-bg/30 sticky top-0 z-20">
-                                            <h3 className="font-mono font-bold text-rams-ink text-sm uppercase tracking-wider">Real-time Activity Feed</h3>
-                                            <button
-                                                onClick={() => setShowAllLogs(!showAllLogs)}
-                                                className="text-[10px] font-mono font-bold text-rams-ink bg-rams-bg border border-rams-rule-light px-3 py-1.5 rounded-sm hover:bg-rams-bg-active transition-all uppercase tracking-wider cursor-pointer"
-                                            >
-                                                {showAllLogs ? 'Show Less' : 'View All'}
-                                            </button>
-                                        </div>
-                                            <table className="w-full text-xs text-left relative">
-                                                <thead className="bg-rams-bg text-rams-ink-muted uppercase text-[9px] font-mono font-bold tracking-widest sticky top-0 z-10 border-b border-rams-rule-light shadow-none">
-                                                    <tr>
-                                                        <th className="px-6 py-3 whitespace-nowrap">Date</th>
-                                                        <th className="px-6 py-3 whitespace-nowrap">Time</th>
-                                                        <th className="px-6 py-3 whitespace-nowrap">Photo</th>
-                                                        <th className="px-6 py-3 whitespace-nowrap">Staff</th>
-                                                        <th className="px-6 py-3 whitespace-nowrap">Action</th>
-                                                        <th className="px-6 py-3 whitespace-nowrap">Status</th>
-                                                        <th className="px-6 py-3 whitespace-nowrap w-10"></th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody className="divide-y divide-rams-rule-light bg-rams-panel">
-                                                    {(showAllLogs ? data.logs : data.logs.slice(0, 15)).map(log => {
-                                                        const status = getShiftStatus(log);
-                                                        return (
-                                                            <tr key={log.id} className={`group transition-all duration-100 ${status.isOvernight ? 'bg-purple-50/40 hover:bg-purple-50/70 border-l-4 border-l-purple-500' : 'hover:bg-rams-bg/30'}`}>
-                                                                <td className="px-6 py-4 font-mono text-rams-ink font-bold text-xs whitespace-nowrap">
-                                                                    <div>{formatDate(log.timestamp)}</div>
-                                                                    {status.isOvernight && (
-                                                                        <div className="text-[10px] font-mono text-purple-700 font-extrabold flex items-center gap-1 mt-0.5">
-                                                                            <span>🌙 กะของเมื่อวาน ({formatDate(parseISO(status.shiftDate))})</span>
-                                                                        </div>
-                                                                    )}
-                                                                </td>
-                                                                <td className="px-6 py-4 font-mono text-rams-ink-muted font-bold text-xs whitespace-nowrap">{formatTime(log.timestamp)}</td>
-                                                                <td className="px-6 py-4">
-                                                                    {log.photo_url ? (
-                                                                        <a href={log.photo_url} target="_blank" rel="noopener noreferrer">
-                                                                            <img src={log.photo_url} alt="log" className="w-9 h-9 rounded-sm object-cover border border-rams-rule-light hover:border-rams-rule transition-all" referrerPolicy="no-referrer" />
-                                                                        </a>
-                                                                    ) : <span className="text-rams-ink-muted font-mono font-bold">-</span>}
-                                                                </td>
-                                                                <td className="px-6 py-4 font-bold text-rams-ink flex items-center gap-3 whitespace-nowrap">
-                                                                    <div className="w-7 h-7 rounded-sm bg-rams-ink border border-rams-rule flex items-center justify-center text-xs text-rams-panel font-mono font-bold shrink-0">
-                                                                        {log.employees?.name?.charAt(0)}
-                                                                    </div>
-                                                                    {log.employees?.name}
-                                                                </td>
-                                                                <td className="px-6 py-4 whitespace-nowrap">
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => handleToggleLogAction(log)}
-                                                                        className="cursor-pointer hover:opacity-80 active:scale-95 transition-all text-left"
-                                                                        title="คลิกเพื่อสลับ Check In / Check Out"
-                                                                    >
-                                                                        <Badge color={status.isOvernight ? 'purple' : log.action_type === 'check_in' ? 'blue' : log.action_type === 'absent' ? 'rose' : 'slate'}>
-                                                                            {status.isOvernight ? 'Check Out (กะเมื่อวาน 🌙)' : log.action_type === 'check_in' ? 'Check In 🔄' : 'Check Out 🔄'}
-                                                                        </Badge>
-                                                                    </button>
-                                                                </td>
-                                                                <td className="px-6 py-4 whitespace-nowrap"><Badge color={status.color}>{status.label}</Badge></td>
-                                                                <td className="px-6 py-4 whitespace-nowrap text-right">
-                                                                    <button
-                                                                        onClick={(e) => { e.stopPropagation(); handleDeleteLog(log.id); }}
-                                                                        className="w-7 h-7 flex items-center justify-center border border-rams-rule-light hover:border-rams-red hover:bg-rams-red/10 text-rams-ink-muted hover:text-rams-red transition-all cursor-pointer rounded-sm"
-                                                                        title="Delete Log"
-                                                                    >
-                                                                        <Icons.Trash size={12} />
-                                                                    </button>
-                                                                </td>
-                                                            </tr>
-                                                        );
-                                                    })}
-                                                    {!showAllLogs && data.logs.length > 15 && (
-                                                        <tr>
-                                                            <td colSpan="7" className="px-6 py-4 text-center">
-                                                                <button
-                                                                    onClick={() => setShowAllLogs(true)}
-                                                                    className="text-xs font-bold text-indigo-600 hover:text-indigo-800 transition-colors"
-                                                                >
-                                                                    Show {data.logs.length - 15} more...
-                                                                </button>
-                                                            </td>
-                                                        </tr>
-                                                    )}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-
-                                {/* Alerts Hub (Action Center) */}
-                                <div className="space-y-6">
-                                    <div className="bg-rams-panel border border-rams-rule rounded-sm p-5 shadow-none">
-                                        <div className="flex justify-between items-center mb-4 pb-2 border-b border-rams-rule-light -mx-5 -mt-5 p-5 bg-rams-bg/30">
-                                            <h3 className="font-mono font-bold text-rams-ink text-sm uppercase tracking-wider">Alerts Hub</h3>
-                                            <Badge color={totalAlertsCount > 0 ? "orange" : "emerald"}>
-                                                {totalAlertsCount > 0 ? `${totalAlertsCount} pending` : "All cleared"}
-                                            </Badge>
-                                        </div>
-
-                                        <div className="space-y-4 max-h-[500px] overflow-y-auto pr-1 custom-scrollbar">
-                                            {totalAlertsCount === 0 ? (
-                                                <div className="text-center py-12 space-y-3 bg-rams-panel">
-                                                    <div className="w-10 h-10 bg-rams-green/10 border border-rams-rule text-rams-green rounded-sm flex items-center justify-center mx-auto text-sm font-mono font-bold">
-                                                        ✓
-                                                    </div>
-                                                    <p className="text-xs font-mono font-bold text-rams-ink uppercase tracking-wider">ทุกอย่างเรียบร้อยดี!</p>
-                                                    <p className="text-[10px] font-mono text-rams-ink-muted uppercase tracking-wider">ไม่มีคำขออนุมัติหรือพนักงานสมัครใหม่</p>
-                                                </div>
-                                            ) : (
-                                                <>
-                                                    {/* 1. Leave Requests */}
-                                                    {data.leaveRequests.filter(r => r.status === 'pending').map(req => (
-                                                        <div key={`leave-${req.id}`} className="p-4 bg-rams-red/5 border border-rams-rule-light rounded-sm space-y-3">
-                                                            <div className="flex justify-between items-start">
-                                                                <Badge color="rose">ขอลาหยุด</Badge>
-                                                                <span className="text-[10px] font-mono font-bold text-rams-ink">{formatDate(req.leave_date)}</span>
-                                                            </div>
-                                                            <div className="text-xs text-rams-ink font-sans">
-                                                                <span className="font-bold text-rams-ink">{req.employees?.name}</span> ขอลาหยุดประเภท <span className="font-mono font-bold text-rams-orange">{req.leave_type}</span>
-                                                                <div className="mt-1.5 p-2 bg-rams-bg border border-rams-rule-light rounded-sm font-mono text-[10px] text-rams-ink-muted leading-normal">เหตุผล: &quot;{req.reason || '-'}&quot;</div>
-                                                                {req.replacement_employee && (
-                                                                    <p className="mt-2 text-xs font-mono font-bold text-rams-ink-muted">
-                                                                        👤 คนทำงานแทน: <span className="bg-rams-bg border border-rams-rule-light text-rams-ink font-mono px-1.5 py-0.5 rounded-sm">{req.replacement_employee.name} {req.replacement_employee.nickname ? `(${req.replacement_employee.nickname})` : ""}</span>
-                                                                    </p>
-                                                                )}
-                                                            </div>
-                                                            <div className="flex gap-2 justify-end pt-1">
-                                                                <button 
-                                                                    onClick={() => handleLeaveAction(req, 'approved')} 
-                                                                    className="px-3 py-1.5 bg-rams-green text-rams-panel font-mono font-bold text-[9px] uppercase tracking-wider rounded-sm border border-rams-rule shadow-[0_1.5px_0_0_var(--color-rams-rule)] hover:bg-rams-green/90 active:translate-y-[1px] active:shadow-none cursor-pointer transition-all"
-                                                                >
-                                                                    ✓ อนุมัติ
-                                                                </button>
-                                                                <button 
-                                                                    onClick={() => handleLeaveAction(req, 'rejected')} 
-                                                                    className="px-3 py-1.5 bg-rams-bg border border-rams-rule-light text-rams-ink-muted font-mono font-bold text-[9px] uppercase tracking-wider rounded-sm hover:bg-rams-ink-muted/10 cursor-pointer transition-all"
-                                                                >
-                                                                    ✕ ปฏิเสธ
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-
-                                                    {/* 2. Shift Swaps */}
-                                                    {data.swapRequests.filter(r => r.status === 'PENDING_MANAGER').map(req => (
-                                                        <div key={`swap-${req.id}`} className="p-4 bg-rams-orange/5 border border-rams-rule-light rounded-sm space-y-3">
-                                                            <div className="flex justify-between items-start">
-                                                                <Badge color="blue">สลับกะ</Badge>
-                                                                <span className="text-[10px] font-mono font-bold text-rams-ink">{req.target_date}</span>
-                                                            </div>
-                                                            <div className="text-xs text-rams-ink font-sans">
-                                                                <span className="font-bold text-rams-ink">{req.requester?.name}</span> ขอสลับกะกับ <span className="font-bold text-rams-ink">{req.peer?.name || 'Open Pool'}</span>
-                                                                <div className="mt-1.5 p-2 bg-rams-bg border border-rams-rule-light rounded-sm font-mono text-[10px] text-rams-ink-muted leading-normal">โน้ต: &quot;{req.notes || '-'}&quot;</div>
-                                                            </div>
-                                                            <div className="flex gap-2 justify-end pt-1">
-                                                                <button 
-                                                                    onClick={() => handleSwapDecision(req.id, 'APPROVE')} 
-                                                                    className="px-3 py-1.5 bg-rams-green text-rams-panel font-mono font-bold text-[9px] uppercase tracking-wider rounded-sm border border-rams-rule shadow-[0_1.5px_0_0_var(--color-rams-rule)] hover:bg-rams-green/90 active:translate-y-[1px] active:shadow-none cursor-pointer transition-all"
-                                                                >
-                                                                    ✓ อนุมัติ
-                                                                </button>
-                                                                <button 
-                                                                    onClick={() => handleSwapDecision(req.id, 'REJECT')} 
-                                                                    className="px-3 py-1.5 bg-rams-bg border border-rams-rule-light text-rams-ink-muted font-mono font-bold text-[9px] uppercase tracking-wider rounded-sm hover:bg-rams-ink-muted/10 cursor-pointer transition-all"
-                                                                >
-                                                                    ✕ ปฏิเสธ
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-
-                                                    {/* 3. Pending Employees */}
-                                                    {data.pendingEmployees?.map(emp => (
-                                                        <div key={`emp-${emp.id}`} className="p-4 bg-rams-amber/5 border border-rams-rule-light rounded-sm space-y-3 animate-fade-in-up">
-                                                            <div className="flex justify-between items-start">
-                                                                <Badge color="amber">พนักงานสมัครใหม่</Badge>
-                                                                <span className="text-[10px] font-mono font-bold text-rams-ink uppercase tracking-wider">สมัครทาง LINE</span>
-                                                            </div>
-                                                            <div className="text-xs text-rams-ink font-sans">
-                                                                <span className="font-bold text-rams-ink">{emp.name}</span> ได้สมัครบัญชีพนักงานเข้ามา รอคุณอนุมัติ
-                                                            </div>
-                                                            <div className="flex justify-end pt-1">
-                                                                <button 
-                                                                    onClick={() => { setEditingStaff(emp); setShowStaffModal(true); }}
-                                                                    className="px-3 py-1.5 bg-rams-orange text-rams-panel font-mono font-bold text-[9px] uppercase tracking-wider rounded-sm border border-rams-rule shadow-[0_1.5px_0_0_var(--color-rams-rule)] hover:bg-rams-orange-active active:translate-y-[1px] active:shadow-none cursor-pointer transition-all"
-                                                                >
-                                                                    ตั้งค่า & อนุมัติบัญชี
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                        <DashboardOverview
+                            data={data}
+                            selectedMonth={selectedMonth}
+                            setSelectedMonth={setSelectedMonth}
+                            draftWeeks={draftWeeks}
+                            dismissedDraftWeeks={dismissedDraftWeeks}
+                            setDismissedDraftWeeks={setDismissedDraftWeeks}
+                            handlePublishRoster={handlePublishRoster}
+                            handleDismissDraftWeek={handleDismissDraftWeek}
+                            handleNotify={handleNotify}
+                            handleFinalizeDay={handleFinalizeDay}
+                            setShowManualModal={setShowManualModal}
+                            setShowAdminLeaveModal={setShowAdminLeaveModal}
+                            setEditingStaff={setEditingStaff}
+                            setShowStaffModal={setShowStaffModal}
+                            handleLeaveAction={handleLeaveAction}
+                            handleSwapDecision={handleSwapDecision}
+                            handleToggleLogAction={handleToggleLogAction}
+                            handleDeleteLog={handleDeleteLog}
+                            onTabChange={(tabId) => {
+                                const matchedNav = navigationCategories.flatMap(c => c.items).find(i => i.id === tabId);
+                                if (matchedNav?.isLink) {
+                                    window.location.href = matchedNav.href;
+                                } else {
+                                    setActiveTab(tabId);
+                                }
+                            }}
+                        />
                     )}
 
                     {/* Manual Entry Modal */}
