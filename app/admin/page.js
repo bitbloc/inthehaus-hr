@@ -1827,27 +1827,41 @@ export default function AdminDashboard() {
                                                     <td className="px-6 py-4 text-right font-mono text-blue-700 font-bold">{row.totalOTPay.toLocaleString()}</td>
                                                     <td className="px-6 py-4 text-right font-mono text-rose-500 font-bold">{row.totalDeduct > 0 ? `-${row.totalDeduct}` : '-'}</td>
                                                     <td className="px-6 py-4 text-right font-mono text-emerald-600 font-black text-base">{row.netSalary.toLocaleString()} ฿</td>
-                                                    <td className="px-6 py-4 text-center"><div className="flex justify-center gap-1">{row.lateCount > 0 && <Badge color="amber">L:{row.lateCount}</Badge>}{row.absentCount > 0 && <Badge color="rose">A:{row.absentCount}</Badge>}</div></td>
+                                                    <td className="px-6 py-4 text-center">
+                                                        <div className="flex flex-wrap justify-center gap-1 font-mono text-[10px]">
+                                                            {row.incompleteCount > 0 && <Badge color="rose">MISSED:{row.incompleteCount}</Badge>}
+                                                            {row.offDayWorkCount > 0 && <Badge color="purple">OFF-DAY:{row.offDayWorkCount}</Badge>}
+                                                            {row.lateCount > 0 && <Badge color="amber">L:{row.lateCount}</Badge>}
+                                                            {row.absentCount > 0 && <Badge color="rose">A:{row.absentCount}</Badge>}
+                                                            {!row.incompleteCount && !row.offDayWorkCount && !row.lateCount && !row.absentCount && <span className="text-slate-400">-</span>}
+                                                        </div>
+                                                    </td>
                                                 </tr>
                                                 {expandedPayrollRow === row.emp.id && (
                                                     <tr className="bg-slate-50/50">
                                                         <td colSpan="8" className="p-6">
                                                             <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-inner">
                                                                 <div className="p-3 bg-slate-100 flex justify-between items-center text-xs font-bold text-slate-500">
-                                                                    <span>🗓️ Daily Details</span>
-                                                                    <span className="font-mono text-slate-800 font-bold">Wage: {row.totalSalary} | OT: {row.totalOTPay} ({row.totalOTHours}h)</span>
+                                                                    <span className="font-mono uppercase tracking-wider">DAILY ATTENDANCE BREAKDOWN</span>
+                                                                    <span className="font-mono text-slate-800 font-bold">Wage: {row.totalSalary.toLocaleString()} | OT: {row.totalOTPay.toLocaleString()} ({row.totalOTHours}h)</span>
                                                                 </div>
                                                                 <table className="w-full text-xs text-left">
-                                                                    <thead className="border-b border-slate-100 bg-white text-slate-900"><tr><th className="p-3">Date</th><th className="p-3">Shift</th><th className="p-3 text-center">Time</th><th className="p-3 text-right">Wage</th><th className="p-3 text-right">OT</th><th className="p-3">Status</th></tr></thead>
-                                                                    <tbody className="divide-y divide-slate-100">
+                                                                    <thead className="border-b border-slate-100 bg-white text-slate-900 font-mono text-[10px] uppercase">
+                                                                        <tr><th className="p-3">Date</th><th className="p-3">Shift</th><th className="p-3 text-center">Time</th><th className="p-3 text-right">Wage</th><th className="p-3 text-right">OT</th><th className="p-3">Status</th></tr>
+                                                                    </thead>
+                                                                    <tbody className="divide-y divide-slate-100 font-mono">
                                                                         {row.dailyDetails.map((day, idx) => (
                                                                             <tr key={idx} className="hover:bg-slate-50">
-                                                                                <td className="p-3 font-mono text-slate-900 font-black">{formatDate(day.date, "dd MMM")}</td>
+                                                                                <td className="p-3 text-slate-900 font-black">{formatDate(day.date, "dd MMM")}</td>
                                                                                 <td className="p-3 font-bold text-slate-800">{day.shift}</td>
-                                                                                <td className="p-3 text-center font-mono text-slate-900 font-extrabold">{day.in} - {day.out}</td>
-                                                                                <td className="p-3 text-right font-mono font-bold text-slate-900">{day.wage > 0 ? day.wage : '-'}</td>
-                                                                                <td className="p-3 text-right font-mono text-blue-600 font-bold">{day.ot > 0 ? `+${day.ot}` : '-'}</td>
-                                                                                <td className="p-3"><Badge color={day.status.includes('Late') ? 'amber' : day.status === 'Absent' ? 'rose' : day.status.includes('Extra') ? 'purple' : day.status === 'Normal' ? 'emerald' : 'slate'}>{day.status}</Badge></td>
+                                                                                <td className="p-3 text-center text-slate-900 font-extrabold">{day.in} - {day.out}</td>
+                                                                                <td className="p-3 text-right font-bold text-slate-900">{day.wage > 0 ? day.wage.toLocaleString() : '-'}</td>
+                                                                                <td className="p-3 text-right text-blue-600 font-bold">{day.ot > 0 ? `+${day.ot.toLocaleString()}` : '-'}</td>
+                                                                                <td className="p-3">
+                                                                                    <Badge color={day.status.includes('LATE') ? 'amber' : day.status.includes('ABSENT') || day.status.includes('MISSED') ? 'rose' : day.status.includes('OFF-DAY') ? 'purple' : day.status.includes('UNSCHEDULED') ? 'orange' : day.status === 'NORMAL' ? 'emerald' : 'slate'}>
+                                                                                        {day.status}
+                                                                                    </Badge>
+                                                                                </td>
                                                                             </tr>
                                                                         ))}
                                                                     </tbody>

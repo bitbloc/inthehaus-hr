@@ -172,7 +172,7 @@ function RosterPDFReportContent() {
                                                         const timeStr = s.custom_start_time 
                                                             ? `${s.custom_start_time.slice(0,5)}-${s.custom_end_time?.slice(0,5)}` 
                                                             : (shiftObj ? `${shiftObj.start_time.slice(0,5)}-${shiftObj.end_time.slice(0,5)}` : '');
-                                                        const cellLabel = s.is_off ? 'OFF (หยุด)' : (matchedPreset ? `${matchedPreset.icon || '⏰'} ${matchedPreset.name}` : (shiftObj?.name || 'Custom'));
+                                                        const cellLabel = s.is_off ? 'OFF' : (matchedPreset ? matchedPreset.name : (shiftObj?.name || 'CUSTOM'));
 
                                                         return (
                                                             <div 

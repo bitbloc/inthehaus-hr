@@ -196,25 +196,27 @@ function PayrollPDFReportContent() {
                             </thead>
                             <tbody className="divide-y divide-neutral-100 bg-white">
                                 {item.dailyDetails.map((d, i) => {
-                                    const isOff = d.shift === 'OFF' || d.status === 'Off Day';
-                                    const isAbsent = d.status?.includes('Absent');
-                                    const isLate = d.status?.includes('Late');
-                                    const isUnscheduled = d.status === 'Unscheduled Work';
-                                    const isIncomplete = d.status?.includes('Incomplete');
+                                    const isOff = d.shift === 'OFF' && d.status === 'OFF';
+                                    const isOffWorked = d.status?.includes('OFF-DAY');
+                                    const isAbsent = d.status?.includes('ABSENT');
+                                    const isLate = d.status?.includes('LATE');
+                                    const isUnscheduled = d.status?.includes('UNSCHEDULED');
+                                    const isMissed = d.status?.includes('MISSED') || d.status?.includes('Incomplete');
 
-                                    let statusColor = 'text-rams-green font-semibold';
-                                    if (isOff) statusColor = 'text-neutral-400';
-                                    else if (isAbsent || isLate) statusColor = 'text-rams-red font-bold';
-                                    else if (isIncomplete) statusColor = 'text-rams-amber font-semibold';
-                                    else if (isUnscheduled) statusColor = 'text-rams-orange font-semibold';
+                                    let statusColor = 'text-rams-green font-bold';
+                                    if (isOff) statusColor = 'text-neutral-400 font-normal';
+                                    else if (isOffWorked) statusColor = 'text-neutral-900 font-black';
+                                    else if (isAbsent || isMissed) statusColor = 'text-rams-red font-bold';
+                                    else if (isLate) statusColor = 'text-rams-amber font-bold';
+                                    else if (isUnscheduled) statusColor = 'text-rams-orange font-bold';
 
                                     return (
                                         <tr key={i} className={`hover:bg-neutral-50 ${isOff ? 'text-neutral-400 bg-neutral-50/50' : 'text-neutral-800'}`}>
                                             <td className="py-2 px-3 font-mono">{d.date.slice(5)}</td>
                                             <td className="py-2 px-3 font-medium">{d.shift}</td>
-                                            <td className={`py-2 px-3 font-mono ${isOff ? 'text-neutral-400' : 'font-bold'}`}>{d.scheduled_in ? `${d.scheduled_in}-${d.scheduled_out}` : '-'}</td>
-                                            <td className={`py-2 px-3 font-mono font-bold ${isOff ? 'text-neutral-400' : ''}`}>{d.in !== '-' || d.out !== '-' ? `${d.in}-${d.out}` : '-'}</td>
-                                            <td className={`py-2 px-3 text-[10px] ${statusColor}`}>{d.status}</td>
+                                            <td className={`py-2 px-3 font-mono ${isOff ? 'text-neutral-400' : 'font-bold'}`}>{d.scheduled_in && d.scheduled_in !== '-' ? `${d.scheduled_in}-${d.scheduled_out}` : '-'}</td>
+                                            <td className={`py-2 px-3 font-mono font-bold ${isOff ? 'text-neutral-400' : isMissed ? 'text-rams-red' : ''}`}>{d.in !== '-' || d.out !== '-' ? `${d.in}-${d.out}` : '-'}</td>
+                                            <td className={`py-2 px-3 text-[9px] uppercase font-mono tracking-wider ${statusColor}`}>{d.status}</td>
                                             <td className={`py-2 px-3 text-right font-mono font-semibold ${isOff ? 'text-neutral-400' : 'text-neutral-700'}`}>{d.regular_hours > 0 ? Number(d.regular_hours).toFixed(1) : '-'}</td>
                                             <td className={`py-2 px-3 text-right font-mono ${isOff ? 'text-neutral-400' : 'text-rams-orange font-medium'}`}>{d.ot_hours > 0 ? Number(d.ot_hours).toFixed(1) : '-'}</td>
                                             <td className={`py-2 px-3 text-right font-mono font-semibold ${isOff ? 'text-neutral-400' : 'text-neutral-700'}`}>{d.wage > 0 ? d.wage.toLocaleString('th-TH', {minimumFractionDigits:2}) : '-'}</td>

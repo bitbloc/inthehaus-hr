@@ -11,6 +11,7 @@ export default function AdminRosterPage() {
     const [employees, setEmployees] = useState([]);
     const [shifts, setShifts] = useState([]);
     const [transactions, setTransactions] = useState([]);
+    const [attendanceLogs, setAttendanceLogs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [leaveRequests, setLeaveRequests] = useState([]);
     const [editingLeaveId, setEditingLeaveId] = useState(null);
@@ -29,22 +30,23 @@ export default function AdminRosterPage() {
     const [customPresets, setCustomPresets] = useState([]);
     const [presetModal, setPresetModal] = useState(null); // { start, end } or null
 
-    // Employee Status & Vacation Filter State
+    // Employee Status, Vacation & Audit Filter State
     const [statusFilter, setStatusFilter] = useState('ALL'); // 'ALL' | 'ACTIVE' | 'SUSPENDED' | 'VACATION'
     const [searchQuery, setSearchQuery] = useState('');
     const [adjustingEmpModal, setAdjustingEmpModal] = useState(null);
+    const [auditExceptionsOnly, setAuditExceptionsOnly] = useState(false);
 
     const PRESET_COLORS = [
-        { id: 'sky', label: 'ฟ้า', bg: 'bg-sky-50', text: 'text-sky-800', border: 'border-sky-200', dot: 'bg-sky-500' },
-        { id: 'amber', label: 'ส้ม', bg: 'bg-amber-50', text: 'text-amber-800', border: 'border-amber-200', dot: 'bg-amber-500' },
-        { id: 'indigo', label: 'ม่วง', bg: 'bg-indigo-50', text: 'text-indigo-800', border: 'border-indigo-200', dot: 'bg-indigo-500' },
-        { id: 'rose', label: 'ชมพู', bg: 'bg-rose-50', text: 'text-rose-800', border: 'border-rose-200', dot: 'bg-rose-500' },
-        { id: 'emerald', label: 'เขียว', bg: 'bg-emerald-50', text: 'text-emerald-800', border: 'border-emerald-200', dot: 'bg-emerald-500' },
-        { id: 'violet', label: 'ม่วงอ่อน', bg: 'bg-violet-50', text: 'text-violet-800', border: 'border-violet-200', dot: 'bg-violet-500' },
-        { id: 'slate', label: 'เทา', bg: 'bg-slate-100', text: 'text-slate-800', border: 'border-slate-300', dot: 'bg-slate-500' },
-        { id: 'teal', label: 'น้ำเงินเขียว', bg: 'bg-teal-50', text: 'text-teal-800', border: 'border-teal-200', dot: 'bg-teal-500' },
+        { id: 'sky', label: 'SKY', bg: 'bg-sky-50', text: 'text-sky-800', border: 'border-sky-200', dot: 'bg-sky-500' },
+        { id: 'amber', label: 'AMBER', bg: 'bg-amber-50', text: 'text-amber-800', border: 'border-amber-200', dot: 'bg-amber-500' },
+        { id: 'indigo', label: 'INDIGO', bg: 'bg-indigo-50', text: 'text-indigo-800', border: 'border-indigo-200', dot: 'bg-indigo-500' },
+        { id: 'rose', label: 'ROSE', bg: 'bg-rose-50', text: 'text-rose-800', border: 'border-rose-200', dot: 'bg-rose-500' },
+        { id: 'emerald', label: 'EMERALD', bg: 'bg-emerald-50', text: 'text-emerald-800', border: 'border-emerald-200', dot: 'bg-emerald-500' },
+        { id: 'violet', label: 'VIOLET', bg: 'bg-violet-50', text: 'text-violet-800', border: 'border-violet-200', dot: 'bg-violet-500' },
+        { id: 'slate', label: 'SLATE', bg: 'bg-slate-100', text: 'text-slate-800', border: 'border-slate-300', dot: 'bg-slate-500' },
+        { id: 'teal', label: 'TEAL', bg: 'bg-teal-50', text: 'text-teal-800', border: 'border-teal-200', dot: 'bg-teal-500' },
     ];
-    const PRESET_ICONS = ['⏰', '☀️', '🌙', '🔥', '⚡', '💼', '🍳', '🌊', '🎯', '✨', '🛎️', '🍽️'];
+    const PRESET_ICONS = [];
 
     const getPresetColor = (colorId) => PRESET_COLORS.find(c => c.id === colorId) || PRESET_COLORS[0];
 
@@ -60,7 +62,7 @@ export default function AdminRosterPage() {
     }, []);
 
     const openPresetModal = (start, end) => {
-        setPresetModal({ start, end, name: '', color: 'sky', icon: '⏰' });
+        setPresetModal({ start, end, name: '', color: 'sky', icon: '' });
     };
 
     const confirmSavePreset = () => {
@@ -73,7 +75,7 @@ export default function AdminRosterPage() {
             setPresetModal(null);
             return;
         }
-        const newPresets = [...customPresets, { start: normStart, end: normEnd, name: name || `${normStart}-${normEnd}`, color: color || 'sky', icon: icon || '⏰' }];
+        const newPresets = [...customPresets, { start: normStart, end: normEnd, name: name || `${normStart}-${normEnd}`, color: color || 'sky', icon: '' }];
         setCustomPresets(newPresets);
         localStorage.setItem('roster_custom_presets', JSON.stringify(newPresets));
         setPresetModal(null);
@@ -97,7 +99,7 @@ export default function AdminRosterPage() {
     async function fetchData() {
         setLoading(true);
         setSelectedLeaveIds([]);
-        const [empRes, shiftRes, transRes, leaveRes] = await Promise.all([
+        const [empRes, shiftRes, transRes, leaveRes, logsRes] = await Promise.all([
             supabase.from('employees').select('*').order('id'),
             supabase.from('shifts').select('*').order('start_time'),
             supabase.from('roster_transactions')
@@ -107,7 +109,11 @@ export default function AdminRosterPage() {
             supabase.from('leave_requests')
                 .select('*, employees!employee_id(name, nickname, position), replacement_employee:employees!replacement_employee_id(name, nickname, position)')
                 .gte('leave_date', format(weekStart, 'yyyy-MM-dd'))
-                .lte('leave_date', format(weekEnd, 'yyyy-MM-dd'))
+                .lte('leave_date', format(weekEnd, 'yyyy-MM-dd')),
+            supabase.from('attendance_logs')
+                .select('*')
+                .gte('timestamp', weekStart.toISOString())
+                .lte('timestamp', addDays(weekEnd, 2).toISOString())
         ]);
         if (empRes.data) {
             const getPositionOrder = (position) => {
@@ -128,8 +134,115 @@ export default function AdminRosterPage() {
         if (shiftRes.data) setShifts(shiftRes.data);
         if (transRes.data) setTransactions(transRes.data);
         if (leaveRes.data) setLeaveRequests(leaveRes.data);
+        if (logsRes.data) setAttendanceLogs(logsRes.data);
         setLoading(false);
     }
+
+    // Attendance Log Matching & Cross-referencing
+    const getAttendanceOnDate = (empId, date) => {
+        const dateStr = format(date, 'yyyy-MM-dd');
+        const empLogs = (attendanceLogs || []).filter(l => l.employee_id === empId);
+        
+        let checkIn = null;
+        let checkOut = null;
+
+        const [y, m, d] = dateStr.split('-').map(Number);
+        const nextDayNoon = new Date(y, m - 1, d + 1, 12, 0, 0);
+
+        empLogs.forEach(log => {
+            const logTime = new Date(log.timestamp);
+            const logDateStr = format(logTime, 'yyyy-MM-dd');
+
+            if (log.action_type === 'check_in') {
+                if (logDateStr === dateStr) {
+                    if (!checkIn || logTime < checkIn) checkIn = logTime;
+                }
+            } else if (log.action_type === 'check_out') {
+                if (logDateStr === dateStr) {
+                    if (!checkOut || logTime > checkOut) checkOut = logTime;
+                } else if (checkIn && logTime > checkIn && logTime <= nextDayNoon) {
+                    if (!checkOut || logTime > checkOut) checkOut = logTime;
+                }
+            }
+        });
+
+        return { checkIn, checkOut };
+    };
+
+    const getCellAttendanceStatus = (empId, date, slots) => {
+        const { checkIn, checkOut } = getAttendanceOnDate(empId, date);
+        const dateStr = format(date, 'yyyy-MM-dd');
+        const todayStr = format(new Date(), 'yyyy-MM-dd');
+        const isPast = dateStr < todayStr;
+        const isToday = dateStr === todayStr;
+
+        const hasWorkSlot = slots.length > 0 && !slots.some(s => s.is_off);
+        const isOffSlot = slots.some(s => s.is_off);
+        const isEmptySlot = slots.length === 0;
+
+        if (hasWorkSlot) {
+            if (checkIn && checkOut) {
+                return {
+                    type: 'OK',
+                    label: `IN ${format(checkIn, 'HH:mm')} - OUT ${format(checkOut, 'HH:mm')}`,
+                    badgeColor: 'bg-rams-green/10 text-rams-green border-rams-green/30'
+                };
+            }
+            if (checkIn && !checkOut) {
+                if (isToday) {
+                    return {
+                        type: 'ACTIVE',
+                        label: `ACTIVE (IN ${format(checkIn, 'HH:mm')})`,
+                        badgeColor: 'bg-rams-ink text-rams-panel border-rams-ink'
+                    };
+                }
+                return {
+                    type: 'MISSED_OUT',
+                    label: `MISSED OUT (IN ${format(checkIn, 'HH:mm')})`,
+                    badgeColor: 'bg-rams-red/10 text-rams-red border-rams-red/30'
+                };
+            }
+            if (!checkIn && checkOut) {
+                return {
+                    type: 'MISSED_IN',
+                    label: `MISSED IN (OUT ${format(checkOut, 'HH:mm')})`,
+                    badgeColor: 'bg-rams-red/10 text-rams-red border-rams-red/30'
+                };
+            }
+            if (!checkIn && !checkOut && isPast) {
+                return {
+                    type: 'ABSENT',
+                    label: 'ABSENT / NO CLOCK-IN',
+                    badgeColor: 'bg-rams-red/10 text-rams-red border-rams-red/30'
+                };
+            }
+        } else {
+            // Scheduled OFF or empty slot
+            if (checkIn && checkOut) {
+                return {
+                    type: 'OFF_DAY_WORK',
+                    label: `OFF-DAY WORK: ${format(checkIn, 'HH:mm')}-${format(checkOut, 'HH:mm')}`,
+                    badgeColor: 'bg-rams-orange text-rams-panel border-rams-orange font-bold'
+                };
+            }
+            if (checkIn && !checkOut) {
+                return {
+                    type: 'OFF_DAY_MISSED_OUT',
+                    label: `OFF-DAY: MISSED OUT (IN ${format(checkIn, 'HH:mm')})`,
+                    badgeColor: 'bg-rams-orange/15 text-rams-orange border-rams-orange/40 font-bold'
+                };
+            }
+            if (!checkIn && checkOut) {
+                return {
+                    type: 'OFF_DAY_MISSED_IN',
+                    label: `OFF-DAY: MISSED IN (OUT ${format(checkOut, 'HH:mm')})`,
+                    badgeColor: 'bg-rams-orange/15 text-rams-orange border-rams-orange/40 font-bold'
+                };
+            }
+        }
+
+        return null;
+    };
 
     // Helper checks for Employee Statuses
     const isSuspended = (emp) => emp.employment_status === 'Suspended' || emp.is_active === false;
@@ -148,7 +261,39 @@ export default function AdminRosterPage() {
     const vacationCount = employees.filter(hasVacation).length;
     const activeCount = employees.filter(e => !isSuspended(e) && !hasVacation(e)).length;
 
+    const weeklyAuditStats = React.useMemo(() => {
+        let missedCount = 0;
+        let offDayCount = 0;
+        let absentCount = 0;
+        const empWithExceptions = new Set();
+
+        employees.forEach(emp => {
+            dates.forEach(d => {
+                const dateStr = format(d, 'yyyy-MM-dd');
+                const slots = transactions.filter(t => t.employee_id === emp.id && t.date === dateStr);
+                const att = getCellAttendanceStatus(emp.id, d, slots);
+                if (att) {
+                    if (att.type === 'MISSED_OUT' || att.type === 'MISSED_IN' || att.type === 'OFF_DAY_MISSED_OUT' || att.type === 'OFF_DAY_MISSED_IN') {
+                        missedCount++;
+                        empWithExceptions.add(emp.id);
+                    } else if (att.type === 'OFF_DAY_WORK') {
+                        offDayCount++;
+                        empWithExceptions.add(emp.id);
+                    } else if (att.type === 'ABSENT') {
+                        absentCount++;
+                        empWithExceptions.add(emp.id);
+                    }
+                }
+            });
+        });
+
+        return { missedCount, offDayCount, absentCount, empWithExceptions };
+    }, [employees, transactions, attendanceLogs, currentDate]);
+
     const filteredEmployees = employees.filter(emp => {
+        if (auditExceptionsOnly && !weeklyAuditStats.empWithExceptions.has(emp.id)) {
+            return false;
+        }
         if (searchQuery.trim()) {
             const q = searchQuery.toLowerCase().trim();
             const matchName = (emp.name || '').toLowerCase().includes(q);
@@ -898,6 +1043,32 @@ export default function AdminRosterPage() {
                 </div>
             </div>
 
+            {/* Audit Summary Bar */}
+            <div className="bg-rams-panel border border-rams-rule-light p-4 rounded-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-3 shadow-none">
+                <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[9px] font-mono font-bold uppercase tracking-widest text-rams-ink-muted">
+                        AUDIT SUMMARY (สัปดาห์นี้):
+                    </span>
+                    <span className={`px-2 py-0.5 rounded-sm text-[9px] font-mono font-bold border uppercase tracking-wider ${weeklyAuditStats.missedCount > 0 ? 'bg-rams-red/10 text-rams-red border-rams-red/30' : 'bg-rams-bg text-rams-ink-muted border-rams-rule-light'}`}>
+                        MISSED PUNCHES: {weeklyAuditStats.missedCount}
+                    </span>
+                    <span className={`px-2 py-0.5 rounded-sm text-[9px] font-mono font-bold border uppercase tracking-wider ${weeklyAuditStats.offDayCount > 0 ? 'bg-rams-orange/10 text-rams-orange border-rams-orange/30' : 'bg-rams-bg text-rams-ink-muted border-rams-rule-light'}`}>
+                        OFF-DAY ATTENDANCE: {weeklyAuditStats.offDayCount}
+                    </span>
+                    <span className={`px-2 py-0.5 rounded-sm text-[9px] font-mono font-bold border uppercase tracking-wider ${weeklyAuditStats.absentCount > 0 ? 'bg-rams-red/10 text-rams-red border-rams-red/30' : 'bg-rams-bg text-rams-ink-muted border-rams-rule-light'}`}>
+                        ABSENT: {weeklyAuditStats.absentCount}
+                    </span>
+                </div>
+
+                <button
+                    type="button"
+                    onClick={() => setAuditExceptionsOnly(!auditExceptionsOnly)}
+                    className={`px-3 py-1 rounded-sm text-[10px] font-mono font-bold uppercase tracking-wider border transition-all cursor-pointer ${auditExceptionsOnly ? 'bg-rams-red text-rams-panel border-rams-red' : 'bg-rams-bg text-rams-ink border-rams-rule-light hover:border-rams-rule'}`}
+                >
+                    {auditExceptionsOnly ? 'SHOWING EXCEPTIONS ONLY' : 'FILTER: EXCEPTIONS ONLY'}
+                </button>
+            </div>
+
             <div className="bg-rams-panel border border-rams-rule rounded-sm overflow-hidden shadow-none">
                 {/* Status Filter Bar & Search */}
                 <div className="p-4 border-b border-rams-rule-light bg-rams-bg/20 flex flex-col md:flex-row justify-between items-stretch md:items-center gap-3">
@@ -924,14 +1095,14 @@ export default function AdminRosterPage() {
                             onClick={() => setStatusFilter('SUSPENDED')}
                             className={`px-3 py-1.5 rounded-sm text-xs font-mono font-bold transition-all flex items-center gap-1 cursor-pointer ${statusFilter === 'SUSPENDED' ? 'bg-rams-red text-rams-panel' : 'bg-rams-bg border border-rams-rule-light text-rams-ink hover:border-rams-rule'}`}
                         >
-                            <UserX size={12} /> 🛑 พักงาน ({suspendedCount})
+                            <UserX size={12} /> พักงาน ({suspendedCount})
                         </button>
                         <button
                             type="button"
                             onClick={() => setStatusFilter('VACATION')}
                             className={`px-3 py-1.5 rounded-sm text-xs font-mono font-bold transition-all flex items-center gap-1 cursor-pointer ${statusFilter === 'VACATION' ? 'bg-sky-600 text-white' : 'bg-rams-bg border border-rams-rule-light text-rams-ink hover:border-rams-rule'}`}
                         >
-                            <Sun size={12} /> 🏖️ พักร้อน ({vacationCount})
+                            <Sun size={12} /> พักร้อน ({vacationCount})
                         </button>
                     </div>
 
@@ -995,20 +1166,20 @@ export default function AdminRosterPage() {
                                                 <div className="text-[10px] font-mono text-rams-ink-muted uppercase tracking-wider">{emp.position}</div>
                                                 
                                                 {/* Status Badges */}
-                                                <div className="flex flex-wrap gap-1 pt-0.5">
+                                                <div className="flex flex-wrap gap-1 pt-0.5 font-mono text-[9px]">
                                                     {empSuspended && (
-                                                        <span className="px-1.5 py-0.5 text-[9px] font-mono font-bold bg-rams-red/10 border border-rams-red/30 text-rams-red rounded-sm">
-                                                            🛑 พักงาน
+                                                        <span className="px-1.5 py-0.5 font-bold bg-rams-red/10 border border-rams-red/30 text-rams-red rounded-sm uppercase">
+                                                            SUSPENDED
                                                         </span>
                                                     )}
                                                     {empVacation && (
-                                                        <span className="px-1.5 py-0.5 text-[9px] font-mono font-bold bg-sky-50 border border-sky-300 text-sky-800 rounded-sm">
-                                                            🏖️ พักร้อน
+                                                        <span className="px-1.5 py-0.5 font-bold bg-sky-50 border border-sky-300 text-sky-800 rounded-sm uppercase">
+                                                            VACATION
                                                         </span>
                                                     )}
                                                     {empLeave && !empVacation && (
-                                                        <span className="px-1.5 py-0.5 text-[9px] font-mono font-bold bg-amber-50 border border-amber-300 text-amber-800 rounded-sm">
-                                                            📝 มีใบลา
+                                                        <span className="px-1.5 py-0.5 font-bold bg-amber-50 border border-amber-300 text-amber-800 rounded-sm uppercase">
+                                                            HAS LEAVE
                                                         </span>
                                                     )}
                                                 </div>
@@ -1017,24 +1188,40 @@ export default function AdminRosterPage() {
                                             const slots = getCellSlots(emp.id, date);
                                             const dateStr = format(date, 'yyyy-MM-dd');
                                             const empLeaves = leaveRequests.filter(l => l.employee_id === emp.id && l.leave_date === dateStr);
+                                            const attendanceStatus = getCellAttendanceStatus(emp.id, date, slots);
+                                            const hasDiscrepancy = attendanceStatus && (attendanceStatus.type === 'OFF_DAY_WORK' || attendanceStatus.type.includes('MISSED') || attendanceStatus.type === 'ABSENT');
+
                                             return (
-                                                <td key={i} className="px-2 py-2 border-l border-rams-rule-light align-top bg-rams-panel/50">
+                                                <td key={i} className={`px-2 py-2 border-l border-rams-rule-light align-top ${hasDiscrepancy ? 'bg-rams-orange/5' : 'bg-rams-panel/50'}`}>
                                                     <div 
-                                                        className="h-full min-h-[65px] w-full rounded-sm border border-dashed border-rams-rule-light hover:border-rams-rule hover:bg-rams-bg cursor-pointer p-1 space-y-1 transition-all flex flex-col"
+                                                        className={`h-full min-h-[65px] w-full rounded-sm border p-1.5 space-y-1.5 transition-all flex flex-col cursor-pointer ${
+                                                            hasDiscrepancy 
+                                                                ? 'border-rams-orange/40 bg-rams-orange/5 hover:border-rams-orange' 
+                                                                : 'border-dashed border-rams-rule-light hover:border-rams-rule hover:bg-rams-bg'
+                                                        }`}
                                                         onClick={() => openCellModal(emp, date)}
                                                     >
-                                                        {slots.length === 0 && empLeaves.length === 0 && <span className="text-rams-ink-muted/50 font-mono text-xs m-auto block text-center">+</span>}
+                                                        {slots.length === 0 && empLeaves.length === 0 && !attendanceStatus && (
+                                                            <span className="text-rams-ink-muted/50 font-mono text-xs m-auto block text-center">+</span>
+                                                        )}
                                                         
+                                                        {/* Real-time Attendance Status Indicator */}
+                                                        {attendanceStatus && (
+                                                            <div className={`p-1 rounded-sm text-[9px] font-mono border ${attendanceStatus.badgeColor} text-center uppercase tracking-wider font-bold`}>
+                                                                {attendanceStatus.label}
+                                                            </div>
+                                                        )}
+
                                                         {/* Leave Request Badges */}
                                                         {empLeaves.map((l, idx) => {
                                                             let badgeColor = 'bg-rams-amber/10 border-rams-amber/30 text-rams-amber';
-                                                            let label = `⏳ ขอลา${l.leave_type === 'sick' ? 'ป่วย' : l.leave_type === 'business' ? 'กิจ' : 'พักร้อน'}`;
+                                                            let label = `LEAVE: ${l.leave_type === 'sick' ? 'SICK' : l.leave_type === 'business' ? 'BIZ' : 'VACATION'} (PENDING)`;
                                                             if (l.status === 'approved') {
                                                                 badgeColor = 'bg-rams-green/10 border-rams-green/30 text-rams-green';
-                                                                label = `✅ ลา${l.leave_type === 'sick' ? 'ป่วย' : l.leave_type === 'business' ? 'กิจ' : 'พักร้อน'}`;
+                                                                label = `LEAVE: ${l.leave_type === 'sick' ? 'SICK' : l.leave_type === 'business' ? 'BIZ' : 'VACATION'} (APPROVED)`;
                                                             } else if (l.status === 'rejected') {
                                                                 badgeColor = 'bg-rams-red/10 border-rams-red/30 text-rams-red';
-                                                                label = `❌ ปฏิเสธลา${l.leave_type === 'sick' ? 'ป่วย' : l.leave_type === 'business' ? 'กิจ' : 'พักร้อน'}`;
+                                                                label = `LEAVE: ${l.leave_type === 'sick' ? 'SICK' : l.leave_type === 'business' ? 'BIZ' : 'VACATION'} (REJECTED)`;
                                                             }
                                                             return (
                                                                 <div key={`leave-${idx}`} className={`p-1 rounded-sm text-[9px] font-mono font-bold border ${badgeColor} text-center uppercase tracking-wider`}>
@@ -1042,6 +1229,8 @@ export default function AdminRosterPage() {
                                                                 </div>
                                                             );
                                                         })}
+
+                                                        {/* Scheduled Shifts */}
                                                         {slots.map((s, idx) => {
                                                             const shiftObj = shifts.find(sh => sh.id === s.shift_id);
                                                             const timeStr = s.custom_start_time ? `${s.custom_start_time.slice(0,5)}-${s.custom_end_time?.slice(0,5)}` : (shiftObj ? `${shiftObj.start_time.slice(0,5)}-${shiftObj.end_time.slice(0,5)}` : '');
@@ -1053,19 +1242,19 @@ export default function AdminRosterPage() {
                                                             const approvedLeave = empLeaves.find(l => l.status === 'approved');
                                                             const isLeaveOff = s.is_off && approvedLeave;
                                                             const bgColor = isLeaveOff
-                                                                ? 'bg-amber-50 border-amber-300 text-amber-900 font-extrabold border-2 border-dashed shadow-sm'
+                                                                ? 'bg-amber-50 border-amber-300 text-amber-900 font-bold border-2 border-dashed shadow-sm'
                                                                 : (matchedPreset
                                                                     ? `${getPresetColor(matchedPreset.color).bg} ${getPresetColor(matchedPreset.color).border} ${getPresetColor(matchedPreset.color).text}`
                                                                     : getShiftColorClass(s, shiftObj));
                                                             const cellLabel = s.is_off
                                                                 ? (approvedLeave
-                                                                    ? `OFF (ลา${approvedLeave.leave_type === 'sick' ? 'ป่วย 😷' : approvedLeave.leave_type === 'business' ? 'กิจ 💼' : 'พักร้อน 🏖️'})`
-                                                                    : 'OFF (วันหยุด)')
-                                                                : (matchedPreset ? `${matchedPreset.icon || '⏰'} ${matchedPreset.name}` : (shiftObj?.name || 'Custom'));
+                                                                    ? `OFF (LEAVE: ${approvedLeave.leave_type === 'sick' ? 'SICK' : approvedLeave.leave_type === 'business' ? 'BIZ' : 'VACATION'})`
+                                                                    : 'OFF')
+                                                                : (matchedPreset ? matchedPreset.name : (shiftObj?.name || 'CUSTOM'));
 
                                                             return (
                                                                 <div key={idx} className={`p-1.5 rounded-sm text-[10px] font-mono border ${bgColor} ${s.status === 'DRAFT' ? 'border-dashed border-2' : ''}`}>
-                                                                    <div className="font-bold">{cellLabel}</div>
+                                                                    <div className="font-bold uppercase tracking-wide">{cellLabel}</div>
                                                                     {!s.is_off && <div className="text-[9px] font-bold text-rams-ink/80 mt-0.5">{timeStr}</div>}
                                                                     {s.slot_type !== 'MAIN' && <div className="text-[9px] uppercase font-bold tracking-wider opacity-60 mt-0.5">{s.slot_type}</div>}
                                                                 </div>
@@ -1089,9 +1278,9 @@ export default function AdminRosterPage() {
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
                         <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-rams-ink flex items-center gap-2">
-                            <span>📝</span> ข้อมูลการลาหยุดสัปดาห์นี้ ({leaveRequests.length} รายการ)
+                            ข้อมูลการลาหยุดสัปดาห์นี้ ({leaveRequests.length} รายการ)
                         </h2>
-                        <p className="text-[10px] text-rams-ink-muted">จัดการ อนุมัติ ปรับรายละเอียดการลา และซิงค์เข้าสู่ตารางเวร roster โดยตรง</p>
+                        <p className="text-[10px] font-mono text-rams-ink-muted uppercase tracking-wider">จัดการ อนุมัติ ปรับรายละเอียดการลา และซิงค์เข้าสู่ตารางเวร roster โดยตรง</p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                         {selectedLeaveIds.length > 0 && (
@@ -1100,7 +1289,7 @@ export default function AdminRosterPage() {
                                 onClick={handleDeleteMultipleLeaves}
                                 className="flex items-center gap-2 px-3 py-1.5 bg-rams-red/10 hover:bg-rams-red/20 text-rams-red border border-rams-red/30 rounded-sm text-xs font-mono font-bold uppercase tracking-wider transition-all shadow-none cursor-pointer"
                             >
-                                🗑️ ลบใบลาที่เลือก ({selectedLeaveIds.length})
+                                ลบใบลาที่เลือก ({selectedLeaveIds.length})
                             </button>
                         )}
                         {leaveRequests.length > 0 && (

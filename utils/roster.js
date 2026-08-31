@@ -60,7 +60,6 @@ export async function getEffectiveRoster(dateObj, options = { includeDrafts: fal
         .from('attendance_logs')
         .select('employee_id, action_type, timestamp')
         .gte('timestamp', startOfDay(targetDate).toISOString())
-        // Fetch up to end of next day to cover overnight shifts safely
         .lte('timestamp', addDays(startOfDay(targetDate), 2).toISOString());
 
     if (logErr) {
@@ -73,9 +72,6 @@ export async function getEffectiveRoster(dateObj, options = { includeDrafts: fal
     if (transactions) {
         transactions.forEach(tx => {
             if (tx.is_off) {
-                // If the shift is explicitly marked as OFF, we skip or mark them as OFF
-                // For getEffectiveRoster, usually we just return working employees. 
-                // But admin UI might need it. We'll include it with a special flag.
                 rosterList.push({
                     ...tx.employees,
                     slot_type: tx.slot_type,
@@ -121,28 +117,26 @@ export async function getEffectiveRoster(dateObj, options = { includeDrafts: fal
         });
     }
 
-    // 4. Apply Attendance Logs by checking Time Range overlap
+    // 4. Apply Attendance Logs to working slots and OFF slots
     if (logs && rosterList.length > 0) {
         logs.forEach(log => {
             const logTime = new Date(log.timestamp);
             
-            // Find all slots for this employee
+            // Find all active working slots for this employee
             const empSlots = rosterList.filter(r => r.id === log.employee_id && !r.is_off);
             
             if (empSlots.length > 0) {
-                // To support SPLIT shifts, we find the closest matching slot for this log time
-                // For simplicity, we just look for a slot where the log time is somewhat near the shift time
-                // E.g., within -4 hours to +4 hours of the shift block.
                 let bestSlot = empSlots[0];
                 let minDistance = Infinity;
 
                 empSlots.forEach(slot => {
-                    // distance from shift center
-                    const shiftCenterTime = (slot.timeRange.start.getTime() + slot.timeRange.end.getTime()) / 2;
-                    const distance = Math.abs(logTime.getTime() - shiftCenterTime);
-                    if (distance < minDistance) {
-                        minDistance = distance;
-                        bestSlot = slot;
+                    if (slot.timeRange) {
+                        const shiftCenterTime = (slot.timeRange.start.getTime() + slot.timeRange.end.getTime()) / 2;
+                        const distance = Math.abs(logTime.getTime() - shiftCenterTime);
+                        if (distance < minDistance) {
+                            minDistance = distance;
+                            bestSlot = slot;
+                        }
                     }
                 });
 
@@ -158,28 +152,37 @@ export async function getEffectiveRoster(dateObj, options = { includeDrafts: fal
                     }
                 }
             } else {
-                // Employee clocked in but not in roster (Extra)
-                // We'll skip for now, or you can add logic to append them like before.
-                // It's safer to only append them if includeDrafts is false (meaning actual operations).
+                // If employee is marked OFF, attach attendance to the OFF slot
+                const offSlot = rosterList.find(r => r.id === log.employee_id && r.is_off);
+                if (offSlot) {
+                    offSlot.hasWorkedOnDayOff = true;
+                    if (log.action_type === 'check_in') {
+                        if (!offSlot.attendance.check_in || logTime < new Date(offSlot.attendance.check_in)) {
+                            offSlot.attendance.check_in = log.timestamp;
+                        }
+                    } else if (log.action_type === 'check_out') {
+                        if (!offSlot.attendance.check_out || logTime > new Date(offSlot.attendance.check_out)) {
+                            offSlot.attendance.check_out = log.timestamp;
+                        }
+                    }
+                }
             }
         });
     }
 
-    // 5. Append Extra logs (employees who checked in but have NO transaction)
+    // 5. Append Extra logs (employees who checked in but have NO transaction at all)
     if (logs) {
         const { data: allEmps } = await supabase.from('employees').select('id, name, nickname, position');
         const empLookup = new Map(allEmps?.map(e => [e.id, e]));
 
         logs.forEach(log => {
             const logTime = new Date(log.timestamp);
-            // Ignore logs that belong to the next day unless it's overnight
-            // A simple heuristic: if it's check_in on the next day, it belongs to next day's roster
             if (log.action_type === 'check_in' && logTime > addDays(startOfDay(targetDate), 1)) {
                 return;
             }
 
-            const hasSlot = rosterList.some(r => r.id === log.employee_id && !r.is_off);
-            if (!hasSlot) {
+            const hasAnySlot = rosterList.some(r => r.id === log.employee_id);
+            if (!hasAnySlot) {
                 let extraSlot = rosterList.find(r => r.id === log.employee_id && r.isExtra);
                 if (!extraSlot) {
                     const empInfo = empLookup.get(log.employee_id);
@@ -189,7 +192,7 @@ export async function getEffectiveRoster(dateObj, options = { includeDrafts: fal
                             slot_type: 'MAIN',
                             is_off: false,
                             status: 'PUBLISHED',
-                            shift: { name: "Extra (No Schedule)" },
+                            shift: { name: "Extra (Unscheduled)" },
                             isExtra: true,
                             attendance: { check_in: null, check_out: null }
                         };
