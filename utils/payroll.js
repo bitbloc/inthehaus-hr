@@ -34,35 +34,64 @@ const getLogLocalDateStr = (timestamp) => {
 };
 
 /**
- * Helper to find check-in and check-out on a given date for an employee
+ * Helper to find check-in and check-out on a given date for an employee with overnight pairing support.
  */
-function findDayPunches(empLogs, dateStr) {
-    let checkIn = null;
-    let checkOut = null;
+function findDayPunches(empLogs, targetDateStr) {
+    const sortedLogs = [...(empLogs || [])].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    const checkInLogs = sortedLogs.filter(l => l.action_type === 'check_in');
+    const checkOutLogs = sortedLogs.filter(l => l.action_type === 'check_out');
 
-    const [y, m, d] = dateStr.split('-').map(Number);
-    const dayStart = new Date(y, m - 1, d, 0, 0, 0);
-    const nextDayEnd = new Date(y, m - 1, d + 1, 12, 0, 0); // Check up to noon next day for overnight
+    const sessions = {};
+    const claimedOutIds = new Set();
 
-    empLogs.forEach(log => {
-        const logTime = new Date(log.timestamp);
-        const logDateStr = getLogLocalDateStr(log.timestamp);
+    checkInLogs.forEach(inLog => {
+        const inTime = new Date(inLog.timestamp);
+        const inDateStr = getLogLocalDateStr(inLog.timestamp);
+        const maxOutWindow = new Date(inTime.getTime() + 20 * 60 * 60 * 1000);
 
-        if (log.action_type === 'check_in') {
-            if (logDateStr === dateStr) {
-                if (!checkIn || logTime < checkIn) checkIn = logTime;
-            }
-        } else if (log.action_type === 'check_out') {
-            if (logDateStr === dateStr) {
-                if (!checkOut || logTime > checkOut) checkOut = logTime;
-            } else if (checkIn && logTime > checkIn && logTime <= nextDayEnd) {
-                // Overnight check-out
-                if (!checkOut || logTime > checkOut) checkOut = logTime;
+        const matchingOut = checkOutLogs.find(outLog => {
+            const outKey = outLog.id ? String(outLog.id) : `${outLog.timestamp}_${outLog.action_type}`;
+            if (claimedOutIds.has(outKey)) return false;
+            const outTime = new Date(outLog.timestamp);
+            return outTime > inTime && outTime <= maxOutWindow;
+        });
+
+        if (matchingOut) {
+            const outKey = matchingOut.id ? String(matchingOut.id) : `${matchingOut.timestamp}_${matchingOut.action_type}`;
+            claimedOutIds.add(outKey);
+        }
+
+        if (!sessions[inDateStr]) {
+            sessions[inDateStr] = {
+                checkIn: inTime,
+                checkOut: matchingOut ? new Date(matchingOut.timestamp) : null
+            };
+        } else {
+            if (inTime < sessions[inDateStr].checkIn) sessions[inDateStr].checkIn = inTime;
+            if (matchingOut) {
+                const outTime = new Date(matchingOut.timestamp);
+                if (!sessions[inDateStr].checkOut || outTime > sessions[inDateStr].checkOut) {
+                    sessions[inDateStr].checkOut = outTime;
+                }
             }
         }
     });
 
-    return { checkIn, checkOut };
+    checkOutLogs.forEach(outLog => {
+        const outKey = outLog.id ? String(outLog.id) : `${outLog.timestamp}_${outLog.action_type}`;
+        if (claimedOutIds.has(outKey)) return;
+        const outTime = new Date(outLog.timestamp);
+        const outDateStr = getLogLocalDateStr(outLog.timestamp);
+
+        if (!sessions[outDateStr]) {
+            sessions[outDateStr] = {
+                checkIn: null,
+                checkOut: outTime
+            };
+        }
+    });
+
+    return sessions[targetDateStr] || { checkIn: null, checkOut: null };
 }
 
 /**

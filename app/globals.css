@@ -1,26 +1,26 @@
 @import "tailwindcss";
 
 :root {
-  --background: #F5F5F7;
-  --foreground: #171717;
-  --primary: #BEF264;
-  --primary-foreground: #171717;
-  --card: #FFFFFF;
-  --card-foreground: #171717;
-  --popover: #FFFFFF;
-  --popover-foreground: #171717;
-  --secondary: #E5E7EB;
-  --secondary-foreground: #1f2937;
-  --muted: #F3F4F6;
-  --muted-foreground: #6B7280;
-  --accent: #D9F99D;
-  --accent-foreground: #171717;
-  --destructive: #EF4444;
+  --background: oklch(96% 0.006 80);
+  --foreground: oklch(20% 0.003 80);
+  --primary: oklch(62% 0.16 45);
+  --primary-foreground: oklch(99% 0.003 80);
+  --card: oklch(99% 0.003 80);
+  --card-foreground: oklch(20% 0.003 80);
+  --popover: oklch(99% 0.003 80);
+  --popover-foreground: oklch(20% 0.003 80);
+  --secondary: oklch(93% 0.005 80);
+  --secondary-foreground: oklch(20% 0.003 80);
+  --muted: oklch(93% 0.005 80);
+  --muted-foreground: oklch(50% 0.003 80);
+  --accent: oklch(62% 0.16 45);
+  --accent-foreground: oklch(99% 0.003 80);
+  --destructive: oklch(55% 0.18 25);
   --destructive-foreground: #FAFAFA;
-  --border: #E5E7EB;
-  --input: #E5E7EB;
-  --ring: #BEF264;
-  --radius: 1.5rem;
+  --border: oklch(88% 0.004 80);
+  --input: oklch(88% 0.004 80);
+  --ring: oklch(62% 0.16 45);
+  --radius: 0.125rem;
 }
 
 @theme inline {
@@ -51,39 +51,38 @@
   --color-rams-amber: oklch(75% 0.15 75);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-    --primary: #BEF264;
-    --primary-foreground: #000000;
-    --card: #171717;
-    --card-foreground: #ededed;
-    --muted: #262626;
-    --muted-foreground: #a3a3a3;
-  }
-}
-
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--color-rams-bg);
+  color: var(--color-rams-ink);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-.soft-shadow {
-  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.05),
-    0 4px 12px -4px rgba(0, 0, 0, 0.02);
+/* Tactile push button effect */
+.tactile-btn {
+  box-shadow: 0 2px 0 0 var(--color-rams-rule);
+  transition: transform 70ms ease, box-shadow 70ms ease, background-color 150ms ease;
 }
 
-.soft-shadow-lg {
-  box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.08),
-    0 8px 16px -8px rgba(0, 0, 0, 0.04);
+.tactile-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 0 0 0 transparent;
 }
 
-.neo-shadow {
-  box-shadow: 6px 6px 16px #d1d5db, -6px -6px 16px #ffffff;
+.tactile-btn-sm {
+  box-shadow: 0 1.5px 0 0 var(--color-rams-rule-light);
+  transition: transform 70ms ease, box-shadow 70ms ease;
+}
+
+.tactile-btn-sm:active {
+  transform: translateY(1.5px);
+  box-shadow: 0 0 0 0 transparent;
+}
+
+/* Mobile Safe Bottom Padding */
+.safe-bottom-dock {
+  padding-bottom: calc(6.5rem + env(safe-area-inset-bottom));
 }
 
 /* Custom Scrollbar */
@@ -97,18 +96,17 @@ body {
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 3px;
+  background: oklch(80% 0.004 80);
+  border-radius: 2px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: oklch(60% 0.004 80);
 }
 
-/* Firefox */
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: #cbd5e1 transparent;
+  scrollbar-color: oklch(80% 0.004 80) transparent;
 }
 
 /* No Scrollbar Utility */
@@ -118,7 +116,5 @@ body {
 
 .no-scrollbar {
   -ms-overflow-style: none;
-  /* IE and Edge */
   scrollbar-width: none;
-  /* Firefox */
 }

@@ -36,6 +36,23 @@ export default function AdminRosterPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [adjustingEmpModal, setAdjustingEmpModal] = useState(null);
     const [auditExceptionsOnly, setAuditExceptionsOnly] = useState(false);
+    const [toast, setToast] = useState(null);
+
+    const showToast = (message, type = 'success') => {
+        setToast({ message, type });
+        setTimeout(() => setToast(null), 4000);
+    };
+
+    const SYSTEM_STANDARD_PRESETS = [
+        { start: '18:00', end: '22:30', name: 'INTHEHAUS', color: 'indigo', icon: '' },
+        { start: '10:00', end: '00:30', name: 'ควบกะ 🔥', color: 'rose', icon: '🔥' },
+        { start: '16:30', end: '00:30', name: 'กะค่ำ 🌙', color: 'sky', icon: '🌙' },
+        { start: '10:00', end: '18:00', name: 'กะเช้า ☀️', color: 'amber', icon: '☀️' },
+        { start: '10:00', end: '20:30', name: 'CHEF', color: 'emerald', icon: '' },
+        { start: '12:30', end: '23:30', name: 'ผู้ช่วยครัว', color: 'violet', icon: '' },
+        { start: '12:00', end: '20:00', name: 'กลางกะ', color: 'sky', icon: '' },
+        { start: '12:30', end: '21:30', name: 'PART-TIME', color: 'rose', icon: '' },
+    ];
 
     const PRESET_COLORS = [
         { id: 'sky', label: 'SKY', bg: 'bg-sky-50', text: 'text-sky-800', border: 'border-sky-200', dot: 'bg-sky-500' },
@@ -62,6 +79,21 @@ export default function AdminRosterPage() {
         }
     }, []);
 
+    const allPresets = React.useMemo(() => {
+        const combined = [...SYSTEM_STANDARD_PRESETS];
+        (customPresets || []).forEach(cp => {
+            const sClean = (cp.start || '').slice(0, 5);
+            const eClean = (cp.end || '').slice(0, 5);
+            const existingIdx = combined.findIndex(p => p.start === sClean && p.end === eClean);
+            if (existingIdx >= 0) {
+                combined[existingIdx] = { ...combined[existingIdx], ...cp };
+            } else {
+                combined.push(cp);
+            }
+        });
+        return combined;
+    }, [customPresets]);
+
     const openPresetModal = (start, end) => {
         setPresetModal({ start, end, name: '', color: 'sky', icon: '' });
     };
@@ -69,7 +101,7 @@ export default function AdminRosterPage() {
     const confirmSavePreset = () => {
         if (!presetModal) return;
         const { start, end, name, color, icon } = presetModal;
-        if (!start || !end) return alert('กรุณากรอกทั้งเวลาเริ่มและเวลาเลิก');
+        if (!start || !end) return showToast('กรุณากรอกทั้งเวลาเริ่มและเวลาเลิก', 'error');
         const normStart = start.slice(0, 5);
         const normEnd = end.slice(0, 5);
         if (customPresets.some(p => (p.start || '').slice(0, 5) === normStart && (p.end || '').slice(0, 5) === normEnd)) {
@@ -79,6 +111,7 @@ export default function AdminRosterPage() {
         const newPresets = [...customPresets, { start: normStart, end: normEnd, name: name || `${normStart}-${normEnd}`, color: color || 'sky', icon: '' }];
         setCustomPresets(newPresets);
         localStorage.setItem('roster_custom_presets', JSON.stringify(newPresets));
+        showToast('บันทึก Preset กะงานเรียบร้อยแล้ว', 'success');
         setPresetModal(null);
     };
 
@@ -118,8 +151,9 @@ export default function AdminRosterPage() {
                 .lte('leave_date', format(weekEnd, 'yyyy-MM-dd')),
             supabase.from('attendance_logs')
                 .select('*')
-                .gte('timestamp', weekStart.toISOString())
+                .gte('timestamp', addDays(weekStart, -1).toISOString())
                 .lte('timestamp', addDays(weekEnd, 2).toISOString())
+                .order('timestamp', { ascending: true })
         ]);
         if (empRes.data) {
             const getPositionOrder = (position) => {
@@ -144,35 +178,71 @@ export default function AdminRosterPage() {
         setLoading(false);
     }
 
-    // Attendance Log Matching & Cross-referencing
+    // Robust Session Punch Pairing Engine (Handles Overnight Shifts & Next-Day Check-outs)
     const getAttendanceOnDate = (empId, date) => {
-        const dateStr = format(date, 'yyyy-MM-dd');
-        const empLogs = (attendanceLogs || []).filter(l => l.employee_id === empId);
+        const targetDateStr = format(date, 'yyyy-MM-dd');
+        const empLogs = (attendanceLogs || [])
+            .filter(l => l.employee_id === empId)
+            .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
         
-        let checkIn = null;
-        let checkOut = null;
+        const sessions = {};
+        const claimedCheckOutKeys = new Set();
 
-        const [y, m, d] = dateStr.split('-').map(Number);
-        const nextDayNoon = new Date(y, m - 1, d + 1, 12, 0, 0);
+        const checkInLogs = empLogs.filter(l => l.action_type === 'check_in');
+        const checkOutLogs = empLogs.filter(l => l.action_type === 'check_out');
 
-        empLogs.forEach(log => {
-            const logTime = new Date(log.timestamp);
-            const logDateStr = format(logTime, 'yyyy-MM-dd');
+        // 1. Pair each check_in with its corresponding check_out
+        checkInLogs.forEach(inLog => {
+            const inTime = new Date(inLog.timestamp);
+            const inDateStr = format(inTime, 'yyyy-MM-dd');
+            const maxOutWindow = new Date(inTime.getTime() + 20 * 60 * 60 * 1000); // 20-hour window
 
-            if (log.action_type === 'check_in') {
-                if (logDateStr === dateStr) {
-                    if (!checkIn || logTime < checkIn) checkIn = logTime;
+            const matchingOut = checkOutLogs.find(outLog => {
+                const outKey = outLog.id ? String(outLog.id) : `${outLog.timestamp}_${outLog.action_type}`;
+                if (claimedCheckOutKeys.has(outKey)) return false;
+                const outTime = new Date(outLog.timestamp);
+                return outTime > inTime && outTime <= maxOutWindow;
+            });
+
+            if (matchingOut) {
+                const outKey = matchingOut.id ? String(matchingOut.id) : `${matchingOut.timestamp}_${matchingOut.action_type}`;
+                claimedCheckOutKeys.add(outKey);
+            }
+
+            if (!sessions[inDateStr]) {
+                sessions[inDateStr] = {
+                    checkIn: inTime,
+                    checkOut: matchingOut ? new Date(matchingOut.timestamp) : null
+                };
+            } else {
+                if (inTime < sessions[inDateStr].checkIn) {
+                    sessions[inDateStr].checkIn = inTime;
                 }
-            } else if (log.action_type === 'check_out') {
-                if (logDateStr === dateStr) {
-                    if (!checkOut || logTime > checkOut) checkOut = logTime;
-                } else if (checkIn && logTime > checkIn && logTime <= nextDayNoon) {
-                    if (!checkOut || logTime > checkOut) checkOut = logTime;
+                if (matchingOut) {
+                    const outTime = new Date(matchingOut.timestamp);
+                    if (!sessions[inDateStr].checkOut || outTime > sessions[inDateStr].checkOut) {
+                        sessions[inDateStr].checkOut = outTime;
+                    }
                 }
             }
         });
 
-        return { checkIn, checkOut };
+        // 2. Identify unclaimed orphan check-outs
+        checkOutLogs.forEach(outLog => {
+            const outKey = outLog.id ? String(outLog.id) : `${outLog.timestamp}_${outLog.action_type}`;
+            if (claimedCheckOutKeys.has(outKey)) return;
+            const outTime = new Date(outLog.timestamp);
+            const outDateStr = format(outTime, 'yyyy-MM-dd');
+
+            if (!sessions[outDateStr]) {
+                sessions[outDateStr] = {
+                    checkIn: null,
+                    checkOut: outTime
+                };
+            }
+        });
+
+        return sessions[targetDateStr] || { checkIn: null, checkOut: null };
     };
 
     const getCellAttendanceStatus = (empId, date, slots) => {
@@ -295,6 +365,18 @@ export default function AdminRosterPage() {
 
         return { missedCount, offDayCount, absentCount, empWithExceptions };
     }, [employees, transactions, attendanceLogs, currentDate]);
+
+    const dailyOnDutyStats = React.useMemo(() => {
+        return dates.map(day => {
+            const dateStr = format(day, 'yyyy-MM-dd');
+            const workingTxs = (transactions || []).filter(t => t.date === dateStr && !t.is_off && t.status !== 'CANCELLED');
+            const workingEmpIds = new Set(workingTxs.map(t => String(t.employee_id)));
+            return {
+                dateStr,
+                count: workingEmpIds.size
+            };
+        });
+    }, [transactions, dates]);
 
     const filteredEmployees = employees.filter(emp => {
         if (auditExceptionsOnly && !weeklyAuditStats.empWithExceptions.has(emp.id)) {
@@ -560,8 +642,9 @@ export default function AdminRosterPage() {
             
             await fetchData();
             setEditingCell(null);
+            showToast('บันทึกกะงานเรียบร้อยแล้ว', 'success');
         } catch (e) {
-            alert(e.message);
+            showToast(e.message || 'บันทึกไม่สำเร็จ', 'error');
         } finally {
             setSaving(false);
         }
@@ -595,8 +678,9 @@ export default function AdminRosterPage() {
                 body: JSON.stringify({ action: 'UPSERT', transactions: newTrans })
             });
             await fetchData();
+            showToast('คัดลอกตารางงานจากสัปดาห์ที่แล้วสำเร็จ', 'success');
         } else {
-            alert('ไม่พบข้อมูลสัปดาห์ที่แล้ว');
+            showToast('ไม่พบข้อมูลสัปดาห์ที่แล้ว', 'error');
             setLoading(false);
         }
     };
@@ -615,10 +699,10 @@ export default function AdminRosterPage() {
                 })
             });
             if (!res.ok) throw new Error('Publish failed');
-            alert('ประกาศตารางงานเรียบร้อยแล้ว');
+            showToast('ประกาศตารางงานและส่งแจ้งเตือนเรียบร้อยแล้ว', 'success');
             await fetchData();
         } catch (e) {
-            alert(e.message);
+            showToast(e.message || 'ประกาศตารางงานไม่สำเร็จ', 'error');
             setLoading(false);
         }
     };
@@ -723,10 +807,10 @@ export default function AdminRosterPage() {
             await supabase.from('leave_requests')
                 .update({ status: 'pending' })
                 .eq('id', req.id);
-            alert("เปลี่ยนสถานะคำขอลาหยุดกลับเป็นรออนุมัติเรียบร้อยแล้ว");
+            showToast("เปลี่ยนสถานะคำขอลาหยุดกลับเป็นรออนุมัติเรียบร้อยแล้ว", "success");
             await fetchData();
         } catch (e) {
-            alert("เกิดข้อผิดพลาด: " + e.message);
+            showToast("เกิดข้อผิดพลาด: " + e.message, "error");
         } finally {
             setLoading(false);
         }
@@ -778,11 +862,11 @@ export default function AdminRosterPage() {
                     .in('date', datesToDelete);
             }
 
-            alert("ลบข้อมูลใบลาและเคลียร์ตาราง Roster เรียบร้อยแล้ว!");
+            showToast("ลบข้อมูลใบลาและเคลียร์ตาราง Roster เรียบร้อยแล้ว!", "success");
             setSelectedLeaveIds(prev => prev.filter(id => id !== req.id));
             await fetchData();
         } catch (e) {
-            alert("เกิดข้อผิดพลาดในการลบใบลา: " + e.message);
+            showToast("เกิดข้อผิดพลาดในการลบใบลา: " + e.message, "error");
         } finally {
             setLoading(false);
         }
@@ -847,11 +931,11 @@ export default function AdminRosterPage() {
                 }
             }
 
-            alert(`ลบใบลาสำเร็จ ${idsToDelete.length} รายการ และเคลียร์ตาราง Roster เรียบร้อยแล้ว!`);
+            showToast(`ลบใบลาสำเร็จ ${idsToDelete.length} รายการ และเคลียร์ตาราง Roster เรียบร้อยแล้ว!`, "success");
             setSelectedLeaveIds([]);
             await fetchData();
         } catch (e) {
-            alert("เกิดข้อผิดพลาดในการลบใบลา: " + e.message);
+            showToast("เกิดข้อผิดพลาดในการลบใบลา: " + e.message, "error");
         } finally {
             setLoading(false);
         }
@@ -862,7 +946,7 @@ export default function AdminRosterPage() {
         setLoading(true);
         const approvedLeaves = leaveRequests.filter(l => l.status === 'approved');
         if (approvedLeaves.length === 0) {
-            alert("ไม่มีใบลาที่อนุมัติแล้วในสัปดาห์นี้ให้ซิงค์");
+            showToast("ไม่มีใบลาที่อนุมัติแล้วในสัปดาห์นี้ให้ซิงค์", "info");
             setLoading(false);
             return;
         }
@@ -929,10 +1013,10 @@ export default function AdminRosterPage() {
                 }
                 count++;
             }
-            alert(`ซิงค์ข้อมูลใบลาอนุมัติสำเร็จ ${count} รายการเข้าสู่ตารางเวร!`);
+            showToast(`ซิงค์ข้อมูลใบลาอนุมัติสำเร็จ ${count} รายการเข้าสู่ตารางเวร!`, "success");
             await fetchData();
         } catch (e) {
-            alert("เกิดข้อผิดพลาดในการซิงค์: " + e.message);
+            showToast("เกิดข้อผิดพลาดในการซิงค์: " + e.message, "error");
         } finally {
             setLoading(false);
         }
@@ -950,7 +1034,7 @@ export default function AdminRosterPage() {
     };
 
     const saveLeaveEdit = async (id) => {
-        if (!leaveForm.startDate || !leaveForm.endDate) return alert("กรุณาระบุวันที่เริ่มและสิ้นสุด");
+        if (!leaveForm.startDate || !leaveForm.endDate) return showToast("กรุณาระบุวันที่เริ่มและสิ้นสุด", "error");
         setLoading(true);
         try {
             // Find original request
@@ -1009,41 +1093,73 @@ export default function AdminRosterPage() {
                 }
             }
 
-            alert("อัปเดตช่วงวันลาเรียบร้อยแล้ว");
+            showToast("อัปเดตช่วงวันลาเรียบร้อยแล้ว", "success");
             setEditingLeaveId(null);
             await fetchData();
         } catch (e) {
-            alert("เกิดข้อผิดพลาด: " + e.message);
+            showToast("เกิดข้อผิดพลาด: " + e.message, "error");
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div className="p-6 max-w-7xl mx-auto space-y-6 text-rams-ink font-sans min-h-screen bg-rams-bg selection:bg-rams-ink/10">
+        <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6 text-rams-ink font-sans min-h-screen bg-rams-bg selection:bg-rams-ink/10 relative">
+            {/* In-App Toast Notification */}
+            {toast && (
+                <div className={`fixed top-5 right-5 z-50 flex items-center gap-3 px-4 py-3 rounded-sm border shadow-lg font-mono text-xs animate-in fade-in slide-in-from-top-3 duration-200 ${
+                    toast.type === 'error' 
+                        ? 'bg-rams-red text-rams-panel border-rams-red' 
+                        : toast.type === 'info'
+                        ? 'bg-rams-ink text-rams-panel border-rams-ink'
+                        : 'bg-rams-green text-rams-panel border-rams-green'
+                }`}>
+                    <span className="font-bold">{toast.message}</span>
+                    <button 
+                        type="button" 
+                        onClick={() => setToast(null)} 
+                        className="opacity-70 hover:opacity-100 p-0.5 ml-2 cursor-pointer"
+                    >
+                        ✕
+                    </button>
+                </div>
+            )}
+
             <div className="mb-2">
                 <a href="/admin" className="text-xs font-mono font-bold text-rams-ink-muted hover:text-rams-ink flex items-center gap-1.5 w-fit transition-colors uppercase tracking-wider">
                     <ChevronLeft size={14} /> กลับสู่หน้าแดชบอร์ดหลัก
                 </a>
             </div>
+
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-rams-panel p-5 rounded-sm border border-rams-rule shadow-none">
                 <div>
-                    <h1 className="text-lg font-mono font-bold tracking-wider text-rams-ink uppercase">จัดการตารางงาน (Matrix View)</h1>
+                    <div className="flex items-center gap-2">
+                        <h1 className="text-lg font-mono font-bold tracking-wider text-rams-ink uppercase">จัดการตารางงาน (Matrix View)</h1>
+                        <span className="px-2 py-0.5 text-[9px] font-mono font-bold uppercase tracking-widest bg-rams-orange text-rams-panel rounded-sm">
+                            LIVE ROSTER
+                        </span>
+                    </div>
                     <p className="text-[10px] font-mono uppercase tracking-widest text-rams-ink-muted mt-1.5">จัดกะการทำงานรองรับแบบยืดหยุ่น ข้ามวัน และกะควบ</p>
                 </div>
                 
-                <div className="flex flex-wrap gap-2">
-                    <button onClick={copyLastWeek} className="flex items-center gap-2 px-4 py-2 bg-rams-bg hover:bg-rams-ink-muted/10 text-rams-ink rounded-sm border border-rams-rule-light text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer">
+                <div className="flex flex-wrap gap-2.5">
+                    <button 
+                        onClick={copyLastWeek} 
+                        className="flex items-center gap-2 px-4 py-2.5 bg-rams-bg hover:bg-rams-ink-muted/10 text-rams-ink rounded-sm border border-rams-rule-light text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer min-h-[40px] active:translate-y-[1px]"
+                    >
                         <Copy size={14} className="text-rams-ink-muted" /> Copy from Last Week
                     </button>
                     <a 
                         href={`/admin/roster/report?start=${format(weekStart, 'yyyy-MM-dd')}`} 
                         target="_blank"
-                        className="flex items-center gap-2 px-4 py-2 bg-rams-bg hover:bg-rams-ink-muted/10 text-rams-ink rounded-sm border border-rams-rule-light text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer"
+                        className="flex items-center gap-2 px-4 py-2.5 bg-rams-bg hover:bg-rams-ink-muted/10 text-rams-ink rounded-sm border border-rams-rule-light text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer min-h-[40px] active:translate-y-[1px]"
                     >
                         <Printer size={14} className="text-rams-ink-muted" /> Export PDF
                     </a>
-                    <button onClick={publishWeek} className="flex items-center gap-2 px-4 py-2 bg-rams-orange hover:bg-rams-orange-active text-rams-panel rounded-sm border border-rams-rule text-xs font-mono font-bold uppercase tracking-wider shadow-[0_2px_0_0_var(--color-rams-rule)] active:translate-y-[1px] active:shadow-none transition-all cursor-pointer">
+                    <button 
+                        onClick={publishWeek} 
+                        className="flex items-center gap-2 px-4 py-2.5 bg-rams-orange hover:bg-rams-orange-active text-rams-panel rounded-sm border border-rams-rule text-xs font-mono font-bold uppercase tracking-wider shadow-[0_2px_0_0_var(--color-rams-rule)] active:translate-y-[1px] active:shadow-none transition-all cursor-pointer min-h-[40px]"
+                    >
                         <CheckCircle size={14} /> Publish & Notify
                     </button>
                 </div>
@@ -1055,13 +1171,13 @@ export default function AdminRosterPage() {
                     <span className="text-[9px] font-mono font-bold uppercase tracking-widest text-rams-ink-muted">
                         AUDIT SUMMARY (สัปดาห์นี้):
                     </span>
-                    <span className={`px-2 py-0.5 rounded-sm text-[9px] font-mono font-bold border uppercase tracking-wider ${weeklyAuditStats.missedCount > 0 ? 'bg-rams-red/10 text-rams-red border-rams-red/30' : 'bg-rams-bg text-rams-ink-muted border-rams-rule-light'}`}>
+                    <span className={`px-2 py-1 rounded-sm text-[9px] font-mono font-bold border uppercase tracking-wider ${weeklyAuditStats.missedCount > 0 ? 'bg-rams-red/10 text-rams-red border-rams-red/30' : 'bg-rams-bg text-rams-ink-muted border-rams-rule-light'}`}>
                         MISSED PUNCHES: {weeklyAuditStats.missedCount}
                     </span>
-                    <span className={`px-2 py-0.5 rounded-sm text-[9px] font-mono font-bold border uppercase tracking-wider ${weeklyAuditStats.offDayCount > 0 ? 'bg-rams-orange/10 text-rams-orange border-rams-orange/30' : 'bg-rams-bg text-rams-ink-muted border-rams-rule-light'}`}>
+                    <span className={`px-2 py-1 rounded-sm text-[9px] font-mono font-bold border uppercase tracking-wider ${weeklyAuditStats.offDayCount > 0 ? 'bg-rams-orange/10 text-rams-orange border-rams-orange/30' : 'bg-rams-bg text-rams-ink-muted border-rams-rule-light'}`}>
                         OFF-DAY ATTENDANCE: {weeklyAuditStats.offDayCount}
                     </span>
-                    <span className={`px-2 py-0.5 rounded-sm text-[9px] font-mono font-bold border uppercase tracking-wider ${weeklyAuditStats.absentCount > 0 ? 'bg-rams-red/10 text-rams-red border-rams-red/30' : 'bg-rams-bg text-rams-ink-muted border-rams-rule-light'}`}>
+                    <span className={`px-2 py-1 rounded-sm text-[9px] font-mono font-bold border uppercase tracking-wider ${weeklyAuditStats.absentCount > 0 ? 'bg-rams-red/10 text-rams-red border-rams-red/30' : 'bg-rams-bg text-rams-ink-muted border-rams-rule-light'}`}>
                         ABSENT: {weeklyAuditStats.absentCount}
                     </span>
                 </div>
@@ -1069,7 +1185,7 @@ export default function AdminRosterPage() {
                 <button
                     type="button"
                     onClick={() => setAuditExceptionsOnly(!auditExceptionsOnly)}
-                    className={`px-3 py-1 rounded-sm text-[10px] font-mono font-bold uppercase tracking-wider border transition-all cursor-pointer ${auditExceptionsOnly ? 'bg-rams-red text-rams-panel border-rams-red' : 'bg-rams-bg text-rams-ink border-rams-rule-light hover:border-rams-rule'}`}
+                    className={`px-3 py-1.5 rounded-sm text-[10px] font-mono font-bold uppercase tracking-wider border transition-all cursor-pointer min-h-[34px] ${auditExceptionsOnly ? 'bg-rams-red text-rams-panel border-rams-red' : 'bg-rams-bg text-rams-ink border-rams-rule-light hover:border-rams-rule'}`}
                 >
                     {auditExceptionsOnly ? 'SHOWING EXCEPTIONS ONLY' : 'FILTER: EXCEPTIONS ONLY'}
                 </button>
@@ -1085,28 +1201,28 @@ export default function AdminRosterPage() {
                         <button
                             type="button"
                             onClick={() => setStatusFilter('ALL')}
-                            className={`px-3 py-1.5 rounded-sm text-xs font-mono font-bold transition-all cursor-pointer ${statusFilter === 'ALL' ? 'bg-rams-ink text-rams-panel' : 'bg-rams-bg border border-rams-rule-light text-rams-ink hover:border-rams-rule'}`}
+                            className={`px-3 py-1.5 rounded-sm text-xs font-mono font-bold transition-all cursor-pointer min-h-[34px] ${statusFilter === 'ALL' ? 'bg-rams-ink text-rams-panel' : 'bg-rams-bg border border-rams-rule-light text-rams-ink hover:border-rams-rule'}`}
                         >
                             ทั้งหมด ({employees.length})
                         </button>
                         <button
                             type="button"
                             onClick={() => setStatusFilter('ACTIVE')}
-                            className={`px-3 py-1.5 rounded-sm text-xs font-mono font-bold transition-all flex items-center gap-1 cursor-pointer ${statusFilter === 'ACTIVE' ? 'bg-rams-green text-rams-panel' : 'bg-rams-bg border border-rams-rule-light text-rams-ink hover:border-rams-rule'}`}
+                            className={`px-3 py-1.5 rounded-sm text-xs font-mono font-bold transition-all flex items-center gap-1 cursor-pointer min-h-[34px] ${statusFilter === 'ACTIVE' ? 'bg-rams-green text-rams-panel' : 'bg-rams-bg border border-rams-rule-light text-rams-ink hover:border-rams-rule'}`}
                         >
                             <UserCheck size={12} /> ทำงานปกติ ({activeCount})
                         </button>
                         <button
                             type="button"
                             onClick={() => setStatusFilter('SUSPENDED')}
-                            className={`px-3 py-1.5 rounded-sm text-xs font-mono font-bold transition-all flex items-center gap-1 cursor-pointer ${statusFilter === 'SUSPENDED' ? 'bg-rams-red text-rams-panel' : 'bg-rams-bg border border-rams-rule-light text-rams-ink hover:border-rams-rule'}`}
+                            className={`px-3 py-1.5 rounded-sm text-xs font-mono font-bold transition-all flex items-center gap-1 cursor-pointer min-h-[34px] ${statusFilter === 'SUSPENDED' ? 'bg-rams-red text-rams-panel' : 'bg-rams-bg border border-rams-rule-light text-rams-ink hover:border-rams-rule'}`}
                         >
                             <UserX size={12} /> พักงาน ({suspendedCount})
                         </button>
                         <button
                             type="button"
                             onClick={() => setStatusFilter('VACATION')}
-                            className={`px-3 py-1.5 rounded-sm text-xs font-mono font-bold transition-all flex items-center gap-1 cursor-pointer ${statusFilter === 'VACATION' ? 'bg-sky-600 text-white' : 'bg-rams-bg border border-rams-rule-light text-rams-ink hover:border-rams-rule'}`}
+                            className={`px-3 py-1.5 rounded-sm text-xs font-mono font-bold transition-all flex items-center gap-1 cursor-pointer min-h-[34px] ${statusFilter === 'VACATION' ? 'bg-rams-ink text-rams-panel' : 'bg-rams-bg border border-rams-rule-light text-rams-ink hover:border-rams-rule'}`}
                         >
                             <Sun size={12} /> พักร้อน ({vacationCount})
                         </button>
@@ -1119,33 +1235,45 @@ export default function AdminRosterPage() {
                             value={searchQuery}
                             onChange={e => setSearchQuery(e.target.value)}
                             placeholder="ค้นชื่อ, ตำแหน่ง..."
-                            className="w-full pl-8 pr-3 py-1.5 text-xs font-mono bg-rams-bg border border-rams-rule-light rounded-sm text-rams-ink outline-none focus:border-rams-rule"
+                            className="w-full pl-8 pr-3 py-1.5 text-xs font-mono bg-rams-bg border border-rams-rule-light rounded-sm text-rams-ink outline-none focus:border-rams-rule min-h-[34px]"
                         />
                     </div>
                 </div>
 
                 <div className="flex items-center justify-between p-4 border-b border-rams-rule-light bg-rams-bg/30">
-                    <button onClick={prevWeek} className="w-8 h-8 bg-rams-panel border border-rams-rule-light hover:border-rams-rule text-rams-ink flex items-center justify-center rounded-sm transition-all cursor-pointer"><ChevronLeft size={16} /></button>
-                    <h2 className="text-sm font-mono font-bold text-rams-ink uppercase tracking-wider">
-                        {format(weekStart, 'dd MMM yyyy')} - {format(weekEnd, 'dd MMM yyyy')}
-                    </h2>
-                    <button onClick={nextWeek} className="w-8 h-8 bg-rams-panel border border-rams-rule-light hover:border-rams-rule text-rams-ink flex items-center justify-center rounded-sm transition-all cursor-pointer"><ChevronRight size={16} /></button>
+                    <button onClick={prevWeek} className="w-9 h-9 bg-rams-panel border border-rams-rule-light hover:border-rams-rule text-rams-ink flex items-center justify-center rounded-sm transition-all cursor-pointer active:translate-y-[1px]"><ChevronLeft size={16} /></button>
+                    <div className="text-center">
+                        <h2 className="text-sm font-mono font-bold text-rams-ink uppercase tracking-wider">
+                            {format(weekStart, 'dd MMM yyyy')} - {format(weekEnd, 'dd MMM yyyy')}
+                        </h2>
+                        <div className="text-[9px] font-mono text-rams-ink-muted uppercase tracking-widest mt-0.5">
+                            สัปดาห์ที่ {format(weekStart, 'w')} ของปี {format(weekStart, 'yyyy')}
+                        </div>
+                    </div>
+                    <button onClick={nextWeek} className="w-9 h-9 bg-rams-panel border border-rams-rule-light hover:border-rams-rule text-rams-ink flex items-center justify-center rounded-sm transition-all cursor-pointer active:translate-y-[1px]"><ChevronRight size={16} /></button>
                 </div>
 
                 <div className="overflow-x-auto">
                     {loading ? (
-                        <div className="p-12 text-center font-mono text-xs text-rams-ink-muted uppercase tracking-wider">Loading roster...</div>
+                        <div className="p-16 text-center font-mono text-xs text-rams-ink-muted uppercase tracking-wider">Loading roster data...</div>
                     ) : filteredEmployees.length === 0 ? (
-                        <div className="p-12 text-center font-mono text-xs text-rams-ink-muted uppercase tracking-wider">ไม่พบพนักงานในเงื่อนไขที่เลือก</div>
+                        <div className="p-16 text-center font-mono text-xs text-rams-ink-muted uppercase tracking-wider">ไม่พบพนักงานในเงื่อนไขที่เลือก</div>
                     ) : (
-                        <table className="w-full text-xs text-left">
-                            <thead className="bg-rams-bg/50 text-rams-ink-muted border-b border-rams-rule-light font-mono text-[9px] uppercase tracking-widest">
+                        <table className="w-full text-xs text-left border-collapse">
+                            <thead className="bg-rams-bg/60 text-rams-ink-muted border-b border-rams-rule-light font-mono text-[9px] uppercase tracking-widest">
                                 <tr>
-                                    <th className="px-4 py-3 min-w-[170px]">พนักงาน</th>
+                                    <th className="px-4 py-3 min-w-[180px] sticky left-0 bg-rams-bg z-20 border-r border-rams-rule shadow-[2px_0_5px_rgba(0,0,0,0.06)]">
+                                        พนักงาน / ตำแหน่ง
+                                    </th>
                                     {dates.map((date, i) => (
-                                        <th key={i} className="px-4 py-3 text-center min-w-[140px] border-l border-rams-rule-light">
+                                        <th key={i} className="px-3 py-3 text-center min-w-[140px] border-l border-rams-rule-light">
                                             <div className="text-[9px] font-mono text-rams-ink-muted uppercase tracking-widest">{daysTitle[i]}</div>
-                                            <div className="font-mono font-bold text-[11px] text-rams-ink mt-0.5">{format(date, 'dd/MM')}</div>
+                                            <div className="font-mono font-bold text-xs text-rams-ink mt-0.5">{format(date, 'dd/MM')}</div>
+                                            <div className="mt-1">
+                                                <span className="inline-block px-1.5 py-0.5 rounded-sm text-[8px] font-mono font-bold uppercase bg-rams-panel border border-rams-rule-light text-rams-ink">
+                                                    ON DUTY: {dailyOnDutyStats[i]?.count || 0}
+                                                </span>
+                                            </div>
                                         </th>
                                     ))}
                                 </tr>
@@ -1156,8 +1284,8 @@ export default function AdminRosterPage() {
                                     const empVacation = hasVacation(emp);
                                     const empLeave = hasOtherLeave(emp);
                                     return (
-                                        <tr key={emp.id} className={`hover:bg-rams-bg/30 text-rams-ink ${empSuspended ? 'bg-rams-red/5' : empVacation ? 'bg-sky-50/40' : ''}`}>
-                                            <td className="px-4 py-3 border-b border-rams-rule-light align-top space-y-1.5">
+                                        <tr key={emp.id} className={`hover:bg-rams-bg/30 text-rams-ink ${empSuspended ? 'bg-rams-red/5' : empVacation ? 'bg-rams-ink/5' : ''}`}>
+                                            <td className="px-4 py-3 border-b border-rams-rule-light align-top space-y-1.5 sticky left-0 bg-rams-panel z-10 border-r border-rams-rule shadow-[2px_0_5px_rgba(0,0,0,0.06)]">
                                                 <div className="flex items-center justify-between gap-1">
                                                     <span className="font-bold">{emp.nickname || emp.name}</span>
                                                     <button
@@ -1179,12 +1307,12 @@ export default function AdminRosterPage() {
                                                         </span>
                                                     )}
                                                     {empVacation && (
-                                                        <span className="px-1.5 py-0.5 font-bold bg-sky-50 border border-sky-300 text-sky-800 rounded-sm uppercase">
+                                                        <span className="px-1.5 py-0.5 font-bold bg-rams-ink/10 border border-rams-ink/30 text-rams-ink rounded-sm uppercase">
                                                             VACATION
                                                         </span>
                                                     )}
                                                     {empLeave && !empVacation && (
-                                                        <span className="px-1.5 py-0.5 font-bold bg-amber-50 border border-amber-300 text-amber-800 rounded-sm uppercase">
+                                                        <span className="px-1.5 py-0.5 font-bold bg-rams-amber/10 border border-rams-amber/30 text-rams-amber rounded-sm uppercase">
                                                             HAS LEAVE
                                                         </span>
                                                     )}
@@ -1200,15 +1328,19 @@ export default function AdminRosterPage() {
                                             return (
                                                 <td key={i} className={`px-2 py-2 border-l border-rams-rule-light align-top ${hasDiscrepancy ? 'bg-rams-orange/5' : 'bg-rams-panel/50'}`}>
                                                     <div 
-                                                        className={`h-full min-h-[65px] w-full rounded-sm border p-1.5 space-y-1.5 transition-all flex flex-col cursor-pointer ${
+                                                        className={`group h-full min-h-[70px] w-full rounded-sm border p-1.5 space-y-1.5 transition-all flex flex-col cursor-pointer ${
                                                             hasDiscrepancy 
                                                                 ? 'border-rams-orange/40 bg-rams-orange/5 hover:border-rams-orange' 
-                                                                : 'border-dashed border-rams-rule-light hover:border-rams-rule hover:bg-rams-bg'
+                                                                : 'border-dashed border-rams-rule-light hover:border-rams-orange hover:bg-rams-orange/5'
                                                         }`}
                                                         onClick={() => openCellModal(emp, date)}
                                                     >
                                                         {slots.length === 0 && empLeaves.length === 0 && !attendanceStatus && (
-                                                            <span className="text-rams-ink-muted/50 font-mono text-xs m-auto block text-center">+</span>
+                                                            <div className="h-full flex items-center justify-center py-4">
+                                                                <span className="text-[10px] font-mono font-bold text-rams-ink-muted/40 uppercase group-hover:text-rams-orange transition-colors">
+                                                                    + กะงาน
+                                                                </span>
+                                                            </div>
                                                         )}
                                                         
                                                         {/* Real-time Attendance Status Indicator */}
@@ -1239,32 +1371,40 @@ export default function AdminRosterPage() {
                                                         {/* Scheduled Shifts */}
                                                         {slots.map((s, idx) => {
                                                             const shiftObj = shifts.find(sh => sh.id === s.shift_id);
-                                                            const timeStr = s.custom_start_time ? `${s.custom_start_time.slice(0,5)}-${s.custom_end_time?.slice(0,5)}` : (shiftObj ? `${shiftObj.start_time.slice(0,5)}-${shiftObj.end_time.slice(0,5)}` : '');
+                                                            const startClean = (s.custom_start_time || shiftObj?.start_time || '').slice(0, 5);
+                                                            const endClean = (s.custom_end_time || shiftObj?.end_time || '').slice(0, 5);
+                                                            const timeStr = startClean && endClean ? `${startClean}-${endClean}` : (shiftObj ? `${shiftObj.start_time.slice(0,5)}-${shiftObj.end_time.slice(0,5)}` : '');
 
-                                                            // Match against saved presets for custom slots
-                                                            const matchedPreset = (!s.is_off && !s.shift_id && s.custom_start_time && s.custom_end_time)
-                                                                ? customPresets.find(p => (p.start || '').slice(0, 5) === s.custom_start_time.slice(0, 5) && (p.end || '').slice(0, 5) === s.custom_end_time.slice(0, 5))
+                                                            // Match against all standard & custom presets
+                                                            const matchedPreset = (!s.is_off && startClean && endClean)
+                                                                ? allPresets.find(p => (p.start || '').slice(0, 5) === startClean && (p.end || '').slice(0, 5) === endClean)
                                                                 : null;
+
+                                                            // Match against DB shifts by start and end time if shiftObj is missing
+                                                            const matchedDbShift = (!shiftObj && !s.is_off && startClean && endClean)
+                                                                ? shifts.find(sh => (sh.start_time || '').slice(0, 5) === startClean && (sh.end_time || '').slice(0, 5) === endClean)
+                                                                : null;
+
                                                             const approvedLeave = empLeaves.find(l => l.status === 'approved');
                                                             const isLeaveOff = s.is_off && approvedLeave;
                                                             const bgColor = isLeaveOff
-                                                                ? 'bg-amber-50 border-amber-300 text-amber-900 font-bold border-2 border-dashed shadow-sm'
+                                                                ? 'bg-rams-amber/15 border-rams-amber text-rams-ink font-bold border-2 border-dashed shadow-none'
                                                                 : (matchedPreset
                                                                     ? `${getPresetColor(matchedPreset.color).bg} ${getPresetColor(matchedPreset.color).border} ${getPresetColor(matchedPreset.color).text}`
-                                                                    : getShiftColorClass(s, shiftObj));
+                                                                    : getShiftColorClass(s, shiftObj || matchedDbShift));
                                                             const cellLabel = s.is_off
                                                                 ? (approvedLeave
                                                                     ? `OFF (LEAVE: ${approvedLeave.leave_type === 'sick' ? 'SICK' : approvedLeave.leave_type === 'business' ? 'BIZ' : 'VACATION'})`
                                                                     : 'OFF')
-                                                                : (matchedPreset ? matchedPreset.name : (shiftObj?.name || 'CUSTOM'));
+                                                                : (matchedPreset ? matchedPreset.name : (shiftObj?.name || matchedDbShift?.name || (timeStr ? `กะ ${timeStr}` : 'CUSTOM')));
 
                                                             return (
                                                                 <div key={idx} className={`p-1.5 rounded-sm text-[10px] font-mono border ${bgColor} ${s.status === 'DRAFT' ? 'border-dashed border-2' : ''}`}>
                                                                     <div className="font-bold uppercase tracking-wide">{cellLabel}</div>
-                                                                    {!s.is_off && <div className="text-[9px] font-bold text-rams-ink/80 mt-0.5">{timeStr}</div>}
+                                                                    {!s.is_off && timeStr && <div className="text-[9px] font-bold text-rams-ink/80 mt-0.5">{timeStr}</div>}
                                                                     {s.slot_type !== 'MAIN' && <div className="text-[9px] uppercase font-bold tracking-wider opacity-60 mt-0.5">{s.slot_type}</div>}
                                                                 </div>
-                                                            )
+                                                            );
                                                         })}
                                                     </div>
                                                 </td>
@@ -1274,6 +1414,18 @@ export default function AdminRosterPage() {
                                 );
                             })}
                             </tbody>
+                            <tfoot>
+                                <tr className="border-t-2 border-rams-rule bg-rams-bg/60 font-mono">
+                                    <td className="px-4 py-3 sticky left-0 bg-rams-bg z-10 border-r border-rams-rule text-[10px] font-bold uppercase tracking-wider text-rams-ink shadow-[2px_0_5px_rgba(0,0,0,0.06)]">
+                                        TOTAL ON DUTY (รวม)
+                                    </td>
+                                    {dates.map((date, i) => (
+                                        <td key={`total-${i}`} className="px-3 py-2.5 text-center text-xs font-bold text-rams-ink border-l border-rams-rule-light">
+                                            {dailyOnDutyStats[i]?.count || 0} คน
+                                        </td>
+                                    ))}
+                                </tr>
+                            </tfoot>
                         </table>
                     )}
                 </div>
@@ -1711,12 +1863,13 @@ export default function AdminRosterPage() {
                                                         </button>
                                                     )}
  
-                                                    {customPresets.length > 0 && (
+                                                    {allPresets.length > 0 && (
                                                         <div className="mt-3">
-                                                            <label className="block text-[9px] font-mono font-bold text-rams-ink uppercase tracking-widest mb-1.5">⚡ Preset ที่บันทึกไว้:</label>
+                                                            <label className="block text-[9px] font-mono font-bold text-rams-ink uppercase tracking-widest mb-1.5">⚡ Preset เวลามาตรฐาน & ที่บันทึกไว้:</label>
                                                             <div className="flex flex-wrap gap-2">
-                                                                {customPresets.map((preset, pIdx) => {
+                                                                {allPresets.map((preset, pIdx) => {
                                                                     const pc = getPresetColor(preset.color);
+                                                                    const isCustom = customPresets.some(cp => (cp.start || '').slice(0,5) === (preset.start || '').slice(0,5) && (cp.end || '').slice(0,5) === (preset.end || '').slice(0,5));
                                                                     return (
                                                                         <div 
                                                                             key={pIdx}
@@ -1728,18 +1881,21 @@ export default function AdminRosterPage() {
                                                                         >
                                                                             <span>{preset.icon || '⏰'}</span>
                                                                             <span>{preset.name || `${preset.start}-${preset.end}`}</span>
-                                                                            <span className="opacity-50 text-[10px] font-semibold">({preset.start}-{preset.end})</span>
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={(e) => {
-                                                                                    e.stopPropagation();
-                                                                                    deleteCustomPreset(pIdx);
-                                                                                }}
-                                                                                className="opacity-50 hover:opacity-100 hover:text-rams-red ml-1 font-bold text-xs leading-none cursor-pointer"
-                                                                                title="ลบ"
-                                                                            >
-                                                                                ×
-                                                                            </button>
+                                                                            <span className="opacity-60 text-[10px] font-semibold">({preset.start}-{preset.end})</span>
+                                                                            {isCustom && (
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation();
+                                                                                        const customIdx = customPresets.findIndex(cp => (cp.start || '').slice(0,5) === (preset.start || '').slice(0,5) && (cp.end || '').slice(0,5) === (preset.end || '').slice(0,5));
+                                                                                        if (customIdx >= 0) deleteCustomPreset(customIdx);
+                                                                                    }}
+                                                                                    className="opacity-50 hover:opacity-100 hover:text-rams-red ml-1 font-bold text-xs leading-none cursor-pointer"
+                                                                                    title="ลบ"
+                                                                                >
+                                                                                    ×
+                                                                                </button>
+                                                                            )}
                                                                         </div>
                                                                     );
                                                                 })}
@@ -2072,23 +2228,35 @@ export default function AdminRosterPage() {
 
 const getShiftColorClass = (s, shiftObj) => {
     if (s.is_off) return 'bg-red-50 border-red-200 text-red-700';
-    if (!s.shift_id || s.custom_start_time || !shiftObj) {
+
+    const name = (shiftObj?.name || '').toLowerCase();
+    const startClean = (s.custom_start_time || shiftObj?.start_time || '').slice(0, 5);
+    const endClean = (s.custom_end_time || shiftObj?.end_time || '').slice(0, 5);
+
+    if (name.includes('ควบ') || name.includes('double') || (startClean === '10:00' && endClean === '00:30')) {
+        return 'bg-rose-50 border-rose-200 text-rose-950';
+    }
+    if (name.includes('ค่ำ') || name.includes('ดึก') || name.includes('night') || (startClean === '16:30' && endClean === '00:30')) {
         return 'bg-sky-50 border-sky-200 text-sky-950';
     }
-
-    const name = (shiftObj.name || '').toLowerCase();
-    
-    if (name.includes('ควบ') || name.toLowerCase().includes('double')) {
+    if (name.includes('inthehaus') || (startClean === '18:00' && endClean === '22:30')) {
+        return 'bg-indigo-50 border-indigo-200 text-indigo-950';
+    }
+    if (name.includes('chef') || (startClean === '10:00' && endClean === '20:30')) {
+        return 'bg-emerald-50 border-emerald-200 text-emerald-950';
+    }
+    if (name.includes('ครัว') || (startClean === '12:30' && endClean === '23:30')) {
+        return 'bg-violet-50 border-violet-200 text-violet-950';
+    }
+    if (name.includes('เช้า') || name.includes('morning') || (startClean === '10:00' && endClean === '18:00')) {
+        return 'bg-amber-50 border-amber-200 text-amber-950';
+    }
+    if (name.includes('กลาง') || (startClean === '12:00' && endClean === '20:00')) {
+        return 'bg-sky-50 border-sky-200 text-sky-950';
+    }
+    if (name.includes('part-time') || (startClean === '12:30' && endClean === '21:30')) {
         return 'bg-rose-50 border-rose-200 text-rose-950';
     }
     
-    if (name.includes('ค่ำ') || name.includes('ดึก') || name.toLowerCase().includes('night') || name.toLowerCase().includes('evening')) {
-        return 'bg-indigo-50 border-indigo-200 text-indigo-950';
-    }
-    
-    if (name.includes('เช้า') || name.toLowerCase().includes('morning')) {
-        return 'bg-amber-50 border-amber-200 text-amber-950';
-    }
-    
-    return 'bg-yellow-50 border-yellow-200 text-yellow-950';
+    return 'bg-sky-50 border-sky-200 text-sky-950';
 };
