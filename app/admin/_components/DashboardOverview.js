@@ -962,10 +962,11 @@ export default function DashboardOverview({
                                             <td className="px-4 py-4 whitespace-nowrap text-center">
                                                 {log.photo_url ? (
                                                     <button
-                                                        onClick={() => setSelectedPhoto(log.photo_url)}
+                                                        onClick={() => setSelectedPhoto(log)}
                                                         className="cursor-pointer group/photo inline-block"
-                                                        title="คลิกเพื่อดูรูปขนาดใหญ่"
+                                                        title="คลิกเพื่อดูรูปและข้อมูลยืนยันเวลา"
                                                     >
+
                                                         <img
                                                             src={log.photo_url}
                                                             alt=""
@@ -1082,37 +1083,117 @@ export default function DashboardOverview({
                 )}
             </div>
 
-            {/* --- LIGHTBOX MODAL FOR VERIFICATION PHOTO --- */}
+            {/* --- LIGHTBOX MODAL FOR VERIFICATION PHOTO WITH RAMS TELEMETRY HUD --- */}
             {selectedPhoto && (
                 <div 
                     className="fixed inset-0 z-[70] bg-rams-ink/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in"
                     onClick={() => setSelectedPhoto(null)}
                 >
                     <div
-                        className="bg-rams-panel border border-rams-rule rounded-sm max-w-md w-full p-4 space-y-3"
+                        className="bg-rams-panel border border-rams-rule rounded-sm max-w-lg w-full p-5 space-y-4 shadow-2xl"
                         onClick={e => e.stopPropagation()}
                     >
-                        <div className="flex justify-between items-center border-b border-rams-rule-light pb-2">
-                            <h4 className="font-mono font-bold text-rams-ink text-xs uppercase tracking-wider">
-                                รูปถ่ายยืนยันการสแกนเวลา
-                            </h4>
-                            <button
-                                onClick={() => setSelectedPhoto(null)}
-                                className="w-6 h-6 flex items-center justify-center border border-rams-rule-light bg-rams-bg text-rams-ink font-mono text-xs cursor-pointer"
-                            >
-                                ✕
-                            </button>
+                        {/* Modal Header */}
+                        <div className="flex justify-between items-center border-b border-rams-rule-light pb-2.5">
+                            <div className="flex items-center gap-2">
+                                <span className="w-2.5 h-2.5 rounded-full bg-rams-orange animate-pulse"></span>
+                                <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-rams-ink-muted">
+                                    IN THE HAUS · ATTENDANCE TELEMETRY
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                {typeof selectedPhoto === 'object' && selectedPhoto?.id && (
+                                    <span className="text-[9px] font-mono font-bold text-rams-ink-muted bg-rams-bg px-2 py-0.5 border border-rams-rule-light rounded-xs">
+                                        #ATT-{selectedPhoto.id}
+                                    </span>
+                                )}
+                                <button
+                                    onClick={() => setSelectedPhoto(null)}
+                                    className="w-6 h-6 flex items-center justify-center border border-rams-rule-light bg-rams-bg text-rams-ink font-mono text-xs cursor-pointer hover:border-rams-rule"
+                                >
+                                    ✕
+                                </button>
+                            </div>
                         </div>
-                        <img
-                            src={selectedPhoto}
-                            alt="Scan"
-                            className="w-full h-80 object-cover rounded-sm border border-rams-rule-light bg-rams-bg"
-                            referrerPolicy="no-referrer"
-                        />
-                        <div className="flex justify-end">
+
+                        {/* Image Canvas Container */}
+                        <div className="flex items-center justify-center bg-rams-bg border border-rams-rule-light rounded-sm p-1.5 overflow-hidden">
+                            <img
+                                src={typeof selectedPhoto === 'object' ? selectedPhoto.photo_url : selectedPhoto}
+                                alt="Scan Verification"
+                                className="max-h-[52vh] w-auto max-w-full object-contain rounded-xs shadow-inner"
+                                referrerPolicy="no-referrer"
+                            />
+                        </div>
+
+                        {/* Dieter Rams Style Telemetry & Timestamp Audit Card */}
+                        {typeof selectedPhoto === 'object' && (
+                            <div className="bg-rams-bg border border-rams-rule-light p-3.5 rounded-sm space-y-2.5 font-mono text-xs">
+                                {/* Row 1: Staff Identity & Punch Action */}
+                                <div className="flex items-center justify-between border-b border-rams-rule-light/70 pb-2">
+                                    <div className="flex items-center gap-2">
+                                        <StaffAvatar
+                                            employee={selectedPhoto.employees}
+                                            className="w-6 h-6"
+                                            textClassName="text-[10px]"
+                                        />
+                                        <div>
+                                            <span className="font-bold text-rams-ink text-xs">
+                                                {selectedPhoto.employees?.name || 'พนักงาน'}
+                                            </span>
+                                            {selectedPhoto.employees?.nickname && (
+                                                <span className="text-[10px] text-rams-orange font-bold ml-1">
+                                                    ({selectedPhoto.employees.nickname})
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <span className={`px-2 py-0.5 text-[9px] font-bold uppercase rounded-xs border ${
+                                        selectedPhoto.action_type === 'check_in'
+                                            ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                                            : 'bg-indigo-50 text-indigo-800 border-indigo-300'
+                                    }`}>
+                                        {selectedPhoto.action_type === 'check_in' ? '● CHECK-IN (เข้างาน)' : '■ CHECK-OUT (ออกงาน)'}
+                                    </span>
+                                </div>
+
+                                {/* Row 2: Precision Timestamp & Telemetry Grid */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10px] text-rams-ink">
+                                    <div>
+                                        <span className="text-[9px] text-rams-ink-muted uppercase block font-bold">
+                                            EXACT TIME (UTC+7 / ICT)
+                                        </span>
+                                        <span className="font-bold tracking-tight text-rams-ink">
+                                            {selectedPhoto.timestamp ? format(new Date(selectedPhoto.timestamp), 'yyyy-MM-dd · HH:mm:ss') : '-'}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <span className="text-[9px] text-rams-ink-muted uppercase block font-bold">
+                                            METHOD & VERIFICATION
+                                        </span>
+                                        <span className="text-rams-ink font-semibold">
+                                            {selectedPhoto.verification_method === 'QR_CODE' 
+                                                ? 'DYNAMIC IN-STORE QR' 
+                                                : `GPS GEOFENCE (${selectedPhoto.accuracy_meters ? `±${selectedPhoto.accuracy_meters}M` : 'VERIFIED'})`}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Modal Footer Controls */}
+                        <div className="flex justify-between items-center pt-1">
+                            <a
+                                href={typeof selectedPhoto === 'object' ? selectedPhoto.photo_url : selectedPhoto}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[10px] font-mono text-rams-ink-muted hover:text-rams-orange underline underline-offset-2"
+                            >
+                                ดูรูปไฟล์เต็ม (RAW ASSET) ↗
+                            </a>
                             <button
                                 onClick={() => setSelectedPhoto(null)}
-                                className="px-4 py-1.5 bg-rams-ink text-rams-panel text-xs font-mono font-bold uppercase rounded-sm cursor-pointer"
+                                className="px-5 py-2 bg-rams-ink text-rams-panel text-xs font-mono font-bold uppercase rounded-sm cursor-pointer hover:opacity-90 active:translate-y-[1px]"
                             >
                                 ปิด
                             </button>
@@ -1120,6 +1201,8 @@ export default function DashboardOverview({
                     </div>
                 </div>
             )}
+
+
         </div>
     );
 }

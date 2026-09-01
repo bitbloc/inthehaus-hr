@@ -1,20 +1,5 @@
 import { differenceInMinutes, addDays, isAfter, format } from "date-fns";
-
-/**
- * Combine a date and a time string into a full Date object.
- */
-function createTimeRange(dateStr, startTimeStr, endTimeStr) {
-    if (!startTimeStr) startTimeStr = '00:00:00';
-    if (!endTimeStr) endTimeStr = '23:59:59';
-
-    const start = new Date(`${dateStr}T${startTimeStr}`);
-    let end = new Date(`${dateStr}T${endTimeStr}`);
-
-    if (endTimeStr < startTimeStr) {
-        end = addDays(end, 1);
-    }
-    return { start, end };
-}
+import { createTimeRange, resolveShiftPresetName } from "./roster.js";
 
 const formatTime = (date) => {
     if (!date) return '-';
@@ -22,12 +7,13 @@ const formatTime = (date) => {
 };
 
 /**
- * Helper to extract local date string (YYYY-MM-DD) from a log timestamp
+ * Helper to extract local date string (YYYY-MM-DD) from a log timestamp with Bangkok Timezone Guard (UTC+7)
  */
-const getLogLocalDateStr = (timestamp) => {
+export const getLogLocalDateStr = (timestamp) => {
     if (!timestamp) return '';
     try {
-        return format(new Date(timestamp), 'yyyy-MM-dd');
+        const d = new Date(timestamp);
+        return d.toLocaleDateString('sv-SE', { timeZone: 'Asia/Bangkok' });
     } catch {
         return '';
     }

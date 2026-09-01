@@ -542,16 +542,16 @@ export default function CheckIn() {
     setShowCamera(true);
   };
 
-  // --- Dynamic Watermark Canvas Helper ---
-  const createWatermarkedPhoto = async (file, staffName, dateText, locText) => {
+  // --- Dynamic Dieter Rams Style Technical Watermark Canvas Helper ---
+  const createWatermarkedPhoto = async (file, staffName, dateText, locText, actionLabel = 'CHECK-IN') => {
     return new Promise((resolve, reject) => {
       const img = new Image();
       const reader = new FileReader();
       reader.onload = (e) => {
         img.onload = () => {
           const canvas = document.createElement('canvas');
-          const maxW = 800;
-          const maxH = 800;
+          const maxW = 1080;
+          const maxH = 1080;
           let w = img.width;
           let h = img.height;
           if (w > maxW || h > maxH) {
@@ -568,21 +568,35 @@ export default function CheckIn() {
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, w, h);
 
-          // Dark Watermark Bar at Bottom
-          const barH = 65;
-          ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+          // Matte Dark Technical Telemetry HUD Bar
+          const barH = Math.max(76, Math.round(h * 0.115));
+          const pad = Math.max(16, Math.round(w * 0.035));
+          
+          // Background HUD panel
+          ctx.fillStyle = 'rgba(18, 18, 18, 0.92)';
           ctx.fillRect(0, h - barH, w, barH);
 
-          // Text details
+          // Accent hairline rule at top of HUD (Rams Signal Orange)
+          ctx.fillStyle = '#ea580c';
+          ctx.fillRect(0, h - barH, w, 2.5);
+
+          // Orange Indicator Dot
+          const dotRadius = Math.max(3.5, Math.round(barH * 0.065));
+          ctx.beginPath();
+          ctx.arc(pad + dotRadius, h - barH + Math.round(barH * 0.33), dotRadius, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Header line: System, Action & Staff Identifier
           ctx.fillStyle = '#FFFFFF';
-          ctx.font = 'bold 16px sans-serif';
-          ctx.fillText(`📍 IN THE HAUS • ${staffName || 'Staff'}`, 16, h - barH + 24);
+          ctx.font = `bold ${Math.max(13, Math.round(barH * 0.22))}px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace`;
+          ctx.fillText(`IN THE HAUS // ${actionLabel.toUpperCase()} · ${staffName || 'STAFF'}`, pad + dotRadius * 2 + 8, h - barH + Math.round(barH * 0.38));
 
-          ctx.fillStyle = '#94A3B8';
-          ctx.font = '12px monospace';
-          ctx.fillText(`⏰ ${dateText} | ${locText}`, 16, h - barH + 48);
+          // Sub line: High-Precision Timestamp & Telemetry
+          ctx.fillStyle = '#9ca3af'; // Rams Ink Muted
+          ctx.font = `${Math.max(10, Math.round(barH * 0.165))}px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace`;
+          ctx.fillText(`TIMESTAMP: ${dateText} ICT | LOC: ${locText.toUpperCase()}`, pad, h - barH + Math.round(barH * 0.74));
 
-          resolve(canvas.toDataURL('image/jpeg', 0.85));
+          resolve(canvas.toDataURL('image/jpeg', 0.88));
         };
         img.onerror = reject;
         img.src = e.target.result;
@@ -652,20 +666,22 @@ export default function CheckIn() {
     if (!file || isUploading || isSubmitting) return;
 
     try {
-      const nowStr = format(new Date(), 'dd/MM/yyyy HH:mm:ss');
-      const locText = status.includes('Ready') ? 'In The Haus Area' : 'GPS Verified';
-      const staffName = employeeData?.nickname || employeeData?.name || profile?.displayName;
+      const nowStr = format(new Date(), 'yyyy-MM-dd HH:mm:ss');
+      const locText = status.includes('Ready') || status.includes('พร้อม') ? 'IN THE HAUS HQ (VERIFIED)' : 'GPS VERIFIED';
+      const staffName = employeeData?.nickname ? `${employeeData.name} (${employeeData.nickname})` : (employeeData?.name || profile?.displayName);
+      const actionName = userStatus?.canCheckIn ? 'CHECK-IN' : 'CHECK-OUT';
 
-      const watermarkedBase64 = await createWatermarkedPhoto(file, staffName, nowStr, locText);
+      const watermarkedBase64 = await createWatermarkedPhoto(file, staffName, nowStr, locText, actionName);
       await executePunch({ photoBase64: watermarkedBase64 });
     } catch (err) {
-      alert("Error processing photo: " + err.message);
-      setIsUploading(false);
-      setIsSubmitting(false);
+      console.error("Photo processing error:", err);
+      alert("ไม่สามารถประมวลผลรูปถ่ายได้ กรุณาลองใหม่อีกครั้ง");
     }
   };
 
+
   const handleQRScanSuccess = async (scannedToken) => {
+
     if (!scannedToken) return;
     await executePunch({ qrToken: scannedToken });
   };

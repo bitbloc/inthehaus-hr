@@ -1,19 +1,7 @@
 import { getGenAI, GEMINI_MODELS } from './gemini-client.js';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabase } from '../lib/supabaseClient.js';
 
 let PDFParse = null;
-
-let supabase = null;
-
-function getSupabase() {
-    if (!supabase) {
-        supabase = createClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL,
-            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-        );
-    }
-    return supabase;
-}
 
 /**
  * Generate embedding for a text string

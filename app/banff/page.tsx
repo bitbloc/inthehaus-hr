@@ -133,14 +133,15 @@ export default function BanffPage() {
             const { data: allTxs } = await supabase.from('vault_transactions').select('*');
 
             if (allLogsValue && allTxs) {
-                const logsSum = allLogsValue.reduce((sum, l: any) => sum + (l.earned_value || 0), 0);
-                const txsSum = allTxs.reduce((sum, t: any) => sum + (t.amount || 0), 0);
+                const logsSum = allLogsValue.reduce((sum: number, l: any) => sum + (l.earned_value || 0), 0);
+                const txsSum = allTxs.reduce((sum: number, t: any) => sum + (t.amount || 0), 0);
 
                 useBanffStore.setState({
                     vaultBalance: logsSum + txsSum,
                     vaultTransactions: allTxs
                 });
             }
+
 
             // 7. Fetch Protocol Activities
             const { data: protocolData } = await supabase.from('protocol_activities').select('*').order('created_at', { ascending: true });

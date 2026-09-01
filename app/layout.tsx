@@ -1,7 +1,6 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import GlobalTimerListener from "./banff/components/GlobalTimerListener";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -14,8 +13,21 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "HR INTH",
-  description: "In the Haus HR System",
+  title: "IN THE HAUS · Operations Portal",
+  description: "In the Haus HR & Operations Management Suite",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "IN THE HAUS"
+  }
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: "cover",
+  themeColor: "#f4f4f3"
 };
 
 export default function RootLayout({
@@ -24,13 +36,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="th">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <GlobalTimerListener />
         {children}
       </body>
     </html>
   );
 }
+

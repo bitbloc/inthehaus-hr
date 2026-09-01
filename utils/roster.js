@@ -2,10 +2,80 @@ import { supabase } from '../lib/supabaseClient.js';
 import { format, parseISO, startOfDay, addDays } from 'date-fns';
 
 /**
+ * ==============================================================================
+ * 1. MASTER SHIFT PRESETS & COLOR DEFINITIONS (Single Source of Truth)
+ * ==============================================================================
+ */
+export const SYSTEM_STANDARD_PRESETS = [
+    { start: '18:00', end: '22:30', name: 'INTHEHAUS', color: 'indigo', hex: '#4f46e5', label: 'เย็น/ค่ำ' },
+    { start: '10:00', end: '00:30', name: 'ควบกะ 🔥', color: 'rose', hex: '#e11d48', label: 'ควบกะ' },
+    { start: '16:30', end: '00:30', name: 'กะค่ำ 🌙', color: 'sky', hex: '#4f46e5', label: 'กะค่ำ' },
+    { start: '10:00', end: '18:00', name: 'กะเช้า ☀️', color: 'amber', hex: '#d97706', label: 'กะเช้า' },
+    { start: '10:00', end: '20:30', name: 'CHEF', color: 'emerald', hex: '#15803d', label: 'CHEF' },
+    { start: '12:30', end: '23:30', name: 'ผู้ช่วยครัว', color: 'violet', hex: '#9c4221', label: 'ผู้ช่วยครัว' },
+    { start: '12:00', end: '20:00', name: 'กลางกะ', color: 'sky', hex: '#0284c7', label: 'กลางกะ' },
+    { start: '12:30', end: '21:30', name: 'PART-TIME', color: 'rose', hex: '#ca8a04', label: 'Part-Time' }
+];
+
+export const PRESET_COLORS = [
+    { id: 'sky', label: 'SKY', bg: 'bg-sky-50', text: 'text-sky-800', border: 'border-sky-200', dot: 'bg-sky-500' },
+    { id: 'amber', label: 'AMBER', bg: 'bg-amber-50', text: 'text-amber-800', border: 'border-amber-200', dot: 'bg-amber-500' },
+    { id: 'indigo', label: 'INDIGO', bg: 'bg-indigo-50', text: 'text-indigo-800', border: 'border-indigo-200', dot: 'bg-indigo-500' },
+    { id: 'rose', label: 'ROSE', bg: 'bg-rose-50', text: 'text-rose-800', border: 'border-rose-200', dot: 'bg-rose-500' },
+    { id: 'emerald', label: 'EMERALD', bg: 'bg-emerald-50', text: 'text-emerald-800', border: 'border-emerald-200', dot: 'bg-emerald-500' },
+    { id: 'violet', label: 'VIOLET', bg: 'bg-violet-50', text: 'text-violet-800', border: 'border-violet-200', dot: 'bg-violet-500' },
+    { id: 'slate', label: 'SLATE', bg: 'bg-slate-100', text: 'text-slate-800', border: 'border-slate-300', dot: 'bg-slate-500' },
+    { id: 'teal', label: 'TEAL', bg: 'bg-teal-50', text: 'text-teal-800', border: 'border-teal-200', dot: 'bg-teal-500' }
+];
+
+/**
+ * Match custom timing against known standard presets
+ */
+export function resolveShiftPresetName(startTime, endTime, fallbackName = 'กะพิเศษ (Custom)') {
+    // 1. If Roster already specifies an explicit shift name, always preserve it directly
+    if (fallbackName && fallbackName !== 'Custom Shift' && fallbackName !== 'กะพิเศษ (Custom)') {
+        return fallbackName;
+    }
+    
+    // 2. If no valid start/end, return default fallback
+    if (!startTime || !endTime) return fallbackName || 'กะพิเศษ (Custom)';
+    
+    // 3. Match against standard presets only when the name is unset/custom
+    const startClean = startTime.slice(0, 5);
+    const endClean = endTime.slice(0, 5);
+    const match = SYSTEM_STANDARD_PRESETS.find(p => p.start === startClean && p.end === endClean);
+    if (match) return match.name;
+
+    return fallbackName || 'กะพิเศษ (Custom)';
+}
+
+
+/**
+ * Color Resolver for Shift Badges & Calendar Cells
+ */
+export function getShiftColorHex(shiftName, isOff = false, isCustomOrExtra = false) {
+    if (isOff) return '#dc2626'; // Red
+    const name = (shiftName || '').toLowerCase();
+
+    // Check matched preset
+    const preset = SYSTEM_STANDARD_PRESETS.find(p => name.includes(p.name.toLowerCase()) || name.includes(p.label.toLowerCase()));
+    if (preset) return preset.hex;
+
+    if (isCustomOrExtra) return '#0284c7';
+    if (name.includes('ควบ') || name.includes('double')) return '#e11d48';
+    if (name.includes('ค่ำ') || name.includes('ดึก') || name.includes('night') || name.includes('evening') || name.includes('กลาง')) return '#4f46e5';
+    if (name.includes('เช้า') || name.includes('morning')) return '#d97706';
+    if (name.includes('chef')) return '#15803d';
+    if (name.includes('inthehaus')) return '#ea580c';
+    if (name.includes('ผู้ช่วยครัว')) return '#9c4221';
+    return '#ca8a04';
+}
+
+/**
  * Combine a date and a time string into a full Date object.
  * If endTime is less than startTime, it implies an overnight shift, so add 1 day to endTime.
  */
-function createTimeRange(dateStr, startTimeStr, endTimeStr) {
+export function createTimeRange(dateStr, startTimeStr, endTimeStr) {
     if (!startTimeStr) startTimeStr = '00:00:00';
     if (!endTimeStr) endTimeStr = '23:59:59';
 
@@ -19,10 +89,120 @@ function createTimeRange(dateStr, startTimeStr, endTimeStr) {
 }
 
 /**
- * Get the effective roster for a specific date using the transactional model.
- * @param {Date|string} dateObj - The target date.
- * @param {Object} options - Options (e.g. { includeDrafts: false })
- * @returns {Array} - List of employees scheduled to work, their shifts, and log data.
+ * ==============================================================================
+ * 2. PURE ROSTER AGGREGATOR (For Frontend State / Components)
+ * ==============================================================================
+ */
+export const getEffectiveDailyRoster = (employees = [], schedules = {}, overrides = [], shifts = [], targetDate, options = { includeDrafts: false }) => {
+    const dateObj = typeof targetDate === 'string' ? parseISO(targetDate) : targetDate;
+    const dayOfWeek = dateObj.getDay();
+    const dateStr = format(dateObj, 'yyyy-MM-dd');
+
+    const empTransactionMap = new Map();
+    (overrides || []).forEach(item => {
+        if (item.date === dateStr) {
+            const eid = String(item.employee_id);
+            if (item.status && item.status !== 'PUBLISHED' && !options.includeDrafts) {
+                return;
+            }
+            if (!empTransactionMap.has(eid)) {
+                empTransactionMap.set(eid, []);
+            }
+            empTransactionMap.get(eid).push(item);
+        }
+    });
+
+    const effectiveRoster = [];
+
+    (employees || []).forEach(emp => {
+        const empId = String(emp.id);
+        const txList = empTransactionMap.get(empId);
+
+        // Priority 1: Check Published Roster Transactions
+        if (txList && txList.length > 0) {
+            txList.forEach(tx => {
+                if (tx.is_off) {
+                    effectiveRoster.push({
+                        employee: emp,
+                        shift_id: null,
+                        shift_name: 'OFF',
+                        start_time: null,
+                        end_time: null,
+                        slot_type: tx.slot_type || 'MAIN',
+                        is_off: true,
+                        source: 'TRANSACTION',
+                        original_record: tx
+                    });
+                    return;
+                }
+
+                const shiftDef = shifts.find(s => String(s.id) === String(tx.shift_id));
+                const startTime = tx.custom_start_time || shiftDef?.start_time || '';
+                const endTime = tx.custom_end_time || shiftDef?.end_time || '';
+
+                let shiftName = shiftDef ? shiftDef.name : resolveShiftPresetName(startTime, endTime, 'กะพิเศษ (Custom)');
+                if (tx.slot_type === 'SPLIT' && !shiftName.includes('ควบ')) {
+                    shiftName = `${shiftName} (ควบ)`;
+                } else if (tx.slot_type === 'OVERTIME') {
+                    shiftName = `${shiftName} (OT)`;
+                }
+
+                effectiveRoster.push({
+                    employee: emp,
+                    shift_id: tx.shift_id,
+                    shift_name: shiftName,
+                    start_time: startTime,
+                    end_time: endTime,
+                    slot_type: tx.slot_type || 'MAIN',
+                    is_off: false,
+                    source: 'TRANSACTION',
+                    original_record: tx
+                });
+            });
+            return;
+        }
+
+        // Priority 2: Optional Fallback to Weekly Template
+        if (options.fallbackToTemplate) {
+            const weeklySchedule = schedules[empId]?.[dayOfWeek];
+            if (weeklySchedule && !weeklySchedule.is_off && weeklySchedule.shift_id) {
+                const shiftDef = shifts.find(s => String(s.id) === String(weeklySchedule.shift_id));
+                if (shiftDef) {
+                    effectiveRoster.push({
+                        employee: emp,
+                        shift_id: shiftDef.id,
+                        shift_name: shiftDef.name,
+                        start_time: shiftDef.start_time,
+                        end_time: shiftDef.end_time,
+                        slot_type: 'MAIN',
+                        is_off: false,
+                        source: 'TEMPLATE'
+                    });
+                    return;
+                }
+            }
+        }
+
+        // Default: If no transaction scheduled for today, employee is OFF
+        effectiveRoster.push({
+            employee: emp,
+            shift_id: null,
+            shift_name: 'OFF',
+            start_time: null,
+            end_time: null,
+            slot_type: 'MAIN',
+            is_off: true,
+            source: 'NONE'
+        });
+    });
+
+    return effectiveRoster;
+};
+
+/**
+ * ==============================================================================
+ * 3. ASYNC ROSTER AGGREGATOR (With Live Database Queries & Punch Pairing)
+ * ==============================================================================
  */
 export async function getEffectiveRoster(dateObj, options = { includeDrafts: false }) {
     const targetDate = typeof dateObj === 'string' ? parseISO(dateObj) : dateObj;
@@ -87,20 +267,7 @@ export async function getEffectiveRoster(dateObj, options = { includeDrafts: fal
             if (tx.custom_start_time) shiftData.start_time = tx.custom_start_time;
             if (tx.custom_end_time) shiftData.end_time = tx.custom_end_time;
 
-            // Match against known presets for custom slots
-            if (shiftData.name === "Custom Shift" && shiftData.start_time && shiftData.end_time) {
-                const startClean = shiftData.start_time.slice(0, 5);
-                const endClean = shiftData.end_time.slice(0, 5);
-                if (startClean === '12:30' && endClean === '23:30') {
-                    shiftData.name = 'ผู้ช่วยครัว';
-                } else if (startClean === '18:00' && endClean === '22:30') {
-                    shiftData.name = 'INTHEHAUS';
-                } else if (startClean === '10:00' && endClean === '20:30') {
-                    shiftData.name = 'CHEF';
-                } else if (startClean === '12:00' && endClean === '20:00') {
-                    shiftData.name = 'กลางกะ';
-                }
-            }
+            shiftData.name = resolveShiftPresetName(shiftData.start_time, shiftData.end_time, shiftData.name);
 
             // Generate precise timestamps for overnight handling
             const { start, end } = createTimeRange(dateStr, shiftData.start_time, shiftData.end_time);
@@ -121,8 +288,6 @@ export async function getEffectiveRoster(dateObj, options = { includeDrafts: fal
     if (logs && rosterList.length > 0) {
         logs.forEach(log => {
             const logTime = new Date(log.timestamp);
-            
-            // Find all active working slots for this employee
             const empSlots = rosterList.filter(r => r.id === log.employee_id && !r.is_off);
             
             if (empSlots.length > 0) {
@@ -152,7 +317,6 @@ export async function getEffectiveRoster(dateObj, options = { includeDrafts: fal
                     }
                 }
             } else {
-                // If employee is marked OFF, attach attendance to the OFF slot
                 const offSlot = rosterList.find(r => r.id === log.employee_id && r.is_off);
                 if (offSlot) {
                     offSlot.hasWorkedOnDayOff = true;
@@ -224,3 +388,4 @@ export async function getEffectiveRoster(dateObj, options = { includeDrafts: fal
 
     return finalRoster;
 }
+
