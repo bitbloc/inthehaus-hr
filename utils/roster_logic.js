@@ -104,23 +104,38 @@ export const getEffectiveDailyRoster = (employees = [], schedules = {}, override
             return;
         }
 
-        // Priority 2: Check Weekly Template (Fallback if no published transaction for this date)
-        const weeklySchedule = schedules[empId]?.[dayOfWeek];
-        if (weeklySchedule && !weeklySchedule.is_off && weeklySchedule.shift_id) {
-            const shiftDef = shifts.find(s => String(s.id) === String(weeklySchedule.shift_id));
-            if (shiftDef) {
-                effectiveRoster.push({
-                    employee: emp,
-                    shift_id: shiftDef.id,
-                    shift_name: shiftDef.name,
-                    start_time: shiftDef.start_time,
-                    end_time: shiftDef.end_time,
-                    slot_type: 'MAIN',
-                    is_off: false,
-                    source: 'TEMPLATE'
-                });
+        // Priority 2: Optional Fallback to Weekly Template (only if explicitly enabled via options.fallbackToTemplate)
+        if (options.fallbackToTemplate) {
+            const weeklySchedule = schedules[empId]?.[dayOfWeek];
+            if (weeklySchedule && !weeklySchedule.is_off && weeklySchedule.shift_id) {
+                const shiftDef = shifts.find(s => String(s.id) === String(weeklySchedule.shift_id));
+                if (shiftDef) {
+                    effectiveRoster.push({
+                        employee: emp,
+                        shift_id: shiftDef.id,
+                        shift_name: shiftDef.name,
+                        start_time: shiftDef.start_time,
+                        end_time: shiftDef.end_time,
+                        slot_type: 'MAIN',
+                        is_off: false,
+                        source: 'TEMPLATE'
+                    });
+                    return;
+                }
             }
         }
+
+        // Default: If no transaction scheduled for today, employee is OFF (ไม่ได้ลงตารางไว้)
+        effectiveRoster.push({
+            employee: emp,
+            shift_id: null,
+            shift_name: 'OFF',
+            start_time: null,
+            end_time: null,
+            slot_type: 'MAIN',
+            is_off: true,
+            source: 'NONE'
+        });
     });
 
     return effectiveRoster;
