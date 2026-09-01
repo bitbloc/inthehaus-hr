@@ -226,7 +226,12 @@ export const calculatePayroll = (employees, logs, transactions, shifts, payrollC
                             otMins = 0;
                         }
 
-                        regularMins = Math.max(0, actualMins - otMins);
+                        // Overtime Policy: OT must be at least 1 hour (>= 60 minutes) to be counted
+                        if (otMins < 60) {
+                            otMins = 0;
+                        }
+
+                        regularMins = Math.min(actualMins, scheduledMins);
                         const rHours = regularMins / 60;
                         const oHours = otMins / 60;
                         const scheduledHours = scheduledMins / 60;
@@ -372,7 +377,10 @@ export const calculatePayroll = (employees, logs, transactions, shifts, payrollC
                     if (actualMins > 0) {
                         const maxRegularMins = 8 * 60;
                         const regularMins = Math.min(actualMins, maxRegularMins);
-                        const otMins = actualMins > maxRegularMins ? actualMins - maxRegularMins : 0;
+                        let otMins = actualMins > maxRegularMins ? actualMins - maxRegularMins : 0;
+                        if (otMins < 60) {
+                            otMins = 0;
+                        }
 
                         const rHours = regularMins / 60;
                         const oHours = otMins / 60;
@@ -465,7 +473,10 @@ export const calculatePayroll = (employees, logs, transactions, shifts, payrollC
                     if (actualMins > 0) {
                         const maxRegularMins = 8 * 60;
                         const regularMins = Math.min(actualMins, maxRegularMins);
-                        const otMins = actualMins > maxRegularMins ? actualMins - maxRegularMins : 0;
+                        let otMins = actualMins > maxRegularMins ? actualMins - maxRegularMins : 0;
+                        if (otMins < 60) {
+                            otMins = 0;
+                        }
 
                         const rHours = regularMins / 60;
                         const oHours = otMins / 60;
