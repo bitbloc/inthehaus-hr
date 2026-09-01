@@ -133,6 +133,8 @@ export const calculatePayroll = (employees, logs, transactions, shifts, payrollC
         
         // Parse rates from JSON or use defaults
         const rates = emp.shift_rates || {};
+        const wageType = rates.wage_type || (emp.employment_status === 'Fulltime' && emp.base_salary > 0 ? 'monthly' : (rates.morning || rates.evening ? 'daily' : 'hourly'));
+        const baseSalary = Number(emp.base_salary || rates.base_salary || 0);
         const hourlyRate = rates.hourly_rate || defaultHourlyRate;
         const otRate = rates.ot_rate || defaultOtRate;
 
@@ -526,9 +528,6 @@ export const calculatePayroll = (employees, logs, transactions, shifts, payrollC
         }
 
         // Deductions & Allowances Calculation
-        const wageType = rates.wage_type || (emp.employment_status === 'Fulltime' && emp.base_salary > 0 ? 'monthly' : (rates.morning || rates.evening ? 'daily' : 'hourly'));
-        const baseSalary = Number(emp.base_salary || rates.base_salary || 0);
-
         // If Monthly staff and active, set totalSalary to baseSalary
         if (wageType === 'monthly' && baseSalary > 0) {
             totalSalary = baseSalary;
