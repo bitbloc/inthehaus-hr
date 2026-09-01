@@ -128,7 +128,7 @@ export default function CheckIn() {
         else {
           const p = await liff.getProfile();
           setProfile(p);
-          fetchUserStatus(p.userId);
+          fetchUserStatus(p.userId, p);
           fetchMyShift(p.userId);
         }
       } catch (e) { setStatus("LIFF Error"); }
@@ -330,7 +330,7 @@ export default function CheckIn() {
     } catch (e) { console.error(e); }
   };
 
-  const fetchUserStatus = async (userId) => {
+  const fetchUserStatus = async (userId, userProfile = null) => {
     // Check user existence regardless of active status (support both line_user_id and line_bot_id)
     const { data: emp } = await supabase
       .from('employees')
@@ -342,6 +342,13 @@ export default function CheckIn() {
       setStatus("New User");
       setLastAction("register"); // New state for registration
       return;
+    }
+
+    // Auto-sync / refresh LINE photo_url if user has a newer picture or stale URL
+    const activePictureUrl = userProfile?.pictureUrl || profile?.pictureUrl;
+    if (activePictureUrl && activePictureUrl !== emp.photo_url) {
+      emp.photo_url = activePictureUrl;
+      supabase.from('employees').update({ photo_url: activePictureUrl }).eq('id', emp.id).then();
     }
 
     if (!emp.is_active) {
@@ -782,7 +789,28 @@ export default function CheckIn() {
                   {employeeData?.position || (lastAction === 'pending' ? 'Pending' : 'Guest')}
                 </span>
               </div>
-              <img src={profile.pictureUrl} className="w-10 h-10 rounded-sm object-cover border border-rams-rule-light" />
+              {profile.pictureUrl ? (
+                <div className="relative w-10 h-10 shrink-0">
+                  <img 
+                    src={profile.pictureUrl} 
+                    alt={profile.displayName || ""}
+                    referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                      const fallback = e.currentTarget.parentElement?.querySelector('.avatar-header-fallback');
+                      if (fallback) fallback.classList.remove('hidden');
+                    }}
+                    className="w-10 h-10 rounded-sm object-cover border border-rams-rule-light" 
+                  />
+                  <div className="avatar-header-fallback hidden w-10 h-10 rounded-sm bg-rams-panel flex items-center justify-center text-xs font-mono font-extrabold text-rams-ink border border-rams-rule-light absolute inset-0">
+                    {(profile.displayName || "U").slice(0, 2).toUpperCase()}
+                  </div>
+                </div>
+              ) : (
+                <div className="w-10 h-10 rounded-sm bg-rams-panel flex items-center justify-center text-xs font-mono font-extrabold text-rams-ink border border-rams-rule-light">
+                  {(profile.displayName || "U").slice(0, 2).toUpperCase()}
+                </div>
+              )}
             </div>
           ) : (
             <button onClick={() => liff.login()} className="px-4 py-2 bg-[#06C755] text-white rounded-sm text-xs font-mono font-bold border border-black shadow-sm">LINE Login</button>
@@ -1022,6 +1050,7 @@ export default function CheckIn() {
                                       <img 
                                         src={l.employees.photo_url} 
                                         alt={empName} 
+                                        referrerPolicy="no-referrer"
                                         onError={(e) => {
                                           e.currentTarget.style.display = 'none';
                                           const fallback = e.currentTarget.parentElement?.querySelector('.avatar-fallback');
@@ -1241,6 +1270,7 @@ export default function CheckIn() {
                       <img 
                         src={log.employees?.photo_url || log.photo_url} 
                         alt=""
+                        referrerPolicy="no-referrer"
                         onError={(e) => {
                           e.currentTarget.style.display = 'none';
                           const fallback = e.currentTarget.parentElement?.querySelector('.avatar-fallback');

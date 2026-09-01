@@ -29,7 +29,7 @@ export default function LeaveRequest() {
     setTimeout(() => setToast(null), 5000);
   };
 
-  const fetchEmployeeAndHistory = async (userId) => {
+  const fetchEmployeeAndHistory = async (userId, userProfile = null) => {
     const { data: emp } = await supabase
       .from("employees")
       .select("*")
@@ -37,6 +37,13 @@ export default function LeaveRequest() {
       .maybeSingle();
 
     if (emp) {
+      // Auto-sync / refresh LINE photo_url if user has a newer picture or stale URL
+      const activePictureUrl = userProfile?.pictureUrl || profile?.pictureUrl;
+      if (activePictureUrl && activePictureUrl !== emp.photo_url) {
+        emp.photo_url = activePictureUrl;
+        supabase.from("employees").update({ photo_url: activePictureUrl }).eq("id", emp.id).then();
+      }
+
       setEmployee(emp);
       const { data } = await supabase
         .from("leave_requests")
@@ -66,7 +73,7 @@ export default function LeaveRequest() {
         } else {
           const p = await liff.getProfile();
           setProfile(p);
-          fetchEmployeeAndHistory(p.userId);
+          fetchEmployeeAndHistory(p.userId, p);
         }
       } catch (e) {
         console.error(e);
@@ -269,12 +276,27 @@ export default function LeaveRequest() {
             </p>
           </div>
 
-          {profile?.pictureUrl && (
-            <img
-              src={profile.pictureUrl}
-              alt="profile"
-              className="w-10 h-10 rounded-sm border border-rams-rule object-cover"
-            />
+          {profile?.pictureUrl ? (
+            <div className="relative w-10 h-10 shrink-0">
+              <img
+                src={profile.pictureUrl}
+                alt="profile"
+                referrerPolicy="no-referrer"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                  const fallback = e.currentTarget.parentElement?.querySelector('.avatar-header-fallback');
+                  if (fallback) fallback.classList.remove('hidden');
+                }}
+                className="w-10 h-10 rounded-sm border border-rams-rule object-cover"
+              />
+              <div className="avatar-header-fallback hidden w-10 h-10 rounded-sm bg-rams-ink text-rams-panel flex items-center justify-center text-xs font-mono font-extrabold border border-rams-rule absolute inset-0">
+                {(employee?.nickname || employee?.name || profile?.displayName || "U").slice(0, 2).toUpperCase()}
+              </div>
+            </div>
+          ) : (
+            <div className="w-10 h-10 rounded-sm bg-rams-ink text-rams-panel flex items-center justify-center text-xs font-mono font-extrabold border border-rams-rule shrink-0">
+              {(employee?.nickname || employee?.name || profile?.displayName || "U").slice(0, 2).toUpperCase()}
+            </div>
           )}
         </div>
       </header>
