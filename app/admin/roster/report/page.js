@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import React, { useState, useEffect, useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "../../../../lib/supabaseClient";
 import { format, startOfWeek, addDays, parseISO } from "date-fns";
@@ -50,19 +50,22 @@ function RosterPDFReportContent() {
         }
     }, []);
 
-    const allPresets = React.useMemo(() => {
-        const combined = [...SYSTEM_STANDARD_PRESETS];
+    const allPresets = useMemo(() => {
+        const presetsMap = new Map();
+        SYSTEM_STANDARD_PRESETS.forEach((p, idx) => {
+            presetsMap.set(p.name, { ...p, id: `sys_${idx}` });
+        });
+
         (customPresets || []).forEach(cp => {
-            const sClean = (cp.start || '').slice(0, 5);
-            const eClean = (cp.end || '').slice(0, 5);
-            const existingIdx = combined.findIndex(p => p.start === sClean && p.end === eClean);
-            if (existingIdx >= 0) {
-                combined[existingIdx] = { ...combined[existingIdx], ...cp };
+            const key = cp.name || cp.id;
+            if (presetsMap.has(key)) {
+                presetsMap.set(key, { ...presetsMap.get(key), ...cp });
             } else {
-                combined.push(cp);
+                presetsMap.set(key, { ...cp });
             }
         });
-        return combined;
+
+        return Array.from(presetsMap.values());
     }, [customPresets]);
 
     const weekStart = startOfWeek(parseISO(startParam), { weekStartsOn: 1 });
@@ -114,7 +117,7 @@ function RosterPDFReportContent() {
         return transactions.filter(t => t.employee_id === empId && t.date === dateStr);
     };
 
-    const dailyOnDutyStats = React.useMemo(() => {
+    const dailyOnDutyStats = useMemo(() => {
         return dates.map(day => {
             const dateStr = format(day, 'yyyy-MM-dd');
             const workingTxs = (transactions || []).filter(t => t.date === dateStr && !t.is_off && t.status !== 'CANCELLED');

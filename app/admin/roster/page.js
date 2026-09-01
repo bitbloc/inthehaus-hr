@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Badge } from '../_components/ui/Badge';
 import { supabase } from '../../../lib/supabaseClient';
 import { useRealtimeSync } from '../../../lib/useRealtimeSync';
@@ -44,14 +44,14 @@ export default function AdminRosterPage() {
     };
 
     const SYSTEM_STANDARD_PRESETS = [
-        { start: '18:00', end: '22:30', name: 'INTHEHAUS', color: 'indigo', icon: '' },
-        { start: '10:00', end: '00:30', name: 'ควบกะ 🔥', color: 'rose', icon: '🔥' },
-        { start: '16:30', end: '00:30', name: 'กะค่ำ 🌙', color: 'sky', icon: '🌙' },
-        { start: '10:00', end: '18:00', name: 'กะเช้า ☀️', color: 'amber', icon: '☀️' },
-        { start: '10:00', end: '20:30', name: 'CHEF', color: 'emerald', icon: '' },
-        { start: '12:30', end: '23:30', name: 'ผู้ช่วยครัว', color: 'violet', icon: '' },
-        { start: '12:00', end: '20:00', name: 'กลางกะ', color: 'sky', icon: '' },
-        { start: '12:30', end: '21:30', name: 'PART-TIME', color: 'rose', icon: '' },
+        { id: 'sys_inthehaus', start: '18:00', end: '22:30', name: 'INTHEHAUS', color: 'indigo', icon: '⚡' },
+        { id: 'sys_double', start: '10:00', end: '00:30', name: 'ควบกะ 🔥', color: 'rose', icon: '🔥' },
+        { id: 'sys_night', start: '16:30', end: '00:30', name: 'กะค่ำ 🌙', color: 'sky', icon: '🌙' },
+        { id: 'sys_morning', start: '10:00', end: '18:00', name: 'กะเช้า ☀️', color: 'amber', icon: '☀️' },
+        { id: 'sys_chef', start: '10:00', end: '20:30', name: 'CHEF', color: 'emerald', icon: '🍳' },
+        { id: 'sys_assistant', start: '12:30', end: '23:30', name: 'ผู้ช่วยครัว', color: 'violet', icon: '🍴' },
+        { id: 'sys_mid', start: '12:00', end: '20:00', name: 'กลางกะ', color: 'sky', icon: '⏰' },
+        { id: 'sys_parttime', start: '12:30', end: '21:30', name: 'PART-TIME', color: 'rose', icon: '⏰' },
     ];
 
     const PRESET_COLORS = [
@@ -64,7 +64,7 @@ export default function AdminRosterPage() {
         { id: 'slate', label: 'SLATE', bg: 'bg-slate-100', text: 'text-slate-800', border: 'border-slate-300', dot: 'bg-slate-500' },
         { id: 'teal', label: 'TEAL', bg: 'bg-teal-50', text: 'text-teal-800', border: 'border-teal-200', dot: 'bg-teal-500' },
     ];
-    const PRESET_ICONS = [];
+    const PRESET_ICONS = ['⏰', '🔥', '🌙', '☀️', '🍳', '🍸', '👑', '💼', '⚡', '☕', '🍴', '✨', '🎯', '📦'];
 
     const getPresetColor = (colorId) => PRESET_COLORS.find(c => c.id === colorId) || PRESET_COLORS[0];
 
@@ -79,46 +79,115 @@ export default function AdminRosterPage() {
         }
     }, []);
 
-    const allPresets = React.useMemo(() => {
-        const combined = [...SYSTEM_STANDARD_PRESETS];
+    const allPresets = useMemo(() => {
+        const presetsMap = new Map();
+        SYSTEM_STANDARD_PRESETS.forEach(p => {
+            presetsMap.set(p.id, { ...p, isSystem: true });
+        });
+
         (customPresets || []).forEach(cp => {
-            const sClean = (cp.start || '').slice(0, 5);
-            const eClean = (cp.end || '').slice(0, 5);
-            const existingIdx = combined.findIndex(p => p.start === sClean && p.end === eClean);
-            if (existingIdx >= 0) {
-                combined[existingIdx] = { ...combined[existingIdx], ...cp };
+            const key = cp.id || cp.name;
+            if (presetsMap.has(key)) {
+                presetsMap.set(key, { ...presetsMap.get(key), ...cp, isEdited: true });
             } else {
-                combined.push(cp);
+                const sysMatch = SYSTEM_STANDARD_PRESETS.find(sp => sp.name === cp.originalName || sp.name === cp.name);
+                if (sysMatch) {
+                    presetsMap.set(sysMatch.id, { ...sysMatch, ...cp, id: sysMatch.id, isEdited: true });
+                } else {
+                    presetsMap.set(key, { ...cp, isCustom: true });
+                }
             }
         });
-        return combined;
+
+        return Array.from(presetsMap.values());
     }, [customPresets]);
 
-    const openPresetModal = (start, end) => {
-        setPresetModal({ start, end, name: '', color: 'sky', icon: '' });
+    const openPresetModal = (start = '', end = '') => {
+        setPresetModal({
+            isEditing: false,
+            id: `custom_${Date.now()}`,
+            start: (start || '').slice(0, 5) || '10:00',
+            end: (end || '').slice(0, 5) || '18:00',
+            name: '',
+            color: 'sky',
+            icon: '⏰'
+        });
+    };
+
+    const openEditPresetModal = (preset) => {
+        setPresetModal({
+            isEditing: true,
+            id: preset.id || preset.name,
+            originalName: preset.name,
+            start: (preset.start || '').slice(0, 5),
+            end: (preset.end || '').slice(0, 5),
+            name: preset.name || '',
+            color: preset.color || 'sky',
+            icon: preset.icon || '⏰',
+            isSystem: preset.isSystem,
+            isEdited: preset.isEdited,
+            isCustom: preset.isCustom
+        });
     };
 
     const confirmSavePreset = () => {
         if (!presetModal) return;
-        const { start, end, name, color, icon } = presetModal;
+        const { id, isEditing, originalName, start, end, name, color, icon } = presetModal;
         if (!start || !end) return showToast('กรุณากรอกทั้งเวลาเริ่มและเวลาเลิก', 'error');
+
         const normStart = start.slice(0, 5);
         const normEnd = end.slice(0, 5);
-        if (customPresets.some(p => (p.start || '').slice(0, 5) === normStart && (p.end || '').slice(0, 5) === normEnd)) {
-            setPresetModal(null);
-            return;
+        const presetName = (name || '').trim() || `${normStart}-${normEnd}`;
+
+        let newCustom = [...(customPresets || [])];
+
+        const updatedItem = {
+            id: id || presetName,
+            originalName: originalName || presetName,
+            name: presetName,
+            start: normStart,
+            end: normEnd,
+            color: color || 'sky',
+            icon: icon || '⏰'
+        };
+
+        const existingIdx = newCustom.findIndex(p => p.id === id || p.name === originalName || p.name === presetName);
+        if (existingIdx >= 0) {
+            newCustom[existingIdx] = updatedItem;
+        } else {
+            newCustom.push(updatedItem);
         }
-        const newPresets = [...customPresets, { start: normStart, end: normEnd, name: name || `${normStart}-${normEnd}`, color: color || 'sky', icon: '' }];
-        setCustomPresets(newPresets);
-        localStorage.setItem('roster_custom_presets', JSON.stringify(newPresets));
-        showToast('บันทึก Preset กะงานเรียบร้อยแล้ว', 'success');
+
+        setCustomPresets(newCustom);
+        try {
+            localStorage.setItem('roster_custom_presets', JSON.stringify(newCustom));
+        } catch (e) {
+            console.error(e);
+        }
+
+        showToast(`บันทึก Preset "${presetName}" (${normStart}-${normEnd}) เรียบร้อยแล้ว`, 'success');
         setPresetModal(null);
     };
 
-    const deleteCustomPreset = (idx) => {
-        const newPresets = customPresets.filter((_, i) => i !== idx);
-        setCustomPresets(newPresets);
-        localStorage.setItem('roster_custom_presets', JSON.stringify(newPresets));
+    const deleteOrResetPreset = (modalData) => {
+        if (!modalData) return;
+        const { id, originalName, name, isSystem } = modalData;
+        const confirmMsg = isSystem 
+            ? `ต้องการคืนค่าเริ่มต้นของ Preset "${name}" หรือไม่?`
+            : `ต้องการลบ Preset "${name}" หรือไม่?`;
+            
+        if (!confirm(confirmMsg)) return;
+
+        const newCustom = (customPresets || []).filter(p => p.id !== id && p.name !== originalName && p.name !== name);
+        setCustomPresets(newCustom);
+        try {
+            localStorage.setItem('roster_custom_presets', JSON.stringify(newCustom));
+        } catch (e) {
+            console.error(e);
+        }
+
+        showToast(isSystem ? `คืนค่าเริ่มต้น Preset "${name}" แล้ว` : `ลบ Preset "${name}" เรียบร้อยแล้ว`, 'success');
+        setPresetModal(null);
     };
 
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 }); // Monday
@@ -337,7 +406,7 @@ export default function AdminRosterPage() {
     const vacationCount = employees.filter(hasVacation).length;
     const activeCount = employees.filter(e => !isSuspended(e) && !hasVacation(e)).length;
 
-    const weeklyAuditStats = React.useMemo(() => {
+    const weeklyAuditStats = useMemo(() => {
         let missedCount = 0;
         let offDayCount = 0;
         let absentCount = 0;
@@ -366,7 +435,7 @@ export default function AdminRosterPage() {
         return { missedCount, offDayCount, absentCount, empWithExceptions };
     }, [employees, transactions, attendanceLogs, currentDate]);
 
-    const dailyOnDutyStats = React.useMemo(() => {
+    const dailyOnDutyStats = useMemo(() => {
         return dates.map(day => {
             const dateStr = format(day, 'yyyy-MM-dd');
             const workingTxs = (transactions || []).filter(t => t.date === dateStr && !t.is_off && t.status !== 'CANCELLED');
@@ -1917,48 +1986,65 @@ export default function AdminRosterPage() {
                                                 {/* Presets Grid */}
                                                 {allPresets.length > 0 && (
                                                     <div>
-                                                        <label className="block text-[9px] font-mono font-bold text-rams-ink uppercase tracking-widest mb-1.5">
-                                                            ⚡ Preset กะมาตรฐาน & กะร้าน (คลิกเพื่อเลือกทันที):
-                                                        </label>
+                                                        <div className="flex justify-between items-center mb-1.5">
+                                                            <label className="block text-[9px] font-mono font-bold text-rams-ink uppercase tracking-widest">
+                                                                ⚡ Preset กะมาตรฐาน & กะร้าน (คลิกเพื่อเลือกทันที):
+                                                            </label>
+                                                            <span className="text-[9px] font-mono text-rams-ink-muted">
+                                                                กด ⚙️ เพื่อแก้ไขเวลา
+                                                            </span>
+                                                        </div>
                                                         <div className="flex flex-wrap gap-1.5">
                                                             {allPresets.map((preset, pIdx) => {
                                                                 const pc = getPresetColor(preset.color);
-                                                                const isCustom = customPresets.some(cp => (cp.start || '').slice(0,5) === (preset.start || '').slice(0,5) && (cp.end || '').slice(0,5) === (preset.end || '').slice(0,5));
                                                                 const isSelected = !slot.is_off && !slot.shift_id && startClean === (preset.start || '').slice(0,5) && endClean === (preset.end || '').slice(0,5);
 
                                                                 return (
                                                                     <div 
-                                                                        key={pIdx}
-                                                                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-sm text-[10px] font-mono font-bold cursor-pointer border transition-all uppercase tracking-wider select-none ${pc.bg} ${pc.text} ${
+                                                                        key={preset.id || pIdx}
+                                                                        className={`group flex items-center gap-1.5 pl-2.5 pr-1.5 py-1.5 rounded-sm text-[10px] font-mono font-bold border transition-all uppercase tracking-wider select-none ${pc.bg} ${pc.text} ${
                                                                             isSelected 
                                                                                 ? `ring-2 ring-rams-ink ${pc.border} shadow-sm font-black scale-[1.02]` 
-                                                                                : `${pc.border} hover:border-rams-ink/40 opacity-85 hover:opacity-100`
+                                                                                : `${pc.border} hover:border-rams-ink/40 opacity-90 hover:opacity-100`
                                                                         }`}
-                                                                        onClick={() => applyPreset(index, preset)}
                                                                     >
-                                                                        <span>{preset.icon || (preset.name.includes('ควบ') ? '🔥' : preset.name.includes('ค่ำ') ? '🌙' : preset.name.includes('เช้า') ? '☀️' : '⏰')}</span>
-                                                                        <span>{preset.name || `${preset.start}-${preset.end}`}</span>
-                                                                        <span className="opacity-75 text-[9px] font-normal">({preset.start}-{preset.end})</span>
-                                                                        {isSelected && (
-                                                                            <span className="text-rams-ink ml-0.5">✓</span>
-                                                                        )}
-                                                                        {isCustom && (
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={(e) => {
-                                                                                    e.stopPropagation();
-                                                                                    const customIdx = customPresets.findIndex(cp => (cp.start || '').slice(0,5) === (preset.start || '').slice(0,5) && (cp.end || '').slice(0,5) === (preset.end || '').slice(0,5));
-                                                                                    if (customIdx >= 0) deleteCustomPreset(customIdx);
-                                                                                }}
-                                                                                className="opacity-50 hover:opacity-100 hover:text-rams-red ml-1 font-bold text-xs leading-none cursor-pointer"
-                                                                                title="ลบ Preset นี้"
-                                                                            >
-                                                                                ×
-                                                                            </button>
-                                                                        )}
+                                                                        <div 
+                                                                            className="flex items-center gap-1.5 cursor-pointer"
+                                                                            onClick={() => applyPreset(index, preset)}
+                                                                        >
+                                                                            <span>{preset.icon || (preset.name.includes('ควบ') ? '🔥' : preset.name.includes('ค่ำ') ? '🌙' : preset.name.includes('เช้า') ? '☀️' : '⏰')}</span>
+                                                                            <span>{preset.name || `${preset.start}-${preset.end}`}</span>
+                                                                            <span className="opacity-75 text-[9px] font-normal">({preset.start}-{preset.end})</span>
+                                                                            {isSelected && (
+                                                                                <span className="text-rams-ink ml-0.5 font-black">✓</span>
+                                                                            )}
+                                                                        </div>
+                                                                        
+                                                                        {/* Inline Edit Timing / Name Button */}
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                openEditPresetModal(preset);
+                                                                            }}
+                                                                            className="opacity-40 group-hover:opacity-100 hover:text-rams-orange p-1 ml-0.5 rounded-sm hover:bg-rams-ink/5 transition-all cursor-pointer"
+                                                                            title={`แก้ไขเวลา/ชื่อของ Preset ${preset.name}`}
+                                                                        >
+                                                                            <Settings size={12} />
+                                                                        </button>
                                                                     </div>
                                                                 );
                                                             })}
+
+                                                            {/* Quick Add Preset Button */}
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => openPresetModal(slot.custom_start_time || '10:00', slot.custom_end_time || '18:00')}
+                                                                className="flex items-center gap-1 px-2.5 py-1.5 rounded-sm text-[10px] font-mono font-bold border border-dashed border-rams-rule-light hover:border-rams-orange text-rams-ink-muted hover:text-rams-orange bg-rams-bg/50 transition-all uppercase cursor-pointer"
+                                                                title="สร้าง Preset ใหม่"
+                                                            >
+                                                                <Plus size={12} /> เพิ่ม Preset
+                                                            </button>
                                                         </div>
                                                     </div>
                                                 )}
@@ -2043,36 +2129,84 @@ export default function AdminRosterPage() {
                 </div>
             )}
 
-            {/* Preset Creation Modal */}
+            {/* Preset Creation & Edit Modal */}
             {presetModal && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center bg-rams-ink/40 backdrop-blur-[2px] p-4">
-                    <div className="bg-rams-panel border border-rams-rule rounded-sm w-full max-w-sm overflow-hidden shadow-none">
-                        <div className="px-6 py-4 border-b border-rams-rule-light bg-rams-bg/30">
-                            <h3 className="font-mono font-bold text-sm uppercase tracking-wider text-rams-ink">✨ สร้าง Preset ใหม่</h3>
-                            <p className="text-[10px] font-mono text-rams-ink-muted uppercase tracking-widest block mt-0.5">เวลา: {presetModal.start} - {presetModal.end}</p>
+                    <div className="bg-rams-panel border border-rams-rule rounded-sm w-full max-w-sm overflow-hidden shadow-none animate-in fade-in zoom-in-95 duration-150 flex flex-col">
+                        <div className="px-6 py-4 border-b border-rams-rule-light bg-rams-bg/30 flex justify-between items-center">
+                            <div>
+                                <h3 className="font-mono font-bold text-sm uppercase tracking-wider text-rams-ink">
+                                    {presetModal.isEditing ? `✏️ แก้ไข Preset` : '✨ สร้าง Preset ใหม่'}
+                                </h3>
+                                <p className="text-[10px] font-mono text-rams-ink-muted uppercase tracking-widest block mt-0.5">
+                                    {presetModal.isEditing ? (presetModal.originalName || presetModal.name) : 'กำหนดเวลาและชื่อกะงาน'}
+                                </p>
+                            </div>
+                            {presetModal.isEditing && (
+                                <button
+                                    type="button"
+                                    onClick={() => deleteOrResetPreset(presetModal)}
+                                    className="text-[10px] font-mono font-bold text-rams-red hover:underline p-1 cursor-pointer transition-all"
+                                    title={presetModal.isSystem ? 'คืนค่าเริ่มต้น' : 'ลบ Preset'}
+                                >
+                                    {presetModal.isSystem ? '🔄 คืนค่าเดิม' : '🗑️ ลบ Preset'}
+                                </button>
+                            )}
                         </div>
-                        <div className="px-6 py-5 space-y-5">
+                        
+                        <div className="px-6 py-5 space-y-4">
+                            {/* Timing (Start and End) */}
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-[9px] font-mono font-bold text-rams-ink uppercase tracking-widest mb-1.5">
+                                        เวลาเริ่ม (Start)
+                                    </label>
+                                    <input
+                                        type="time"
+                                        value={presetModal.start || ''}
+                                        onChange={e => setPresetModal(p => ({ ...p, start: e.target.value }))}
+                                        className="w-full border border-rams-rule rounded-sm px-3 py-2 text-xs font-mono font-bold text-rams-ink bg-rams-bg outline-none focus:border-rams-orange"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[9px] font-mono font-bold text-rams-ink uppercase tracking-widest mb-1.5">
+                                        เวลาเลิก (End)
+                                    </label>
+                                    <input
+                                        type="time"
+                                        value={presetModal.end || ''}
+                                        onChange={e => setPresetModal(p => ({ ...p, end: e.target.value }))}
+                                        className="w-full border border-rams-rule rounded-sm px-3 py-2 text-xs font-mono font-bold text-rams-ink bg-rams-bg outline-none focus:border-rams-orange"
+                                    />
+                                </div>
+                            </div>
+
                             {/* Name */}
                             <div>
-                                <label className="block text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1.5">ชื่อ Preset</label>
+                                <label className="block text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1.5">
+                                    ชื่อ Preset
+                                </label>
                                 <input
                                     type="text"
-                                    value={presetModal.name}
+                                    value={presetModal.name || ''}
                                     onChange={e => setPresetModal(p => ({ ...p, name: e.target.value }))}
-                                    placeholder={`เช่น กะพิเศษ, เปิดร้าน...`}
+                                    placeholder={`เช่น INTHEHAUS, ควบกะ, กะค่ำ...`}
                                     className="w-full border border-rams-rule-light rounded-sm px-3 py-2 text-xs font-sans text-rams-ink bg-rams-bg outline-none focus:border-rams-rule"
                                 />
                             </div>
+
                             {/* Icon */}
                             <div>
-                                <label className="block text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1.5">เลือก Icon</label>
-                                <div className="flex flex-wrap gap-2">
+                                <label className="block text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1.5">
+                                    เลือก Icon
+                                </label>
+                                <div className="flex flex-wrap gap-1.5">
                                     {PRESET_ICONS.map(icon => (
                                         <button
                                             key={icon}
                                             type="button"
                                             onClick={() => setPresetModal(p => ({ ...p, icon }))}
-                                            className={`w-9 h-9 rounded-sm text-sm flex items-center justify-center border transition-all cursor-pointer ${
+                                            className={`w-8 h-8 rounded-sm text-xs flex items-center justify-center border transition-all cursor-pointer ${
                                                 presetModal.icon === icon
                                                     ? 'border-rams-rule bg-rams-ink text-rams-panel'
                                                     : 'border-rams-rule-light bg-rams-bg hover:border-rams-rule text-rams-ink'
@@ -2083,50 +2217,59 @@ export default function AdminRosterPage() {
                                     ))}
                                 </div>
                             </div>
+
                             {/* Color */}
                             <div>
-                                <label className="block text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1.5">เลือกสี</label>
-                                <div className="flex flex-wrap gap-2">
+                                <label className="block text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1.5">
+                                    เลือกสี
+                                </label>
+                                <div className="flex flex-wrap gap-1.5">
                                     {PRESET_COLORS.map(c => (
                                         <button
                                             key={c.id}
                                             type="button"
                                             onClick={() => setPresetModal(p => ({ ...p, color: c.id }))}
-                                            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-[10px] font-mono font-bold border transition-all cursor-pointer ${c.bg} ${c.text} ${
+                                            className={`flex items-center gap-1.5 px-2 py-1 rounded-sm text-[10px] font-mono font-bold border transition-all cursor-pointer ${c.bg} ${c.text} ${
                                                 presetModal.color === c.id
                                                     ? `${c.border} border-rams-rule ring-1 ring-rams-rule`
                                                     : 'border-rams-rule-light hover:border-rams-rule'
                                             }`}
                                         >
-                                            <span className={`w-2.5 h-2.5 rounded-sm ${c.dot}`}></span>
+                                            <span className={`w-2 h-2 rounded-sm ${c.dot}`}></span>
                                             {c.label}
                                         </button>
                                     ))}
                                 </div>
                             </div>
+
                             {/* Preview */}
                             <div>
-                                <label className="block text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1.5">ตัวอย่าง</label>
+                                <label className="block text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1.5">
+                                    ตัวอย่างแสดงผล
+                                </label>
                                 {(() => {
                                     const pc = getPresetColor(presetModal.color);
                                     return (
                                         <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 ${pc.bg} ${pc.text} rounded-sm text-xs font-mono font-bold border ${pc.border} uppercase tracking-wider`}>
                                             <span>{presetModal.icon || '⏰'}</span>
-                                            <span>{presetModal.name || `${presetModal.start}-${presetModal.end}`}</span>
-                                            <span className="opacity-50 text-[10px] font-semibold">({presetModal.start}-{presetModal.end})</span>
+                                            <span>{presetModal.name || `${presetModal.start || ''}-${presetModal.end || ''}`}</span>
+                                            <span className="opacity-70 text-[10px] font-normal">({presetModal.start || ''}-{presetModal.end || ''})</span>
                                         </div>
                                     );
                                 })()}
                             </div>
                         </div>
+
                         <div className="px-6 py-4 border-t border-rams-rule-light flex justify-end gap-3 bg-rams-bg/30">
                             <button
+                                type="button"
                                 onClick={() => setPresetModal(null)}
                                 className="px-4 py-2 text-rams-ink hover:bg-rams-ink-muted/10 border border-rams-rule-light rounded-sm font-mono font-bold text-xs uppercase tracking-wider transition-all cursor-pointer"
                             >
                                 ยกเลิก
                             </button>
                             <button
+                                type="button"
                                 onClick={confirmSavePreset}
                                 className="px-5 py-2 bg-rams-orange text-rams-panel font-mono font-bold text-xs uppercase tracking-wider rounded-sm border border-rams-rule shadow-[0_2px_0_0_var(--color-rams-rule)] hover:bg-rams-orange-active active:translate-y-[1px] active:shadow-none transition-all cursor-pointer"
                             >
