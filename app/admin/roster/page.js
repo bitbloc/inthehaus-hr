@@ -570,80 +570,153 @@ export default function AdminRosterPage() {
         setEditingCell({
             employee: emp,
             date: date,
-            slots: existingSlots.length > 0 ? existingSlots : [{
+            slots: existingSlots.length > 0 ? existingSlots.map(s => {
+                const shiftObj = shifts.find(sh => sh.id === s.shift_id);
+                return {
+                    ...s,
+                    custom_start_time: (s.custom_start_time || shiftObj?.start_time || '').slice(0, 5),
+                    custom_end_time: (s.custom_end_time || shiftObj?.end_time || '').slice(0, 5),
+                };
+            }) : [{
                 slot_type: 'MAIN',
                 is_off: false,
                 shift_id: '',
                 custom_start_time: '',
                 custom_end_time: '',
-                status: 'DRAFT',
+                status: 'PUBLISHED',
                 isNew: true
             }]
+        });
+    };
+
+    const updateSlot = (index, updates) => {
+        setEditingCell(prev => {
+            if (!prev) return prev;
+            const newSlots = prev.slots.map((slot, i) => {
+                if (i !== index) return slot;
+                return { ...slot, ...updates };
+            });
+            return { ...prev, slots: newSlots };
         });
     };
 
     const handleSlotChange = (index, field, value) => {
-        const newSlots = [...editingCell.slots];
-        newSlots[index][field] = value;
-        setEditingCell({ ...editingCell, slots: newSlots });
+        setEditingCell(prev => {
+            if (!prev) return prev;
+            const newSlots = prev.slots.map((slot, i) => {
+                if (i !== index) return slot;
+                const updated = { ...slot, [field]: value };
+                if (field === 'shift_id') {
+                    if (value) {
+                        const found = shifts.find(sh => String(sh.id) === String(value));
+                        if (found) {
+                            updated.custom_start_time = (found.start_time || '').slice(0, 5);
+                            updated.custom_end_time = (found.end_time || '').slice(0, 5);
+                            updated.is_off = false;
+                        }
+                    }
+                }
+                if (field === 'is_off' && value) {
+                    updated.shift_id = '';
+                }
+                return updated;
+            });
+            return { ...prev, slots: newSlots };
+        });
+    };
+
+    const applyPreset = (index, preset) => {
+        setEditingCell(prev => {
+            if (!prev) return prev;
+            const newSlots = prev.slots.map((slot, i) => {
+                if (i !== index) return slot;
+                return {
+                    ...slot,
+                    is_off: false,
+                    shift_id: '',
+                    custom_start_time: (preset.start || '').slice(0, 5),
+                    custom_end_time: (preset.end || '').slice(0, 5)
+                };
+            });
+            return { ...prev, slots: newSlots };
+        });
     };
 
     const addSlot = () => {
-        setEditingCell({
-            ...editingCell,
-            slots: [...editingCell.slots, {
-                slot_type: 'SPLIT',
-                is_off: false,
-                shift_id: '',
-                custom_start_time: '',
-                custom_end_time: '',
-                status: 'DRAFT',
-                isNew: true
-            }]
+        setEditingCell(prev => {
+            if (!prev) return prev;
+            return {
+                ...prev,
+                slots: [
+                    ...prev.slots,
+                    {
+                        slot_type: 'SPLIT',
+                        is_off: false,
+                        shift_id: '',
+                        custom_start_time: '',
+                        custom_end_time: '',
+                        status: 'PUBLISHED',
+                        isNew: true
+                    }
+                ]
+            };
         });
     };
 
     const removeSlot = (index) => {
-        const newSlots = [...editingCell.slots];
-        newSlots.splice(index, 1);
-        setEditingCell({ ...editingCell, slots: newSlots });
+        setEditingCell(prev => {
+            if (!prev) return prev;
+            const newSlots = prev.slots.filter((_, i) => i !== index);
+            return { ...prev, slots: newSlots };
+        });
     };
 
     const saveCell = async () => {
+        if (!editingCell) return;
         setSaving(true);
         const dateStr = format(editingCell.date, 'yyyy-MM-dd');
         const empId = editingCell.employee.id;
 
-        const payload = editingCell.slots.map(s => ({
-            employee_id: empId,
-            date: dateStr,
-            slot_type: s.slot_type,
-            shift_id: s.shift_id ? parseInt(s.shift_id) : null,
-            custom_start_time: s.custom_start_time || null,
-            custom_end_time: s.custom_end_time || null,
-            is_off: s.is_off,
-            status: s.status || 'DRAFT'
-        }));
+        const payload = editingCell.slots.map(s => {
+            const isOff = !!s.is_off;
+            const startClean = isOff ? null : (s.custom_start_time ? s.custom_start_time.slice(0, 5) : null);
+            const endClean = isOff ? null : (s.custom_end_time ? s.custom_end_time.slice(0, 5) : null);
+            const shiftId = isOff ? null : (s.shift_id ? parseInt(s.shift_id) : null);
+
+            return {
+                employee_id: empId,
+                date: dateStr,
+                slot_type: s.slot_type || 'MAIN',
+                shift_id: shiftId,
+                custom_start_time: startClean,
+                custom_end_time: endClean,
+                is_off: isOff,
+                status: s.status || 'PUBLISHED'
+            };
+        });
 
         try {
-            // Because we might have deleted some slots, let's just delete all for this cell first then insert
-            await supabase.from('roster_transactions')
-                .delete()
-                .match({ employee_id: empId, date: dateStr });
-            
-            if (payload.length > 0) {
-                const res = await fetch('/api/roster/bulk', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'UPSERT', transactions: payload })
-                });
-                if (!res.ok) throw new Error('Save failed');
+            const res = await fetch('/api/roster/bulk', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    action: 'SAVE_CELL', 
+                    employee_id: empId,
+                    date: dateStr,
+                    transactions: payload 
+                })
+            });
+
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.message || 'Save failed');
             }
             
             await fetchData();
             setEditingCell(null);
             showToast('บันทึกกะงานเรียบร้อยแล้ว', 'success');
         } catch (e) {
+            console.error("saveCell error:", e);
             showToast(e.message || 'บันทึกไม่สำเร็จ', 'error');
         } finally {
             setSaving(false);
@@ -1787,127 +1860,164 @@ export default function AdminRosterPage() {
                                     </div>
                                 );
                             })()}
-                            {editingCell.slots.map((slot, index) => (
-                                <div key={index} className="bg-rams-panel p-4 rounded-sm border border-rams-rule-light shadow-none space-y-3 relative">
-                                    <div className="flex justify-between items-center mb-2">
-                                        <select 
-                                            value={slot.slot_type}
-                                            onChange={e => handleSlotChange(index, 'slot_type', e.target.value)}
-                                            className="text-[10px] font-mono font-bold uppercase bg-rams-bg text-rams-ink px-2 py-1 rounded-sm border border-rams-rule-light outline-none cursor-pointer"
-                                        >
-                                            <option value="MAIN">Main Shift</option>
-                                            <option value="SPLIT">Split Shift</option>
-                                            <option value="OVERTIME">Overtime</option>
-                                        </select>
-                                        <button onClick={() => removeSlot(index)} className="text-rams-red hover:text-rams-red/80 transition-colors cursor-pointer">
-                                            <Trash2 size={16} />
-                                        </button>
-                                    </div>
-                                    
-                                    <label className="flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-rams-red bg-rams-red/5 p-2 rounded-sm border border-rams-red/20 cursor-pointer select-none">
-                                        <input 
-                                            type="checkbox" 
-                                            checked={slot.is_off}
-                                            onChange={e => handleSlotChange(index, 'is_off', e.target.checked)}
-                                            className="w-3.5 h-3.5 rounded-sm border-rams-red/30 bg-rams-bg accent-rams-red focus:ring-0 cursor-pointer"
-                                        />
-                                        วันหยุด (OFF)
-                                    </label>
- 
-                                    {!slot.is_off && (
-                                        <>
-                                            <div>
-                                                <label className="block text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1">เลือกกะสำเร็จรูป</label>
+                            {editingCell.slots.map((slot, index) => {
+                                const startClean = (slot.custom_start_time || '').slice(0, 5);
+                                const endClean = (slot.custom_end_time || '').slice(0, 5);
+
+                                return (
+                                    <div key={index} className="bg-rams-panel p-4 rounded-sm border border-rams-rule-light shadow-none space-y-3.5 relative">
+                                        <div className="flex justify-between items-center mb-1">
+                                            <div className="flex items-center gap-2">
                                                 <select 
-                                                    value={slot.shift_id || ''}
-                                                    onChange={e => handleSlotChange(index, 'shift_id', e.target.value)}
-                                                    className="w-full border border-rams-rule-light rounded-sm p-2 text-xs font-mono text-rams-ink bg-rams-bg outline-none focus:border-rams-rule cursor-pointer"
+                                                    value={slot.slot_type}
+                                                    onChange={e => handleSlotChange(index, 'slot_type', e.target.value)}
+                                                    className="text-[10px] font-mono font-bold uppercase bg-rams-bg text-rams-ink px-2 py-1 rounded-sm border border-rams-rule-light outline-none cursor-pointer"
                                                 >
-                                                    <option value="">-- กะกำหนดเอง (Custom) --</option>
-                                                    {shifts.map(sh => (
-                                                        <option key={sh.id} value={sh.id}>{sh.name} ({sh.start_time.slice(0,5)} - {sh.end_time.slice(0,5)})</option>
-                                                    ))}
+                                                    <option value="MAIN">Main Shift (กะหลัก)</option>
+                                                    <option value="SPLIT">Split Shift (กะพ่วง/กะแยก)</option>
+                                                    <option value="OVERTIME">Overtime (OT)</option>
                                                 </select>
                                             </div>
- 
-                                            {!slot.shift_id && (
-                                                <div className="space-y-2 border-t border-rams-rule-light pt-2">
+                                            <button 
+                                                type="button" 
+                                                onClick={() => removeSlot(index)} 
+                                                className="text-rams-red hover:text-rams-red/80 transition-colors cursor-pointer p-1"
+                                                title="ลบกะนี้"
+                                            >
+                                                <Trash2 size={15} />
+                                            </button>
+                                        </div>
+                                        
+                                        {/* Quick Status / OFF Toggle */}
+                                        <div className="flex items-center justify-between gap-2 bg-rams-bg/60 p-2.5 rounded-sm border border-rams-rule-light">
+                                            <label className="flex items-center gap-2.5 text-xs font-mono font-bold uppercase tracking-wider text-rams-ink cursor-pointer select-none">
+                                                <input 
+                                                    type="checkbox" 
+                                                    checked={slot.is_off}
+                                                    onChange={e => {
+                                                        if (e.target.checked) {
+                                                            updateSlot(index, { is_off: true, shift_id: '', custom_start_time: '', custom_end_time: '' });
+                                                        } else {
+                                                            updateSlot(index, { is_off: false });
+                                                        }
+                                                    }}
+                                                    className="w-4 h-4 rounded-sm border-rams-rule bg-rams-bg accent-rams-red focus:ring-0 cursor-pointer"
+                                                />
+                                                <span className={slot.is_off ? "text-rams-red font-black" : ""}>กำหนดเป็น วันหยุด (OFF)</span>
+                                            </label>
+                                            {slot.is_off && (
+                                                <span className="text-[10px] font-mono font-bold text-rams-red uppercase px-2 py-0.5 bg-rams-red/10 border border-rams-red/20 rounded-sm">
+                                                    OFF
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        {!slot.is_off && (
+                                            <div className="space-y-3 pt-1">
+                                                {/* Presets Grid */}
+                                                {allPresets.length > 0 && (
+                                                    <div>
+                                                        <label className="block text-[9px] font-mono font-bold text-rams-ink uppercase tracking-widest mb-1.5">
+                                                            ⚡ Preset กะมาตรฐาน & กะร้าน (คลิกเพื่อเลือกทันที):
+                                                        </label>
+                                                        <div className="flex flex-wrap gap-1.5">
+                                                            {allPresets.map((preset, pIdx) => {
+                                                                const pc = getPresetColor(preset.color);
+                                                                const isCustom = customPresets.some(cp => (cp.start || '').slice(0,5) === (preset.start || '').slice(0,5) && (cp.end || '').slice(0,5) === (preset.end || '').slice(0,5));
+                                                                const isSelected = !slot.is_off && !slot.shift_id && startClean === (preset.start || '').slice(0,5) && endClean === (preset.end || '').slice(0,5);
+
+                                                                return (
+                                                                    <div 
+                                                                        key={pIdx}
+                                                                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-sm text-[10px] font-mono font-bold cursor-pointer border transition-all uppercase tracking-wider select-none ${pc.bg} ${pc.text} ${
+                                                                            isSelected 
+                                                                                ? `ring-2 ring-rams-ink ${pc.border} shadow-sm font-black scale-[1.02]` 
+                                                                                : `${pc.border} hover:border-rams-ink/40 opacity-85 hover:opacity-100`
+                                                                        }`}
+                                                                        onClick={() => applyPreset(index, preset)}
+                                                                    >
+                                                                        <span>{preset.icon || (preset.name.includes('ควบ') ? '🔥' : preset.name.includes('ค่ำ') ? '🌙' : preset.name.includes('เช้า') ? '☀️' : '⏰')}</span>
+                                                                        <span>{preset.name || `${preset.start}-${preset.end}`}</span>
+                                                                        <span className="opacity-75 text-[9px] font-normal">({preset.start}-{preset.end})</span>
+                                                                        {isSelected && (
+                                                                            <span className="text-rams-ink ml-0.5">✓</span>
+                                                                        )}
+                                                                        {isCustom && (
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    const customIdx = customPresets.findIndex(cp => (cp.start || '').slice(0,5) === (preset.start || '').slice(0,5) && (cp.end || '').slice(0,5) === (preset.end || '').slice(0,5));
+                                                                                    if (customIdx >= 0) deleteCustomPreset(customIdx);
+                                                                                }}
+                                                                                className="opacity-50 hover:opacity-100 hover:text-rams-red ml-1 font-bold text-xs leading-none cursor-pointer"
+                                                                                title="ลบ Preset นี้"
+                                                                            >
+                                                                                ×
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Manual Timing Adjustment */}
+                                                <div className="space-y-2 border-t border-rams-rule-light pt-2.5">
                                                     <div className="grid grid-cols-2 gap-3">
                                                         <div>
-                                                            <label className="block text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1">เวลาเริ่ม</label>
+                                                            <label className="block text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1">เวลาเริ่ม (Start)</label>
                                                             <input 
                                                                 type="time" 
                                                                 value={slot.custom_start_time || ''}
-                                                                onChange={e => handleSlotChange(index, 'custom_start_time', e.target.value)}
-                                                                className="w-full border border-rams-rule-light rounded-sm p-2 text-xs font-mono text-rams-ink bg-rams-bg outline-none"
+                                                                onChange={e => updateSlot(index, { custom_start_time: e.target.value, shift_id: '', is_off: false })}
+                                                                className="w-full border border-rams-rule-light rounded-sm p-2 text-xs font-mono text-rams-ink bg-rams-bg outline-none focus:border-rams-rule"
                                                             />
                                                         </div>
                                                         <div>
-                                                            <label className="block text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1">เวลาเลิก</label>
+                                                            <label className="block text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1">เวลาเลิก (End)</label>
                                                             <input 
                                                                 type="time" 
                                                                 value={slot.custom_end_time || ''}
-                                                                onChange={e => handleSlotChange(index, 'custom_end_time', e.target.value)}
-                                                                className="w-full border border-rams-rule-light rounded-sm p-2 text-xs font-mono text-rams-ink bg-rams-bg outline-none"
+                                                                onChange={e => updateSlot(index, { custom_end_time: e.target.value, shift_id: '', is_off: false })}
+                                                                className="w-full border border-rams-rule-light rounded-sm p-2 text-xs font-mono text-rams-ink bg-rams-bg outline-none focus:border-rams-rule"
                                                             />
                                                         </div>
                                                     </div>
- 
+
                                                     {slot.custom_start_time && slot.custom_end_time && (
                                                         <button 
-                                                            type="button"
+                                                            type="button" 
                                                             onClick={() => openPresetModal(slot.custom_start_time, slot.custom_end_time)}
                                                             className="text-[10px] font-mono font-bold text-rams-orange hover:text-rams-orange-active uppercase tracking-wider flex items-center gap-1 mt-1 transition-colors cursor-pointer"
                                                         >
-                                                            💾 บันทึกเป็น Preset ({slot.custom_start_time} - {slot.custom_end_time})
+                                                            💾 บันทึกเวลานี้เป็น Preset ({slot.custom_start_time} - {slot.custom_end_time})
                                                         </button>
                                                     )}
- 
-                                                    {allPresets.length > 0 && (
-                                                        <div className="mt-3">
-                                                            <label className="block text-[9px] font-mono font-bold text-rams-ink uppercase tracking-widest mb-1.5">⚡ Preset เวลามาตรฐาน & ที่บันทึกไว้:</label>
-                                                            <div className="flex flex-wrap gap-2">
-                                                                {allPresets.map((preset, pIdx) => {
-                                                                    const pc = getPresetColor(preset.color);
-                                                                    const isCustom = customPresets.some(cp => (cp.start || '').slice(0,5) === (preset.start || '').slice(0,5) && (cp.end || '').slice(0,5) === (preset.end || '').slice(0,5));
-                                                                    return (
-                                                                        <div 
-                                                                            key={pIdx}
-                                                                            className={`flex items-center gap-1.5 px-2.5 py-1 ${pc.bg} hover:bg-opacity-90 ${pc.text} rounded-sm text-[10px] font-mono font-bold cursor-pointer border ${pc.border} transition-all uppercase tracking-wider`}
-                                                                            onClick={() => {
-                                                                                handleSlotChange(index, 'custom_start_time', preset.start);
-                                                                                handleSlotChange(index, 'custom_end_time', preset.end);
-                                                                            }}
-                                                                        >
-                                                                            <span>{preset.icon || '⏰'}</span>
-                                                                            <span>{preset.name || `${preset.start}-${preset.end}`}</span>
-                                                                            <span className="opacity-60 text-[10px] font-semibold">({preset.start}-{preset.end})</span>
-                                                                            {isCustom && (
-                                                                                <button
-                                                                                    type="button"
-                                                                                    onClick={(e) => {
-                                                                                        e.stopPropagation();
-                                                                                        const customIdx = customPresets.findIndex(cp => (cp.start || '').slice(0,5) === (preset.start || '').slice(0,5) && (cp.end || '').slice(0,5) === (preset.end || '').slice(0,5));
-                                                                                        if (customIdx >= 0) deleteCustomPreset(customIdx);
-                                                                                    }}
-                                                                                    className="opacity-50 hover:opacity-100 hover:text-rams-red ml-1 font-bold text-xs leading-none cursor-pointer"
-                                                                                    title="ลบ"
-                                                                                >
-                                                                                    ×
-                                                                                </button>
-                                                                            )}
-                                                                        </div>
-                                                                    );
-                                                                })}
-                                                            </div>
-                                                        </div>
-                                                    )}
                                                 </div>
-                                            )}
-                                        </>
-                                    )}
-                                </div>
-                            ))}
+
+                                                {/* Optional Database Shift selector */}
+                                                {shifts.length > 0 && (
+                                                    <div className="border-t border-rams-rule-light pt-2">
+                                                        <label className="block text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1">หรือเลือกจาก Master Shifts ในระบบ</label>
+                                                        <select 
+                                                            value={slot.shift_id || ''}
+                                                            onChange={e => handleSlotChange(index, 'shift_id', e.target.value)}
+                                                            className="w-full border border-rams-rule-light rounded-sm p-2 text-xs font-mono text-rams-ink bg-rams-bg outline-none focus:border-rams-rule cursor-pointer"
+                                                        >
+                                                            <option value="">-- กะกำหนดเอง / ตาม Preset ข้างต้น --</option>
+                                                            {shifts.map(sh => (
+                                                                <option key={sh.id} value={sh.id}>{sh.name} ({(sh.start_time || '').slice(0,5)} - {(sh.end_time || '').slice(0,5)})</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
  
                             <button onClick={addSlot} className="w-full py-2 border border-dashed border-rams-rule-light rounded-sm text-rams-ink-muted font-mono font-bold text-xs uppercase tracking-wider hover:bg-rams-bg transition-colors flex justify-center items-center gap-2 cursor-pointer">
                                 <Plus size={16} /> เพิ่มกะในวันนี้ (Split Shift)

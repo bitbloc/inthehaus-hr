@@ -19,31 +19,77 @@ export async function POST(request) {
     const body = await request.json();
     const { action, transactions, startDate, endDate } = body;
 
-    if (action === 'UPSERT') {
+    if (action === 'SAVE_CELL') {
+      const { employee_id, date, transactions } = body;
+      if (!employee_id || !date) {
+        return NextResponse.json({ success: false, message: 'Missing employee_id or date' }, { status: 400 });
+      }
+
+      // 1. Delete all existing transactions for this employee and date atomically
+      const { error: delErr } = await supabase
+        .from('roster_transactions')
+        .delete()
+        .eq('employee_id', parseInt(employee_id))
+        .eq('date', date);
+
+      if (delErr) {
+        console.error("Error deleting old cell transactions:", delErr);
+        throw delErr;
+      }
+
+      // 2. Insert new transactions if any
+      if (transactions && transactions.length > 0) {
+        const insertData = transactions.map(t => ({
+          employee_id: parseInt(t.employee_id),
+          date: t.date,
+          slot_type: t.slot_type || 'MAIN',
+          shift_id: t.shift_id ? parseInt(t.shift_id) : null,
+          custom_start_time: t.is_off ? null : (t.custom_start_time || null),
+          custom_end_time: t.is_off ? null : (t.custom_end_time || null),
+          is_off: !!t.is_off,
+          status: t.status || 'PUBLISHED',
+          updated_at: new Date().toISOString()
+        }));
+
+        const { error: insErr } = await supabase
+          .from('roster_transactions')
+          .insert(insertData);
+
+        if (insErr) {
+          console.error("Error inserting cell transactions:", insErr);
+          throw insErr;
+        }
+      }
+
+      return NextResponse.json({ success: true, message: 'Cell saved successfully' });
+
+    } else if (action === 'UPSERT') {
       // Upsert drafts to the database safely
       // Expected transactions format: array of { employee_id, date, slot_type, shift_id, custom_start_time, custom_end_time, is_off, status }
       
-      const upsertData = transactions.map(t => ({
-        employee_id: t.employee_id,
+      const upsertData = (transactions || []).map(t => ({
+        employee_id: parseInt(t.employee_id),
         date: t.date,
         slot_type: t.slot_type || 'MAIN',
-        shift_id: t.shift_id || null,
-        custom_start_time: t.custom_start_time || null,
-        custom_end_time: t.custom_end_time || null,
-        is_off: t.is_off || false,
+        shift_id: t.shift_id ? parseInt(t.shift_id) : null,
+        custom_start_time: t.is_off ? null : (t.custom_start_time || null),
+        custom_end_time: t.is_off ? null : (t.custom_end_time || null),
+        is_off: !!t.is_off,
         status: t.status || 'DRAFT',
         updated_at: new Date().toISOString()
       }));
 
-      const { data, error } = await supabase
-        .from('roster_transactions')
-        .upsert(upsertData, { 
-          onConflict: 'employee_id, date, slot_type',
-          ignoreDuplicates: false 
-        });
+      if (upsertData.length > 0) {
+        const { error } = await supabase
+          .from('roster_transactions')
+          .upsert(upsertData, { 
+            onConflict: 'employee_id, date, slot_type',
+            ignoreDuplicates: false 
+          });
 
-      if (error) {
-        throw error;
+        if (error) {
+          throw error;
+        }
       }
       return NextResponse.json({ success: true, message: 'Upserted successfully' });
 
