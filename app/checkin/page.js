@@ -561,17 +561,44 @@ export default function CheckIn() {
   };
 
   // --- Dynamic Dieter Rams Style Technical Watermark Canvas Helper ---
+  const fileToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = (err) => reject(err);
+      reader.readAsDataURL(file);
+    });
+  };
+
   const createWatermarkedPhoto = async (file, staffName, dateText, locText, actionLabel = 'CHECK-IN') => {
     return new Promise((resolve, reject) => {
+      let objectUrl = null;
+      try {
+        if (typeof window !== 'undefined' && window.URL && window.URL.createObjectURL) {
+          objectUrl = URL.createObjectURL(file);
+        }
+      } catch (e) {
+        console.warn("createObjectURL failed:", e);
+      }
+
       const img = new Image();
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        img.onload = () => {
+
+      const cleanup = () => {
+        if (objectUrl) {
+          try {
+            URL.revokeObjectURL(objectUrl);
+          } catch (e) {}
+        }
+      };
+
+      img.onload = () => {
+        try {
           const canvas = document.createElement('canvas');
           const maxW = 1080;
           const maxH = 1080;
-          let w = img.width;
-          let h = img.height;
+          let w = img.naturalWidth || img.width || 800;
+          let h = img.naturalHeight || img.height || 800;
+
           if (w > maxW || h > maxH) {
             if (w > h) {
               h = Math.round((h * maxW) / w);
@@ -584,6 +611,12 @@ export default function CheckIn() {
           canvas.width = w;
           canvas.height = h;
           const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            cleanup();
+            reject(new Error("Canvas 2D context not available"));
+            return;
+          }
+
           ctx.drawImage(img, 0, 0, w, h);
 
           // Matte Dark Technical Telemetry HUD Bar
@@ -614,13 +647,29 @@ export default function CheckIn() {
           ctx.font = `${Math.max(10, Math.round(barH * 0.165))}px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace`;
           ctx.fillText(`TIMESTAMP: ${dateText} ICT | LOC: ${locText.toUpperCase()}`, pad, h - barH + Math.round(barH * 0.74));
 
-          resolve(canvas.toDataURL('image/jpeg', 0.88));
-        };
-        img.onerror = reject;
-        img.src = e.target.result;
+          cleanup();
+          resolve(canvas.toDataURL('image/jpeg', 0.85));
+        } catch (canvasErr) {
+          cleanup();
+          reject(canvasErr);
+        }
       };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
+
+      img.onerror = (err) => {
+        cleanup();
+        reject(new Error("Image decoding failed"));
+      };
+
+      if (objectUrl) {
+        img.src = objectUrl;
+      } else {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          img.src = e.target.result;
+        };
+        reader.onerror = (e) => reject(new Error("FileReader failed"));
+        reader.readAsDataURL(file);
+      }
     });
   };
 
@@ -680,20 +729,38 @@ export default function CheckIn() {
   };
 
   const handleFileChange = async (e) => {
-    const file = e.target.files[0];
+    const file = e.target.files?.[0];
     if (!file || isUploading || isSubmitting) return;
 
     try {
+      setIsUploading(true);
       const nowStr = format(new Date(), 'yyyy-MM-dd HH:mm:ss');
       const locText = status.includes('Ready') || status.includes('พร้อม') ? 'IN THE HAUS HQ (VERIFIED)' : 'GPS VERIFIED';
       const staffName = employeeData?.nickname ? `${employeeData.name} (${employeeData.nickname})` : (employeeData?.name || profile?.displayName);
-      const actionName = userStatus?.canCheckIn ? 'CHECK-IN' : 'CHECK-OUT';
+      const actionName = lastAction === 'check_in' ? 'CHECK-OUT' : 'CHECK-IN';
 
-      const watermarkedBase64 = await createWatermarkedPhoto(file, staffName, nowStr, locText, actionName);
+      let watermarkedBase64 = null;
+      try {
+        watermarkedBase64 = await createWatermarkedPhoto(file, staffName, nowStr, locText, actionName);
+      } catch (procErr) {
+        console.warn("Watermarking failed, falling back to resizeImage:", procErr);
+        try {
+          const resizedFile = await resizeImage(file, 800, 0.8);
+          watermarkedBase64 = await fileToBase64(resizedFile);
+        } catch (resizeErr) {
+          console.warn("Resize failed, falling back to direct base64:", resizeErr);
+          watermarkedBase64 = await fileToBase64(file);
+        }
+      }
+
       await executePunch({ photoBase64: watermarkedBase64 });
     } catch (err) {
       console.error("Photo processing error:", err);
-      alert("ไม่สามารถประมวลผลรูปถ่ายได้ กรุณาลองใหม่อีกครั้ง");
+      alert("ไม่สามารถประมวลผลรูปถ่ายได้ กรุณาลองใหม่อีกครั้ง (" + (err?.message || "ระบบกำลังแก้ไข") + ")");
+    } finally {
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
