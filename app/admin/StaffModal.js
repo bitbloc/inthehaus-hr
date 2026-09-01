@@ -389,14 +389,24 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
                                             { value: 'Resigned', label: 'Resigned (ลาออกแล้ว)' }
                                         ]} 
                                     />
-                                    <FormInput 
-                                        label="ตำแหน่ง / หน้าที่ (Position / Role) *" 
-                                        name="position" 
-                                        value={formData.position || ''} 
-                                        onChange={handleChange} 
-                                        required 
-                                        placeholder="เช่น Bar & Floor, Cooking, Kitchen, Manager" 
-                                    />
+                                    <div>
+                                        <FormInput 
+                                            label="ตำแหน่ง / หน้าที่ (Position / Role) *" 
+                                            name="position" 
+                                            value={formData.position || ''} 
+                                            onChange={handleChange} 
+                                            required 
+                                            placeholder="เช่น Bar & Floor, Cooking, Kitchen, Owner, Manager" 
+                                        />
+                                        {((formData.position || '').toLowerCase().includes('owner') || (formData.position || '').toLowerCase().includes('ceo')) && (
+                                            <div className="mt-2 p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-sm flex items-start gap-2">
+                                                <span className="text-sm shrink-0">👑</span>
+                                                <span className="text-amber-800 text-[11px] font-sans leading-tight">
+                                                    <strong>ตำแหน่ง Owner / ผู้บริหาร:</strong> ได้รับการยกเว้นการบังคับลงเวลาเข้างาน (Check-in Exempt), ไม่แสดงเตือนมาสาย และไม่ถูกแจ้งเตือนขาดงานใน LINE
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

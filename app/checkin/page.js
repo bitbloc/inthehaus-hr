@@ -54,6 +54,7 @@ export default function CheckIn() {
   const [showWrapUp, setShowWrapUp] = useState(false);
   const [wrapUpData, setWrapUpData] = useState(null);
   const [lastCheckInTime, setLastCheckInTime] = useState(null);
+  const [showOptionalPunch, setShowOptionalPunch] = useState(false);
 
   // Dev Mode State (Disabled for plain security)
   const [devMode, setDevMode] = useState(false);
@@ -360,6 +361,8 @@ export default function CheckIn() {
     setEmployeeData(emp);
     fetchDashboardData(emp.id);
 
+    const isEmpOwner = (emp.position || '').toLowerCase().includes('owner') || (emp.position || '').toLowerCase().includes('ceo');
+
     const { data: log } = await supabase.from('attendance_logs').select('action_type, timestamp').eq('employee_id', emp.id).order('timestamp', { ascending: false }).limit(1).maybeSingle();
 
     if (log) {
@@ -374,7 +377,9 @@ export default function CheckIn() {
       }
 
       if (log.action_type === 'check_in' && !isToday && today.getHours() >= 2) {
-        alert("คุณลืมลงชื่อออกเมื่อวาน ระบบจะเริ่มนับวันใหม่ให้");
+        if (!isEmpOwner) {
+          alert("คุณลืมลงชื่อออกเมื่อวาน ระบบจะเริ่มนับวันใหม่ให้");
+        }
         setLastAction('check_out'); // UI shows Check In
       } else {
         setLastAction(log.action_type);
@@ -411,10 +416,16 @@ export default function CheckIn() {
     try {
       const { data: emp } = await supabase
         .from('employees')
-        .select('id')
+        .select('id, position')
         .or(`line_user_id.eq.${userId},line_bot_id.eq.${userId}`)
         .maybeSingle();
       if (!emp) return;
+
+      const pos = (emp.position || '').toLowerCase();
+      if (pos.includes('owner') || pos.includes('ceo')) {
+        setShiftContext(null);
+        return;
+      }
 
       const today = new Date();
       const dateStr = format(today, 'yyyy-MM-dd');
@@ -739,8 +750,10 @@ export default function CheckIn() {
     return deg * (Math.PI / 180);
   }
 
+  const isOwner = Boolean(employeeData && ((employeeData.position || '').toLowerCase().includes('owner') || (employeeData.position || '').toLowerCase().includes('ceo')));
+
   // Dynamic Button Colors and Logic
-  const isLate = shiftContext?.isLate && lastAction !== 'check_in';
+  const isLate = !isOwner && shiftContext?.isLate && lastAction !== 'check_in';
   let mainButtonConfig = { label: 'Check In', icon: '☀️', sub: 'Start your day', color: "bg-rams-orange text-rams-panel border-rams-rule active:bg-rams-orange-active shadow-[0_4px_0_0_var(--color-rams-rule)]" };
 
   if (lastAction === 'register') {
@@ -752,6 +765,10 @@ export default function CheckIn() {
   } else if (isLate) {
     mainButtonConfig = { label: 'Check In', icon: '☀️', sub: 'Start your day', color: "bg-rams-red text-rams-panel border-rams-rule active:bg-red-700 shadow-[0_4px_0_0_var(--color-rams-rule)]" };
   }
+
+  const displayStatus = isOwner 
+    ? (status.includes('Ready') || status.includes('พร้อม') ? '👑 OWNER · พร้อมใช้งาน (HQ)' : '👑 OWNER · ยกเว้นการลงเวลา (EXEMPT)') 
+    : status;
 
   return (
     <div className="min-h-screen bg-rams-bg text-rams-ink font-sans flex flex-col items-center relative overflow-hidden font-feature-settings-['ss01'] pb-32">
@@ -784,9 +801,12 @@ export default function CheckIn() {
                     navigator.clipboard.writeText(profile.userId);
                     alert("Copied User ID");
                   }}
-                  className="text-[9px] font-mono text-rams-ink-muted cursor-pointer hover:text-rams-orange transition-colors"
+                  className={cn(
+                    "text-[9px] font-mono cursor-pointer transition-colors",
+                    isOwner ? "text-amber-600 font-extrabold" : "text-rams-ink-muted hover:text-rams-orange"
+                  )}
                 >
-                  {employeeData?.position || (lastAction === 'pending' ? 'Pending' : 'Guest')}
+                  {isOwner ? `👑 ${employeeData?.position || 'Owner'}` : (employeeData?.position || (lastAction === 'pending' ? 'Pending' : 'Guest'))}
                 </span>
               </div>
               {profile.pictureUrl ? (
@@ -867,15 +887,19 @@ export default function CheckIn() {
 
           <motion.div
             className={cn(
-              "inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-[10px] font-mono font-bold tracking-wider uppercase border border-rams-rule-light bg-rams-panel"
+              "inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-[10px] font-mono font-bold tracking-wider uppercase border border-rams-rule-light bg-rams-panel",
+              isOwner ? "border-amber-500/40 text-amber-700 bg-amber-500/5" : ""
             )}
           >
-            <span className={cn("w-2.5 h-2.5 rounded-full border border-rams-rule-light shadow-inner animate-pulse shrink-0", status.includes('Ready') ? 'bg-rams-green' : 'bg-rams-red')}></span>
-            {status}
+            <span className={cn(
+              "w-2.5 h-2.5 rounded-full border border-rams-rule-light shadow-inner animate-pulse shrink-0", 
+              isOwner ? 'bg-amber-500' : (status.includes('Ready') ? 'bg-rams-green' : 'bg-rams-red')
+            )}></span>
+            {displayStatus}
           </motion.div>
           
           {/* Gamification: Early Bird Badge */}
-          {lastAction !== 'check_in' && shiftContext && !isLate && (
+          {!isOwner && lastAction !== 'check_in' && shiftContext && !isLate && (
             <div className="mt-3 flex justify-center">
               <motion.div
                 initial={{ opacity: 0, y: 5 }}
@@ -888,39 +912,193 @@ export default function CheckIn() {
           )}
         </motion.div>
 
-        {/* Check-In / Check-Out Button & QR Scanner Button */}
+        {/* Check-In / Check-Out Section */}
         {!status.includes('Checking') && (
-          <div className="w-full max-w-sm px-6 mb-6 z-30 space-y-3">
-            <motion.button
-              initial={{ scale: 0.98, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              onClick={handleStartCheckIn}
-              disabled={isSubmitting}
-              className="w-full transition-all active:translate-y-[4px] active:scale-[0.98] disabled:opacity-50"
-            >
-              <div className={cn(
-                "w-full py-4 rounded-[2rem] flex flex-col items-center justify-center border border-rams-rule transition-all text-center select-none cursor-pointer",
-                mainButtonConfig.color
-              )}>
-                <span className="text-3xl mb-1">{mainButtonConfig.icon}</span>
-                <span className="text-lg font-mono font-bold uppercase tracking-wider">
-                  {isSubmitting ? "Processing..." : mainButtonConfig.label}
-                </span>
-                <span className="text-[10px] font-mono opacity-80 mt-0.5 font-bold uppercase tracking-widest">
-                  {mainButtonConfig.sub}
-                </span>
-              </div>
-            </motion.button>
+          <>
+            {isOwner ? (
+              /* Executive Command Hub for Owner */
+              <div className="w-full max-w-sm px-6 mb-6 z-30 space-y-3.5">
+                {/* Executive Status Card */}
+                <motion.div
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-rams-panel border border-rams-rule p-4.5 rounded-[2rem] shadow-[0_2px_0_0_var(--color-rams-rule)] relative overflow-hidden"
+                >
+                  <div className="flex items-center justify-between mb-2.5">
+                    <span className="px-2.5 py-1 bg-amber-500/15 text-amber-700 border border-amber-500/30 rounded-full text-[10px] font-mono font-extrabold tracking-wider uppercase flex items-center gap-1.5">
+                      <span>👑</span>
+                      <span>OWNER / MANAGEMENT</span>
+                    </span>
+                    <span className="text-[9px] font-mono font-bold text-rams-green bg-rams-green/10 border border-rams-green/30 px-2 py-0.5 rounded-full">
+                      EXEMPT ✓
+                    </span>
+                  </div>
 
-            {/* Shop Dynamic QR Code Option */}
-            <button
-              onClick={() => setShowQRScanner(true)}
-              className="w-full py-3 bg-rams-panel hover:bg-slate-900/90 border border-rams-rule-light rounded-2xl flex items-center justify-center gap-2 text-xs font-mono font-bold text-rams-ink transition-all active:scale-[0.99] shadow-sm"
-            >
-              <span>📱 สแกน QR หน้าร้าน</span>
-              <span className="text-[10px] text-rams-ink-muted">(หาก GPS เพี้ยน)</span>
-            </button>
-          </div>
+                  <h3 className="text-sm font-mono font-bold text-rams-ink mb-1">
+                    สวัสดีครับคุณ {employeeData?.nickname || employeeData?.name}
+                  </h3>
+                  <p className="text-[11px] font-sans text-rams-ink-muted leading-relaxed">
+                    ตำแหน่งของคุณได้รับการยกเว้นการลงเวลาเข้า-ออกงานและไม่ถูกนับขาดงาน สามารถเข้าใช้งานเมนูบริหารจัดการร้านได้ทันที
+                  </p>
+
+                  <div className="mt-3.5 pt-3 border-t border-rams-rule-light grid grid-cols-2 gap-2 text-center">
+                    <div className="p-2 bg-rams-bg rounded-xl border border-rams-rule-light">
+                      <span className="text-[8px] font-mono font-bold text-rams-ink-muted uppercase block">สิทธิ์การใช้งาน</span>
+                      <span className="text-xs font-mono font-extrabold text-rams-ink mt-0.5 block">ผู้บริหารระดับสูง</span>
+                    </div>
+                    <div className="p-2 bg-rams-bg rounded-xl border border-rams-rule-light">
+                      <span className="text-[8px] font-mono font-bold text-rams-ink-muted uppercase block">การลงเวลา</span>
+                      <span className="text-xs font-mono font-extrabold text-rams-green mt-0.5 block">ทางเลือก (Optional)</span>
+                    </div>
+                  </div>
+                </motion.div>
+
+                {/* Executive Quick Portals Grid */}
+                <div className="grid grid-cols-2 gap-2">
+                  <Link
+                    href="/admin"
+                    className="p-3 bg-rams-panel hover:bg-rams-bg border border-rams-rule rounded-2xl flex flex-col justify-between transition-all active:scale-[0.98] shadow-sm group"
+                  >
+                    <div className="text-lg mb-1">🏛️</div>
+                    <div>
+                      <div className="text-xs font-mono font-bold text-rams-ink group-hover:text-rams-orange transition-colors">
+                        Admin Console
+                      </div>
+                      <div className="text-[9px] font-mono text-rams-ink-muted mt-0.5">
+                        ระบบ HR & หลังบ้าน
+                      </div>
+                    </div>
+                  </Link>
+
+                  <Link
+                    href="/shifts"
+                    className="p-3 bg-rams-panel hover:bg-rams-bg border border-rams-rule rounded-2xl flex flex-col justify-between transition-all active:scale-[0.98] shadow-sm group"
+                  >
+                    <div className="text-lg mb-1">📋</div>
+                    <div>
+                      <div className="text-xs font-mono font-bold text-rams-ink group-hover:text-rams-orange transition-colors">
+                        Master Roster
+                      </div>
+                      <div className="text-[9px] font-mono text-rams-ink-muted mt-0.5">
+                        ตารางกะ & เวรทีมงาน
+                      </div>
+                    </div>
+                  </Link>
+
+                  <Link
+                    href="/admin/report/espresso"
+                    className="p-3 bg-rams-panel hover:bg-rams-bg border border-rams-rule rounded-2xl flex flex-col justify-between transition-all active:scale-[0.98] shadow-sm group"
+                  >
+                    <div className="text-lg mb-1">☕</div>
+                    <div>
+                      <div className="text-xs font-mono font-bold text-rams-ink group-hover:text-rams-orange transition-colors">
+                        Espresso Report
+                      </div>
+                      <div className="text-[9px] font-mono text-rams-ink-muted mt-0.5">
+                        รายงานบาร์ & สกัดช็อต
+                      </div>
+                    </div>
+                  </Link>
+
+                  <Link
+                    href="/stock/audit"
+                    className="p-3 bg-rams-panel hover:bg-rams-bg border border-rams-rule rounded-2xl flex flex-col justify-between transition-all active:scale-[0.98] shadow-sm group"
+                  >
+                    <div className="text-lg mb-1">📦</div>
+                    <div>
+                      <div className="text-xs font-mono font-bold text-rams-ink group-hover:text-rams-orange transition-colors">
+                        Stock Audit
+                      </div>
+                      <div className="text-[9px] font-mono text-rams-ink-muted mt-0.5">
+                        เช็คสต็อกวัตถุดิบ
+                      </div>
+                    </div>
+                  </Link>
+                </div>
+
+                {/* Optional Voluntary Punch Accordion */}
+                <div className="pt-1">
+                  <button
+                    onClick={() => setShowOptionalPunch(!showOptionalPunch)}
+                    className="w-full py-2 px-3 bg-rams-bg hover:bg-rams-panel border border-rams-rule-light rounded-xl flex items-center justify-between text-[10px] font-mono font-bold text-rams-ink-muted hover:text-rams-ink transition-all"
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <span>📸</span>
+                      <span>บันทึกเวลาเป็นประวัติ (ทางเลือก / Optional)</span>
+                    </span>
+                    <span>{showOptionalPunch ? '▲ ซ่อน' : '▼ เปิด'}</span>
+                  </button>
+
+                  <AnimatePresence>
+                    {showOptionalPunch && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="pt-2 space-y-2 overflow-hidden"
+                      >
+                        <motion.button
+                          onClick={handleStartCheckIn}
+                          disabled={isSubmitting}
+                          className="w-full transition-all active:translate-y-[2px]"
+                        >
+                          <div className={cn(
+                            "w-full py-3 rounded-2xl flex items-center justify-center gap-2 border border-rams-rule text-center select-none cursor-pointer",
+                            mainButtonConfig.color
+                          )}>
+                            <span className="text-xl">{mainButtonConfig.icon}</span>
+                            <span className="text-xs font-mono font-bold uppercase tracking-wider">
+                              {isSubmitting ? "Processing..." : `${mainButtonConfig.label} (ทางเลือก)`}
+                            </span>
+                          </div>
+                        </motion.button>
+
+                        <button
+                          onClick={() => setShowQRScanner(true)}
+                          className="w-full py-2.5 bg-rams-panel hover:bg-slate-900/90 border border-rams-rule-light rounded-xl flex items-center justify-center gap-1.5 text-xs font-mono font-bold text-rams-ink transition-all"
+                        >
+                          <span>📱 สแกน QR หน้าร้าน</span>
+                        </button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </div>
+            ) : (
+              /* Standard Staff Check-in / Check-out Button & QR Scanner Button */
+              <div className="w-full max-w-sm px-6 mb-6 z-30 space-y-3">
+                <motion.button
+                  initial={{ scale: 0.98, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  onClick={handleStartCheckIn}
+                  disabled={isSubmitting}
+                  className="w-full transition-all active:translate-y-[4px] active:scale-[0.98] disabled:opacity-50"
+                >
+                  <div className={cn(
+                    "w-full py-4 rounded-[2rem] flex flex-col items-center justify-center border border-rams-rule transition-all text-center select-none cursor-pointer",
+                    mainButtonConfig.color
+                  )}>
+                    <span className="text-3xl mb-1">{mainButtonConfig.icon}</span>
+                    <span className="text-lg font-mono font-bold uppercase tracking-wider">
+                      {isSubmitting ? "Processing..." : mainButtonConfig.label}
+                    </span>
+                    <span className="text-[10px] font-mono opacity-80 mt-0.5 font-bold uppercase tracking-widest">
+                      {mainButtonConfig.sub}
+                    </span>
+                  </div>
+                </motion.button>
+
+                {/* Shop Dynamic QR Code Option */}
+                <button
+                  onClick={() => setShowQRScanner(true)}
+                  className="w-full py-3 bg-rams-panel hover:bg-slate-900/90 border border-rams-rule-light rounded-2xl flex items-center justify-center gap-2 text-xs font-mono font-bold text-rams-ink transition-all active:scale-[0.99] shadow-sm"
+                >
+                  <span>📱 สแกน QR หน้าร้าน</span>
+                  <span className="text-[10px] text-rams-ink-muted">(หาก GPS เพี้ยน)</span>
+                </button>
+              </div>
+            )}
+          </>
         )}
 
         {/* Daily Bulletin & Dashboard */}

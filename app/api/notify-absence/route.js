@@ -50,13 +50,18 @@ export async function POST(request) {
     let scheduledList = [];
 
     if (transactions && transactions.length > 0) {
-      scheduledList = transactions.map(t => ({
-        employee_id: t.employee_id,
-        name: t.employees?.name || 'พนักงาน',
-        nickname: t.employees?.nickname || '',
-        shift_name: t.shifts?.name || 'กะงาน',
-        start_time: t.custom_start_time || t.shifts?.start_time || ''
-      }));
+      scheduledList = transactions
+        .filter(t => {
+          const pos = (t.employees?.position || '').toLowerCase();
+          return !pos.includes('owner') && !pos.includes('ceo') && !pos.includes('develop');
+        })
+        .map(t => ({
+          employee_id: t.employee_id,
+          name: t.employees?.name || 'พนักงาน',
+          nickname: t.employees?.nickname || '',
+          shift_name: t.shifts?.name || 'กะงาน',
+          start_time: t.custom_start_time || t.shifts?.start_time || ''
+        }));
     } else {
       // Fallback: หากยังไม่มี Published Transaction ให้ดึงจาก Template
       const { data: schedules } = await supabase
@@ -66,13 +71,18 @@ export async function POST(request) {
         .eq('is_off', false);
 
       if (schedules) {
-        scheduledList = schedules.map(s => ({
-          employee_id: s.employee_id,
-          name: s.employees?.name || 'พนักงาน',
-          nickname: s.employees?.nickname || '',
-          shift_name: s.shifts?.name || 'กะงาน',
-          start_time: s.shifts?.start_time || ''
-        }));
+        scheduledList = schedules
+          .filter(s => {
+            const pos = (s.employees?.position || '').toLowerCase();
+            return !pos.includes('owner') && !pos.includes('ceo') && !pos.includes('develop');
+          })
+          .map(s => ({
+            employee_id: s.employee_id,
+            name: s.employees?.name || 'พนักงาน',
+            nickname: s.employees?.nickname || '',
+            shift_name: s.shifts?.name || 'กะงาน',
+            start_time: s.shifts?.start_time || ''
+          }));
       }
     }
 

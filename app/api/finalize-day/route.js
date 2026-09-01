@@ -77,7 +77,7 @@ export async function POST(request) {
     // 4. Fetch logs ของวันเป้าหมาย
     const { data: logs, error } = await supabase
       .from('attendance_logs')
-      .select('*, employees(id, name, nickname, photo_url)')
+      .select('*, employees(id, name, nickname, position, photo_url)')
       .gte('timestamp', startOfDayUTC.toISOString())
       .lt('timestamp', endOfDayUTC.toISOString())
       .order('timestamp', { ascending: true });
@@ -88,14 +88,19 @@ export async function POST(request) {
     const empMap = {};
     (logs || []).forEach(log => {
       const empId = log.employee_id;
+      const empPos = (log.employees?.position || '').toLowerCase();
+      const isOwner = empPos.includes('owner') || empPos.includes('ceo');
+
       if (!empMap[empId]) {
         const scheduled = scheduledShiftMap.get(empId);
         empMap[empId] = {
           name: log.employees?.name || 'Unknown',
           nickname: log.employees?.nickname ? `(${log.employees.nickname})` : '',
+          position: log.employees?.position || '',
+          isOwner,
           checkIn: null,
           checkOut: null,
-          shift: scheduled?.shiftName || 'กะพิเศษ',
+          shift: scheduled?.shiftName || (isOwner ? '👑 Owner' : 'กะพิเศษ'),
           shiftStart: scheduled?.startTime,
           shiftEnd: scheduled?.endTime,
           isOff: scheduled?.isOff || false
@@ -139,25 +144,30 @@ export async function POST(request) {
       let status = 'ปกติ';
       let color = '#22c55e'; // Green
 
-      // Late Check: เทียบกับเวลาเริ่มของกะจริงในวันนั้น
-      if (emp.checkIn && emp.shiftStart) {
-        const [sh, sm] = emp.shiftStart.split(':').map(Number);
-        const checkInDate = new Date(emp.checkIn.toLocaleString("en-US", { timeZone: "Asia/Bangkok" }));
-        const checkInMinutes = checkInDate.getHours() * 60 + checkInDate.getMinutes();
-        const shiftStartMinutes = sh * 60 + sm;
+      if (emp.isOwner) {
+        status = '👑 Owner';
+        color = '#d97706'; // Amber / Gold
+      } else {
+        // Late Check: เทียบกับเวลาเริ่มของกะจริงในวันนั้น
+        if (emp.checkIn && emp.shiftStart) {
+          const [sh, sm] = emp.shiftStart.split(':').map(Number);
+          const checkInDate = new Date(emp.checkIn.toLocaleString("en-US", { timeZone: "Asia/Bangkok" }));
+          const checkInMinutes = checkInDate.getHours() * 60 + checkInDate.getMinutes();
+          const shiftStartMinutes = sh * 60 + sm;
 
-        // อลุ้มอล่วย 5 นาที
-        if (checkInMinutes > shiftStartMinutes + 5) {
-          const lateMins = checkInMinutes - shiftStartMinutes;
-          status = `สาย ${lateMins}น.`;
-          color = '#ef4444'; // Red
+          // อลุ้มอล่วย 5 นาที
+          if (checkInMinutes > shiftStartMinutes + 5) {
+            const lateMins = checkInMinutes - shiftStartMinutes;
+            status = `สาย ${lateMins}น.`;
+            color = '#ef4444'; // Red
+          }
         }
-      }
 
-      // Check Incomplete
-      if (!emp.checkOut) {
-        status = 'ยังไม่ลงออก';
-        color = '#f59e0b'; // Amber
+        // Check Incomplete
+        if (!emp.checkOut) {
+          status = 'ยังไม่ลงออก';
+          color = '#f59e0b'; // Amber
+        }
       }
 
       reportLines.push({

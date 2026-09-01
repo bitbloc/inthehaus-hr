@@ -510,7 +510,14 @@ export default function StaffDirectoryManager({
 
                                             {/* Position & Job Level */}
                                             <td className="px-4 py-3.5 font-sans">
-                                                <div className="font-bold text-rams-ink">{emp.position || "-"}</div>
+                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                    <span className="font-bold text-rams-ink">{emp.position || "-"}</span>
+                                                    {((emp.position || '').toLowerCase().includes('owner') || (emp.position || '').toLowerCase().includes('ceo')) && (
+                                                        <span className="px-1.5 py-0.2 rounded-sm text-[8px] font-mono font-extrabold bg-amber-500/15 text-amber-700 border border-amber-500/30 uppercase tracking-wider" title="ยกเว้นการลงเวลาเข้า-ออกงาน">
+                                                            👑 EXEMPT
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 <div className="text-[10px] text-rams-ink-muted font-mono uppercase tracking-wider">
                                                     {emp.job_level || "Staff"}
                                                 </div>
