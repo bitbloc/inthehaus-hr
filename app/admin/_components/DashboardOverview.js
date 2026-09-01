@@ -97,6 +97,18 @@ export default function DashboardOverview({
 
     // Helper: Determine shift status for a log
     const getShiftStatusForLog = (log) => {
+        if (!log || !log.timestamp) return { label: '-', color: 'slate' };
+
+        const emp = (data.employees || []).find(e => String(e.id) === String(log.employee_id));
+        const empPos = (emp?.position || '').toLowerCase();
+        const isOwner = empPos.includes('owner') || empPos.includes('ceo');
+
+        if (isOwner) {
+            return log.action_type === 'check_in'
+                ? { label: '👑 Owner (ลงเวลา)', color: 'amber', isLate: false, lateMinutes: 0 }
+                : { label: 'ออกงาน', color: 'slate' };
+        }
+
         const date = new Date(log.timestamp);
         const logDateLocalStr = format(date, 'yyyy-MM-dd');
         const hour = date.getHours();
@@ -183,6 +195,9 @@ export default function DashboardOverview({
             if (!emp) return;
             processedEmpIds.add(String(emp.id));
 
+            const empPos = (emp.position || '').toLowerCase();
+            const isOwner = empPos.includes('owner') || empPos.includes('ceo');
+
             // Find logs today for this employee
             const empLogsToday = todayLogs.filter(l => String(l.employee_id) === String(emp.id))
                 .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
@@ -207,6 +222,27 @@ export default function DashboardOverview({
                 statusCategory = 'LEAVE';
                 statusLabel = 'ลาหยุด (Approved)';
                 statusBadgeColor = 'rose';
+            } else if (isOwner) {
+                // Owner is exempt from required check-in
+                if (latestLog && latestLog.action_type === 'check_in') {
+                    statusCategory = 'ON_DUTY';
+                    statusLabel = '👑 ปฏิบัติงาน (Owner)';
+                    statusBadgeColor = 'emerald';
+                    punchTime = latestLog.timestamp;
+                } else if (latestLog && latestLog.action_type === 'check_out') {
+                    statusCategory = 'COMPLETED';
+                    statusLabel = 'ออกกะแล้ว';
+                    statusBadgeColor = 'slate';
+                    punchTime = latestLog.timestamp;
+                } else if (rosterItem.is_off) {
+                    statusCategory = 'OFF';
+                    statusLabel = 'วันหยุด (Owner)';
+                    statusBadgeColor = 'slate';
+                } else {
+                    statusCategory = 'UPCOMING';
+                    statusLabel = '👑 ยกเว้นการลงเวลา';
+                    statusBadgeColor = 'amber';
+                }
             } else if (rosterItem.is_off) {
                 if (latestLog && latestLog.action_type === 'check_in') {
                     statusCategory = 'ON_DUTY';
