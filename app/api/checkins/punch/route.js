@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '../../../../lib/supabaseClient';
 import { verifyShopToken } from '../shop-token/route';
+import { format, addHours } from 'date-fns';
 
 // Shop Coordinates (In The Haus Nakhon Phanom)
 const SHOP_LAT = 17.39009845004315;
@@ -93,13 +94,18 @@ export async function POST(request) {
     }
 
     // 3. Determine Action (Smart Check-in / Check-out & Overnight Resolution)
-    const { data: lastLog } = await supabase
+    // IMPORTANT: attendance_logs has (id, employee_id, action_type, timestamp) - NO created_at column!
+    const { data: lastLog, error: lastLogErr } = await supabase
       .from('attendance_logs')
-      .select('id, action_type, timestamp, created_at')
+      .select('id, action_type, timestamp')
       .eq('employee_id', employee.id)
       .order('timestamp', { ascending: false })
       .limit(1)
       .maybeSingle();
+
+    if (lastLogErr) {
+      console.warn("attendance_logs lastLog query warning:", lastLogErr);
+    }
 
     const serverNow = new Date();
     const serverTimestamp = serverNow.toISOString();
@@ -133,9 +139,136 @@ export async function POST(request) {
     // If client explicitly requested an action, respect it if valid
     if (requestedAction === 'check_in' || requestedAction === 'check_out') {
       action = requestedAction;
+      // If client requests check_out but duration wasn't computed from lastLog, calculate it if lastLog is check_in
+      if (action === 'check_out' && !duration && lastLog && lastLog.action_type === 'check_in') {
+        const lastTime = new Date(lastLog.timestamp);
+        const diffMs = Math.max(0, serverNow - lastTime);
+        const totalMinutes = Math.floor(diffMs / (1000 * 60));
+        const hours = Math.floor(totalMinutes / 60);
+        const minutes = totalMinutes % 60;
+        duration = { hours, minutes, totalMinutes };
+      }
     }
 
-    // 4. Upload Photo to Supabase Storage (if provided)
+    // 4. Calculate Punctuality & Shift Context (ICT / Bangkok Time: UTC+7)
+    const bangkokNow = addHours(serverNow, 7);
+    const todayDateStr = format(bangkokNow, 'yyyy-MM-dd');
+    const dayOfWeek = bangkokNow.getUTCDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+    const dayIndex = (dayOfWeek + 6) % 7; // 0=Mon, ..., 6=Sun
+    const punchHours = bangkokNow.getUTCHours();
+    const punchMins = bangkokNow.getUTCMinutes();
+    const punchMinutes = punchHours * 60 + punchMins;
+    const timeFormatted = `${String(punchHours).padStart(2, '0')}:${String(punchMins).padStart(2, '0')}`;
+
+    const empPos = (employee.position || '').toLowerCase();
+    const isOwner = empPos.includes('owner') || empPos.includes('ceo');
+
+    let shiftInfo = null;
+    let statusCategory = 'ON_TIME'; // 'ON_TIME' | 'LATE' | 'OFF_DAY' | 'NO_SHIFT' | 'CHECKED_OUT'
+    let statusLabel = 'เข้างานตรงเวลา (ปกติ ✅)';
+    let isLate = false;
+    let lateMinutes = 0;
+
+    if (action === 'check_in') {
+      if (isOwner) {
+        statusCategory = 'ON_TIME';
+        statusLabel = 'เข้างานสำเร็จ (👑 ผู้บริหาร)';
+        shiftInfo = { name: '👑 ผู้บริหาร', startTime: null, endTime: null, isOff: false, isOwner: true };
+      } else {
+        // 1. Check Roster Transactions (highest priority)
+        const { data: tx } = await supabase
+          .from('roster_transactions')
+          .select('*, shifts(*)')
+          .eq('employee_id', employee.id)
+          .eq('date', todayDateStr)
+          .maybeSingle();
+
+        let shiftStartTime = null;
+        let shiftEndTime = null;
+        let shiftName = null;
+        let isOff = false;
+
+        if (tx) {
+          isOff = tx.is_off;
+          shiftStartTime = tx.custom_start_time || tx.shifts?.start_time;
+          shiftEndTime = tx.custom_end_time || tx.shifts?.end_time;
+          shiftName = tx.shifts?.name || (isOff ? 'วันหยุด (OFF)' : 'กะงาน');
+        } else {
+          // 2. Check Overrides
+          const { data: override } = await supabase
+            .from('roster_overrides')
+            .select('*')
+            .eq('employee_id', employee.id)
+            .eq('date', todayDateStr)
+            .maybeSingle();
+
+          if (override) {
+            isOff = override.is_off;
+            shiftStartTime = override.custom_start_time;
+            shiftEndTime = override.custom_end_time;
+            shiftName = 'กะพิเศษ (Override)';
+          } else {
+            // 3. Check Weekly Schedule
+            const { data: weekly } = await supabase
+              .from('employee_schedules')
+              .select('shift_id, is_off, shifts(*)')
+              .eq('employee_id', employee.id)
+              .eq('day_of_week', dayIndex)
+              .maybeSingle();
+
+            if (weekly) {
+              isOff = weekly.is_off;
+              shiftStartTime = weekly.shifts?.start_time;
+              shiftEndTime = weekly.shifts?.end_time;
+              shiftName = weekly.shifts?.name || 'กะประจำ';
+            }
+          }
+        }
+
+        if (isOff) {
+          statusCategory = 'OFF_DAY';
+          statusLabel = 'เข้างานวันหยุด (ทำงานกะพิเศษ 🌟)';
+          shiftInfo = { name: 'วันหยุด (OFF)', startTime: null, endTime: null, isOff: true };
+        } else if (shiftStartTime) {
+          const [sh, sm] = shiftStartTime.split(':').map(Number);
+          const shiftStartMins = sh * 60 + sm;
+          const diff = punchMinutes - shiftStartMins;
+
+          shiftInfo = {
+            name: shiftName,
+            startTime: shiftStartTime.slice(0, 5),
+            endTime: shiftEndTime ? shiftEndTime.slice(0, 5) : null,
+            isOff: false
+          };
+
+          if (diff > 15) {
+            statusCategory = 'LATE';
+            isLate = true;
+            lateMinutes = diff;
+            statusLabel = `เข้างานสาย (+${diff} นาที ⚠️)`;
+          } else {
+            statusCategory = 'ON_TIME';
+            isLate = false;
+            lateMinutes = 0;
+            statusLabel = 'เข้างานตรงเวลา (ปกติ ✅)';
+          }
+        } else {
+          statusCategory = 'NO_SHIFT';
+          statusLabel = 'เข้างานสำเร็จ (นอกตารางกะ)';
+          shiftInfo = null;
+        }
+      }
+    } else {
+      // Check-out
+      statusCategory = 'CHECKED_OUT';
+      if (duration) {
+        statusLabel = `ออกงานเรียบร้อย (${duration.hours} ชม. ${duration.minutes} น. 🌙)`;
+      } else {
+        statusLabel = 'ลงเวลาออกงานสำเร็จ 🌙';
+      }
+    }
+
+    // 5. Upload Photo to Supabase Storage (if provided)
     let photoUrl = null;
     if (photoBase64 && typeof photoBase64 === 'string') {
       try {
@@ -165,7 +298,7 @@ export async function POST(request) {
       }
     }
 
-    // 5. Insert Log with Server-Authority Timestamp into attendance_logs
+    // 6. Insert Log with Server-Authority Timestamp into attendance_logs
     const insertPayload = {
       employee_id: employee.id,
       action_type: action,
@@ -194,7 +327,18 @@ export async function POST(request) {
       action,
       timestamp: serverTimestamp,
       verificationMethod,
-      duration, // Hours and minutes summary only (no OT calculation as requested)
+      duration,
+      punchResult: {
+        action,
+        statusCategory, // 'ON_TIME' | 'LATE' | 'OFF_DAY' | 'NO_SHIFT' | 'CHECKED_OUT'
+        statusLabel,
+        isLate,
+        lateMinutes,
+        timeFormatted,
+        dateFormatted: todayDateStr,
+        shiftInfo,
+        duration
+      },
       employee: {
         id: employee.id,
         name: employee.name,

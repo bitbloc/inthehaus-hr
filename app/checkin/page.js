@@ -56,6 +56,11 @@ export default function CheckIn() {
   const [lastCheckInTime, setLastCheckInTime] = useState(null);
   const [showOptionalPunch, setShowOptionalPunch] = useState(false);
 
+  // Punch Result Feedback Modal
+  const [punchFeedback, setPunchFeedback] = useState(null);
+  const [showPunchModal, setShowPunchModal] = useState(false);
+  const [selectedMood, setSelectedMood] = useState(null);
+
   // Dev Mode State (Disabled for plain security)
   const [devMode, setDevMode] = useState(false);
   const fileInputRef = useRef(null);
@@ -680,12 +685,14 @@ export default function CheckIn() {
     setIsUploading(true);
 
     try {
+      const intendedAction = lastAction === 'check_in' ? 'check_out' : 'check_in';
       const staffName = employeeData?.nickname ? `${employeeData.name} (${employeeData.nickname})` : (employeeData?.name || profile.displayName);
       const res = await fetch('/api/checkins/punch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: profile.userId,
+          actionType: intendedAction,
           latitude: userPosition?.lat,
           longitude: userPosition?.lon,
           accuracy: userPosition?.accuracy,
@@ -707,17 +714,29 @@ export default function CheckIn() {
 
       setShowCamera(false);
       setShowQRScanner(false);
+
+      const actualAction = json.action || intendedAction;
+      setLastAction(actualAction);
+      if (actualAction === 'check_in') {
+        setLastCheckInTime(new Date(json.timestamp));
+      } else {
+        setLastCheckInTime(null);
+      }
+
+      // Show Punch Confirmation / Attendance Status Modal
+      setPunchFeedback({
+        ...(json.punchResult || {}),
+        logId: json.logId,
+        action: actualAction,
+        timestamp: json.timestamp,
+        duration: json.duration,
+        employee: json.employee || employeeData
+      });
+      setSelectedMood(null);
+      setShowPunchModal(true);
+
       fetchRecents();
       fetchUserStatus(profile.userId);
-
-      // Handle Check-out Wrap up
-      if (json.action === 'check_out' && json.duration) {
-        setWrapUpData(json.duration);
-        setShowMoodSelector(true);
-      } else {
-        setWrapUpData(null);
-        setShowMoodSelector(true);
-      }
 
     } catch (err) {
       console.error("Punch error:", err);
@@ -766,34 +785,31 @@ export default function CheckIn() {
 
 
   const handleQRScanSuccess = async (scannedToken) => {
-
     if (!scannedToken) return;
     await executePunch({ qrToken: scannedToken });
   };
 
   const handleMoodSelect = async (mood) => {
+    setSelectedMood(mood);
     try {
-      const { data: latestLog } = await supabase.from('attendance_logs')
-        .select('id, action_type')
-        .eq('employee_id', employeeData.id)
-        .order('timestamp', { ascending: false })
-        .limit(1)
-        .single();
+      const targetLogId = punchFeedback?.logId;
+      if (targetLogId) {
+        await supabase.from('attendance_logs').update({ mood_status: mood }).eq('id', targetLogId);
+      } else if (employeeData?.id) {
+        const { data: latestLog } = await supabase.from('attendance_logs')
+          .select('id, action_type')
+          .eq('employee_id', employeeData.id)
+          .order('timestamp', { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
-      if (latestLog) {
-        await supabase.from('attendance_logs').update({ mood_status: mood }).eq('id', latestLog.id);
-        fetchRecents();
-        
-        if (latestLog.action_type === 'check_out' && wrapUpData) {
-           setWrapUpData(prev => ({ ...prev, mood }));
+        if (latestLog) {
+          await supabase.from('attendance_logs').update({ mood_status: mood }).eq('id', latestLog.id);
         }
       }
-    } catch (e) { console.error(e); }
-    setShowMoodSelector(false);
-    
-    // If it was a checkout, show wrap up
-    if (wrapUpData) {
-      setShowWrapUp(true);
+      fetchRecents();
+    } catch (e) {
+      console.error("Mood select error:", e);
     }
   };
 
@@ -1594,6 +1610,150 @@ export default function CheckIn() {
           </motion.div>
         )}
 
+        {/* Punch Confirmation & Attendance Status Modal */}
+        {showPunchModal && punchFeedback && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 select-none">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/60 backdrop-blur-md"
+              onClick={() => {
+                setShowPunchModal(false);
+                setPunchFeedback(null);
+              }}
+            />
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              transition={{ type: "spring", damping: 25, stiffness: 280 }}
+              className="w-full max-w-sm bg-rams-panel border-2 border-rams-rule rounded-[2rem] p-6 shadow-2xl relative overflow-hidden z-10 space-y-4"
+            >
+              {/* Rams Decorative Status Top Bar */}
+              <div className={cn(
+                "h-2 w-full absolute top-0 inset-x-0",
+                punchFeedback.action === 'check_in' 
+                  ? (punchFeedback.isLate ? "bg-amber-500" : "bg-emerald-500")
+                  : "bg-rams-ink"
+              )} />
+
+              {/* Status Header */}
+              <div className="text-center pt-2">
+                <div className={cn(
+                  "w-16 h-16 rounded-2xl mx-auto flex items-center justify-center text-3xl mb-2.5 border shadow-sm",
+                  punchFeedback.action === 'check_in'
+                    ? (punchFeedback.isLate ? "bg-amber-500/10 border-amber-500/30 text-amber-600" : "bg-emerald-500/10 border-emerald-500/30 text-emerald-600")
+                    : "bg-slate-800 text-white border-slate-700"
+                )}>
+                  {punchFeedback.action === 'check_in' ? (punchFeedback.isLate ? '⚠️' : '☀️') : '🌙'}
+                </div>
+
+                <span className="text-[10px] font-mono font-bold tracking-widest text-rams-ink-muted uppercase block">
+                  {punchFeedback.action === 'check_in' ? 'CHECK-IN CONFIRMED' : 'CHECK-OUT CONFIRMED'}
+                </span>
+
+                <h3 className="text-xl font-mono font-extrabold text-rams-ink mt-0.5">
+                  {punchFeedback.action === 'check_in' ? 'ลงเวลาเข้างานสำเร็จ!' : 'ลงเวลาออกงานสำเร็จ!'}
+                </h3>
+              </div>
+
+              {/* Attendance Status Badge Card */}
+              <div className="p-3.5 bg-rams-bg rounded-2xl border border-rams-rule-light space-y-2.5">
+                <div className="flex items-center justify-between pb-2 border-b border-rams-rule-light">
+                  <span className="text-[10px] font-mono font-bold text-rams-ink-muted uppercase">สถานะการลงเวลา</span>
+                  <span className={cn(
+                    "px-2.5 py-1 rounded-full text-[10px] font-mono font-black tracking-wide border",
+                    punchFeedback.action === 'check_in'
+                      ? (punchFeedback.statusCategory === 'LATE'
+                          ? "bg-rams-red/10 text-rams-red border-rams-red/30 animate-pulse"
+                          : punchFeedback.statusCategory === 'OFF_DAY'
+                            ? "bg-purple-500/10 text-purple-700 border-purple-500/30"
+                            : "bg-emerald-500/10 text-emerald-700 border-emerald-500/30")
+                      : "bg-slate-200 text-slate-800 border-slate-300"
+                  )}>
+                    {punchFeedback.statusLabel || (punchFeedback.action === 'check_in' ? 'ตรงเวลา (ปกติ ✅)' : 'ออกงานเรียบร้อย 🌙')}
+                  </span>
+                </div>
+
+                {/* Details Grid */}
+                <div className="grid grid-cols-2 gap-2 text-center">
+                  <div className="p-2 bg-rams-panel rounded-xl border border-rams-rule-light">
+                    <span className="text-[9px] font-mono text-rams-ink-muted block">เวลาบันทึก</span>
+                    <span className="text-xs font-mono font-extrabold text-rams-ink mt-0.5 block">
+                      {punchFeedback.timeFormatted ? `${punchFeedback.timeFormatted} น.` : format(new Date(), 'HH:mm น.')}
+                    </span>
+                  </div>
+
+                  <div className="p-2 bg-rams-panel rounded-xl border border-rams-rule-light">
+                    <span className="text-[9px] font-mono text-rams-ink-muted block">
+                      {punchFeedback.action === 'check_in' ? 'กะการทำงาน' : 'รวมเวลาทำงาน'}
+                    </span>
+                    <span className="text-xs font-mono font-extrabold text-rams-ink mt-0.5 block truncate">
+                      {punchFeedback.action === 'check_in'
+                        ? (punchFeedback.shiftInfo?.startTime ? `${punchFeedback.shiftInfo.startTime} - ${punchFeedback.shiftInfo.endTime || ''}` : (punchFeedback.shiftInfo?.name || 'กะประจำ'))
+                        : (punchFeedback.duration ? `${punchFeedback.duration.hours} ชม. ${punchFeedback.duration.minutes} น.` : 'เสร็จสิ้น')}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Mood Selector Section */}
+              <div className="space-y-2 pt-0.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-mono font-bold text-rams-ink-muted uppercase">
+                    {selectedMood ? 'บันทึกอารมณ์แล้ว:' : 'รู้สึกอย่างไรตอนนี้?'}
+                  </span>
+                  {selectedMood && (
+                    <span className="text-[10px] font-mono font-bold text-rams-orange truncate ml-2">
+                      {selectedMood === '🔥' && 'มีพลังพร้อมลุย!'}
+                      {selectedMood === '😊' && 'อารมณ์ดี สดชื่น!'}
+                      {selectedMood === '😐' && 'ปกติ เรื่อยๆ'}
+                      {selectedMood === '😴' && 'เหนื่อยหน่อย พักผ่อนนะ'}
+                      {selectedMood === '🤒' && 'ไม่ค่อยสบาย ดูแลสุขภาพด้วยนะ'}
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-5 gap-1.5">
+                  {[
+                    { emoji: '🔥', label: 'ฟิต' },
+                    { emoji: '😊', label: 'ดี' },
+                    { emoji: '😐', label: 'เฉย' },
+                    { emoji: '😴', label: 'ง่วง' },
+                    { emoji: '🤒', label: 'ป่วย' }
+                  ].map((m) => (
+                    <button
+                      key={m.emoji}
+                      onClick={() => handleMoodSelect(m.emoji)}
+                      className={cn(
+                        "py-2.5 rounded-xl border flex flex-col items-center justify-center transition-all active:scale-95 cursor-pointer",
+                        selectedMood === m.emoji
+                          ? "bg-rams-orange text-white border-rams-rule scale-105 shadow-md"
+                          : "bg-rams-bg hover:bg-rams-panel border-rams-rule-light text-rams-ink"
+                      )}
+                    >
+                      <span className="text-xl font-emoji mb-0.5">{m.emoji}</span>
+                      <span className="text-[8px] font-mono font-bold opacity-80">{m.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Close / Acknowledge Button */}
+              <button
+                onClick={() => {
+                  setShowPunchModal(false);
+                  setPunchFeedback(null);
+                }}
+                className="w-full py-3.5 bg-rams-ink hover:bg-neutral-800 text-rams-panel rounded-2xl text-xs font-mono font-bold border border-rams-rule transition-all active:translate-y-[1px] shadow-sm cursor-pointer"
+              >
+                ตกลง / เรียบร้อย ✓
+              </button>
+            </motion.div>
+          </div>
+        )}
+
         {showMoodSelector && (
           <div className="fixed inset-x-0 bottom-0 z-50 flex flex-col items-center justify-end pointer-events-none">
             <motion.div
@@ -1665,7 +1825,7 @@ export default function CheckIn() {
 
               <div className="bg-rams-bg border border-rams-rule-light p-5 mb-6 relative rounded-sm">
                 <p className="text-sm font-bold text-rams-ink leading-relaxed">
-                  "ทำได้ดีมาก! ขอบคุณสำหรับความทุ่มเทในวันนี้นะ 🐾"
+                  &ldquo;ทำได้ดีมาก! ขอบคุณสำหรับความทุ่มเทในวันนี้นะ 🐾&rdquo;
                 </p>
                 {(wrapUpData.mood === '😴' || wrapUpData.mood === '🤒') && (
                   <div className="mt-3 pt-3 border-t border-rams-rule-light">
