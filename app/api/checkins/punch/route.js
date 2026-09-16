@@ -82,14 +82,14 @@ export async function POST(request) {
       } else {
         return NextResponse.json({
           success: false,
-          error: `คุณอยู่ห่างจากร้าน In The Haus เกินกำหนด (${(distanceKm * 1000).toFixed(0)} เมตร) กรุณาอยู่ที่ร้านหรือสแกน Dynamic QR Code หน้าร้าน`,
+          error: `คุณอยู่ห่างจากร้าน In The Haus เกินกำหนด (${(distanceKm * 1000).toFixed(0)} เมตร) กรุณาอยู่ในพื้นที่ร้านก่อนลงเวลา`,
           distanceMeters: Math.round(distanceKm * 1000)
         }, { status: 400 });
       }
     } else {
       return NextResponse.json({
         success: false,
-        error: "ไม่สามารถระบุตำแหน่งพิกัดได้ กรุณาเปิด GPS หรือสแกน QR Code ประจำร้าน"
+        error: "ไม่สามารถระบุตำแหน่งพิกัดได้ กรุณาเปิด GPS และอนุญาตสิทธิ์ตำแหน่งที่ตั้งในโทรศัพท์"
       }, { status: 400 });
     }
 

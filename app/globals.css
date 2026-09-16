@@ -51,7 +51,9 @@
   --color-rams-amber: oklch(75% 0.15 75);
 }
 
+html,
 body {
+  overflow-x: clip;
   background: var(--color-rams-bg);
   color: var(--color-rams-ink);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
