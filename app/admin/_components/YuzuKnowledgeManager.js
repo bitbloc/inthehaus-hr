@@ -28,6 +28,7 @@ export default function YuzuKnowledgeManager() {
     const [searchTerm, setSearchTerm] = useState('');
     const [showCleanupConfirm, setShowCleanupConfirm] = useState(false);
     const [cleanupLoading, setCleanupLoading] = useState(false);
+    const [cleanupStatus, setCleanupStatus] = useState({ state: 'idle', message: '', type: 'info' });
     const [isFlowVisible, setIsFlowVisible] = useState(true);
 
     // New States for AI Operations Dashboard
@@ -1261,7 +1262,13 @@ export default function YuzuKnowledgeManager() {
         }
 
         setCleanupLoading(true);
-        setMessage(shouldBackup ? 'กำลังสำรองข้อมูลและล้างพื้นที่...' : 'กำลังล้างพื้นที่จัดเก็บ...');
+        setCleanupStatus({
+            state: 'running',
+            message: shouldBackup 
+                ? 'กำลังดึงข้อมูลและเตรียมไฟล์สำรอง (JSON)...' 
+                : 'กำลังตรวจสอบและล้างไฟล์ภาพเก่าในระบบ...',
+            type: 'info'
+        });
 
         try {
             if (shouldBackup) {
@@ -1270,60 +1277,110 @@ export default function YuzuKnowledgeManager() {
                 cutoffDate.setDate(cutoffDate.getDate() - days);
                 const cutoffISO = cutoffDate.toISOString();
 
-                // Fetch slips
-                const { data: slipsToBackup } = await supabase
-                    .from('slip_transactions')
-                    .select('id, amount, slip_url, timestamp, sender_name, user_id, bank_name, date')
-                    .not('slip_url', 'is', null)
-                    .lt('timestamp', cutoffISO);
+                try {
+                    // Fetch slips
+                    const { data: slipsToBackup, error: slipErr } = await supabase
+                        .from('slip_transactions')
+                        .select('id, amount, slip_url, timestamp, sender_name, user_id, bank_name, date')
+                        .not('slip_url', 'is', null)
+                        .lt('timestamp', cutoffISO);
 
-                // Fetch coffee shot reports and descriptions
-                const { data: chatsToBackup } = await supabase
-                    .from('yuzu_chat_history')
-                    .select('id, created_at, user_id, role, content, message_type')
-                    .eq('message_type', 'image_description')
-                    .like('content', '%[ภาพประกอบช็อตกาแฟ]%')
-                    .lt('created_at', cutoffISO);
+                    if (slipErr) console.warn("Backup slips warning:", slipErr);
 
-                const backupData = {
-                    backup_date: new Date().toISOString(),
-                    retention_days: days,
-                    slips: slipsToBackup || [],
-                    espresso_photos: chatsToBackup || []
-                };
+                    // Fetch coffee shot reports and descriptions
+                    const { data: chatsToBackup, error: chatErr } = await supabase
+                        .from('yuzu_chat_history')
+                        .select('id, created_at, user_id, role, content, message_type')
+                        .eq('message_type', 'image_description')
+                        .like('content', '%[ภาพประกอบช็อตกาแฟ]%')
+                        .lt('created_at', cutoffISO);
 
-                // Trigger browser JSON download
-                const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = `yuzu-storage-backup-${new Date().toISOString().split('T')[0]}.json`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                URL.revokeObjectURL(url);
+                    if (chatErr) console.warn("Backup chats warning:", chatErr);
+
+                    const backupData = {
+                        backup_date: new Date().toISOString(),
+                        retention_days: days,
+                        slips: slipsToBackup || [],
+                        espresso_photos: chatsToBackup || []
+                    };
+
+                    // Trigger browser JSON download
+                    const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.setAttribute('download', `yuzu-storage-backup-${new Date().toISOString().split('T')[0]}.json`);
+                    document.body.appendChild(link);
+                    link.click();
+                    setTimeout(() => {
+                        if (document.body.contains(link)) document.body.removeChild(link);
+                        URL.revokeObjectURL(url);
+                    }, 2000);
+                } catch (backupErr) {
+                    console.error("Backup file generation error:", backupErr);
+                }
             }
 
-            // 2. Call the cleanup API
+            setCleanupStatus({
+                state: 'running',
+                message: 'กำลังล้างไฟล์ภาพเก่าใน Supabase Storage...',
+                type: 'info'
+            });
+
+            // 2. Call the cleanup API with a 45s timeout guard so the button never gets stuck
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 45000);
+
             const res = await fetch('/api/yuzu/cleanup-uploads', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ days })
+                body: JSON.stringify({ days }),
+                signal: controller.signal
             });
+            clearTimeout(timeoutId);
+
+            if (!res.ok) {
+                const text = await res.text();
+                let errMsg = `เกิดข้อผิดพลาดจากเซิร์ฟเวอร์ (${res.status})`;
+                try {
+                    const parsed = JSON.parse(text);
+                    if (parsed.error) errMsg = parsed.error;
+                } catch (_) {}
+                throw new Error(errMsg);
+            }
 
             const result = await res.json();
             if (result.success) {
-                setMessage(`ล้างข้อมูลสำเร็จ! ลบสลิป ${result.yuzu_slips_deleted} รูป, รูปวาด ${result.yuzu_images_deleted} รูป ✨`);
+                const totalDeleted = (result.yuzu_slips_deleted || 0) + (result.yuzu_images_deleted || 0);
+                const msg = totalDeleted > 0
+                    ? `ล้างข้อมูลสำเร็จ! ลบสลิป ${result.yuzu_slips_deleted} รูป, รูปประกอบ ${result.yuzu_images_deleted} รูป (รวม ${totalDeleted} รูป) ✨`
+                    : `ระบบตรวจสอบแล้ว: ไม่มีรูปภาพที่เก่ากว่า ${days} วันในระบบ (พื้นที่สะอาดเรียบร้อยแล้ว) ✨`;
+
+                setCleanupStatus({
+                    state: 'success',
+                    message: msg,
+                    type: 'success'
+                });
                 setShowCleanupConfirm(false);
             } else {
-                setMessage('เกิดข้อผิดพลาด: ' + (result.error || 'ไม่ทราบสาเหตุ'));
+                setCleanupStatus({
+                    state: 'error',
+                    message: 'เกิดข้อผิดพลาด: ' + (result.error || 'ไม่ทราบสาเหตุ'),
+                    type: 'error'
+                });
             }
         } catch (err) {
             console.error("Cleanup execution error:", err);
-            setMessage('เกิดข้อผิดพลาดในการล้างข้อมูล: ' + err.message);
+            const isTimeout = err.name === 'AbortError';
+            setCleanupStatus({
+                state: 'error',
+                message: isTimeout
+                    ? 'การเชื่อมต่อใช้เวลานานเกินไป (Timeout): ระบบอาจกำลังดำเนินการเบื้องหลัง กรุณารอสักครู่แล้วตรวจสอบอีกครั้ง'
+                    : 'เกิดข้อผิดพลาดในการล้างข้อมูล: ' + err.message,
+                type: 'error'
+            });
         } finally {
             setCleanupLoading(false);
-            setTimeout(() => setMessage(''), 5000);
         }
     }
 
@@ -2089,10 +2146,46 @@ export default function YuzuKnowledgeManager() {
                             คุณสามารถเคลียร์พื้นที่จัดเก็บข้อมูล (Supabase Storage) โดยการลบไฟล์รูปภาพสลิปและรูปภาพประกอบการชงกาแฟที่เก่ากว่า 30 วัน 
                             ระบบจะลบเฉพาะไฟล์รูปภาพออกไปอย่างถาวร แต่จะยังคงเก็บข้อมูลสรุปตัวเลขและประวัติแชทเอาไว้ (ไม่ส่งผลกระทบต่อหน้ารายงาน PDF นอกจากการไม่แสดงรูปประกอบที่ถูกลบไปแล้ว)
                         </p>
+
+                        {/* Status feedback banner */}
+                        {cleanupStatus.state !== 'idle' && (
+                            <div className={`p-4 rounded-sm border font-mono text-xs flex items-start gap-2.5 transition-all ${
+                                cleanupStatus.type === 'success' 
+                                    ? 'bg-rams-green/10 border-rams-green text-rams-green'
+                                    : cleanupStatus.type === 'error'
+                                    ? 'bg-rams-red/10 border-rams-red text-rams-red'
+                                    : 'bg-rams-bg border-rams-rule text-rams-ink'
+                            }`}>
+                                {cleanupStatus.state === 'running' ? (
+                                    <span className="animate-spin rounded-full h-4 w-4 border-2 border-current border-t-transparent shrink-0 mt-0.5" />
+                                ) : cleanupStatus.type === 'success' ? (
+                                    <span className="text-sm shrink-0">✅</span>
+                                ) : (
+                                    <span className="text-sm shrink-0">⚠️</span>
+                                )}
+                                <div className="flex-1">
+                                    <p className="font-bold leading-relaxed">{cleanupStatus.message}</p>
+                                </div>
+                                {cleanupStatus.state !== 'running' && (
+                                    <button 
+                                        onClick={() => setCleanupStatus({ state: 'idle', message: '', type: 'info' })}
+                                        className="text-xs text-rams-ink-muted hover:text-rams-ink ml-2 cursor-pointer"
+                                        title="ปิดข้อความ"
+                                    >
+                                        ✕
+                                    </button>
+                                )}
+                            </div>
+                        )}
                         
                         {!showCleanupConfirm ? (
                             <button
-                                onClick={() => setShowCleanupConfirm(true)}
+                                onClick={() => {
+                                    setShowCleanupConfirm(true);
+                                    if (cleanupStatus.state !== 'running') {
+                                        setCleanupStatus({ state: 'idle', message: '', type: 'info' });
+                                    }
+                                }}
                                 disabled={cleanupLoading}
                                 className="px-6 py-3 bg-rams-amber border border-rams-amber text-rams-ink font-mono font-bold text-xs tracking-widest uppercase hover:bg-rams-amber/90 transition-all flex items-center gap-2 w-fit disabled:opacity-50 rounded-sm cursor-pointer"
                             >
