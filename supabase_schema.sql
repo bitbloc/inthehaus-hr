@@ -213,3 +213,9 @@ ALTER TABLE leave_requests ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow read leave_requests for all" ON leave_requests FOR SELECT USING (true);
 CREATE POLICY "Allow modify leave_requests for authenticated" ON leave_requests FOR ALL USING (auth.role() = 'authenticated');
 
+-- 12. Row Level Security for Stock & AI Knowledge Tables
+ALTER TABLE IF EXISTS stock_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS stock_transactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS yuzu_knowledge ENABLE ROW LEVEL SECURITY;
+
+

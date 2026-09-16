@@ -545,6 +545,14 @@ export default function CheckIn() {
   };
 
   const handleStartCheckIn = () => {
+    if (!profile?.userId) {
+      alert("ไม่พบข้อมูลบัญชี LINE กรุณาเปิดใช้งานผ่าน LINE หรือรอระบบเชื่อมต่อสักครู่");
+      if (typeof liff !== 'undefined' && !liff.isLoggedIn?.()) {
+        try { liff.login(); } catch (e) { console.error(e); }
+      }
+      return;
+    }
+
     if (lastAction === 'register') {
       handleRegister();
       return;
@@ -588,7 +596,16 @@ export default function CheckIn() {
 
       const img = new Image();
 
+      let timeoutTimer = setTimeout(() => {
+        cleanup();
+        reject(new Error("การประมวลผลรูปภาพใช้เวลานานเกินกำหนด กรุณาลองใหม่อีกครั้ง"));
+      }, 10000);
+
       const cleanup = () => {
+        if (timeoutTimer) {
+          clearTimeout(timeoutTimer);
+          timeoutTimer = null;
+        }
         if (objectUrl) {
           try {
             URL.revokeObjectURL(objectUrl);
@@ -679,7 +696,13 @@ export default function CheckIn() {
   };
 
   const executePunch = async ({ photoBase64 = null, qrToken = null }) => {
-    if (!profile?.userId || isSubmitting) return;
+    if (!profile?.userId) {
+      alert("ไม่พบข้อมูลผู้ใช้ LINE กรุณาเข้าสู่ระบบ LINE ก่อนลงเวลา");
+      setIsUploading(false);
+      setIsSubmitting(false);
+      return;
+    }
+    if (isSubmitting) return;
 
     setIsSubmitting(true);
     setIsUploading(true);
@@ -780,6 +803,7 @@ export default function CheckIn() {
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
+      setIsUploading(false);
     }
   };
 

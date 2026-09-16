@@ -18,6 +18,7 @@ import StaffModal from "./StaffModal";
 import StaffDirectoryManager from "./_components/StaffDirectoryManager";
 import YuzuKnowledgeManager from "./_components/YuzuKnowledgeManager";
 import DashboardOverview from "./_components/DashboardOverview";
+import IndividualHistoryManager from "./_components/IndividualHistoryManager";
 
 // --- Reducer for Cleaner State ---
 const initialState = {
@@ -247,6 +248,7 @@ export default function AdminDashboard() {
         if (activeTab === 'applications') fetchData('job_applications', 'jobApplications');
         if (activeTab === 'history') {
             fetchTransactions();
+            fetchData('leave_requests', 'leaveRequests');
             fetchIndividualLogs();
         }
         if (activeTab === 'orders') fetchOrders();
@@ -2820,38 +2822,25 @@ export default function AdminDashboard() {
 
                     {/* --- STAFF INDIVIDUAL HISTORY --- */}
                     {activeTab === 'history' && (
-                        <div className="space-y-6">
-                            <Card className="flex gap-4 items-center border border-slate-100">
-                                <span className="font-black text-slate-800">Select Staff:</span>
-                                <select value={selectedEmpId} onChange={e => setSelectedEmpId(e.target.value)} className="p-2.5 border rounded-xl font-bold bg-slate-50 outline-none">
-                                    <option value="ALL">- Choose -</option>
-                                    {data.employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
-                                </select>
-                            </Card>
-                            {selectedEmpId !== 'ALL' && (
-                                <div className="space-y-6">
-                                    <div className="grid grid-cols-3 gap-4">
-                                        <Card className="py-4 text-center"><div className="text-2xl font-black text-slate-900">{data.individualStats.work_days}</div><div className="text-xs text-slate-700 uppercase font-extrabold mt-1">Work Days</div></Card>
-                                        <Card className="py-4 text-center"><div className="text-2xl font-black text-amber-600">{data.individualStats.late}</div><div className="text-xs text-slate-700 uppercase font-extrabold mt-1">Late</div></Card>
-                                        <Card className="py-4 text-center"><div className="text-2xl font-black text-rose-600">{data.individualStats.absent}</div><div className="text-xs text-slate-700 uppercase font-extrabold mt-1">Absent</div></Card>
-                                    </div>
-                                    <Card className="p-0 overflow-hidden">
-                                        <table className="w-full text-sm text-left">
-                                            <thead className="bg-slate-50 text-slate-500 font-extrabold text-xs uppercase"><tr><th className="p-4">Date</th><th className="p-4">Action</th><th className="p-4">Status</th></tr></thead>
-                                            <tbody className="divide-y divide-slate-100">
-                                                {data.individualLogs.map(log => (
-                                                    <tr key={log.id} className="hover:bg-slate-50">
-                                                        <td className="p-4 font-mono text-slate-900 font-black">{formatDate(log.timestamp)} {formatTime(log.timestamp)}</td>
-                                                        <td className="p-4"><Badge color={log.action_type === 'check_in' ? 'blue' : log.action_type === 'absent' ? 'rose' : 'slate'}>{log.action_type}</Badge></td>
-                                                        <td className="p-4"><Badge color={getShiftStatus(log).color}>{getShiftStatus(log).label}</Badge></td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </Card>
-                                </div>
-                            )}
-                        </div>
+                        <IndividualHistoryManager
+                            employees={data.employees}
+                            shifts={data.shifts}
+                            schedules={data.schedules}
+                            transactions={data.transactions}
+                            leaveRequests={data.leaveRequests}
+                            individualLogs={data.individualLogs}
+                            individualStats={data.individualStats}
+                            selectedEmpId={selectedEmpId}
+                            setSelectedEmpId={setSelectedEmpId}
+                            selectedMonth={selectedMonth}
+                            setSelectedMonth={setSelectedMonth}
+                            getShiftStatus={getShiftStatus}
+                            handleToggleLogAction={handleToggleLogAction}
+                            handleDeleteLog={handleDeleteLog}
+                            setShowManualModal={setShowManualModal}
+                            setManualForm={setManualForm}
+                            onRefresh={fetchIndividualLogs}
+                        />
                     )}
 
                     {/* --- SHIFT CONFIGURATION (SETTINGS) --- */}
