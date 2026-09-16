@@ -208,6 +208,42 @@ export default function CheckIn() {
     }
   };
 
+  const handleLineLogin = async () => {
+    try {
+      if (typeof liff === 'undefined') {
+        alert("กำลังเริ่มต้นระบบ LINE กรุณารอสักครู่...");
+        return;
+      }
+      if (!liff.isLoggedIn()) {
+        liff.login();
+      } else {
+        let p = null;
+        try {
+          p = await liff.getProfile();
+        } catch (e) {
+          const idToken = liff.getDecodedIDToken?.();
+          if (idToken) {
+            p = {
+              userId: idToken.sub,
+              displayName: idToken.name || "LINE Staff",
+              pictureUrl: idToken.picture || null
+            };
+          }
+        }
+        if (p && p.userId) {
+          setProfile(p);
+          fetchUserStatus(p.userId, p);
+          fetchMyShift(p.userId);
+        } else {
+          liff.login();
+        }
+      }
+    } catch (err) {
+      console.error("Manual LINE Login Error:", err);
+      window.location.href = OFFICIAL_LIFF_URL;
+    }
+  };
+
   // --- Init ---
   useEffect(() => {
     setCurrentTime(new Date()); // Init on client
@@ -217,36 +253,52 @@ export default function CheckIn() {
     const init = async () => {
       try {
         await liff.init({ liffId: process.env.NEXT_PUBLIC_LIFF_ID || "2008567449-W868y8RY" });
-        if (!liff.isLoggedIn()) {
-          // ต้องเปิดผ่าน https://liff.line.me/2008567449-W868y8RY ถ้ามาจากทางอื่นให้กลับเข้า link นี้
-          const lastRedirect = safeStorage.getItem("last_liff_redirect");
-          const now = Date.now();
-          if (!lastRedirect || (now - Number(lastRedirect)) > 6000) {
-            safeStorage.setItem("last_liff_redirect", String(now));
-            window.location.replace(OFFICIAL_LIFF_URL);
-            return;
-          } else {
-            liff.login({ redirectUri: OFFICIAL_LIFF_URL });
-            return;
+
+        if (liff.isLoggedIn()) {
+          let p = null;
+          try {
+            p = await liff.getProfile();
+          } catch (profileErr) {
+            console.warn("getProfile failed, using decoded ID token fallback:", profileErr);
+            const idToken = liff.getDecodedIDToken?.();
+            if (idToken) {
+              p = {
+                userId: idToken.sub,
+                displayName: idToken.name || "LINE Staff",
+                pictureUrl: idToken.picture || null
+              };
+            }
+          }
+
+          if (p && p.userId) {
+            setProfile(p);
+            fetchUserStatus(p.userId, p);
+            fetchMyShift(p.userId);
           }
         } else {
-          safeStorage.setItem("last_liff_redirect", "0");
-          const p = await liff.getProfile();
-          setProfile(p);
-          fetchUserStatus(p.userId, p);
-          fetchMyShift(p.userId);
+          // If opened inside LINE client, prompt authorization smoothly
+          if (liff.isInClient?.()) {
+            liff.login();
+            return;
+          }
+
+          // If opened in external browser: check if callback or already visited
+          const search = typeof window !== 'undefined' ? (window.location.search || "") : "";
+          const isCallbackOrLiff = search.includes("code=") || search.includes("state=") || search.includes("liff");
+
+          // Only redirect once to official LIFF if accessed directly without LIFF context
+          if (!isCallbackOrLiff) {
+            const alreadyRedirected = safeStorage.getItem("liff_initial_bounce");
+            if (!alreadyRedirected) {
+              safeStorage.setItem("liff_initial_bounce", "1");
+              window.location.replace(OFFICIAL_LIFF_URL);
+              return;
+            }
+          }
         }
       } catch (e) {
         console.error("LIFF Init Error:", e);
         setStatus("LIFF Error");
-        // ถ้าเปิดนอก LINE หรือเกิด Error นำทางกลับเข้า LIFF link
-        const lastRedirect = safeStorage.getItem("last_liff_redirect");
-        const now = Date.now();
-        if (!lastRedirect || (now - Number(lastRedirect)) > 6000) {
-          safeStorage.setItem("last_liff_redirect", String(now));
-          window.location.replace(OFFICIAL_LIFF_URL);
-          return;
-        }
       }
 
       if (navigator.geolocation) {
@@ -656,8 +708,11 @@ export default function CheckIn() {
 
   const handleStartCheckIn = () => {
     if (!profile?.userId) {
-      alert("ระบบต้องเปิดใช้งานผ่าน LINE เท่านั้น กำลังนำทางไปยัง LINE...");
-      window.location.replace(OFFICIAL_LIFF_URL);
+      if (typeof liff !== 'undefined' && !liff.isLoggedIn?.()) {
+        handleLineLogin();
+      } else {
+        alert("กำลังเชื่อมต่อบัญชี LINE กรุณารอสักครู่ หรือกดปุ่ม LINE Login ด้านบน");
+      }
       return;
     }
 
@@ -1063,7 +1118,12 @@ export default function CheckIn() {
               )}
             </div>
           ) : (
-            <button onClick={() => liff.login()} className="px-4 py-2 bg-[#06C755] text-white rounded-sm text-xs font-mono font-bold border border-black shadow-sm">LINE Login</button>
+            <button 
+              onClick={handleLineLogin} 
+              className="px-3.5 py-1.5 bg-[#06C755] hover:bg-[#05b34c] text-white rounded-sm text-xs font-mono font-bold border border-rams-rule active:translate-y-[1px] tactile-btn-sm shadow-sm transition-[transform,background-color]"
+            >
+              LINE Login
+            </button>
           )}
         </div>
       </motion.div>
