@@ -143,15 +143,12 @@ function appendBrandingToFlex(msg) {
 
     if (!bubble.styles) bubble.styles = {};
     if (!bubble.styles.footer) {
-      const bodyBg = bubble.styles.body?.backgroundColor;
-      if (bodyBg === '#181818') {
-        bubble.styles.footer = { backgroundColor: '#181818' };
-        const copyrightText = bubble.footer.contents.find(c => c.type === 'text' && c.text && c.text.includes('ONHAUS SYSTEM'));
-        if (copyrightText) {
-          copyrightText.color = '#666666';
-        }
-      } else {
-        bubble.styles.footer = { backgroundColor: '#ebebeb' };
+      const bodyBg = bubble.styles.body?.backgroundColor || '#FAF9F6';
+      bubble.styles.footer = { backgroundColor: bodyBg };
+      const isDark = bodyBg.startsWith('#1') || bodyBg.startsWith('#2') || bodyBg.startsWith('#0');
+      const copyrightText = bubble.footer.contents.find(c => c.type === 'text' && c.text && c.text.includes('ONHAUS SYSTEM'));
+      if (copyrightText) {
+        copyrightText.color = isDark ? '#666666' : '#A3A3A3';
       }
     }
   };
@@ -634,9 +631,9 @@ export async function POST(request) {
 
               const context = await getIngredientPrices();
 
-              // Wait 4.0 seconds for all images in the same batch to insert their lock rows
+              // Wait 800ms for images in the same batch to insert their lock rows
               const nowTime = Date.now();
-              await new Promise(resolve => setTimeout(resolve, 4000));
+              await new Promise(resolve => setTimeout(resolve, 800));
 
               const { supabase } = await import('../../../lib/supabaseClient');
               const tenSecondsAgo = new Date(nowTime - 10000).toISOString();
@@ -781,7 +778,7 @@ export async function POST(request) {
               } else {
                 // Not the chosen one: Sleep to allow the chosen one to decide
                 console.log(`Yuzu Vision Batching: Message ${currentMsgId} waiting for chosen one's decision...`);
-                await new Promise(resolve => setTimeout(resolve, 4500));
+                await new Promise(resolve => setTimeout(resolve, 1000));
 
                 const twelveSecondsAgo = new Date(nowTime - 12000).toISOString();
                 const { data: decision } = await supabase

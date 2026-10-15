@@ -113,7 +113,9 @@ export async function verifySlipWithEasySlip(imageInput, options = {}) {
     return { success: false, isSlip: false, error: 'EMPTY_IMAGE_DATA' };
   }
 
-  const checkDuplicate = options.checkDuplicate ?? true;
+  // Default to checkDuplicate: false so EasySlip ALWAYS returns the full bank verification data!
+  // Our application's database (slip_transactions) handles internal duplicate detection reliably with custom business rules.
+  const checkDuplicate = options.checkDuplicate ?? false;
 
   try {
     const controller = new AbortController();
@@ -178,18 +180,52 @@ export async function verifySlipWithEasySlip(imageInput, options = {}) {
       };
     }
 
-    // EasySlip indicated no QR code found (e.g. food, espresso shot, cat, or non-QR slip)
-    if (result && (result.status === 404 || result.message === 'qrcode_not_found')) {
-      return {
-        success: false,
-        isSlip: false,
-        code: 'QRCODE_NOT_FOUND',
-        message: 'No bank QR code found in image'
-      };
-    }
-
-    // Duplicate slip reported by EasySlip
+    // Duplicate slip reported by EasySlip: Auto-retry with checkDuplicate=false to extract data
     if (result && (result.status === 409 || result.message === 'duplicate_slip')) {
+      try {
+        const retryRes = await fetch('https://api.easyslip.com/v1/verify', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            image: base64Data,
+            checkDuplicate: false
+          })
+        });
+        const retryJson = await retryRes.json();
+        if (retryJson && retryJson.status === 200 && retryJson.data) {
+          const retryData = retryJson.data;
+          const { transDate, transTime, isoDate } = formatBangkokDateTime(retryData.date);
+          const amountVal = retryData.amount?.amount ?? (typeof retryData.amount === 'number' ? retryData.amount : 0);
+          const senderName = retryData.sender?.account?.name?.th || retryData.sender?.name || null;
+          const receiverName = retryData.receiver?.account?.name?.th || retryData.receiver?.name || null;
+          const primaryBank = retryData.sender?.bank?.name || retryData.receiver?.bank?.name || 'ธนาคารพาณิชย์';
+
+          return {
+            success: true,
+            isSlip: true,
+            amount: Number(amountVal),
+            transactionRef: retryData.transRef || null,
+            senderName: senderName ? String(senderName).trim() : null,
+            receiverName: receiverName ? String(receiverName).trim() : null,
+            bankName: primaryBank ? String(primaryBank).trim() : null,
+            transTime: transTime,
+            transDate: transDate,
+            isoDate: isoDate,
+            rawPayload: retryData.payload || null,
+            isDuplicate: true,
+            source: 'easyslip',
+            shortDescription: `สลิปโอนเงิน (EasySlip Verified): ${Number(amountVal).toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท [${primaryBank}]`,
+            shouldReply: true,
+            rawResponse: retryData
+          };
+        }
+      } catch (retryErr) {
+        console.warn('[EasySlip] Retry with checkDuplicate=false failed:', retryErr.message);
+      }
+
       return {
         success: false,
         isSlip: true,
