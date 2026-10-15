@@ -368,7 +368,7 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
                     contents: [
                       {
                         type: 'text',
-                        text: isEasySlip ? '⚡ BANK VERIFIED' : '📸 OCR RECORDED',
+                        text: isEasySlip ? '⚡ BANK VERIFIED (v2)' : '📸 OCR RECORDED',
                         size: 'xxs',
                         color: isEasySlip ? '#047857' : '#52525B',
                         weight: 'bold'
@@ -395,27 +395,22 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
                     weight: 'bold'
                   },
                   {
-                    type: 'box',
-                    layout: 'horizontal',
-                    alignItems: 'baseline',
+                    type: 'text',
                     margin: 'xs',
                     contents: [
                       {
-                        type: 'text',
+                        type: 'span',
                         text: parsedAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 }),
                         size: '3xl',
                         weight: 'bold',
-                        color: '#0F172A',
-                        flex: 0
+                        color: '#0F172A'
                       },
                       {
-                        type: 'text',
-                        text: 'THB',
+                        type: 'span',
+                        text: ' THB',
                         size: 'xs',
                         weight: 'bold',
-                        color: '#64748B',
-                        margin: 'sm',
-                        flex: 0
+                        color: '#64748B'
                       }
                     ]
                   }
@@ -594,7 +589,7 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
                       ...(isEasySlip ? [
                         {
                           type: 'text',
-                          text: '✓ EasySlip Bank API',
+                          text: '✓ EasySlip Bank API (v2)',
                           size: 'xxs',
                           color: '#059669',
                           weight: 'bold',
