@@ -1,6 +1,6 @@
-import { supabase } from '../../../../lib/supabaseClient';
+import { supabase } from '../../../../lib/supabaseClient.js';
 import { format, addHours } from 'date-fns';
-import { sanitizeTransactionRef, sanitizeAmount } from '../../../../utils/gemini';
+import { sanitizeTransactionRef, sanitizeAmount } from '../../../../utils/gemini.js';
 import sharp from 'sharp';
 
 // In-memory cache for employee resolution: line_user_id / line_bot_id -> { mappedDbUserId, senderName, cachedAt }
@@ -663,5 +663,207 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
         }
       }
       return true;
+}
+
+/**
+ * Handle Fake or AI-Generated Slip Detection Alert
+ * Rejects slip insertion and alerts staff with urgent security guidance.
+ */
+export async function handleFakeSlipAlert(event, client, buffer, userId, groupId, result) {
+  const empInfo = await resolveEmployee(userId, groupId, client);
+  const senderName = empInfo.senderName || 'ทีมงาน';
+
+  const cleanRef = sanitizeTransactionRef(result.transactionRef);
+  const parsedAmount = result.amount ? sanitizeAmount(result.amount) : null;
+  const cleanBank = result.bankName && !['-', 'null', 'undefined', 'ไม่ระบุ', 'ไม่มี', 'n/a'].includes(String(result.bankName).trim().toLowerCase()) 
+    ? String(result.bankName).trim() 
+    : null;
+  const fakeReason = result.fakeReason || 'ไม่พบข้อมูลธุรกรรมในระบบธนาคาร (สลิปปลอมหรือใช้ AI สร้าง)';
+
+  const fakeFlexMsg = {
+    type: 'flex',
+    altText: `🚨 แจ้งเตือนสลิปต้องสงสัย: ตรวจไม่พบข้อมูลธุรกรรมในระบบธนาคาร (สลิปปลอม/AI)`,
+    contents: {
+      type: 'bubble',
+      size: 'mega',
+      styles: {
+        header: { backgroundColor: '#FEE2E2' },
+        body: { backgroundColor: '#FAF9F6' },
+        footer: { backgroundColor: '#FAF9F6' }
+      },
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        paddingAll: '16px',
+        contents: [
+          {
+            type: 'text',
+            text: '🚨 SECURITY ALERT // ONHAUS SYSTEM',
+            color: '#DC2626',
+            weight: 'bold',
+            size: 'xxs'
+          },
+          {
+            type: 'text',
+            text: 'ตรวจไม่พบข้อมูลธุรกรรมในระบบธนาคาร',
+            color: '#991B1B',
+            weight: 'bold',
+            size: 'sm',
+            margin: 'xs',
+            wrap: true
+          },
+          {
+            type: 'text',
+            text: 'ปฏิเสธการบันทึก: สลิปปลอมหรือใช้ AI สร้าง',
+            color: '#B91C1C',
+            size: 'xxs',
+            weight: 'bold',
+            margin: 'xs',
+            wrap: true
+          }
+        ]
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        paddingAll: '16px',
+        spacing: 'sm',
+        contents: [
+          // Alert Explanation Box
+          {
+            type: 'box',
+            layout: 'vertical',
+            backgroundColor: '#FEF2F2',
+            cornerRadius: '8px',
+            paddingAll: '12px',
+            contents: [
+              {
+                type: 'text',
+                text: '⚠️ ปฏิเสธการบันทึกยอดเงินเข้าสู่ระบบ',
+                color: '#991B1B',
+                weight: 'bold',
+                size: 'xs',
+                wrap: true
+              },
+              {
+                type: 'text',
+                text: 'ระบบตรวจสอบรหัสสลิปกับเครือข่ายธนาคารแล้ว ไม่พบประวัติการทำรายการนี้จริงครับ สลิปนี้อาจเป็นสลิปปลอม ตัดต่อแก้ไขภาพ หรือถูกสร้างขึ้นด้วย AI เพื่อความปลอดภัยทางการเงินของร้าน ระบบไม่อนุญาตให้บันทึกรายการนี้ครับ',
+                color: '#4B5563',
+                size: 'xxs',
+                margin: 'xs',
+                wrap: true
+              },
+              {
+                type: 'text',
+                text: `สาเหตุ: ${fakeReason}`,
+                color: '#DC2626',
+                weight: 'bold',
+                size: 'xxs',
+                margin: 'sm',
+                wrap: true
+              }
+            ]
+          },
+
+          // Details
+          {
+            type: 'box',
+            layout: 'vertical',
+            backgroundColor: '#F2F0E8',
+            cornerRadius: '8px',
+            paddingAll: '12px',
+            spacing: 'xs',
+            margin: 'sm',
+            contents: [
+              {
+                type: 'box',
+                layout: 'horizontal',
+                contents: [
+                  { type: 'text', text: 'เลขอ้างอิง (REF):', size: 'xxs', color: '#78716C', flex: 4 },
+                  { type: 'text', text: cleanRef || 'ไม่พบในระบบธนาคาร', size: 'xxs', color: '#1C1917', weight: 'bold', flex: 6, align: 'end', wrap: true }
+                ]
+              },
+              ...(parsedAmount ? [{
+                type: 'box',
+                layout: 'horizontal',
+                contents: [
+                  { type: 'text', text: 'ยอดเงินที่ระบุ:', size: 'xxs', color: '#78716C', flex: 4 },
+                  { type: 'text', text: `${parsedAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})} THB`, size: 'xxs', color: '#DC2626', weight: 'bold', flex: 6, align: 'end' }
+                ]
+              }] : []),
+              ...(cleanBank ? [{
+                type: 'box',
+                layout: 'horizontal',
+                contents: [
+                  { type: 'text', text: 'ธนาคารที่อ้าง:', size: 'xxs', color: '#78716C', flex: 4 },
+                  { type: 'text', text: cleanBank, size: 'xxs', color: '#1C1917', flex: 6, align: 'end', wrap: true }
+                ]
+              }] : []),
+              {
+                type: 'box',
+                layout: 'horizontal',
+                contents: [
+                  { type: 'text', text: 'ผู้ส่งภาพเข้าระบบ:', size: 'xxs', color: '#78716C', flex: 4 },
+                  { type: 'text', text: `พี่${senderName}`, size: 'xxs', color: '#1C1917', weight: 'bold', flex: 6, align: 'end' }
+                ]
+              }
+            ]
+          },
+
+          // Actionable guidance for staff
+          {
+            type: 'box',
+            layout: 'vertical',
+            backgroundColor: '#FFFBEB',
+            cornerRadius: '8px',
+            paddingAll: '12px',
+            margin: 'sm',
+            contents: [
+              {
+                type: 'text',
+                text: '📌 ข้อปฏิบัติสำหรับทีมงานหน้าร้าน:',
+                size: 'xxs',
+                weight: 'bold',
+                color: '#92400E'
+              },
+              {
+                type: 'text',
+                text: '1. ขอให้ลูกค้าเปิดประวัติการโอนเงินจริงในแอปธนาคาร (Statement / รายการย้อนหลัง) ให้ตรวจสอบ\n2. หรือให้ลูกค้าสแกนชำระผ่าน QR Code รับเงินของทางร้านใหม่อีกครั้งครับ',
+                size: 'xxs',
+                color: '#78350F',
+                margin: 'xs',
+                wrap: true
+              }
+            ]
+          }
+        ]
+      }
+    }
+  };
+
+  // Log suspicious transaction in chat history
+  try {
+    await supabase.from('yuzu_chat_history').insert({
+      group_id: groupId,
+      user_id: empInfo.mappedDbUserId || userId,
+      role: 'system',
+      content: `[ALERT] ไม่พบข้อมูลธุรกรรม (สลิปปลอม/AI): ${cleanRef || 'No Ref'} ยอด ${parsedAmount || 0} บาท (${fakeReason})`,
+      message_type: 'fake_slip_alert'
+    });
+  } catch (logErr) {
+    console.error("Failed to log fake slip alert:", logErr);
+  }
+
+  // Reply message
+  try {
+    await client.replyMessage(event.replyToken, fakeFlexMsg);
+  } catch (replyErr) {
+    console.warn("Fake slip replyMessage failed, attempting pushMessage fallback:", replyErr.message);
+    const target = groupId || userId;
+    if (target) {
+      await client.pushMessage(target, fakeFlexMsg);
+    }
+  }
+  return true;
 }
 

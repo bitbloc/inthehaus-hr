@@ -8,6 +8,41 @@ import { extractQrFromImage } from './qrScanner.js';
 
 const DEFAULT_API_KEY = 'e0650eb6-a4c8-4e25-b109-54bf3a10256e';
 
+export const BANK_CODE_MAP = {
+  '002': 'ธนาคารกรุงเทพ',
+  '004': 'ธนาคารกสิกรไทย',
+  '006': 'ธนาคารกรุงไทย',
+  '011': 'ธนาคารทหารไทยธนชาต (ttb)',
+  '014': 'ธนาคารไทยพาณิชย์ (SCB)',
+  '025': 'ธนาคารกรุงศรีอยุธยา',
+  '030': 'ธนาคารออมสิน (GSB)',
+  '034': 'ธนาคารเพื่อการเกษตรและสหกรณ์การเกษตร (ธ.ก.ส.)'
+};
+
+export function parseRefFromQrPayload(payload) {
+  if (!payload || typeof payload !== 'string') return null;
+  // Look for Tag 02 followed by 2-digit length (e.g. 0220 = length 20)
+  const tag02Match = payload.match(/02(\d{2})/);
+  if (tag02Match) {
+    const idx = payload.indexOf(tag02Match[0]);
+    const len = parseInt(tag02Match[1], 10);
+    const value = payload.slice(idx + 4, idx + 4 + len);
+    if (value && value.length === len) return value;
+  }
+  // Fallback regex for standard 15-25 alphanumeric ref code
+  const match = payload.match(/[0-9]{10,18}[A-Za-z0-9]{3,12}/);
+  return match ? match[0] : null;
+}
+
+export function parseBankFromQrPayload(payload) {
+  if (!payload || typeof payload !== 'string') return null;
+  const match = payload.match(/0103(\d{3})/);
+  if (match && BANK_CODE_MAP[match[1]]) {
+    return BANK_CODE_MAP[match[1]];
+  }
+  return 'ธนาคารพาณิชย์';
+}
+
 export function getEasySlipApiKey() {
   return process.env.EASYSLIP_API_KEY || DEFAULT_API_KEY;
 }
@@ -234,7 +269,37 @@ export async function verifySlipWithEasySlip(imageInput, options = {}) {
       };
     }
 
-    // In API v2, non-slip or invalid returns { success: false, error: { code, message } }
+    // In API v2, check if EasySlip explicitly rejected an attempted slip or failed validation
+    const errCode = String(result?.error?.code || result?.status || '').toUpperCase();
+    const errMsg = String(result?.error?.message || result?.message || '').toLowerCase();
+    const hasQrPayload = Boolean(requestBody?.payload);
+
+    const isBankRejection = errCode === 'VALIDATION_ERROR' || 
+                            errCode === 'SLIP_NOT_FOUND' || 
+                            errCode === 'NOT_FOUND' || 
+                            errCode === 'INVALID_SLIP' || 
+                            result?.status === 404 || 
+                            errMsg.includes('not found') || 
+                            errMsg.includes('verification failed') || 
+                            errMsg.includes('ไม่พบ');
+
+    if (hasQrPayload && isBankRejection) {
+      const parsedRef = parseRefFromQrPayload(requestBody.payload);
+      const parsedBank = parseBankFromQrPayload(requestBody.payload);
+      console.warn(`[EasySlip v2] 🚨 FAKE SLIP OR TRANSACTION NOT FOUND: Ref: ${parsedRef || 'N/A'}, Code: ${errCode}`);
+      return {
+        success: false,
+        isSlip: true,
+        isNotFound: true,
+        isFakeOrAi: true,
+        transactionRef: parsedRef,
+        bankName: parsedBank,
+        fakeReason: 'ไม่พบข้อมูลธุรกรรมในระบบธนาคาร (สลิปปลอมหรือใช้ AI สร้าง)',
+        code: errCode || 'SLIP_NOT_FOUND',
+        message: result?.error?.message || result?.message || 'Transaction not found in bank system'
+      };
+    }
+
     return {
       success: false,
       isSlip: false,

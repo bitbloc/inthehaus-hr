@@ -6,7 +6,7 @@ import { getIngredientPrices } from '../../../utils/price';
 import { saveMessage, cleanupOldHistory, getEmployeeByLineId, getYuzuConfigs, checkIsBoss } from '../../../utils/memory';
 import { handleRosterCommand, handleRosterPostback } from './handlers/rosterHandler';
 import { handleStockPostback } from './handlers/stockHandler';
-import { handleSlipImage } from './handlers/slipHandler';
+import { handleSlipImage, handleFakeSlipAlert } from './handlers/slipHandler';
 import { handleBusinessCardImage } from './handlers/ocrHandler';
 import { verifySlipWithEasySlip } from '../../../utils/easyslip';
 import { handleOrderAndReservationDetection, handleOrderAndReservationPostback } from './handlers/orderHandler';
@@ -589,6 +589,7 @@ export async function POST(request) {
                 console.warn("[EasySlip Fast-Path] Error or bypass, falling back to vision flow:", easySlipErr?.message || easySlipErr);
               }
 
+              // Case A: Valid bank slip verified by EasySlip
               if (easySlipResult && easySlipResult.success && easySlipResult.isSlip) {
                 console.log(`[EasySlip Fast-Path] Slip verified successfully (Ref: ${easySlipResult.transactionRef}, Amount: ${easySlipResult.amount})`);
                 handledLocally = true;
@@ -596,6 +597,18 @@ export async function POST(request) {
                   await handleSlipImage(event, client, buffer, userId, groupId, easySlipResult);
                 } catch (handleErr) {
                   console.error("[EasySlip Fast-Path] Error in handleSlipImage:", handleErr?.message || handleErr);
+                }
+                return;
+              }
+
+              // Case B: Transaction NOT FOUND in Bank / Fake Slip / AI Generated!
+              if (easySlipResult && (easySlipResult.isNotFound || easySlipResult.isFakeOrAi)) {
+                console.warn(`[Security Alert] Transaction NOT FOUND in bank system (Fake/AI): Ref: ${easySlipResult.transactionRef || 'N/A'}`);
+                handledLocally = true;
+                try {
+                  await handleFakeSlipAlert(event, client, buffer, userId, groupId, easySlipResult);
+                } catch (fakeErr) {
+                  console.error("[Security Alert] Error in handleFakeSlipAlert:", fakeErr?.message || fakeErr);
                 }
                 return;
               }
@@ -753,7 +766,20 @@ export async function POST(request) {
                 console.log(`Yuzu Vision Batching: Chosen one (${currentMsgId}) analyzing first image...`);
                 const result = await classifyAndAnalyzeImage(base64, "image/jpeg", context, bossRole, positionInstruction, friendlyName);
 
-                if (result.isSlip) {
+                if (result.isFakeOrAi) {
+                  // Write approval flag to DB so batch doesn't process subsequent images as reports
+                  await supabase.from('yuzu_chat_history').insert({
+                    group_id: groupId,
+                    user_id: userId,
+                    role: 'system',
+                    content: currentMsgId,
+                    message_type: 'slip_batch_approved'
+                  });
+
+                  // Process fake/AI slip alert immediately
+                  handledLocally = true;
+                  await handleFakeSlipAlert(event, client, buffer, userId, groupId, result);
+                } else if (result.isSlip) {
                   // Write approval flag to DB
                   await supabase.from('yuzu_chat_history').insert({
                     group_id: groupId,
@@ -842,7 +868,10 @@ export async function POST(request) {
                 console.log(`Yuzu Vision Batching: Message ${currentMsgId} proceeding individually.`);
                 const result = await classifyAndAnalyzeImage(base64, "image/jpeg", context, bossRole, positionInstruction, friendlyName);
 
-                if (result.isSlip) {
+                if (result.isFakeOrAi) {
+                  handledLocally = true;
+                  await handleFakeSlipAlert(event, client, buffer, userId, groupId, result);
+                } else if (result.isSlip) {
                   handledLocally = true;
                   await handleSlipImage(event, client, buffer, userId, groupId, result);
                 } else if (result.isBusinessCard) {

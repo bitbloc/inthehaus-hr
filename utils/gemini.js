@@ -292,12 +292,22 @@ export async function classifyAndAnalyzeImage(imageBase64, mimeType = "image/jpe
   "transTime": "วันเวลาที่ทำรายการ",
   "transDate": "YYYY-MM-DD",
   "shortDescription": "สลิปโอนเงิน...",
-  "shouldReply": true
+  "shouldReply": true,
+  "isFakeOrAi": false,
+  "fakeReason": null
 }
 * กฎเฉพาะสำหรับสลิป:
 - amount: ให้ส่งเป็นตัวเลขบวกเท่านั้น (ห้ามติดลบ แม้หน้าจอโอนเงินออกจะเขียน -658.00 บาท ก็ให้ส่ง 658 หรือ 658.00)
 - transactionRef: หากมีตัวเลขรหัสอ้างอิง/เลขที่รายการ/Txn ID บนภาพให้ใส่มา แต่หากเป็นภาพถ่ายหน้าจอที่ไม่มีตัวเลขรหัสอ้างอิงกำกับไว้ชัดเจน ให้ส่งเป็น null เท่านั้น (ห้ามส่ง "-", "N/A", "ไม่มี", "ไม่ระบุ" เด็ดขาด)
 - transDate: ให้ออกมาเป็นรูปแบบ "YYYY-MM-DD" (เช่น "2026-08-23" หากปีบนสลิปเป็น 2569 ให้แปลงเป็น ค.ศ. 2026)
+* กฎสำคัญด้านความปลอดภัยและการตรวจสอบสลิปปลอม/AI:
+- หากภาพเป็นสลิปหรือภาพหน้าจอโอนเงิน แต่พบข้อใดข้อหนึ่งต่อไปนี้:
+  1) สลิปสร้างด้วย AI: ตัวอักษรภาษาไทยหรืออังกฤษบิดเบี้ยว เพี้ยน ขาดวิ่น ไม่เป็นคำ สระลอย อ่านไม่รู้เรื่อง ฟอนต์เละผิดธรรมชาติ (AI hallucination/warped text)
+  2) สลิปแต่งภาพ/ตัดต่อ: มีร่องรอยการตัดแปะ แก้ไขตัวเลขยอดเงิน วันที่ หรือเวลาอย่างชัดเจน
+  3) โลโก้หรือหน้าตาแอปธนาคารเพี้ยนไปจากแอปธนาคารจริงอย่างสิ้นเชิง
+  ให้ส่งค่า:
+  "isFakeOrAi": true,
+  "fakeReason": "ระบุเหตุผลสั้นๆ เช่น ตัวอักษรบิดเบี้ยวคล้ายภาพ AI / มีร่องรอยตัดต่อตัวเลขยอดเงิน / ไม่ใช่สลิปธนาคารจริง"
 
 2. นามบัตร หรือ ข้อมูลออกใบกำกับภาษี / เปิดบิลบริษัท / บัตรผู้เสียภาษี (Business Card / Tax Invoice Info Card)
 (รวมถึง: การ์ด/ป้ายข้อมูลผู้เสียภาษีสำหรับเปิดบิล, นามบัตรบริษัท, ข้อมูลชื่อ-ที่อยู่-เลขประจำตัวผู้เสียภาษี 13 หลัก, เอกสาร ภ.พ.20 ย่อส่วน หรือป้ายชื่อเปิดบิลที่พนักงานถ่ายส่งมาเพื่อออกใบเสร็จหรือใบกำกับภาษีเต็มรูปให้ลูกค้า)
@@ -372,6 +382,23 @@ export async function classifyAndAnalyzeImage(imageBase64, mimeType = "image/jpe
             const cleanRef = sanitizeTransactionRef(data.transactionRef);
             const cleanAmt = sanitizeAmount(data.amount);
             const cleanTextVal = (v) => v && !['-', 'null', 'undefined', 'ไม่ระบุ', 'ไม่มี', 'n/a'].includes(String(v).trim().toLowerCase()) ? String(v).trim() : null;
+
+            if (data.isFakeOrAi) {
+                return {
+                    isSlip: true,
+                    isFakeOrAi: true,
+                    fakeReason: data.fakeReason || 'ตรวจพบความผิดปกติของภาพสลิป หรือสร้างด้วย AI',
+                    amount: cleanAmt,
+                    transactionRef: cleanRef,
+                    senderName: cleanTextVal(data.senderName),
+                    receiverName: cleanTextVal(data.receiverName),
+                    bankName: cleanTextVal(data.bankName),
+                    transTime: data.transTime || null,
+                    transDate: data.transDate || null,
+                    shortDescription: 'สลิปต้องสงสัย (ปลอมหรือ AI)',
+                    shouldReply: true
+                };
+            }
 
             return { 
                 isSlip: true, 
