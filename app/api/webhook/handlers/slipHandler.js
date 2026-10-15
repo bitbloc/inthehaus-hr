@@ -318,7 +318,7 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
         altText: `บันทึกยอดโอน ${parsedAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท เรียบร้อยค่ะ`,
         contents: {
           type: 'bubble',
-          size: 'kilo',
+          size: 'mega',
           styles: {
             body: { backgroundColor: '#FAF9F6' },
             footer: { backgroundColor: '#FAF9F6' }
@@ -328,57 +328,30 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
             layout: 'vertical',
             paddingAll: '18px',
             contents: [
-              // Top Bar: Brand & Verification Pill
+              // Top Bar: Brand & Title (Full width, no truncation)
               {
                 type: 'box',
-                layout: 'horizontal',
-                alignItems: 'center',
+                layout: 'vertical',
                 contents: [
                   {
-                    type: 'box',
-                    layout: 'vertical',
-                    flex: 1,
-                    contents: [
-                      {
-                        type: 'text',
-                        text: 'ร้านในบ้าน · IN THE HAUS',
-                        size: 'xxs',
-                        weight: 'bold',
-                        color: '#78716C'
-                      },
-                      {
-                        type: 'text',
-                        text: 'บันทึกการโอนเงินสำเร็จ',
-                        size: 'sm',
-                        weight: 'bold',
-                        color: '#1C1917',
-                        margin: 'xs'
-                      }
-                    ]
+                    type: 'text',
+                    text: 'ร้านในบ้าน · IN THE HAUS',
+                    size: 'xxs',
+                    weight: 'bold',
+                    color: '#78716C'
                   },
                   {
-                    type: 'box',
-                    layout: 'vertical',
-                    backgroundColor: isEasySlip ? '#ECFDF5' : '#F4F4F5',
-                    cornerRadius: '6px',
-                    paddingStart: '8px',
-                    paddingEnd: '8px',
-                    paddingTop: '3px',
-                    paddingBottom: '3px',
-                    contents: [
-                      {
-                        type: 'text',
-                        text: isEasySlip ? '⚡ BANK VERIFIED (v2)' : '📸 OCR RECORDED',
-                        size: 'xxs',
-                        color: isEasySlip ? '#047857' : '#52525B',
-                        weight: 'bold'
-                      }
-                    ]
+                    type: 'text',
+                    text: 'บันทึกการโอนเงินสำเร็จ',
+                    size: 'sm',
+                    weight: 'bold',
+                    color: '#1C1917',
+                    margin: 'xs'
                   }
                 ]
               },
 
-              // Hero Amount Display Well
+              // Hero Amount Display Well with Verification Pill inside
               {
                 type: 'box',
                 layout: 'vertical',
@@ -388,15 +361,42 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
                 margin: 'md',
                 contents: [
                   {
-                    type: 'text',
-                    text: 'ยอดเงินที่บันทึก',
-                    size: 'xxs',
-                    color: '#78716C',
-                    weight: 'bold'
+                    type: 'box',
+                    layout: 'horizontal',
+                    alignItems: 'center',
+                    contents: [
+                      {
+                        type: 'text',
+                        text: 'ยอดเงินที่บันทึก',
+                        size: 'xxs',
+                        color: '#78716C',
+                        weight: 'bold',
+                        flex: 1
+                      },
+                      {
+                        type: 'box',
+                        layout: 'vertical',
+                        backgroundColor: isEasySlip ? '#ECFDF5' : '#F4F4F5',
+                        cornerRadius: '6px',
+                        paddingStart: '8px',
+                        paddingEnd: '8px',
+                        paddingTop: '3px',
+                        paddingBottom: '3px',
+                        contents: [
+                          {
+                            type: 'text',
+                            text: isEasySlip ? '✓ ตรวจสอบกับธนาคารแล้ว' : '📸 อ่านจากภาพ',
+                            size: 'xxs',
+                            color: isEasySlip ? '#047857' : '#52525B',
+                            weight: 'bold'
+                          }
+                        ]
+                      }
+                    ]
                   },
                   {
                     type: 'text',
-                    margin: 'xs',
+                    margin: 'sm',
                     contents: [
                       {
                         type: 'span',
@@ -589,12 +589,11 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
                       ...(isEasySlip ? [
                         {
                           type: 'text',
-                          text: '✓ EasySlip Bank API (v2)',
+                          text: 'EasySlip Verified',
                           size: 'xxs',
                           color: '#059669',
                           weight: 'bold',
-                          align: 'end',
-                          flex: 1
+                          align: 'end'
                         }
                       ] : [])
                     ]
