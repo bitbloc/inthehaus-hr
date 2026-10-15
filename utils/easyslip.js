@@ -1,3 +1,5 @@
+import { extractQrFromImage } from './qrScanner.js';
+
 /**
  * EasySlip API Integration for In The Haus
  * Provides bank slip verification via EasySlip API (18+ Thai banks supported)
@@ -92,7 +94,7 @@ export async function getEasySlipQuota() {
  * Verify a bank transfer slip using EasySlip API v2
  * Provides bank slip verification via EasySlip API (18+ Thai banks supported)
  * Docs: https://document.easyslip.com/th/
- * Accepts base64 image (with or without data URI prefix) or Buffer
+ * Accepts Buffer, base64 image, or QR payload string
  * Returns normalized slip object or error status
  */
 export async function verifySlipWithEasySlip(imageInput, options = {}) {
@@ -101,42 +103,89 @@ export async function verifySlipWithEasySlip(imageInput, options = {}) {
     return { success: false, isSlip: false, error: 'NO_API_KEY' };
   }
 
-  let base64Data = '';
-  if (Buffer.isBuffer(imageInput)) {
-    base64Data = imageInput.toString('base64');
-  } else if (typeof imageInput === 'string') {
-    // Strip data URI scheme if present: data:image/jpeg;base64, ...
-    base64Data = imageInput.replace(/^data:image\/[a-zA-Z]+;base64,/, '').trim();
-  } else {
-    return { success: false, isSlip: false, error: 'INVALID_INPUT_TYPE' };
-  }
-
-  if (!base64Data || base64Data.length < 50) {
-    return { success: false, isSlip: false, error: 'EMPTY_IMAGE_DATA' };
-  }
-
   // EasySlip API v2: checkDuplicate boolean (default false to ensure full verification data)
   const checkDuplicate = options.checkDuplicate ?? false;
 
+  let requestBody = null;
+  let fallbackBase64 = null;
+
+  // Case 1: Explicit payload passed
+  if (typeof imageInput === 'object' && imageInput?.payload) {
+    requestBody = { payload: imageInput.payload, checkDuplicate };
+  } else if (typeof imageInput === 'string' && imageInput.startsWith('000201')) {
+    // Direct PromptPay QR string
+    requestBody = { payload: imageInput, checkDuplicate };
+  }
+
+  // Case 2: Buffer passed -> Fast-Path with local QR extraction
+  if (!requestBody && Buffer.isBuffer(imageInput)) {
+    try {
+      const qrPayload = await extractQrFromImage(imageInput);
+      if (qrPayload && qrPayload.length >= 20) {
+        console.log('[EasySlip v2] ⚡ Fast QR Payload Mode triggered! Sending 150-byte payload instead of 3MB image.');
+        requestBody = { payload: qrPayload, checkDuplicate };
+      }
+    } catch (qrErr) {
+      console.warn('[EasySlip v2] Local QR extraction failed, fallback to base64:', qrErr?.message || qrErr);
+    }
+  }
+
+  // Case 3: Fallback or raw base64 string
+  if (!requestBody) {
+    let base64Data = '';
+    if (Buffer.isBuffer(imageInput)) {
+      base64Data = imageInput.toString('base64');
+    } else if (typeof imageInput === 'string') {
+      base64Data = imageInput.replace(/^data:image\/[a-zA-Z]+;base64,/, '').trim();
+    } else {
+      return { success: false, isSlip: false, error: 'INVALID_INPUT_TYPE' };
+    }
+
+    if (!base64Data || base64Data.length < 50) {
+      return { success: false, isSlip: false, error: 'EMPTY_IMAGE_DATA' };
+    }
+
+    requestBody = { base64: base64Data, checkDuplicate };
+  }
+
+  // Save base64 for fallback in case payload mode errors
+  if (requestBody.payload && Buffer.isBuffer(imageInput)) {
+    fallbackBase64 = () => imageInput.toString('base64');
+  }
+
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 9000); // 9-second timeout safeguard
+    const makeApiCall = async (body) => {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 9000);
+      try {
+        const res = await fetch('https://api.easyslip.com/v2/verify/bank', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(body),
+          signal: controller.signal
+        });
+        clearTimeout(timeout);
+        return await res.json();
+      } catch (err) {
+        clearTimeout(timeout);
+        throw err;
+      }
+    };
 
-    const response = await fetch('https://api.easyslip.com/v2/verify/bank', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        base64: base64Data,
-        checkDuplicate
-      }),
-      signal: controller.signal
-    });
-    clearTimeout(timeout);
+    let result = await makeApiCall(requestBody);
 
-    const result = await response.json();
+    // If payload mode failed and we have fallback base64, try fallback once
+    if (requestBody.payload && fallbackBase64 && (!result || result.success === false)) {
+      console.log('[EasySlip v2] Payload mode unsuccessful, retrying with base64 image fallback...');
+      try {
+        result = await makeApiCall({ base64: fallbackBase64(), checkDuplicate });
+      } catch (fbErr) {
+        console.warn('[EasySlip v2] Base64 fallback error:', fbErr?.message || fbErr);
+      }
+    }
 
     // Check if EasySlip API v2 verified the bank slip
     if (result && (result.success === true || result.status === 200) && result.data) {

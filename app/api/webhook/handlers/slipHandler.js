@@ -1,14 +1,21 @@
 import { supabase } from '../../../../lib/supabaseClient';
 import { format, addHours } from 'date-fns';
 import { sanitizeTransactionRef, sanitizeAmount } from '../../../../utils/gemini';
+import sharp from 'sharp';
 
-export async function handleSlipImage(event, client, buffer, userId, groupId, result) {
-  if (!result.isSlip) return false;
+// In-memory cache for employee resolution: line_user_id / line_bot_id -> { mappedDbUserId, senderName, cachedAt }
+const employeeCache = new Map();
+const EMPLOYEE_CACHE_TTL = 1000 * 60 * 60; // 1 hour
+
+async function resolveEmployee(userId, groupId, client) {
+  const cached = employeeCache.get(userId);
+  if (cached && (Date.now() - cached.cachedAt < EMPLOYEE_CACHE_TTL)) {
+    return cached;
+  }
 
   let mappedDbUserId = userId;
   let senderName = "ทีมงาน";
 
-  // 1. ตรวจสอบชื่อพนักงานจากฐานข้อมูล employees เพื่อดึงชื่อเล่น
   try {
     const { data: emp } = await supabase
        .from('employees')
@@ -20,8 +27,7 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
     if (emp) {
       if (emp.line_user_id) mappedDbUserId = emp.line_user_id;
       if (emp.nickname || emp.name) senderName = emp.nickname || emp.name;
-    } else {
-      // 2. หากยังไม่มีในฐานข้อมูล ให้ดึงชื่อ Display Name จาก LINE Profile
+    } else if (client) {
       try {
         if (groupId && groupId.startsWith('C')) {
           const profile = await client.getGroupMemberProfile(groupId, userId);
@@ -30,15 +36,88 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
           const profile = await client.getProfile(userId);
           if (profile && profile.displayName) senderName = profile.displayName;
         }
-      } catch (profileErr) {
+      } catch {
         senderName = "ทีมงาน";
       }
     }
   } catch (err) {
-    console.warn("Could not resolve employee nickname:", err?.message);
+    console.warn("[Slip Handler] Could not resolve employee nickname:", err?.message);
   }
 
-  // ปรับให้ทุกคนสามารถส่งสลิปได้ตามคำสั่งผู้ใช้ (เปิดอิสระ ไม่บล็อกสิทธิ์)
+  const result = { mappedDbUserId, senderName, cachedAt: Date.now() };
+  employeeCache.set(userId, result);
+  if (mappedDbUserId !== userId) {
+    employeeCache.set(mappedDbUserId, result);
+  }
+  return result;
+}
+
+async function checkDuplicateSlip({ result, cleanRef, parsedAmount, dateStr, cleanSender, userId }) {
+  // Layer 0 / 1: By Clean Ref or EasySlip Network Duplicate
+  if (cleanRef) {
+    const { data: existingSlip } = await supabase
+      .from('slip_transactions')
+      .select('id, amount, date, timestamp, sender_name, bank_name, transaction_ref, user_id')
+      .eq('transaction_ref', cleanRef)
+      .eq('is_deleted', false)
+      .maybeSingle();
+
+    if (existingSlip) {
+      console.log(`[Slip Duplicate Prevention] Match by Ref: ${cleanRef}`);
+      return existingSlip;
+    }
+  }
+
+  if (result.source === 'easyslip' && result.isDuplicate) {
+    console.log(`[Slip Duplicate Prevention] EasySlip flagged duplicate in bank network: ${cleanRef}`);
+    return {
+      amount: parsedAmount,
+      date: dateStr,
+      transaction_ref: cleanRef || 'EasySlip Network Detected',
+      sender_name: cleanSender || 'ระบบธนาคารตรวจพบสลิปซ้ำ',
+      timestamp: new Date().toISOString(),
+      user_id: userId,
+      isNetworkDuplicate: true
+    };
+  }
+
+  // Layer 2: Check screen capture slip without ref (Composite Matching)
+  if (parsedAmount > 0) {
+    const { data: sameDaySlips } = await supabase
+      .from('slip_transactions')
+      .select('id, amount, date, timestamp, sender_name, bank_name, transaction_ref, user_id')
+      .eq('amount', parsedAmount)
+      .eq('date', dateStr)
+      .eq('is_deleted', false);
+
+    if (sameDaySlips && sameDaySlips.length > 0) {
+      for (const slip of sameDaySlips) {
+        if (cleanSender && slip.sender_name) {
+          const normA = cleanSender.toLowerCase().replace(/[\s.*_]/g, '');
+          const normB = slip.sender_name.toLowerCase().replace(/[\s.*_]/g, '');
+          if (normA.length >= 3 && normB.length >= 3 && (normA.includes(normB) || normB.includes(normA))) {
+            console.log(`[Slip Duplicate Prevention] Match by composite (Same Amount + Date + Sender: ${cleanSender})`);
+            return slip;
+          }
+        }
+
+        if (!cleanRef && !slip.transaction_ref && slip.timestamp) {
+          const slipTime = new Date(slip.timestamp).getTime();
+          const diffMinutes = Math.abs(Date.now() - slipTime) / (1000 * 60);
+          if (diffMinutes <= 10) {
+            console.log(`[Slip Duplicate Prevention] Match by composite (Same Amount + uploaded within 10 mins)`);
+            return slip;
+          }
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+export async function handleSlipImage(event, client, buffer, userId, groupId, result) {
+  if (!result.isSlip) return false;
 
   // Parse amount safely
   const parsedAmount = sanitizeAmount(result.amount);
@@ -60,100 +139,31 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
     dateStr = result.transDate;
   }
 
-  // --- Duplicate Slip Detection (ระบบป้องกันสลิปซ้ำแบบอัจฉริยะ) ---
-  let duplicateSlip = null;
+  // ⚡ Phase 1 Optimization: Run Employee Resolution & Duplicate Check in PARALLEL
+  const [empInfo, duplicateSlip] = await Promise.all([
+    resolveEmployee(userId, groupId, client),
+    checkDuplicateSlip({ result, cleanRef, parsedAmount, dateStr, cleanSender, userId })
+  ]);
 
-  // Layer 0: ตรวจสอบจาก EasySlip Bank Network Duplicate Detection (ถ้าตรวจพบการตรวจซ้ำในเครือข่ายธนาคาร)
-  if (result.source === 'easyslip' && result.isDuplicate) {
-    console.log(`[Slip Duplicate Prevention] EasySlip flagged duplicate in bank network: ${cleanRef}`);
-    if (cleanRef) {
-      const { data: existingSlip } = await supabase
-        .from('slip_transactions')
-        .select('id, amount, date, timestamp, sender_name, bank_name, transaction_ref, user_id')
-        .eq('transaction_ref', cleanRef)
-        .eq('is_deleted', false)
-        .maybeSingle();
-      if (existingSlip) {
-        duplicateSlip = existingSlip;
-      }
-    }
-    if (!duplicateSlip) {
-      duplicateSlip = {
-        amount: parsedAmount,
-        date: dateStr,
-        transaction_ref: cleanRef || 'EasySlip Network Detected',
-        sender_name: cleanSender || 'ระบบธนาคารตรวจพบสลิปซ้ำ',
-        timestamp: new Date().toISOString(),
-        user_id: mappedDbUserId,
-        isNetworkDuplicate: true
-      };
-    }
-  }
-
-  // Layer 1: ตรวจสอบด้วย Transaction Ref Code (ถ้ามี Ref Code ที่ถูกต้อง)
-  if (!duplicateSlip && cleanRef) {
-    const { data: existingSlip } = await supabase
-      .from('slip_transactions')
-      .select('id, amount, date, timestamp, sender_name, bank_name, transaction_ref, user_id')
-      .eq('transaction_ref', cleanRef)
-      .eq('is_deleted', false)
-      .maybeSingle();
-
-    if (existingSlip) {
-      console.log(`[Slip Duplicate Prevention] Match by Ref: ${cleanRef}`);
-      duplicateSlip = existingSlip;
-    }
-  }
-
-  // Layer 2: ตรวจสอบสลิปหน้าจอแอปที่ไม่มี Ref Code (Composite Matching)
-  // เพื่อกันกดส่งซ้ำ หรือพนักงาน 2 คนส่งรูปหน้าจอเดียวกัน โดยไม่บล็อกสลิปยอดเดียวกันที่คนละคนโอน
-  if (!duplicateSlip && parsedAmount > 0) {
-    const { data: sameDaySlips } = await supabase
-      .from('slip_transactions')
-      .select('id, amount, date, timestamp, sender_name, bank_name, transaction_ref, user_id')
-      .eq('amount', parsedAmount)
-      .eq('date', dateStr)
-      .eq('is_deleted', false);
-
-    if (sameDaySlips && sameDaySlips.length > 0) {
-      for (const slip of sameDaySlips) {
-        // 2.1 หากมีชื่อผู้โอนตรงกัน (หรือคล้ายกันมาก) ในวันเดียวกัน
-        if (cleanSender && slip.sender_name) {
-          const normA = cleanSender.toLowerCase().replace(/[\s.*_]/g, '');
-          const normB = slip.sender_name.toLowerCase().replace(/[\s.*_]/g, '');
-          if (normA.length >= 3 && normB.length >= 3 && (normA.includes(normB) || normB.includes(normA))) {
-            console.log(`[Slip Duplicate Prevention] Match by composite (Same Amount + Date + Sender: ${cleanSender})`);
-            duplicateSlip = slip;
-            break;
-          }
-        }
-
-        // 2.2 หากบันทึกไปในเวลาใกล้เคียงกันมาก (ภายใน 10 นาที) และไม่มี ref ทั้งคู่
-        if (!cleanRef && !slip.transaction_ref && slip.timestamp) {
-          const slipTime = new Date(slip.timestamp).getTime();
-          const nowMs = Date.now();
-          const diffMinutes = Math.abs(nowMs - slipTime) / (1000 * 60);
-          if (diffMinutes <= 10) {
-            console.log(`[Slip Duplicate Prevention] Match by composite (Same Amount + uploaded within 10 mins)`);
-            duplicateSlip = slip;
-            break;
-          }
-        }
-      }
-    }
-  }
+  const mappedDbUserId = empInfo.mappedDbUserId;
+  const senderName = empInfo.senderName;
 
   // หากตรวจพบสลิปซ้ำ แสดง Alert และปฏิเสธการบันทึก
   if (duplicateSlip) {
     let originalOperator = duplicateSlip.sender_name || "พนักงานในระบบ";
     if (duplicateSlip.user_id) {
-      const { data: origEmp } = await supabase
-        .from('employees')
-        .select('nickname, name')
-        .eq('line_user_id', duplicateSlip.user_id)
-        .maybeSingle();
-      if (origEmp) {
-        originalOperator = origEmp.nickname || origEmp.name;
+      const origCached = employeeCache.get(duplicateSlip.user_id);
+      if (origCached) {
+        originalOperator = origCached.senderName;
+      } else {
+        const { data: origEmp } = await supabase
+          .from('employees')
+          .select('nickname, name')
+          .eq('line_user_id', duplicateSlip.user_id)
+          .maybeSingle();
+        if (origEmp) {
+          originalOperator = origEmp.nickname || origEmp.name;
+        }
       }
     }
 
@@ -275,41 +285,61 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
     return true;
   }
 
-  // อัปโหลดรูปสลิปและบันทึกลง Database พร้อมกันด้วย Promise.all (ลด Latency ลง ~500ms)
+  // ⚡ Phase 1 Optimization: Deterministic Public URL generation + Instant DB Insert
+  // Do NOT block LINE reply waiting for multi-megabyte image storage upload!
   const fileName = `slip_${Date.now()}_${mappedDbUserId}.jpg`;
   const { data: { publicUrl: slipUrl } } = supabase.storage.from('yuzu-slips').getPublicUrl(fileName);
 
-  const [uploadRes, insertRes] = await Promise.all([
-    supabase.storage.from('yuzu-slips').upload(fileName, buffer, { contentType: 'image/jpeg' }),
-    supabase.from('slip_transactions').insert({
-      group_id: groupId,
-      user_id: mappedDbUserId,
-      amount: parsedAmount,
-      slip_url: slipUrl,
-      transaction_ref: cleanRef || null,
-      sender_name: cleanSender || null,
-      bank_name: cleanBank || null,
-      date: dateStr
-    })
-  ]);
+  const { error: insertError } = await supabase.from('slip_transactions').insert({
+    group_id: groupId,
+    user_id: mappedDbUserId,
+    amount: parsedAmount,
+    slip_url: slipUrl,
+    transaction_ref: cleanRef || null,
+    sender_name: cleanSender || null,
+    bank_name: cleanBank || null,
+    date: dateStr
+  });
 
-  if (uploadRes.error) {
-    console.error("Slip Storage Upload Error:", uploadRes.error);
+  if (insertError) {
+    console.error("Slip Insert Error:", insertError);
+    if (insertError.code === '23505') {
+      await client.replyMessage(event.replyToken, { type: 'text', text: `⚠️ สลิปใบนี้ (อ้างอิง: ${cleanRef || 'ไม่ทราบ'}) ได้ถูกบันทึกเข้าระบบเรียบร้อยแล้วครับ ระบบปฏิเสธการบันทึกซ้ำซ้อน` });
+    } else {
+      await client.replyMessage(event.replyToken, { type: 'text', text: `เกิดข้อผิดพลาดในการบันทึกข้อมูลสลิปเข้าระบบครับ (Error: ${insertError.message || insertError.code || 'Unknown DB Error'})` });
+    }
+    return true;
   }
 
-  const insertError = insertRes.error;
-  if (insertError) {
-     console.error("Slip Insert Error:", insertError);
-      if (insertError.code === '23505') {
-           await client.replyMessage(event.replyToken, { type: 'text', text: `⚠️ สลิปใบนี้ (อ้างอิง: ${cleanRef || 'ไม่ทราบ'}) ได้ถูกบันทึกเข้าระบบเรียบร้อยแล้วครับ ระบบปฏิเสธการบันทึกซ้ำซ้อน` });
-      } else {
-           await client.replyMessage(event.replyToken, { type: 'text', text: `เกิดข้อผิดพลาดในการบันทึกข้อมูลสลิปเข้าระบบครับ (Error: ${insertError.message || insertError.code || 'Unknown DB Error'})` });
-      }
-  } else {
-     const formattedTime = result.transTime || format(bkkNow, 'dd/MM/yyyy HH:mm น.');
-     const displayRef = cleanRef || 'สลิปหน้าจอแอป (ยืนยันด้วยยอดและเวลา)';
+  // ⚡ Phase 1 & 4 Optimization: Background Image Compression (sharp) & Upload
+  // Runs in the background (fire-and-forget) so the LINE user receives the reply immediately!
+  if (buffer && Buffer.isBuffer(buffer)) {
+    (async () => {
+      try {
+        const compressedBuffer = await sharp(buffer)
+          .resize({ width: 1280, height: 1280, fit: 'inside', withoutEnlargement: true })
+          .jpeg({ quality: 80, progressive: true })
+          .toBuffer();
 
-     const isEasySlip = result.source === 'easyslip';
+        const { error: uploadError } = await supabase.storage
+          .from('yuzu-slips')
+          .upload(fileName, compressedBuffer, { contentType: 'image/jpeg' });
+
+        if (uploadError) {
+          console.error("[Slip Storage Upload Error]:", uploadError);
+        } else {
+          console.log(`[Slip Storage] Successfully uploaded compressed slip (${Math.round(compressedBuffer.length / 1024)} KB): ${fileName}`);
+        }
+      } catch (bgUploadErr) {
+        console.error("[Slip Background Upload Error]:", bgUploadErr?.message || bgUploadErr);
+      }
+    })();
+  }
+
+  const formattedTime = result.transTime || format(bkkNow, 'dd/MM/yyyy HH:mm น.');
+  const displayRef = cleanRef || 'สลิปหน้าจอแอป (ยืนยันด้วยยอดและเวลา)';
+
+  const isEasySlip = result.source === 'easyslip';
 
      /* Hallmark · pre-emit critique: P5 H5 E5 S5 R5 V5 */
      // Hallmark Redesign: Tactile warm linen paper, clean typography hierarchy, restrained dividers
@@ -623,7 +653,6 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
           await client.pushMessage(target, slipFlexMsg);
         }
       }
-  }
-  return true;
+      return true;
 }
 
