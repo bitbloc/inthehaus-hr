@@ -85,8 +85,35 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
   // --- Duplicate Slip Detection (ระบบป้องกันสลิปซ้ำแบบอัจฉริยะ) ---
   let duplicateSlip = null;
 
+  // Layer 0: ตรวจสอบจาก EasySlip Bank Network Duplicate Detection (ถ้าตรวจพบการตรวจซ้ำในเครือข่ายธนาคาร)
+  if (result.source === 'easyslip' && result.isDuplicate) {
+    console.log(`[Slip Duplicate Prevention] EasySlip flagged duplicate in bank network: ${cleanRef}`);
+    if (cleanRef) {
+      const { data: existingSlip } = await supabase
+        .from('slip_transactions')
+        .select('id, amount, date, timestamp, sender_name, bank_name, transaction_ref, user_id')
+        .eq('transaction_ref', cleanRef)
+        .eq('is_deleted', false)
+        .maybeSingle();
+      if (existingSlip) {
+        duplicateSlip = existingSlip;
+      }
+    }
+    if (!duplicateSlip) {
+      duplicateSlip = {
+        amount: parsedAmount,
+        date: dateStr,
+        transaction_ref: cleanRef || 'EasySlip Network Detected',
+        sender_name: cleanSender || 'ระบบธนาคารตรวจพบสลิปซ้ำ',
+        timestamp: new Date().toISOString(),
+        user_id: mappedDbUserId,
+        isNetworkDuplicate: true
+      };
+    }
+  }
+
   // Layer 1: ตรวจสอบด้วย Transaction Ref Code (ถ้ามี Ref Code ที่ถูกต้อง)
-  if (cleanRef) {
+  if (!duplicateSlip && cleanRef) {
     const { data: existingSlip } = await supabase
       .from('slip_transactions')
       .select('id, amount, date, timestamp, sender_name, bank_name, transaction_ref, user_id')
@@ -196,7 +223,9 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
           contents: [
             {
               type: 'text',
-              text: `สลิปยอด ${Number(duplicateSlip.amount).toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท เคยถูกบันทึกเข้าระบบไปแล้วครับ`,
+              text: duplicateSlip.isNetworkDuplicate 
+                ? `สลิปยอด ${Number(duplicateSlip.amount).toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท นี้ถูกตรวจพบว่าเคยถูกนำไปใช้งาน/ตรวจซ้ำในระบบเครือข่ายธนาคารแล้วครับ`
+                : `สลิปยอด ${Number(duplicateSlip.amount).toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท เคยถูกบันทึกเข้าระบบไปแล้วครับ`,
               size: 'xs',
               color: '#374151',
               wrap: true
@@ -256,7 +285,15 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
       }
     };
 
-    await client.replyMessage(event.replyToken, duplicateFlexMsg);
+    try {
+      await client.replyMessage(event.replyToken, duplicateFlexMsg);
+    } catch (replyErr) {
+      console.warn("Duplicate replyMessage failed, attempting pushMessage fallback:", replyErr.message);
+      const target = groupId || userId;
+      if (target) {
+        await client.pushMessage(target, duplicateFlexMsg);
+      }
+    }
     return true;
   }
 
@@ -326,12 +363,42 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
                     color: '#333333'
                   },
                   {
-                    type: 'text',
-                    text: 'DEPOSIT RECORDED',
-                    weight: 'bold',
-                    size: 'lg',
-                    color: '#000000',
-                    margin: 'xs'
+                    type: 'box',
+                    layout: 'horizontal',
+                    alignItems: 'center',
+                    margin: 'xs',
+                    contents: [
+                      {
+                        type: 'text',
+                        text: 'DEPOSIT RECORDED',
+                        weight: 'bold',
+                        size: 'lg',
+                        color: '#000000',
+                        flex: 0
+                      },
+                      ...(result.source === 'easyslip' ? [
+                        {
+                          type: 'box',
+                          layout: 'vertical',
+                          backgroundColor: '#059669',
+                          cornerRadius: '4px',
+                          paddingStart: '6px',
+                          paddingEnd: '6px',
+                          paddingTop: '2px',
+                          paddingBottom: '2px',
+                          margin: 'sm',
+                          contents: [
+                            {
+                              type: 'text',
+                              text: '⚡ BANK VERIFIED',
+                              size: 'xxs',
+                              color: '#ffffff',
+                              weight: 'bold'
+                            }
+                          ]
+                        }
+                      ] : [])
+                    ]
                   }
                 ]
               },
@@ -510,11 +577,29 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
                     wrap: true
                   },
                   {
-                    type: 'text',
-                    text: 'REFERENCE NO.',
-                    size: 'xxs',
-                    color: '#333333',
-                    margin: 'xs'
+                    type: 'box',
+                    layout: 'horizontal',
+                    margin: 'xs',
+                    contents: [
+                      {
+                        type: 'text',
+                        text: 'REFERENCE NO.',
+                        size: 'xxs',
+                        color: '#333333',
+                        flex: 1
+                      },
+                      ...(result.source === 'easyslip' ? [
+                        {
+                          type: 'text',
+                          text: '✓ EasySlip Bank API',
+                          size: 'xxs',
+                          color: '#059669',
+                          weight: 'bold',
+                          align: 'end',
+                          flex: 1
+                        }
+                      ] : [])
+                    ]
                   }
                 ]
               },
@@ -549,7 +634,15 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
           }
         }
       };
-      await client.replyMessage(event.replyToken, slipFlexMsg);
+      try {
+        await client.replyMessage(event.replyToken, slipFlexMsg);
+      } catch (replyErr) {
+        console.warn("Slip replyMessage failed, attempting pushMessage fallback:", replyErr.message);
+        const target = groupId || userId;
+        if (target) {
+          await client.pushMessage(target, slipFlexMsg);
+        }
+      }
   }
   return true;
 }

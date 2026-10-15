@@ -3,10 +3,26 @@ import { getSupabase } from '../lib/supabaseClient.js';
 
 let PDFParse = null;
 
+// In-memory cache for query embeddings (Phase 3 Performance)
+const queryEmbeddingCache = new Map();
+const EMBED_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
 /**
- * Generate embedding for a text string
+ * Generate embedding for a text string (cached for RETRIEVAL_QUERY)
  */
 export async function getEmbedding(text, taskType = 'RETRIEVAL_QUERY', title = null) {
+    if (!text || typeof text !== 'string') return { error: "Invalid text input" };
+    const cleanText = text.trim();
+
+    // Cache hit check for queries
+    if (taskType === 'RETRIEVAL_QUERY' && !title) {
+        const cacheKey = cleanText.toLowerCase();
+        const cached = queryEmbeddingCache.get(cacheKey);
+        if (cached && Date.now() < cached.expiry) {
+            return { values: cached.values };
+        }
+    }
+
     try {
         const instance = getGenAI();
         if (!instance) {
@@ -20,7 +36,7 @@ export async function getEmbedding(text, taskType = 'RETRIEVAL_QUERY', title = n
         try {
             // Priority: Optimized call based on latest documentation
             result = await model.embedContent({
-                content: { parts: [{ text }] },
+                content: { parts: [{ text: cleanText }] },
                 taskType: taskType,
                 title: title || undefined,
                 outputDimensionality: 768
@@ -32,7 +48,7 @@ export async function getEmbedding(text, taskType = 'RETRIEVAL_QUERY', title = n
                 // Secondary Fallback: Try a different reliable model
                 const fallbackModel = instance.getGenerativeModel({ model: GEMINI_MODELS.EMBEDDING_FALLBACK || "gemini-embedding-001" });
                 result = await fallbackModel.embedContent({
-                    content: { parts: [{ text }] },
+                    content: { parts: [{ text: cleanText }] },
                     outputDimensionality: 768
                 });
             } catch (fallbackError) {
@@ -44,7 +60,14 @@ export async function getEmbedding(text, taskType = 'RETRIEVAL_QUERY', title = n
             throw new Error("Gemini returned an empty embedding response");
         }
         
-        return { values: result.embedding.values };
+        const values = result.embedding.values;
+        if (taskType === 'RETRIEVAL_QUERY' && !title) {
+            queryEmbeddingCache.set(cleanText.toLowerCase(), {
+                values,
+                expiry: Date.now() + EMBED_CACHE_TTL_MS
+            });
+        }
+        return { values };
     } catch (error) {
         console.error("Full Embedding Error Details:", error);
         return { error: error.message || "Unknown embedding error" };
@@ -52,27 +75,55 @@ export async function getEmbedding(text, taskType = 'RETRIEVAL_QUERY', title = n
 }
 
 /**
- * Search the knowledge base for relevant chunks
+ * Search the knowledge base for relevant chunks (pgvector RPC with keyword fallback)
  */
 export async function searchKnowledge(query, limit = 3) {
+    if (!query || typeof query !== 'string') return [];
+    const cleanQuery = query.trim();
+
     try {
-        // Use RETRIEVAL_QUERY for searching
-        const result = await getEmbedding(query, 'RETRIEVAL_QUERY');
-        if (result.error || !result.values) return [];
-
         const client = getSupabase();
-        const { data, error } = await client.rpc('match_yuzu_knowledge', {
-            query_embedding: result.values,
-            match_threshold: 0.5,
-            match_count: limit
-        });
+        if (!client) return [];
 
-        if (error) {
-            console.error("Knowledge Search Error:", error);
-            return [];
+        // 1. Generate query embedding
+        const result = await getEmbedding(cleanQuery, 'RETRIEVAL_QUERY');
+        let vectorResults = [];
+
+        if (result && result.values && !result.error) {
+            const { data, error } = await client.rpc('match_yuzu_knowledge', {
+                query_embedding: result.values,
+                match_threshold: 0.5,
+                match_count: limit
+            });
+
+            if (!error && Array.isArray(data) && data.length > 0) {
+                vectorResults = data;
+            } else if (error) {
+                console.warn("Knowledge Vector Search RPC Error (falling back to text match):", error.message);
+            }
         }
 
-        return data;
+        if (vectorResults.length > 0) {
+            return vectorResults;
+        }
+
+        // 2. Resilient Keyword Fallback: Search content directly if RPC not ready or no match
+        const searchTerms = cleanQuery.split(/\s+/).filter(t => t.length > 1).slice(0, 3);
+        if (searchTerms.length > 0) {
+            let dbQuery = client
+                .from('yuzu_knowledge')
+                .select('id, content, metadata')
+                .limit(limit);
+
+            const filterPattern = searchTerms.map(t => `content.ilike.%${t}%`).join(',');
+            const { data: textMatches } = await dbQuery.or(filterPattern);
+
+            if (textMatches && textMatches.length > 0) {
+                return textMatches;
+            }
+        }
+
+        return [];
     } catch (error) {
         console.error("RAG Utility Error:", error);
         return [];

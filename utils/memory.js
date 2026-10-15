@@ -231,11 +231,50 @@ export async function getEmployeeHistory(userId, days = 30) {
         return "";
     }
 }
+// ==========================================
+// In-Memory TTL Cache (Phase 2 Performance Engine)
+// ==========================================
+const memoryCache = new Map();
+const DEFAULT_TTL_MS = 60 * 1000; // 60 seconds
+
+function getFromCache(key) {
+    const entry = memoryCache.get(key);
+    if (!entry) return null;
+    if (Date.now() > entry.expiry) {
+        memoryCache.delete(key);
+        return null;
+    }
+    return entry.value;
+}
+
+function setToCache(key, value, ttlMs = DEFAULT_TTL_MS) {
+    memoryCache.set(key, {
+        value,
+        expiry: Date.now() + ttlMs
+    });
+}
+
+export function invalidateMemoryCache(prefix = null) {
+    if (!prefix) {
+        memoryCache.clear();
+        return;
+    }
+    for (const key of memoryCache.keys()) {
+        if (key.startsWith(prefix)) {
+            memoryCache.delete(key);
+        }
+    }
+}
+
 /**
- * Get employee details by LINE Bot ID (Sync with HR data)
+ * Get employee details by LINE Bot ID (Sync with HR data, cached 60s)
  */
 export async function getEmployeeByLineId(lineUserId) {
     if (!lineUserId) return null;
+    const cacheKey = `emp_line_${String(lineUserId).toLowerCase()}`;
+    const cached = getFromCache(cacheKey);
+    if (cached !== null) return cached;
+
     try {
         const client = getSupabase();
         
@@ -266,6 +305,9 @@ export async function getEmployeeByLineId(lineUserId) {
             }
         }
 
+        if (data) {
+            setToCache(cacheKey, data, 60000);
+        }
         return data;
     } catch (err) {
         console.error("Memory Utility Error (fetch employee):", err);
@@ -274,9 +316,13 @@ export async function getEmployeeByLineId(lineUserId) {
 }
 
 /**
- * Get all active employees (for mapping UIDs in chat context)
+ * Get all active employees (for mapping UIDs in chat context, cached 60s)
  */
 export async function getAllEmployeesData() {
+    const cacheKey = 'all_employees_data';
+    const cached = getFromCache(cacheKey);
+    if (cached !== null) return cached;
+
     try {
         const client = getSupabase();
         if (!client) return [];
@@ -289,16 +335,23 @@ export async function getAllEmployeesData() {
             console.error("Error fetching all employees:", error);
             return [];
         }
-        return data || [];
+        const result = data || [];
+        setToCache(cacheKey, result, 60000);
+        return result;
     } catch (err) {
         console.error("Memory Utility Error (fetch all employees):", err);
         return [];
     }
 }
+
 /**
- * Get Yuzu System Configuration (Father/Mother UIDs)
+ * Get Yuzu System Configuration (Father/Mother UIDs, cached 60s)
  */
 export async function getYuzuConfigs() {
+    const cacheKey = 'yuzu_configs';
+    const cached = getFromCache(cacheKey);
+    if (cached !== null) return cached;
+
     try {
         const client = getSupabase();
         if (!client) throw new Error("No client");
@@ -314,7 +367,6 @@ export async function getYuzuConfigs() {
 
         if (error) {
             console.error("Error fetching yuzu_config:", error);
-            // Return defaults if error
             return config;
         }
 
@@ -338,6 +390,7 @@ export async function getYuzuConfigs() {
             config.staff_roster = rosterStr;
         }
         
+        setToCache(cacheKey, config, 60000);
         return config;
     } catch (err) {
         console.error("Memory Utility Error (fetch config):", err);
@@ -347,17 +400,25 @@ export async function getYuzuConfigs() {
         };
     }
 }
+
 /**
- * Check if a user is an Owner/Boss (Robust Dual-UID Check)
+ * Check if a user is an Owner/Boss (Robust Dual-UID Check, cached 60s)
  */
 export async function checkIsBoss(userId) {
     if (!userId) return false;
+    const cacheKey = `is_boss_${String(userId).toLowerCase()}`;
+    const cached = getFromCache(cacheKey);
+    if (cached !== null) return cached;
+
     try {
         const configs = await getYuzuConfigs();
         const { father_uid, mother_uid } = configs;
         
         // 1. Check against config UIDs (Direct match from Yuzu Config)
-        if (userId === father_uid || userId === mother_uid) return true;
+        if (userId === father_uid || userId === mother_uid) {
+            setToCache(cacheKey, true, 60000);
+            return true;
+        }
         
         // 2. Check employees table for Owner position (Dual-UID Match)
         const client = getSupabase();
@@ -368,13 +429,12 @@ export async function checkIsBoss(userId) {
             .eq('is_active', true)
             .maybeSingle();
         
-        if (emp && (emp.position === 'Owner' || emp.position === 'CEO' || emp.position === 'Manager' || emp.position === 'แอดมิน')) {
-            return true;
-        }
-        
-        return false;
+        const isBoss = !!(emp && (emp.position === 'Owner' || emp.position === 'CEO' || emp.position === 'Manager' || emp.position === 'แอดมิน'));
+        setToCache(cacheKey, isBoss, 60000);
+        return isBoss;
     } catch (err) {
         console.error("Error in checkIsBoss:", err);
         return false;
     }
 }
+

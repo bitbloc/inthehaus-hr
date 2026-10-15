@@ -4,8 +4,10 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
  * Centralized Gemini Model Registry
  */
 export const GEMINI_MODELS = {
-    FLASH: "gemini-3.7-flash",
+    FLASH: "gemini-4-argon",
+    ARGON: "gemini-4-argon",
     FALLBACKS: [
+        "gemini-4-argon",
         "gemini-3.7-flash",
         "gemini-2.5-flash",
         "gemini-2.0-flash",

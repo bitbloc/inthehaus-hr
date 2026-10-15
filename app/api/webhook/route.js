@@ -7,6 +7,7 @@ import { saveMessage, cleanupOldHistory, getEmployeeByLineId, getYuzuConfigs, ch
 import { handleRosterCommand, handleRosterPostback } from './handlers/rosterHandler';
 import { handleStockPostback } from './handlers/stockHandler';
 import { handleSlipImage } from './handlers/slipHandler';
+import { verifySlipWithEasySlip } from '../../../utils/easyslip';
 import { handleOrderAndReservationDetection, handleOrderAndReservationPostback } from './handlers/orderHandler';
 import { handleChatCommand, handleChatPostback } from './handlers/chatHandler';
 import { isEspressoShotReport, handleEspressoShotAnalysis } from './handlers/espressoHandler';
@@ -196,18 +197,18 @@ export async function POST(request) {
       // Run cleanup occasionally
       cleanupOldHistory().catch(e => console.error("Cleanup Error:", e));
 
-      for (const event of events) {
+      await Promise.allSettled(events.map(async (event) => {
         const eventId = event.webhookEventId || event.message?.id || event.replyToken;
         if (eventId) {
           const now = Date.now();
           if (inProgressEvents.has(eventId)) {
             console.log("Duplicate event ignored (in-progress in memory):", eventId);
-            continue;
+            return;
           }
           const lastProcessed = recentlyProcessedEvents.get(eventId);
           if (lastProcessed && (now - lastProcessed) < 15000) {
             console.log("Duplicate event ignored (recently processed in memory):", eventId);
-            continue;
+            return;
           }
           inProgressEvents.add(eventId);
         }
@@ -225,7 +226,7 @@ export async function POST(request) {
 
             if (existingLock && existingLock.length > 0) {
               console.log("Duplicate event ignored (found lock in DB):", messageId);
-              continue;
+              return;
             }
 
             const groupId = event.source.groupId || event.source.userId;
@@ -282,7 +283,7 @@ export async function POST(request) {
               if (error) {
                 await client.replyMessage(event.replyToken, { type: 'text', text: 'Error fetching data: ' + error.message });
                 handledLocally = true;
-                continue;
+                return;
               }
 
               // Fetch today's roster transactions for shift time comparison
@@ -581,6 +582,20 @@ export async function POST(request) {
               const buffer = Buffer.concat(chunks);
               const base64 = buffer.toString('base64');
 
+              // ⚡ FAST-PATH: EasySlip Bank Verification (< 800ms)
+              // If it's a bank slip with QR code, EasySlip parses it instantly with 100% bank accuracy!
+              try {
+                const easySlipResult = await verifySlipWithEasySlip(base64);
+                if (easySlipResult && easySlipResult.success && easySlipResult.isSlip) {
+                  console.log(`[EasySlip Fast-Path] Slip verified successfully (Ref: ${easySlipResult.transactionRef}, Amount: ${easySlipResult.amount})`);
+                  handledLocally = true;
+                  await handleSlipImage(event, client, buffer, userId, groupId, easySlipResult);
+                  return;
+                }
+              } catch (easySlipErr) {
+                console.warn("[EasySlip Fast-Path] Error or bypass, falling back to vision flow:", easySlipErr?.message || easySlipErr);
+              }
+
               const configs = await getYuzuConfigs();
               const isBoss = await checkIsBoss(userId);
 
@@ -784,7 +799,7 @@ export async function POST(request) {
                   console.log(`Yuzu Vision Batching: Message ${currentMsgId} is part of report batch. Skipping reply.`);
                   await saveMessage(groupId, userId, 'user', `[ภาพประกอบเพิ่มเติม]`, 'image_description');
                   handledLocally = true;
-                  continue;
+                  return;
                 }
 
                 // If it is a slip batch (or fallback to individual processing)
@@ -881,7 +896,7 @@ export async function POST(request) {
             cleanUpOldProcessedEvents();
           }
         }
-      }
+      }));
 
       // Forward to GAS if it's from the original Nakhon Phanom chat group and wasn't local-only
       const isFromOriginalGroup = events.some(e => e.source?.groupId === 'C1210c7a0601b5a675060e312efe10bff');
