@@ -6,61 +6,39 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
   if (!result.isSlip) return false;
 
   let mappedDbUserId = userId;
-  let senderName = "บุคคลภายนอก (ไม่มีในระบบ)";
-  let isAuthorized = false;
+  let senderName = "ทีมงาน";
 
-  // Direct query to ensure fresh database check
-  const { data: emp } = await supabase
-     .from('employees')
-     .select('line_user_id, line_bot_id, name, nickname, position')
-     .eq('is_active', true)
-     .or(`line_bot_id.eq.${userId},line_user_id.eq.${userId}`)
-     .maybeSingle();
+  // 1. ตรวจสอบชื่อพนักงานจากฐานข้อมูล employees เพื่อดึงชื่อเล่น
+  try {
+    const { data: emp } = await supabase
+       .from('employees')
+       .select('line_user_id, line_bot_id, name, nickname, position')
+       .eq('is_active', true)
+       .or(`line_bot_id.eq.${userId},line_user_id.eq.${userId}`)
+       .maybeSingle();
 
-  // Fetch allowed slip positions from yuzu_config
-  let allowedPositions = ['Bar & Floor', 'Owner', 'CEO', 'Manager', 'Part-time'];
-  const { data: configData } = await supabase
-     .from('yuzu_config')
-     .select('value')
-     .eq('key', 'allowed_slip_positions')
-     .maybeSingle();
-
-  if (configData && configData.value) {
-     try {
-        if (configData.value.trim().startsWith('[')) {
-           allowedPositions = JSON.parse(configData.value);
+    if (emp) {
+      if (emp.line_user_id) mappedDbUserId = emp.line_user_id;
+      if (emp.nickname || emp.name) senderName = emp.nickname || emp.name;
+    } else {
+      // 2. หากยังไม่มีในฐานข้อมูล ให้ดึงชื่อ Display Name จาก LINE Profile
+      try {
+        if (groupId && groupId.startsWith('C')) {
+          const profile = await client.getGroupMemberProfile(groupId, userId);
+          if (profile && profile.displayName) senderName = profile.displayName;
         } else {
-           allowedPositions = configData.value.split(',').map(s => s.trim()).filter(Boolean);
+          const profile = await client.getProfile(userId);
+          if (profile && profile.displayName) senderName = profile.displayName;
         }
-     } catch (e) {
-        allowedPositions = configData.value.split(',').map(s => s.trim()).filter(Boolean);
-     }
+      } catch (profileErr) {
+        senderName = "ทีมงาน";
+      }
+    }
+  } catch (err) {
+    console.warn("Could not resolve employee nickname:", err?.message);
   }
 
-  if (emp) {
-     if (emp.line_user_id) {
-       mappedDbUserId = emp.line_user_id;
-     }
-     if (emp.nickname || emp.name) {
-       senderName = emp.nickname || emp.name;
-     }
-     const empPosClean = emp.position ? emp.position.toLowerCase().replace(/\s/g, '') : '';
-     isAuthorized = allowedPositions.some(p => {
-        const pClean = p.toLowerCase().replace(/\s/g, '');
-        return empPosClean.includes(pClean) || pClean.includes(empPosClean);
-     });
-  }
-
-  if (!isAuthorized) {
-     let formattedAllowed = 'Bar & Floor และ Owner';
-     if (allowedPositions.length === 1) {
-        formattedAllowed = allowedPositions[0];
-     } else if (allowedPositions.length > 1) {
-        formattedAllowed = `${allowedPositions.slice(0, -1).join(', ')} และ ${allowedPositions[allowedPositions.length - 1]}`;
-     }
-     await client.replyMessage(event.replyToken, { type: 'text', text: `คุณ ${senderName} ไม่มีสิทธิ์ในการบันทึกสลิปเข้าระบบครับ (จำกัดสิทธิ์เฉพาะตำแหน่ง ${formattedAllowed} เท่านั้น)\n[UID: ${userId}]` });
-     return true;
-  }
+  // ปรับให้ทุกคนสามารถส่งสลิปได้ตามคำสั่งผู้ใช้ (เปิดอิสระ ไม่บล็อกสิทธิ์)
 
   // Parse amount safely
   const parsedAmount = sanitizeAmount(result.amount);

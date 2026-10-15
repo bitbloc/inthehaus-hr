@@ -686,16 +686,17 @@ export async function POST(request) {
 
                 const now = Date.now();
                 const lastReplyTime = lastVisionReplyTime.get(groupId) || 0;
-                let hasRecentReply = (now - lastReplyTime) < 8000;
+                // ป้องกันตอบซ้ำซ้อนสำหรับภาพงานปฏิบัติการทั่วไป (เช่น ดอกไม้, จัดเตรียมของ, ครัว) ในช่วง 90 วินาที
+                let hasRecentReply = (now - lastReplyTime) < 90000;
 
                 if (!hasRecentReply) {
-                  const eightSecondsAgo = new Date(now - 8000).toISOString();
+                  const ninetySecondsAgo = new Date(now - 90000).toISOString();
                   const { data: recentReplies } = await supabase
                     .from('yuzu_chat_history')
                     .select('id')
                     .eq('group_id', groupId)
                     .eq('role', 'model')
-                    .gte('created_at', eightSecondsAgo)
+                    .gte('created_at', ninetySecondsAgo)
                     .limit(1);
                   if (recentReplies && recentReplies.length > 0) {
                     hasRecentReply = true;
@@ -703,8 +704,8 @@ export async function POST(request) {
                 }
 
                 if (hasRecentReply) {
-                  console.log("Yuzu Vision Redundancy Filter: Anti-spam triggered. Logging photo silently.");
-                  await saveMessage(groupId, userId, 'user', `[ภาพประกอบ] ${resVal.shortDescription || 'รูปภาพ'}`, 'image_description');
+                  console.log("Yuzu Vision Redundancy Filter: Anti-spam triggered (recent reply within 90s). Logging photo silently.");
+                  await saveMessage(groupId, userId, 'user', `[ภาพประกอบเพิ่มเติม] ${resVal.shortDescription || 'รูปภาพ'}`, 'image_description');
                   handledLocally = true;
                   return;
                 }
@@ -720,6 +721,15 @@ export async function POST(request) {
               };
 
               if (isChosenOne) {
+                // บันทึก flag ล่วงหน้าทันที เพื่อให้รูปภาพที่ตามมาใน batch เดียวกันรู้ว่ามีกระบวนการรับเรื่องแล้ว ไม่ส่งข้อความซ้ำ
+                await supabase.from('yuzu_chat_history').insert({
+                  group_id: groupId,
+                  user_id: userId,
+                  role: 'system',
+                  content: currentMsgId,
+                  message_type: 'report_batch_taken'
+                });
+
                 // The chosen one: Analyze the first image to see if it is a slip
                 console.log(`Yuzu Vision Batching: Chosen one (${currentMsgId}) analyzing first image...`);
                 const result = await classifyAndAnalyzeImage(base64, "image/jpeg", context, bossRole, positionInstruction, friendlyName);
@@ -738,14 +748,6 @@ export async function POST(request) {
                   handledLocally = true;
                   await handleSlipImage(event, client, buffer, userId, groupId, result);
                 } else {
-                  // Write report batch taken flag to DB
-                  await supabase.from('yuzu_chat_history').insert({
-                    group_id: groupId,
-                    user_id: userId,
-                    role: 'system',
-                    content: currentMsgId,
-                    message_type: 'report_batch_taken'
-                  });
 
                   // Gather other images
                   const batchMsgIds = sortedLocks.map(l => l.content);
