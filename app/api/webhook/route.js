@@ -582,16 +582,22 @@ export async function POST(request) {
 
               // ⚡ ULTRA FAST-PATH: EasySlip Bank Verification with Local QR Scanner (~300ms)
               // Extracts QR locally via sharp + jsQR in ~20ms, then sends 150-byte payload to EasySlip!
+              let easySlipResult = null;
               try {
-                const easySlipResult = await verifySlipWithEasySlip(buffer);
-                if (easySlipResult && easySlipResult.success && easySlipResult.isSlip) {
-                  console.log(`[EasySlip Fast-Path] Slip verified successfully (Ref: ${easySlipResult.transactionRef}, Amount: ${easySlipResult.amount})`);
-                  handledLocally = true;
-                  await handleSlipImage(event, client, buffer, userId, groupId, easySlipResult);
-                  return;
-                }
+                easySlipResult = await verifySlipWithEasySlip(buffer);
               } catch (easySlipErr) {
                 console.warn("[EasySlip Fast-Path] Error or bypass, falling back to vision flow:", easySlipErr?.message || easySlipErr);
+              }
+
+              if (easySlipResult && easySlipResult.success && easySlipResult.isSlip) {
+                console.log(`[EasySlip Fast-Path] Slip verified successfully (Ref: ${easySlipResult.transactionRef}, Amount: ${easySlipResult.amount})`);
+                handledLocally = true;
+                try {
+                  await handleSlipImage(event, client, buffer, userId, groupId, easySlipResult);
+                } catch (handleErr) {
+                  console.error("[EasySlip Fast-Path] Error in handleSlipImage:", handleErr?.message || handleErr);
+                }
+                return;
               }
 
               // Optimize image for Gemini Vision (compress to max 1024px to speed up AI inference by ~2s)

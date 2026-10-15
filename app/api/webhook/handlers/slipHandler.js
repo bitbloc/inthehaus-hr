@@ -401,24 +401,33 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
                         size: 'xxs',
                         color: '#78716C',
                         weight: 'bold',
-                        flex: 1
+                        flex: 0
                       },
                       {
                         type: 'box',
-                        layout: 'vertical',
-                        backgroundColor: isEasySlip ? '#ECFDF5' : '#F4F4F5',
-                        cornerRadius: '6px',
-                        paddingStart: '8px',
-                        paddingEnd: '8px',
-                        paddingTop: '3px',
-                        paddingBottom: '3px',
+                        layout: 'horizontal',
+                        justifyContent: 'flex-end',
+                        flex: 1,
                         contents: [
                           {
-                            type: 'text',
-                            text: isEasySlip ? '✓ ตรวจสอบกับธนาคารแล้ว' : '📸 อ่านจากภาพ',
-                            size: 'xxs',
-                            color: isEasySlip ? '#047857' : '#52525B',
-                            weight: 'bold'
+                            type: 'box',
+                            layout: 'vertical',
+                            backgroundColor: isEasySlip ? '#ECFDF5' : '#F4F4F5',
+                            cornerRadius: '6px',
+                            paddingStart: '8px',
+                            paddingEnd: '8px',
+                            paddingTop: '3px',
+                            paddingBottom: '3px',
+                            contents: [
+                              {
+                                type: 'text',
+                                text: isEasySlip ? '✓ ตรวจสอบกับธนาคารแล้ว' : '📸 อ่านจากภาพ',
+                                size: 'xxs',
+                                color: isEasySlip ? '#047857' : '#52525B',
+                                weight: 'bold',
+                                wrap: true
+                              }
+                            ]
                           }
                         ]
                       }

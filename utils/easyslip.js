@@ -112,8 +112,8 @@ export async function verifySlipWithEasySlip(imageInput, options = {}) {
   // Case 1: Explicit payload passed
   if (typeof imageInput === 'object' && imageInput?.payload) {
     requestBody = { payload: imageInput.payload, checkDuplicate };
-  } else if (typeof imageInput === 'string' && imageInput.startsWith('000201')) {
-    // Direct PromptPay QR string
+  } else if (typeof imageInput === 'string' && (imageInput.startsWith('000201') || imageInput.startsWith('004100') || (imageInput.startsWith('00') && imageInput.length >= 20 && imageInput.length <= 300))) {
+    // Direct PromptPay / Bank Slip QR string
     requestBody = { payload: imageInput, checkDuplicate };
   }
 
