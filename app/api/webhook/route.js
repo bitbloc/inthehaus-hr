@@ -7,6 +7,7 @@ import { saveMessage, cleanupOldHistory, getEmployeeByLineId, getYuzuConfigs, ch
 import { handleRosterCommand, handleRosterPostback } from './handlers/rosterHandler';
 import { handleStockPostback } from './handlers/stockHandler';
 import { handleSlipImage } from './handlers/slipHandler';
+import { handleBusinessCardImage } from './handlers/ocrHandler';
 import { verifySlipWithEasySlip } from '../../../utils/easyslip';
 import { handleOrderAndReservationDetection, handleOrderAndReservationPostback } from './handlers/orderHandler';
 import { handleChatCommand, handleChatPostback } from './handlers/chatHandler';
@@ -759,6 +760,19 @@ export async function POST(request) {
                   // Process slip
                   handledLocally = true;
                   await handleSlipImage(event, client, buffer, userId, groupId, result);
+                } else if (result.isBusinessCard) {
+                  // Write approval flag to DB so batch doesn't send duplicate
+                  await supabase.from('yuzu_chat_history').insert({
+                    group_id: groupId,
+                    user_id: userId,
+                    role: 'system',
+                    content: currentMsgId,
+                    message_type: 'slip_batch_approved'
+                  });
+
+                  // Process Business Card / Tax Invoice Card OCR
+                  handledLocally = true;
+                  await handleBusinessCardImage(event, client, result, userId, groupId);
                 } else {
 
                   // Gather other images
@@ -787,7 +801,12 @@ export async function POST(request) {
                     finalResult = await classifyAndAnalyzeImage(base64Images, "image/jpeg", context, bossRole, positionInstruction, friendlyName);
                   }
 
-                  await handleNonSlipImage(finalResult, buffer);
+                  if (finalResult.isBusinessCard) {
+                    handledLocally = true;
+                    await handleBusinessCardImage(event, client, finalResult, userId, groupId);
+                  } else {
+                    await handleNonSlipImage(finalResult, buffer);
+                  }
                 }
               } else {
                 // Not the chosen one: Sleep to allow the chosen one to decide
@@ -813,13 +832,16 @@ export async function POST(request) {
                   return;
                 }
 
-                // If it is a slip batch (or fallback to individual processing)
+                // If it is a slip/business card batch (or fallback to individual processing)
                 console.log(`Yuzu Vision Batching: Message ${currentMsgId} proceeding individually.`);
                 const result = await classifyAndAnalyzeImage(base64, "image/jpeg", context, bossRole, positionInstruction, friendlyName);
 
                 if (result.isSlip) {
                   handledLocally = true;
                   await handleSlipImage(event, client, buffer, userId, groupId, result);
+                } else if (result.isBusinessCard) {
+                  handledLocally = true;
+                  await handleBusinessCardImage(event, client, result, userId, groupId);
                 } else {
                   await handleNonSlipImage(result, buffer);
                 }

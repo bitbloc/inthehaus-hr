@@ -299,7 +299,27 @@ export async function classifyAndAnalyzeImage(imageBase64, mimeType = "image/jpe
 - transactionRef: หากมีตัวเลขรหัสอ้างอิง/เลขที่รายการ/Txn ID บนภาพให้ใส่มา แต่หากเป็นภาพถ่ายหน้าจอที่ไม่มีตัวเลขรหัสอ้างอิงกำกับไว้ชัดเจน ให้ส่งเป็น null เท่านั้น (ห้ามส่ง "-", "N/A", "ไม่มี", "ไม่ระบุ" เด็ดขาด)
 - transDate: ให้ออกมาเป็นรูปแบบ "YYYY-MM-DD" (เช่น "2026-08-23" หากปีบนสลิปเป็น 2569 ให้แปลงเป็น ค.ศ. 2026)
 
-2. การรายงานปฏิบัติงาน หรือ ภาพถ่ายหน้างาน (รวมถึง: รูปบิลวัตถุดิบ/ใบเสร็จ, ของมาส่ง, อาหาร/วัตถุดิบ, สมุนไพร/garnish, ความสะอาด, อุปกรณ์พัง/ชำรุด, เครื่องชงกาแฟ, พื้นที่ร้าน, รีวิวลูกค้า, ภาพโต๊ะ/หน้าร้าน, กล้องวงจรปิด, ทำความสะอาด, พัสดุ) → {"isFood": true, "isReceipt": true/false, "menuName": "...", "itemsList": ["..."], "costAnalysis": "...", "shortDescription": "คำอธิบายสั้นมาก", "shouldReply": true}
+2. นามบัตร หรือ ข้อมูลออกใบกำกับภาษี / เปิดบิลบริษัท / บัตรผู้เสียภาษี (Business Card / Tax Invoice Info Card)
+(รวมถึง: การ์ด/ป้ายข้อมูลผู้เสียภาษีสำหรับเปิดบิล, นามบัตรบริษัท, ข้อมูลชื่อ-ที่อยู่-เลขประจำตัวผู้เสียภาษี 13 หลัก, เอกสาร ภ.พ.20 ย่อส่วน หรือป้ายชื่อเปิดบิลที่พนักงานถ่ายส่งมาเพื่อออกใบเสร็จหรือใบกำกับภาษีเต็มรูปให้ลูกค้า)
+→ ตอบ JSON โครงสร้างนี้:
+{
+  "isBusinessCard": true,
+  "companyName": "ชื่อบริษัท/ห้างหุ้นส่วน/ชื่อบุคคล (สะกดถูกต้อง 100%)",
+  "branch": "สำนักงานใหญ่ หรือ สาขาที่... (ถ้ามีระบุ หรือ null)",
+  "address": "ที่อยู่ฉบับเต็ม พร้อมรหัสไปรษณีย์ (สะกดถูกต้อง 100%)",
+  "taxId": "เลขประจำตัวผู้เสียภาษี 13 หลัก (ใส่ขีดตามบัตร เช่น 0-1055-59008-12-4 หรือตัวเลข 13 หลัก หรือ null)",
+  "phone": "เบอร์โทรศัพท์ (ถ้ามี หรือ null)",
+  "email": "อีเมล (ถ้ามี หรือ null)",
+  "contactPerson": "ชื่อผู้ติดต่อหรือตำแหน่ง (ถ้ามี หรือ null)",
+  "ocrText": "ข้อความทั้งหมดบนบัตรที่อ่านได้ ถอดข้อความแบบแม่นยำ 100% จัดบรรทัดให้อ่านและคัดลอกง่าย",
+  "shortDescription": "นามบัตร/ข้อมูลออกใบกำกับภาษี: ...",
+  "shouldReply": true
+}
+* กฎสำคัญสำหรับนามบัตรและข้อมูลภาษี:
+- ถอดข้อความ (OCR) ทุกตัวอักษรอย่างแม่นยำ 100% ห้ามสะกดชื่อ นามสกุล บริษัท สาขา ซอย ถนน แขวง เขต จังหวัด หรือตัวเลขประจำตัวผู้เสียภาษีผิดพลาดเด็ดขาด
+- ให้ส่ง isBusinessCard: true เสมอเมื่อพบภาพนามบัตรหรือบัตรข้อมูลภาษี
+
+3. การรายงานปฏิบัติงาน หรือ ภาพถ่ายหน้างาน (รวมถึง: รูปบิลวัตถุดิบ/ใบเสร็จ, ของมาส่ง, อาหาร/วัตถุดิบ, สมุนไพร/garnish, ความสะอาด, อุปกรณ์พัง/ชำรุด, เครื่องชงกาแฟ, พื้นที่ร้าน, รีวิวลูกค้า, ภาพโต๊ะ/หน้าร้าน, กล้องวงจรปิด, ทำความสะอาด, พัสดุ) → {"isFood": true, "isReceipt": true/false, "menuName": "...", "itemsList": ["..."], "costAnalysis": "...", "shortDescription": "คำอธิบายสั้นมาก", "shouldReply": true}
 
 *** กฎเหล็กสำคัญสูงสุดสำหรับการตอบกลับภาพถ่าย (ในฟิลด์ costAnalysis และ catFeelings): ***
 - ข้อความตอบกลับทั้งหมดต้องสั้น กระชับ และมีความยาว "ไม่เกิน 2 บรรทัด" โดยเด็ดขาด! (Maximum 2 lines of text)
@@ -319,8 +339,8 @@ export async function classifyAndAnalyzeImage(imageBase64, mimeType = "image/jpe
 
    - กฎภาษา: ห้ามเขียนคำลงท้ายผู้หญิง (ค่ะ/นะคะ) เด็ดขาด แทนตัวเองด้วย "ผม" หรือ "ยูซุ" และลงท้ายสุภาพมีหางเสียง (ครับ/น้า)
 
-3. แมว → {"isCat": true, "catFeelings": "${catInstruction}", "shortDescription": "...", "shouldReply": true}
-4. อื่นๆ (เช่น อุปกรณ์เครื่องใช้ทั่วไป) → {"shouldReply": false, "shortDescription": "คำอธิบายภาพสั้นๆ เช่น ยางมัดผมที่ลูกค้าลืมไว้บนโต๊ะ"}
+4. แมว → {"isCat": true, "catFeelings": "${catInstruction}", "shortDescription": "...", "shouldReply": true}
+5. อื่นๆ (เช่น อุปกรณ์เครื่องใช้ทั่วไป) → {"shouldReply": false, "shortDescription": "คำอธิบายภาพสั้นๆ เช่น ยางมัดผมที่ลูกค้าลืมไว้บนโต๊ะ"}
 
 *** ข้อกำหนดเพิ่มเติมเมื่อส่งมาหลายรูปพร้อมกัน:
 - ให้วิเคราะห์ภาพทั้งหมดรวมกันเป็นสรุปภาพรวมของทุกรูป สั้นๆ ไม่เกิน 2 บรรทัดมัดรวมไว้ในฟิลด์ "costAnalysis" เพียงจุดเดียว`;
@@ -365,6 +385,21 @@ export async function classifyAndAnalyzeImage(imageBase64, mimeType = "image/jpe
                 shortDescription: data.shortDescription || 'สลิปโอนเงิน', 
                 shouldReply: true 
             };
+        } else if (data.shouldReply && (data.isBusinessCard || data.isTaxCard)) {
+            const cleanTextVal = (v) => v && !['-', 'null', 'undefined', 'ไม่ระบุ', 'ไม่มี', 'n/a'].includes(String(v).trim().toLowerCase()) ? String(v).trim() : null;
+            return {
+                isBusinessCard: true,
+                companyName: cleanTextVal(data.companyName),
+                branch: cleanTextVal(data.branch),
+                address: cleanTextVal(data.address),
+                taxId: cleanTextVal(data.taxId),
+                phone: cleanTextVal(data.phone),
+                email: cleanTextVal(data.email),
+                contactPerson: cleanTextVal(data.contactPerson),
+                ocrText: cleanTextVal(data.ocrText),
+                shortDescription: data.shortDescription || 'ข้อมูลออกใบกำกับภาษี / นามบัตร',
+                shouldReply: true
+            };
         } else if (data.shouldReply && data.isFood) {
             const cleanText = cleanAnalysis(data.costAnalysis);
             return { isFood: true, analysis: cleanText, shortDescription: data.shortDescription, shouldReply: true };
@@ -372,7 +407,7 @@ export async function classifyAndAnalyzeImage(imageBase64, mimeType = "image/jpe
             const cleanText = cleanAnalysis(data.catFeelings);
             return { isCat: true, analysis: `🐱 ${cleanText}`, shortDescription: data.shortDescription, shouldReply: true };
         }
-        return { isFood: false, isCat: false, isSlip: false, shouldReply: false, shortDescription: data.shortDescription || "ภาพถ่ายทั่วไป" };
+        return { isFood: false, isCat: false, isSlip: false, isBusinessCard: false, shouldReply: false, shortDescription: data.shortDescription || "ภาพถ่ายทั่วไป" };
     } catch (error) {
         console.error("Gemini Vision Error:", error);
         return { isFood: false, analysis: "", shortDescription: "error" };
