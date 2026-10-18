@@ -66,6 +66,12 @@ async function checkDuplicateSlip({ result, cleanRef, parsedAmount, dateStr, cle
       console.log(`[Slip Duplicate Prevention] Match by Ref: ${cleanRef}`);
       return existingSlip;
     }
+
+    // ⚡ CRITICAL: If incoming slip has a valid cleanRef and it is NOT found in DB,
+    // it is a genuine, unique bank transaction with its own official reference code.
+    // Different transaction refs = DIFFERENT bank transfers (even if same amount, same date, same sender).
+    // It must NEVER fall through to Layer 2 Composite Matching!
+    return null;
   }
 
   if (result.source === 'easyslip' && result.isDuplicate) {
@@ -81,8 +87,9 @@ async function checkDuplicateSlip({ result, cleanRef, parsedAmount, dateStr, cle
     };
   }
 
-  // Layer 2: Check screen capture slip without ref (Composite Matching)
-  if (parsedAmount > 0) {
+  // Layer 2: ONLY for unreferenced screen captures (!cleanRef)
+  // When an image has NO transaction reference code (e.g. cropped mobile capture where ref was cut off):
+  if (!cleanRef && parsedAmount > 0) {
     const { data: sameDaySlips } = await supabase
       .from('slip_transactions')
       .select('id, amount, date, timestamp, sender_name, bank_name, transaction_ref, user_id')
@@ -92,16 +99,23 @@ async function checkDuplicateSlip({ result, cleanRef, parsedAmount, dateStr, cle
 
     if (sameDaySlips && sameDaySlips.length > 0) {
       for (const slip of sameDaySlips) {
-        if (cleanSender && slip.sender_name) {
+        // If an unreferenced capture has the same sender and same amount on the same day:
+        // Only match if uploaded within 15 minutes of the existing slip.
+        if (cleanSender && slip.sender_name && slip.timestamp) {
           const normA = cleanSender.toLowerCase().replace(/[\s.*_]/g, '');
           const normB = slip.sender_name.toLowerCase().replace(/[\s.*_]/g, '');
           if (normA.length >= 3 && normB.length >= 3 && (normA.includes(normB) || normB.includes(normA))) {
-            console.log(`[Slip Duplicate Prevention] Match by composite (Same Amount + Date + Sender: ${cleanSender})`);
-            return slip;
+            const slipTime = new Date(slip.timestamp).getTime();
+            const diffMinutes = Math.abs(Date.now() - slipTime) / (1000 * 60);
+            if (diffMinutes <= 15) {
+              console.log(`[Slip Duplicate Prevention] Match by composite (No Ref + Same Amount + Same Sender within 15 mins: ${cleanSender})`);
+              return slip;
+            }
           }
         }
 
-        if (!cleanRef && !slip.transaction_ref && slip.timestamp) {
+        // Unreferenced capture with no sender name uploaded within 10 minutes
+        if (!slip.transaction_ref && slip.timestamp) {
           const slipTime = new Date(slip.timestamp).getTime();
           const diffMinutes = Math.abs(Date.now() - slipTime) / (1000 * 60);
           if (diffMinutes <= 10) {
@@ -171,7 +185,7 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
       ? new Date(duplicateSlip.timestamp).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
       : duplicateSlip.date;
 
-    const displayRef = cleanRef || duplicateSlip.transaction_ref || "สลิปหน้าจอ (ไม่มี Ref Code)";
+    const displayRef = duplicateSlip.transaction_ref || cleanRef || "สลิปหน้าจอ (ไม่มี Ref Code)";
 
     const duplicateFlexMsg = {
       type: 'flex',
