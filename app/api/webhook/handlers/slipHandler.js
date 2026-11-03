@@ -18,11 +18,11 @@ async function resolveEmployee(userId, groupId, client) {
 
   try {
     const { data: emp } = await supabase
-       .from('employees')
-       .select('line_user_id, line_bot_id, name, nickname, position')
-       .eq('is_active', true)
-       .or(`line_bot_id.eq.${userId},line_user_id.eq.${userId}`)
-       .maybeSingle();
+      .from('employees')
+      .select('line_user_id, line_bot_id, name, nickname, position')
+      .eq('is_active', true)
+      .or(`line_bot_id.eq.${userId},line_user_id.eq.${userId}`)
+      .maybeSingle();
 
     if (emp) {
       if (emp.line_user_id) mappedDbUserId = emp.line_user_id;
@@ -53,24 +53,47 @@ async function resolveEmployee(userId, groupId, client) {
 }
 
 async function checkDuplicateSlip({ result, cleanRef, parsedAmount, dateStr, cleanSender, userId }) {
-  // Layer 0 / 1: By Clean Ref or EasySlip Network Duplicate
+  // Layer 0 / 1: By Clean Ref (case-insensitive match) or EasySlip Network Duplicate
   if (cleanRef) {
-    const { data: existingSlip } = await supabase
+    const { data: existingSlips } = await supabase
       .from('slip_transactions')
       .select('id, amount, date, timestamp, sender_name, bank_name, transaction_ref, user_id')
-      .eq('transaction_ref', cleanRef)
+      .ilike('transaction_ref', cleanRef)
       .eq('is_deleted', false)
-      .maybeSingle();
+      .limit(1);
 
-    if (existingSlip) {
+    if (existingSlips && existingSlips.length > 0) {
       console.log(`[Slip Duplicate Prevention] Match by Ref: ${cleanRef}`);
-      return existingSlip;
+      return existingSlips[0];
     }
 
-    // ⚡ CRITICAL: If incoming slip has a valid cleanRef and it is NOT found in DB,
-    // it is a genuine, unique bank transaction with its own official reference code.
-    // Different transaction refs = DIFFERENT bank transfers (even if same amount, same date, same sender).
-    // It must NEVER fall through to Layer 2 Composite Matching!
+    // Also check if an unreferenced capture of the exact same transfer (same amount + same sender within 10 mins) was already uploaded
+    if (parsedAmount > 0 && cleanSender) {
+      const { data: recentUnrefSlips } = await supabase
+        .from('slip_transactions')
+        .select('id, amount, date, timestamp, sender_name, bank_name, transaction_ref, user_id')
+        .eq('amount', parsedAmount)
+        .eq('date', dateStr)
+        .is('transaction_ref', null)
+        .eq('is_deleted', false);
+
+      if (recentUnrefSlips && recentUnrefSlips.length > 0) {
+        const normA = cleanSender.toLowerCase().replace(/[\s.*_]/g, '');
+        for (const slip of recentUnrefSlips) {
+          if (slip.sender_name && slip.timestamp) {
+            const normB = slip.sender_name.toLowerCase().replace(/[\s.*_]/g, '');
+            if (normA.length >= 3 && normB.length >= 3 && (normA.includes(normB) || normB.includes(normA))) {
+              const diffMinutes = Math.abs(Date.now() - new Date(slip.timestamp).getTime()) / (1000 * 60);
+              if (diffMinutes <= 10) {
+                console.log(`[Slip Duplicate Prevention] Match against recent unreferenced slip of same sender & amount: ${cleanSender}`);
+                return slip;
+              }
+            }
+          }
+        }
+      }
+    }
+
     return null;
   }
 
@@ -88,7 +111,6 @@ async function checkDuplicateSlip({ result, cleanRef, parsedAmount, dateStr, cle
   }
 
   // Layer 2: ONLY for unreferenced screen captures (!cleanRef)
-  // When an image has NO transaction reference code (e.g. cropped mobile capture where ref was cut off):
   if (!cleanRef && parsedAmount > 0) {
     const { data: sameDaySlips } = await supabase
       .from('slip_transactions')
@@ -99,8 +121,6 @@ async function checkDuplicateSlip({ result, cleanRef, parsedAmount, dateStr, cle
 
     if (sameDaySlips && sameDaySlips.length > 0) {
       for (const slip of sameDaySlips) {
-        // If an unreferenced capture has the same sender and same amount on the same day:
-        // Only match if uploaded within 15 minutes of the existing slip.
         if (cleanSender && slip.sender_name && slip.timestamp) {
           const normA = cleanSender.toLowerCase().replace(/[\s.*_]/g, '');
           const normB = slip.sender_name.toLowerCase().replace(/[\s.*_]/g, '');
@@ -114,7 +134,6 @@ async function checkDuplicateSlip({ result, cleanRef, parsedAmount, dateStr, cle
           }
         }
 
-        // Unreferenced capture with no sender name uploaded within 10 minutes
         if (!slip.transaction_ref && slip.timestamp) {
           const slipTime = new Date(slip.timestamp).getTime();
           const diffMinutes = Math.abs(Date.now() - slipTime) / (1000 * 60);
@@ -133,27 +152,30 @@ async function checkDuplicateSlip({ result, cleanRef, parsedAmount, dateStr, cle
 export async function handleSlipImage(event, client, buffer, userId, groupId, result) {
   if (!result.isSlip) return false;
 
-  // Parse amount safely
   const parsedAmount = sanitizeAmount(result.amount);
   const cleanRef = sanitizeTransactionRef(result.transactionRef);
-  const cleanSender = result.senderName && !['-', 'null', 'undefined', 'ไม่ระบุ', 'ไม่มี', 'n/a'].includes(String(result.senderName).trim().toLowerCase()) 
-    ? String(result.senderName).trim() 
-    : null;
-  const cleanReceiver = result.receiverName && !['-', 'null', 'undefined', 'ไม่ระบุ', 'ไม่มี', 'n/a'].includes(String(result.receiverName).trim().toLowerCase()) 
-    ? String(result.receiverName).trim() 
-    : null;
-  const cleanBank = result.bankName && !['-', 'null', 'undefined', 'ไม่ระบุ', 'ไม่มี', 'n/a'].includes(String(result.bankName).trim().toLowerCase()) 
-    ? String(result.bankName).trim() 
-    : null;
+  const cleanText = (v) =>
+    v && !['-', 'null', 'undefined', 'ไม่ระบุ', 'ไม่มี', 'n/a'].includes(String(v).trim().toLowerCase())
+      ? String(v).trim()
+      : null;
+
+  const cleanSender = cleanText(result.senderName);
+  const cleanSenderAcc = cleanText(result.senderAccount);
+  const cleanReceiver = cleanText(result.receiverName);
+  const cleanReceiverAcc = cleanText(result.receiverAccount);
+  const cleanBank = cleanText(result.bankName);
 
   // Determine Thailand date string (YYYY-MM-DD)
   const bkkNow = addHours(new Date(), 7);
-  let dateStr = format(bkkNow, 'yyyy-MM-dd');
+  const todayStr = format(bkkNow, 'yyyy-MM-dd');
+  let dateStr = todayStr;
   if (result.transDate && /^\d{4}-\d{2}-\d{2}$/.test(result.transDate)) {
     dateStr = result.transDate;
   }
 
-  // ⚡ Phase 1 Optimization: Run Employee Resolution & Duplicate Check in PARALLEL
+  const isPastDateSlip = dateStr !== todayStr;
+
+  // Run Employee Resolution & Duplicate Check in PARALLEL
   const [empInfo, duplicateSlip] = await Promise.all([
     resolveEmployee(userId, groupId, client),
     checkDuplicateSlip({ result, cleanRef, parsedAmount, dateStr, cleanSender, userId })
@@ -181,7 +203,7 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
       }
     }
 
-    const origTime = duplicateSlip.timestamp 
+    const origTime = duplicateSlip.timestamp
       ? new Date(duplicateSlip.timestamp).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
       : duplicateSlip.date;
 
@@ -189,7 +211,7 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
 
     const duplicateFlexMsg = {
       type: 'flex',
-      altText: `⚠️ แจ้งเตือนสลิปซ้ำ: ยอด ${Number(duplicateSlip.amount).toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท`,
+      altText: `⚠️ แจ้งเตือนสลิปซ้ำ: ยอด ${Number(duplicateSlip.amount).toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท`,
       contents: {
         type: 'bubble',
         size: 'mega',
@@ -225,9 +247,9 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
           contents: [
             {
               type: 'text',
-              text: duplicateSlip.isNetworkDuplicate 
-                ? `สลิปยอด ${Number(duplicateSlip.amount).toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท นี้ถูกตรวจพบว่าเคยถูกนำไปใช้งาน/ตรวจซ้ำในระบบเครือข่ายธนาคารแล้วครับ`
-                : `สลิปยอด ${Number(duplicateSlip.amount).toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท เคยถูกบันทึกเข้าระบบไปแล้วครับ`,
+              text: duplicateSlip.isNetworkDuplicate
+                ? `สลิปยอด ${Number(duplicateSlip.amount).toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท นี้ถูกตรวจพบว่าเคยถูกนำไปใช้งาน/ตรวจซ้ำในระบบเครือข่ายธนาคารแล้วครับ`
+                : `สลิปยอด ${Number(duplicateSlip.amount).toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท เคยถูกบันทึกเข้าระบบไปแล้วครับ`,
               size: 'xs',
               color: '#374151',
               wrap: true
@@ -246,7 +268,7 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
               layout: 'horizontal',
               contents: [
                 { type: 'text', text: 'ยอดเงินเดิม:', size: 'xxs', color: '#6b7280', flex: 4 },
-                { type: 'text', text: `${Number(duplicateSlip.amount).toLocaleString('th-TH', {minimumFractionDigits: 2})} THB`, size: 'xxs', color: '#dc2626', weight: 'bold', flex: 6, align: 'end' }
+                { type: 'text', text: `${Number(duplicateSlip.amount).toLocaleString('th-TH', { minimumFractionDigits: 2 })} THB`, size: 'xxs', color: '#dc2626', weight: 'bold', flex: 6, align: 'end' }
               ]
             },
             ...(duplicateSlip.sender_name ? [{
@@ -299,8 +321,7 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
     return true;
   }
 
-  // ⚡ Phase 1 Optimization: Deterministic Public URL generation + Instant DB Insert
-  // Do NOT block LINE reply waiting for multi-megabyte image storage upload!
+  // Deterministic Public URL generation + Instant DB Insert
   const fileName = `slip_${Date.now()}_${mappedDbUserId}.jpg`;
   const { data: { publicUrl: slipUrl } } = supabase.storage.from('yuzu-slips').getPublicUrl(fileName);
 
@@ -325,8 +346,7 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
     return true;
   }
 
-  // ⚡ Phase 1 & 4 Optimization: Background Image Compression (sharp) & Upload
-  // Runs in the background (fire-and-forget) so the LINE user receives the reply immediately!
+  // Background Image Compression (sharp) & Upload
   if (buffer && Buffer.isBuffer(buffer)) {
     (async () => {
       try {
@@ -353,350 +373,423 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
   const formattedTime = result.transTime || format(bkkNow, 'dd/MM/yyyy HH:mm น.');
   const displayRef = cleanRef || 'สลิปหน้าจอแอป (ยืนยันด้วยยอดและเวลา)';
 
-  const isEasySlip = result.source === 'easyslip';
+  const isBankVerified = result.source === 'easyslip' || result.verificationTier === 'BANK_VERIFIED';
+  const isForensicVerified = result.verificationTier === 'FORENSIC_VERIFIED_BANK_DELAY';
 
-     /* Hallmark · pre-emit critique: P5 H5 E5 S5 R5 V5 */
-     // Hallmark Redesign: Tactile warm linen paper, clean typography hierarchy, restrained dividers
-     const slipFlexMsg = {
-        type: 'flex',
-        altText: `บันทึกยอดโอน ${parsedAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท เรียบร้อยค่ะ`,
-        contents: {
-          type: 'bubble',
-          size: 'mega',
-          styles: {
-            body: { backgroundColor: '#FAF9F6' },
-            footer: { backgroundColor: '#FAF9F6' }
-          },
-          body: {
+  const badgeBg = isBankVerified ? '#ECFDF5' : (isForensicVerified ? '#FEF3C7' : '#F4F4F5');
+  const badgeColor = isBankVerified ? '#047857' : (isForensicVerified ? '#92400E' : '#52525B');
+  const badgeText = result.verificationBadge || (isBankVerified ? '✓ ตรวจสอบกับธนาคารแล้ว' : '📸 อ่านจากภาพ');
+
+  const senderDisplay = cleanSender
+    ? (cleanSenderAcc ? `${cleanSender} (${cleanSenderAcc})` : cleanSender)
+    : 'ไม่ระบุ';
+  const receiverDisplay = cleanReceiver
+    ? (cleanReceiverAcc ? `${cleanReceiver} (${cleanReceiverAcc})` : cleanReceiver)
+    : null;
+
+  const checkItems = Array.isArray(result.checks) && result.checks.length > 0
+    ? result.checks
+    : [
+        isBankVerified ? '✓ ยืนยันรหัสธุรกรรมกับระบบธนาคาร (EasySlip)' : '✓ ตรวจสอบข้อมูลจากภาพสลิปเรียบร้อย',
+        '✓ ตรวจสอบไม่พบประวัติสลิปซ้ำในระบบ'
+      ];
+
+  /* Hallmark · pre-emit critique: P5 H5 E5 S5 R5 V5 */
+  const slipFlexMsg = {
+    type: 'flex',
+    altText: `บันทึกยอดโอน ${parsedAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท เรียบร้อยครับ`,
+    contents: {
+      type: 'bubble',
+      size: 'mega',
+      styles: {
+        body: { backgroundColor: '#FAF9F6' },
+        footer: { backgroundColor: '#FAF9F6' }
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        paddingAll: '18px',
+        contents: [
+          // Top Bar: Brand & Title
+          {
             type: 'box',
             layout: 'vertical',
-            paddingAll: '18px',
             contents: [
-              // Top Bar: Brand & Title (Full width, no truncation)
               {
-                type: 'box',
-                layout: 'vertical',
-                contents: [
-                  {
-                    type: 'text',
-                    text: 'ร้านในบ้าน · IN THE HAUS',
-                    size: 'xxs',
-                    weight: 'bold',
-                    color: '#78716C'
-                  },
-                  {
-                    type: 'text',
-                    text: 'บันทึกการโอนเงินสำเร็จ',
-                    size: 'sm',
-                    weight: 'bold',
-                    color: '#1C1917',
-                    margin: 'xs'
-                  }
-                ]
+                type: 'text',
+                text: 'ร้านในบ้าน · IN THE HAUS',
+                size: 'xxs',
+                weight: 'bold',
+                color: '#78716C'
               },
+              {
+                type: 'text',
+                text: 'บันทึกการโอนเงินสำเร็จ',
+                size: 'sm',
+                weight: 'bold',
+                color: '#1C1917',
+                margin: 'xs'
+              }
+            ]
+          },
 
-              // Hero Amount Display Well with Verification Pill inside
+          // Hero Amount Display Well with Verification Pill inside
+          {
+            type: 'box',
+            layout: 'vertical',
+            backgroundColor: '#F2F0E8',
+            cornerRadius: '8px',
+            paddingAll: '14px',
+            margin: 'md',
+            contents: [
               {
                 type: 'box',
-                layout: 'vertical',
-                backgroundColor: '#F2F0E8',
-                cornerRadius: '8px',
-                paddingAll: '14px',
-                margin: 'md',
+                layout: 'horizontal',
+                alignItems: 'center',
                 contents: [
+                  {
+                    type: 'text',
+                    text: 'ยอดเงินที่บันทึก',
+                    size: 'xxs',
+                    color: '#78716C',
+                    weight: 'bold',
+                    flex: 0
+                  },
                   {
                     type: 'box',
                     layout: 'horizontal',
-                    alignItems: 'center',
+                    justifyContent: 'flex-end',
+                    flex: 1,
                     contents: [
                       {
-                        type: 'text',
-                        text: 'ยอดเงินที่บันทึก',
-                        size: 'xxs',
-                        color: '#78716C',
-                        weight: 'bold',
-                        flex: 0
-                      },
-                      {
                         type: 'box',
-                        layout: 'horizontal',
-                        justifyContent: 'flex-end',
-                        flex: 1,
+                        layout: 'vertical',
+                        backgroundColor: badgeBg,
+                        cornerRadius: '6px',
+                        paddingStart: '8px',
+                        paddingEnd: '8px',
+                        paddingTop: '3px',
+                        paddingBottom: '3px',
                         contents: [
                           {
-                            type: 'box',
-                            layout: 'vertical',
-                            backgroundColor: isEasySlip ? '#ECFDF5' : '#F4F4F5',
-                            cornerRadius: '6px',
-                            paddingStart: '8px',
-                            paddingEnd: '8px',
-                            paddingTop: '3px',
-                            paddingBottom: '3px',
-                            contents: [
-                              {
-                                type: 'text',
-                                text: isEasySlip ? '✓ ตรวจสอบกับธนาคารแล้ว' : '📸 อ่านจากภาพ',
-                                size: 'xxs',
-                                color: isEasySlip ? '#047857' : '#52525B',
-                                weight: 'bold',
-                                wrap: true
-                              }
-                            ]
+                            type: 'text',
+                            text: badgeText,
+                            size: 'xxs',
+                            color: badgeColor,
+                            weight: 'bold',
+                            wrap: true
                           }
                         ]
                       }
                     ]
-                  },
-                  {
-                    type: 'text',
-                    margin: 'sm',
-                    contents: [
-                      {
-                        type: 'span',
-                        text: parsedAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 }),
-                        size: '3xl',
-                        weight: 'bold',
-                        color: '#0F172A'
-                      },
-                      {
-                        type: 'span',
-                        text: ' THB',
-                        size: 'xs',
-                        weight: 'bold',
-                        color: '#64748B'
-                      }
-                    ]
                   }
                 ]
               },
-
-              // Hairline Divider
               {
-                type: 'separator',
-                color: '#E7E5E0',
-                margin: 'md'
-              },
-
-              // Data Grid: Row 1 (Bank & Sender)
-              {
-                type: 'box',
-                layout: 'horizontal',
-                margin: 'md',
-                spacing: 'md',
+                type: 'text',
+                margin: 'sm',
                 contents: [
                   {
-                    type: 'box',
-                    layout: 'vertical',
-                    flex: 1,
-                    contents: [
-                      {
-                        type: 'text',
-                        text: 'ธนาคาร (BANK)',
-                        size: 'xxs',
-                        color: '#78716C',
-                        weight: 'bold'
-                      },
-                      {
-                        type: 'text',
-                        text: cleanBank || 'ไม่ระบุ',
-                        size: 'xs',
-                        weight: 'bold',
-                        color: '#1E293B',
-                        margin: 'xs',
-                        wrap: true
-                      }
-                    ]
+                    type: 'span',
+                    text: parsedAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 }),
+                    size: '3xl',
+                    weight: 'bold',
+                    color: '#0F172A'
                   },
                   {
-                    type: 'box',
-                    layout: 'vertical',
-                    flex: 1,
-                    contents: [
-                      {
-                        type: 'text',
-                        text: 'ผู้โอน (SENDER)',
-                        size: 'xxs',
-                        color: '#78716C',
-                        weight: 'bold'
-                      },
-                      {
-                        type: 'text',
-                        text: cleanSender || 'ไม่ระบุ',
-                        size: 'xs',
-                        weight: 'bold',
-                        color: '#1E293B',
-                        margin: 'xs',
-                        wrap: true
-                      }
-                    ]
+                    type: 'span',
+                    text: ' THB',
+                    size: 'xs',
+                    weight: 'bold',
+                    color: '#64748B'
                   }
                 ]
-              },
+              }
+            ]
+          },
 
-              // Data Grid: Row 2 (Time & Operator)
+          // Past-date warning if slip date !== today
+          ...(isPastDateSlip ? [{
+            type: 'box',
+            layout: 'vertical',
+            backgroundColor: '#FEF3C7',
+            cornerRadius: '6px',
+            paddingAll: '8px',
+            margin: 'sm',
+            contents: [
               {
-                type: 'box',
-                layout: 'horizontal',
-                margin: 'md',
-                spacing: 'md',
-                contents: [
-                  {
-                    type: 'box',
-                    layout: 'vertical',
-                    flex: 1,
-                    contents: [
-                      {
-                        type: 'text',
-                        text: 'วัน-เวลาโอน (TRANSFER TIME)',
-                        size: 'xxs',
-                        color: '#78716C',
-                        weight: 'bold'
-                      },
-                      {
-                        type: 'text',
-                        text: formattedTime,
-                        size: 'xs',
-                        color: '#1E293B',
-                        margin: 'xs',
-                        wrap: true
-                      }
-                    ]
-                  },
-                  {
-                    type: 'box',
-                    layout: 'vertical',
-                    flex: 1,
-                    contents: [
-                      {
-                        type: 'text',
-                        text: 'ผู้ลงบันทึก (OPERATOR)',
-                        size: 'xxs',
-                        color: '#78716C',
-                        weight: 'bold'
-                      },
-                      {
-                        type: 'text',
-                        text: senderName || 'ไม่ระบุ',
-                        size: 'xs',
-                        weight: 'bold',
-                        color: '#1E293B',
-                        margin: 'xs',
-                        wrap: true
-                      }
-                    ]
-                  }
-                ]
-              },
+                type: 'text',
+                text: `⚠️ หมายเหตุ: วันที่บนสลิปคือ ${dateStr} (ไม่ใช่วันนี้ ${todayStr}) กรุณาตรวจสอบเวลาโอนอีกครั้งครับ`,
+                size: 'xxs',
+                color: '#92400E',
+                weight: 'bold',
+                wrap: true
+              }
+            ]
+          }] : []),
 
-              // Optional Row 3: Receiver
-              ...(cleanReceiver ? [
-                {
-                  type: 'box',
-                  layout: 'vertical',
-                  margin: 'md',
-                  contents: [
-                    {
-                      type: 'text',
-                      text: 'บัญชีปลายทาง (RECEIVER)',
-                      size: 'xxs',
-                      color: '#78716C',
-                      weight: 'bold'
-                    },
-                    {
-                      type: 'text',
-                      text: cleanReceiver,
-                      size: 'xs',
-                      color: '#334155',
-                      margin: 'xs',
-                      wrap: true
-                    }
-                  ]
-                }
-              ] : []),
+          // Hairline Divider
+          {
+            type: 'separator',
+            color: '#E7E5E0',
+            margin: 'md'
+          },
 
-              // Hairline Divider
-              {
-                type: 'separator',
-                color: '#E7E5E0',
-                margin: 'md'
-              },
-
-              // Row 4: Transaction Reference
+          // Data Grid: Row 1 (Bank & Sender)
+          {
+            type: 'box',
+            layout: 'horizontal',
+            margin: 'md',
+            spacing: 'md',
+            contents: [
               {
                 type: 'box',
                 layout: 'vertical',
-                margin: 'md',
+                flex: 1,
                 contents: [
                   {
-                    type: 'box',
-                    layout: 'horizontal',
-                    contents: [
-                      {
-                        type: 'text',
-                        text: 'รหัสอ้างอิง (REF NO.)',
-                        size: 'xxs',
-                        color: '#78716C',
-                        weight: 'bold',
-                        flex: 1
-                      },
-                      ...(isEasySlip ? [
-                        {
-                          type: 'text',
-                          text: 'EasySlip Verified',
-                          size: 'xxs',
-                          color: '#059669',
-                          weight: 'bold',
-                          align: 'end'
-                        }
-                      ] : [])
-                    ]
+                    type: 'text',
+                    text: 'ธนาคาร (BANK)',
+                    size: 'xxs',
+                    color: '#78716C',
+                    weight: 'bold'
                   },
                   {
                     type: 'text',
-                    text: displayRef,
-                    size: 'xxs',
-                    color: '#475569',
+                    text: cleanBank || 'ไม่ระบุ',
+                    size: 'xs',
                     weight: 'bold',
+                    color: '#1E293B',
+                    margin: 'xs',
+                    wrap: true
+                  }
+                ]
+              },
+              {
+                type: 'box',
+                layout: 'vertical',
+                flex: 1,
+                contents: [
+                  {
+                    type: 'text',
+                    text: 'ผู้โอน (SENDER)',
+                    size: 'xxs',
+                    color: '#78716C',
+                    weight: 'bold'
+                  },
+                  {
+                    type: 'text',
+                    text: senderDisplay,
+                    size: 'xs',
+                    weight: 'bold',
+                    color: '#1E293B',
                     margin: 'xs',
                     wrap: true
                   }
                 ]
               }
             ]
-          }
-        }
-      };
+          },
 
-      try {
-        await client.replyMessage(event.replyToken, slipFlexMsg);
-      } catch (replyErr) {
-        console.warn("Slip replyMessage failed, attempting pushMessage fallback:", replyErr.message);
-        const target = groupId || userId;
-        if (target) {
-          await client.pushMessage(target, slipFlexMsg);
-        }
+          // Data Grid: Row 2 (Time & Operator)
+          {
+            type: 'box',
+            layout: 'horizontal',
+            margin: 'md',
+            spacing: 'md',
+            contents: [
+              {
+                type: 'box',
+                layout: 'vertical',
+                flex: 1,
+                contents: [
+                  {
+                    type: 'text',
+                    text: 'วัน-เวลาโอน (TRANSFER TIME)',
+                    size: 'xxs',
+                    color: '#78716C',
+                    weight: 'bold'
+                  },
+                  {
+                    type: 'text',
+                    text: formattedTime,
+                    size: 'xs',
+                    color: '#1E293B',
+                    margin: 'xs',
+                    wrap: true
+                  }
+                ]
+              },
+              {
+                type: 'box',
+                layout: 'vertical',
+                flex: 1,
+                contents: [
+                  {
+                    type: 'text',
+                    text: 'ผู้ลงบันทึก (OPERATOR)',
+                    size: 'xxs',
+                    color: '#78716C',
+                    weight: 'bold'
+                  },
+                  {
+                    type: 'text',
+                    text: senderName || 'ไม่ระบุ',
+                    size: 'xs',
+                    weight: 'bold',
+                    color: '#1E293B',
+                    margin: 'xs',
+                    wrap: true
+                  }
+                ]
+              }
+            ]
+          },
+
+          // Row 3: Receiver
+          ...(receiverDisplay ? [
+            {
+              type: 'box',
+              layout: 'vertical',
+              margin: 'md',
+              contents: [
+                {
+                  type: 'text',
+                  text: 'บัญชีปลายทาง (RECEIVER)',
+                  size: 'xxs',
+                  color: '#78716C',
+                  weight: 'bold'
+                },
+                {
+                  type: 'text',
+                  text: receiverDisplay,
+                  size: 'xs',
+                  color: '#047857',
+                  weight: 'bold',
+                  margin: 'xs',
+                  wrap: true
+                }
+              ]
+            }
+          ] : []),
+
+          // Hairline Divider
+          {
+            type: 'separator',
+            color: '#E7E5E0',
+            margin: 'md'
+          },
+
+          // Row 4: Transaction Reference
+          {
+            type: 'box',
+            layout: 'vertical',
+            margin: 'md',
+            contents: [
+              {
+                type: 'box',
+                layout: 'horizontal',
+                contents: [
+                  {
+                    type: 'text',
+                    text: 'รหัสอ้างอิง (REF NO.)',
+                    size: 'xxs',
+                    color: '#78716C',
+                    weight: 'bold',
+                    flex: 1
+                  },
+                  ...(isBankVerified ? [
+                    {
+                      type: 'text',
+                      text: 'EasySlip Verified',
+                      size: 'xxs',
+                      color: '#059669',
+                      weight: 'bold',
+                      align: 'end'
+                    }
+                  ] : [])
+                ]
+              },
+              {
+                type: 'text',
+                text: displayRef,
+                size: 'xxs',
+                color: '#475569',
+                weight: 'bold',
+                margin: 'xs',
+                wrap: true
+              }
+            ]
+          },
+
+          // Row 5: Detailed Verification Checklist Summary
+          {
+            type: 'box',
+            layout: 'vertical',
+            backgroundColor: '#F2F0E8',
+            cornerRadius: '6px',
+            paddingAll: '10px',
+            margin: 'md',
+            spacing: 'xs',
+            contents: [
+              {
+                type: 'text',
+                text: 'รายละเอียดการตรวจสอบความถูกต้อง:',
+                size: 'xxs',
+                weight: 'bold',
+                color: '#57534E'
+              },
+              ...checkItems.map(item => ({
+                type: 'text',
+                text: item,
+                size: 'xxs',
+                color: item.startsWith('ℹ️') ? '#92400E' : '#065F46',
+                wrap: true
+              }))
+            ]
+          }
+        ]
       }
-      return true;
+    }
+  };
+
+  try {
+    await client.replyMessage(event.replyToken, slipFlexMsg);
+  } catch (replyErr) {
+    console.warn("Slip replyMessage failed, attempting pushMessage fallback:", replyErr.message);
+    const target = groupId || userId;
+    if (target) {
+      await client.pushMessage(target, slipFlexMsg);
+    }
+  }
+  return true;
 }
 
 /**
- * Handle Fake or AI-Generated Slip Detection Alert
- * Rejects slip insertion and alerts staff with urgent security guidance.
+ * Handle Fake, Doctored, Wrong-Receiver, or Unverified Slip Detection Alert
+ * Rejects slip insertion and alerts staff with detailed forensic findings.
  */
 export async function handleFakeSlipAlert(event, client, buffer, userId, groupId, result) {
   const empInfo = await resolveEmployee(userId, groupId, client);
   const senderName = empInfo.senderName || 'ทีมงาน';
 
+  const cleanText = (v) =>
+    v && !['-', 'null', 'undefined', 'ไม่ระบุ', 'ไม่มี', 'n/a'].includes(String(v).trim().toLowerCase())
+      ? String(v).trim()
+      : null;
+
   const cleanRef = sanitizeTransactionRef(result.transactionRef);
   const parsedAmount = result.amount ? sanitizeAmount(result.amount) : null;
-  const cleanBank = result.bankName && !['-', 'null', 'undefined', 'ไม่ระบุ', 'ไม่มี', 'n/a'].includes(String(result.bankName).trim().toLowerCase()) 
-    ? String(result.bankName).trim() 
-    : null;
-  const fakeReason = result.fakeReason || 'ไม่พบข้อมูลธุรกรรมในระบบธนาคาร (สลิปปลอมหรือใช้ AI สร้าง)';
+  const cleanBank = cleanText(result.bankName);
+  const cleanCustomerSender = cleanText(result.senderName);
+  const cleanReceiver = cleanText(result.receiverName);
+  const alertTitle = result.alertTitle || 'ตรวจไม่พบข้อมูลธุรกรรมในระบบธนาคาร';
+  const fakeReason = result.fakeReason || 'ไม่พบข้อมูลธุรกรรมในระบบธนาคาร หรือตรวจพบความผิดปกติของสลิป';
+  const checkLines = Array.isArray(result.checks) ? result.checks : [];
 
   const fakeFlexMsg = {
     type: 'flex',
-    altText: `🚨 แจ้งเตือนสลิปต้องสงสัย: ตรวจไม่พบข้อมูลธุรกรรมในระบบธนาคาร (สลิปปลอม/AI)`,
+    altText: `🚨 แจ้งเตือนสลิปต้องสงสัย: ${alertTitle}`,
     contents: {
       type: 'bubble',
       size: 'mega',
@@ -719,7 +812,7 @@ export async function handleFakeSlipAlert(event, client, buffer, userId, groupId
           },
           {
             type: 'text',
-            text: 'ตรวจไม่พบข้อมูลธุรกรรมในระบบธนาคาร',
+            text: alertTitle,
             color: '#991B1B',
             weight: 'bold',
             size: 'sm',
@@ -728,7 +821,9 @@ export async function handleFakeSlipAlert(event, client, buffer, userId, groupId
           },
           {
             type: 'text',
-            text: 'ปฏิเสธการบันทึก: สลิปปลอมหรือใช้ AI สร้าง',
+            text: result.isWrongReceiver
+              ? 'ปฏิเสธการบันทึก: บัญชีผู้รับเงินไม่ใช่บัญชีของทางร้าน'
+              : 'ปฏิเสธการบันทึก: ข้อมูลไม่ผ่านเกณฑ์ความปลอดภัยทางการเงิน',
             color: '#B91C1C',
             size: 'xxs',
             weight: 'bold',
@@ -761,21 +856,24 @@ export async function handleFakeSlipAlert(event, client, buffer, userId, groupId
               },
               {
                 type: 'text',
-                text: 'ระบบตรวจสอบรหัสสลิปกับเครือข่ายธนาคารแล้ว ไม่พบประวัติการทำรายการนี้จริงครับ สลิปนี้อาจเป็นสลิปปลอม ตัดต่อแก้ไขภาพ หรือถูกสร้างขึ้นด้วย AI เพื่อความปลอดภัยทางการเงินของร้าน ระบบไม่อนุญาตให้บันทึกรายการนี้ครับ',
-                color: '#4B5563',
-                size: 'xxs',
-                margin: 'xs',
-                wrap: true
-              },
-              {
-                type: 'text',
                 text: `สาเหตุ: ${fakeReason}`,
                 color: '#DC2626',
                 weight: 'bold',
                 size: 'xxs',
-                margin: 'sm',
+                margin: 'xs',
                 wrap: true
-              }
+              },
+              ...(checkLines.length > 0 ? [
+                { type: 'separator', color: '#FECACA', margin: 'sm' },
+                ...checkLines.map(line => ({
+                  type: 'text',
+                  text: line,
+                  color: '#7F1D1D',
+                  size: 'xxs',
+                  margin: 'xs',
+                  wrap: true
+                }))
+              ] : [])
             ]
           },
 
@@ -801,8 +899,16 @@ export async function handleFakeSlipAlert(event, client, buffer, userId, groupId
                 type: 'box',
                 layout: 'horizontal',
                 contents: [
-                  { type: 'text', text: 'ยอดเงินที่ระบุ:', size: 'xxs', color: '#78716C', flex: 4 },
-                  { type: 'text', text: `${parsedAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})} THB`, size: 'xxs', color: '#DC2626', weight: 'bold', flex: 6, align: 'end' }
+                  { type: 'text', text: 'ยอดเงินบนสลิป:', size: 'xxs', color: '#78716C', flex: 4 },
+                  { type: 'text', text: `${parsedAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 })} THB`, size: 'xxs', color: '#DC2626', weight: 'bold', flex: 6, align: 'end' }
+                ]
+              }] : []),
+              ...(result.bankVerifiedAmount ? [{
+                type: 'box',
+                layout: 'horizontal',
+                contents: [
+                  { type: 'text', text: 'ยอดจริงใน QR ธนาคาร:', size: 'xxs', color: '#78716C', flex: 4 },
+                  { type: 'text', text: `${Number(result.bankVerifiedAmount).toLocaleString('th-TH', { minimumFractionDigits: 2 })} THB`, size: 'xxs', color: '#047857', weight: 'bold', flex: 6, align: 'end' }
                 ]
               }] : []),
               ...(cleanBank ? [{
@@ -811,6 +917,22 @@ export async function handleFakeSlipAlert(event, client, buffer, userId, groupId
                 contents: [
                   { type: 'text', text: 'ธนาคารที่อ้าง:', size: 'xxs', color: '#78716C', flex: 4 },
                   { type: 'text', text: cleanBank, size: 'xxs', color: '#1C1917', flex: 6, align: 'end', wrap: true }
+                ]
+              }] : []),
+              ...(cleanCustomerSender ? [{
+                type: 'box',
+                layout: 'horizontal',
+                contents: [
+                  { type: 'text', text: 'ชื่อผู้โอนในสลิป:', size: 'xxs', color: '#78716C', flex: 4 },
+                  { type: 'text', text: cleanCustomerSender, size: 'xxs', color: '#1C1917', flex: 6, align: 'end', wrap: true }
+                ]
+              }] : []),
+              ...(cleanReceiver ? [{
+                type: 'box',
+                layout: 'horizontal',
+                contents: [
+                  { type: 'text', text: 'ผู้รับในสลิป:', size: 'xxs', color: '#78716C', flex: 4 },
+                  { type: 'text', text: cleanReceiver, size: 'xxs', color: result.isWrongReceiver ? '#DC2626' : '#1C1917', weight: 'bold', flex: 6, align: 'end', wrap: true }
                 ]
               }] : []),
               {
@@ -842,7 +964,7 @@ export async function handleFakeSlipAlert(event, client, buffer, userId, groupId
               },
               {
                 type: 'text',
-                text: '1. ขอให้ลูกค้าเปิดประวัติการโอนเงินจริงในแอปธนาคาร (Statement / รายการย้อนหลัง) ให้ตรวจสอบ\n2. หรือให้ลูกค้าสแกนชำระผ่าน QR Code รับเงินของทางร้านใหม่อีกครั้งครับ',
+                text: '1. ขอให้ลูกค้าเปิดประวัติการโอนเงินจริงในแอปธนาคาร (Statement / รายการย้อนหลัง) และเช็คว่าโอนเข้าบัญชี "น.ส. ธัญญธร ศรีวิเศษ (2455)" ถูกต้อง\n2. หรือให้ลูกค้าสแกนชำระผ่าน QR Code รับเงินของทางร้านใหม่อีกครั้งครับ',
                 size: 'xxs',
                 color: '#78350F',
                 margin: 'xs',
@@ -861,7 +983,7 @@ export async function handleFakeSlipAlert(event, client, buffer, userId, groupId
       group_id: groupId,
       user_id: empInfo.mappedDbUserId || userId,
       role: 'system',
-      content: `[ALERT] ไม่พบข้อมูลธุรกรรม (สลิปปลอม/AI): ${cleanRef || 'No Ref'} ยอด ${parsedAmount || 0} บาท (${fakeReason})`,
+      content: `[ALERT] ${alertTitle}: ${cleanRef || 'No Ref'} ยอด ${parsedAmount || 0} บาท (${fakeReason})`,
       message_type: 'fake_slip_alert'
     });
   } catch (logErr) {
@@ -880,4 +1002,3 @@ export async function handleFakeSlipAlert(event, client, buffer, userId, groupId
   }
   return true;
 }
-

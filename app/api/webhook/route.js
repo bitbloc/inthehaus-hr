@@ -8,7 +8,7 @@ import { handleRosterCommand, handleRosterPostback } from './handlers/rosterHand
 import { handleStockPostback } from './handlers/stockHandler';
 import { handleSlipImage, handleFakeSlipAlert } from './handlers/slipHandler';
 import { handleBusinessCardImage } from './handlers/ocrHandler';
-import { verifySlipWithEasySlip } from '../../../utils/easyslip';
+import { verifySlipWithEasySlip, reconcileSlipVerification } from '../../../utils/easyslip';
 import { handleOrderAndReservationDetection, handleOrderAndReservationPostback } from './handlers/orderHandler';
 import { handleChatCommand, handleChatPostback } from './handlers/chatHandler';
 import { isEspressoShotReport, handleEspressoShotAnalysis } from './handlers/espressoHandler';
@@ -580,49 +580,45 @@ export async function POST(request) {
               for await (const chunk of stream) chunks.push(chunk);
               const buffer = Buffer.concat(chunks);
 
-              // ⚡ ULTRA FAST-PATH: EasySlip Bank Verification with Local QR Scanner (~300ms)
-              // Extracts QR locally via sharp + jsQR in ~20ms, then sends 150-byte payload to EasySlip!
-              let easySlipResult = null;
-              try {
-                easySlipResult = await verifySlipWithEasySlip(buffer);
-              } catch (easySlipErr) {
-                console.warn("[EasySlip Fast-Path] Error or bypass, falling back to vision flow:", easySlipErr?.message || easySlipErr);
-              }
+              // Optimize image for Gemini Vision + Run Local QR & EasySlip Verification in PARALLEL
+              const [base64, easySlipResult] = await Promise.all([
+                (async () => {
+                  try {
+                    const optimizedBuffer = await sharp(buffer)
+                      .resize({ width: 1024, height: 1024, fit: 'inside', withoutEnlargement: true })
+                      .jpeg({ quality: 80 })
+                      .toBuffer();
+                    return optimizedBuffer.toString('base64');
+                  } catch {
+                    return buffer.toString('base64');
+                  }
+                })(),
+                verifySlipWithEasySlip(buffer).catch((easySlipErr) => {
+                  console.warn("[EasySlip Fast-Path] Error or bypass, falling back to vision flow:", easySlipErr?.message || easySlipErr);
+                  return null;
+                })
+              ]);
 
-              // Case A: Valid bank slip verified by EasySlip
-              if (easySlipResult && easySlipResult.success && easySlipResult.isSlip) {
-                console.log(`[EasySlip Fast-Path] Slip verified successfully (Ref: ${easySlipResult.transactionRef}, Amount: ${easySlipResult.amount})`);
-                handledLocally = true;
-                try {
-                  await handleSlipImage(event, client, buffer, userId, groupId, easySlipResult);
-                } catch (handleErr) {
-                  console.error("[EasySlip Fast-Path] Error in handleSlipImage:", handleErr?.message || handleErr);
+              // ⚡ DUAL-ENGINE SLIP VERIFICATION (QR Detected on Image):
+              // Always cross-check QR bank lookup with Gemini Vision OCR & Forensics
+              // (Catches edited amounts on real QR codes AND prevents false-positive fake alerts when KTB/bank API lags!)
+              if (easySlipResult && easySlipResult.hasQrPayload) {
+                console.log(`[Dual-Engine Slip Check] QR detected (Ref: ${easySlipResult.transactionRef || 'N/A'}), cross-checking with Gemini Vision Forensics...`);
+                const visionSlipResult = await classifyAndAnalyzeImage(base64, "image/jpeg", "", null, "", "ทีมงาน");
+                const reconciled = await reconcileSlipVerification({
+                  easySlipResult,
+                  visionResult: visionSlipResult
+                });
+
+                if (reconciled.approved && reconciled.isSlip) {
+                  handledLocally = true;
+                  await handleSlipImage(event, client, buffer, userId, groupId, reconciled);
+                  return;
+                } else if (!reconciled.approved && reconciled.isSlip) {
+                  handledLocally = true;
+                  await handleFakeSlipAlert(event, client, buffer, userId, groupId, reconciled);
+                  return;
                 }
-                return;
-              }
-
-              // Case B: Transaction NOT FOUND in Bank / Fake Slip / AI Generated!
-              if (easySlipResult && (easySlipResult.isNotFound || easySlipResult.isFakeOrAi)) {
-                console.warn(`[Security Alert] Transaction NOT FOUND in bank system (Fake/AI): Ref: ${easySlipResult.transactionRef || 'N/A'}`);
-                handledLocally = true;
-                try {
-                  await handleFakeSlipAlert(event, client, buffer, userId, groupId, easySlipResult);
-                } catch (fakeErr) {
-                  console.error("[Security Alert] Error in handleFakeSlipAlert:", fakeErr?.message || fakeErr);
-                }
-                return;
-              }
-
-              // Optimize image for Gemini Vision (compress to max 1024px to speed up AI inference by ~2s)
-              let base64 = '';
-              try {
-                const optimizedBuffer = await sharp(buffer)
-                  .resize({ width: 1024, height: 1024, fit: 'inside', withoutEnlargement: true })
-                  .jpeg({ quality: 80 })
-                  .toBuffer();
-                base64 = optimizedBuffer.toString('base64');
-              } catch {
-                base64 = buffer.toString('base64');
               }
 
               const configs = await getYuzuConfigs();
@@ -686,6 +682,19 @@ export async function POST(request) {
 
               const currentMsgId = event.message.id;
               const isChosenOne = sortedLocks.length === 0 || sortedLocks[0].content === currentMsgId;
+
+              // Local helper to process slip via 7-Point Reconciliation (including Synthetic Mini-QR lookup!)
+              const processVisionSlip = async (visionRes) => {
+                const reconciled = await reconcileSlipVerification({
+                  easySlipResult,
+                  visionResult: visionRes
+                });
+                if (reconciled.approved && reconciled.isSlip) {
+                  await handleSlipImage(event, client, buffer, userId, groupId, reconciled);
+                } else {
+                  await handleFakeSlipAlert(event, client, buffer, userId, groupId, reconciled);
+                }
+              };
 
               // Local helper to handle non-slip (operational/reports/etc.) images
               const handleNonSlipImage = async (resVal, imgBuffer) => {
@@ -753,21 +762,12 @@ export async function POST(request) {
               };
 
               if (isChosenOne) {
-                // บันทึก flag ล่วงหน้าทันที เพื่อให้รูปภาพที่ตามมาใน batch เดียวกันรู้ว่ามีกระบวนการรับเรื่องแล้ว ไม่ส่งข้อความซ้ำ
-                await supabase.from('yuzu_chat_history').insert({
-                  group_id: groupId,
-                  user_id: userId,
-                  role: 'system',
-                  content: currentMsgId,
-                  message_type: 'report_batch_taken'
-                });
-
-                // The chosen one: Analyze the first image to see if it is a slip
+                // Analyze the first image to determine whether it is a slip/business card or an operational report
                 console.log(`Yuzu Vision Batching: Chosen one (${currentMsgId}) analyzing first image...`);
                 const result = await classifyAndAnalyzeImage(base64, "image/jpeg", context, bossRole, positionInstruction, friendlyName);
 
-                if (result.isFakeOrAi) {
-                  // Write approval flag to DB so batch doesn't process subsequent images as reports
+                if (result.isFakeOrAi || result.isSlip) {
+                  // Write slip_batch_approved flag to DB so other slips in the same batch are processed individually
                   await supabase.from('yuzu_chat_history').insert({
                     group_id: groupId,
                     user_id: userId,
@@ -776,24 +776,10 @@ export async function POST(request) {
                     message_type: 'slip_batch_approved'
                   });
 
-                  // Process fake/AI slip alert immediately
                   handledLocally = true;
-                  await handleFakeSlipAlert(event, client, buffer, userId, groupId, result);
-                } else if (result.isSlip) {
-                  // Write approval flag to DB
-                  await supabase.from('yuzu_chat_history').insert({
-                    group_id: groupId,
-                    user_id: userId,
-                    role: 'system',
-                    content: currentMsgId,
-                    message_type: 'slip_batch_approved'
-                  });
-
-                  // Process slip
-                  handledLocally = true;
-                  await handleSlipImage(event, client, buffer, userId, groupId, result);
+                  await processVisionSlip(result);
                 } else if (result.isBusinessCard) {
-                  // Write approval flag to DB so batch doesn't send duplicate
+                  // Write approval flag to DB so batch doesn't merge business cards as reports
                   await supabase.from('yuzu_chat_history').insert({
                     group_id: groupId,
                     user_id: userId,
@@ -802,10 +788,17 @@ export async function POST(request) {
                     message_type: 'slip_batch_approved'
                   });
 
-                  // Process Business Card / Tax Invoice Card OCR
                   handledLocally = true;
                   await handleBusinessCardImage(event, client, result, userId, groupId);
                 } else {
+                  // Operational report batch: write report_batch_taken flag so subsequent report photos in the same batch don't spam replies
+                  await supabase.from('yuzu_chat_history').insert({
+                    group_id: groupId,
+                    user_id: userId,
+                    role: 'system',
+                    content: currentMsgId,
+                    message_type: 'report_batch_taken'
+                  });
 
                   // Gather other images
                   const batchMsgIds = sortedLocks.map(l => l.content);
@@ -841,22 +834,23 @@ export async function POST(request) {
                   }
                 }
               } else {
-                // Not the chosen one: Sleep to allow the chosen one to decide
+                // Not the chosen one: Wait for the chosen one's classification decision
                 console.log(`Yuzu Vision Batching: Message ${currentMsgId} waiting for chosen one's decision...`);
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                await new Promise(resolve => setTimeout(resolve, 1800));
 
-                const twelveSecondsAgo = new Date(nowTime - 12000).toISOString();
+                const fifteenSecondsAgo = new Date(nowTime - 15000).toISOString();
                 const { data: decision } = await supabase
                   .from('yuzu_chat_history')
                   .select('message_type')
                   .eq('group_id', groupId)
                   .eq('user_id', userId)
                   .in('message_type', ['slip_batch_approved', 'report_batch_taken'])
-                  .gte('created_at', twelveSecondsAgo);
+                  .gte('created_at', fifteenSecondsAgo);
 
+                const hasSlipBatchApproved = decision && decision.some(d => d.message_type === 'slip_batch_approved');
                 const hasReportBatchTaken = decision && decision.some(d => d.message_type === 'report_batch_taken');
 
-                if (hasReportBatchTaken) {
+                if (hasReportBatchTaken && !hasSlipBatchApproved) {
                   // Skip reply as this batch is already handled as a report batch
                   console.log(`Yuzu Vision Batching: Message ${currentMsgId} is part of report batch. Skipping reply.`);
                   await saveMessage(groupId, userId, 'user', `[ภาพประกอบเพิ่มเติม]`, 'image_description');
@@ -868,12 +862,9 @@ export async function POST(request) {
                 console.log(`Yuzu Vision Batching: Message ${currentMsgId} proceeding individually.`);
                 const result = await classifyAndAnalyzeImage(base64, "image/jpeg", context, bossRole, positionInstruction, friendlyName);
 
-                if (result.isFakeOrAi) {
+                if (result.isFakeOrAi || result.isSlip) {
                   handledLocally = true;
-                  await handleFakeSlipAlert(event, client, buffer, userId, groupId, result);
-                } else if (result.isSlip) {
-                  handledLocally = true;
-                  await handleSlipImage(event, client, buffer, userId, groupId, result);
+                  await processVisionSlip(result);
                 } else if (result.isBusinessCard) {
                   handledLocally = true;
                   await handleBusinessCardImage(event, client, result, userId, groupId);
