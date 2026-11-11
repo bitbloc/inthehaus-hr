@@ -1,4 +1,4 @@
-import { format, addDays, startOfWeek, parseISO, subWeeks } from 'date-fns';
+import { format, addDays, startOfWeek, parseISO, subWeeks, differenceInCalendarWeeks } from 'date-fns';
 import { supabase } from '../lib/supabaseClient.js';
 
 /**
@@ -64,15 +64,39 @@ export async function learnEmployeePatterns(options = { weeksBack: 8, client: su
         };
     });
 
-    const nowMs = Date.now();
+    // Inject master template baseline with strong weight so configured schedules are honored
+    Object.keys(templateMap).forEach(empId => {
+        if (!patterns[empId]) return;
+        for (let dow = 0; dow < 7; dow++) {
+            const tmpl = templateMap[empId]?.[dow];
+            if (tmpl) {
+                const key = tmpl.is_off
+                    ? 'OFF'
+                    : JSON.stringify({
+                        shift_id: tmpl.shift_id || null,
+                        custom_start_time: null,
+                        custom_end_time: null,
+                        slot_type: 'MAIN'
+                    });
+                patterns[empId].days[dow][key] = (patterns[empId].days[dow][key] || 0) + 15;
+            }
+        }
+    });
+
     (txs || []).forEach(tx => {
         if (!patterns[tx.employee_id]) return;
         const txDate = parseISO(tx.date);
         const dow = txDate.getDay();
 
-        // Recency weighting: recent weeks have higher influence on routine
-        const ageWeeks = Math.max(1, Math.floor((nowMs - txDate.getTime()) / (7 * 24 * 60 * 60 * 1000)));
-        const weight = ageWeeks <= 2 ? 3 : (ageWeeks <= 4 ? 2 : 1);
+        // Recency weighting with calendar week awareness:
+        // When operating hours or shift policies change (e.g. from 9 Nov 2026), the latest week holds highest authority
+        const ageWeeks = differenceInCalendarWeeks(today, txDate, { weekStartsOn: 1 });
+        let weight = 1;
+        if (ageWeeks <= 0) weight = 25; // Current & newly published week
+        else if (ageWeeks === 1) weight = 8;
+        else if (ageWeeks === 2) weight = 4;
+        else if (ageWeeks === 3) weight = 2;
+        else weight = 1;
 
         const key = tx.is_off
             ? 'OFF'

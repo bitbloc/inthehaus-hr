@@ -65,24 +65,25 @@ export default function AdminRosterPage() {
         }
     }, []);
 
-    // Strict Master Deduplication: Guarantees zero duplicate presets by time and normalized name
+    // Strict Master Deduplication: Guarantees zero duplicate presets by (name + time)
+    // Ensures distinct variations (e.g. ควบกะ 22:00 vs ควบกะ 00:30, CHEF 20:30 vs CHEF 21:30) are preserved,
+    // while eliminating identical duplicates completely.
     const allPresets = useMemo(() => {
         const cleanList = SYSTEM_STANDARD_PRESETS.map(p => ({ ...p, isSystem: true }));
 
-        const normalizeName = (s) => (s || '').replace(/[\s\(\)\:\-0-9\.]/g, '').toLowerCase();
+        const normalizeName = (s) => (s || '').replace(/[\s\(\)\:\-0-9\.🍳☀️🕒🌙🔥🍴⚡⏰👑✨🍸💼]/g, '').toLowerCase();
         const normalizeTime = (st, en) => `${(st || '').slice(0, 5)}-${(en || '').slice(0, 5)}`;
 
         (customPresets || []).forEach(cp => {
             if (!cp || !cp.start || !cp.end) return;
             const timeKey = normalizeTime(cp.start, cp.end);
             const nameKey = normalizeName(cp.name);
+            const comboKey = `${nameKey}_${timeKey}`;
 
-            const existingIdx = cleanList.findIndex(p =>
-                (cp.id && p.id === cp.id) ||
-                (cp.originalName && (p.name === cp.originalName || normalizeName(p.name) === normalizeName(cp.originalName))) ||
-                (timeKey && normalizeTime(p.start, p.end) === timeKey) ||
-                (nameKey && normalizeName(p.name) === nameKey)
-            );
+            const existingIdx = cleanList.findIndex(p => {
+                const pCombo = `${normalizeName(p.name)}_${normalizeTime(p.start, p.end)}`;
+                return (cp.id && p.id === cp.id) || pCombo === comboKey;
+            });
 
             if (existingIdx >= 0) {
                 cleanList[existingIdx] = {
@@ -103,19 +104,18 @@ export default function AdminRosterPage() {
             }
         });
 
-        const seenTimes = new Set();
-        const seenNames = new Set();
+        const seenCombos = new Set();
         const deduplicated = [];
 
         for (const item of cleanList) {
             const timeKey = normalizeTime(item.start, item.end);
             const nameKey = normalizeName(item.name);
+            const comboKey = `${nameKey}_${timeKey}`;
 
-            if (seenTimes.has(timeKey) || seenNames.has(nameKey)) {
+            if (seenCombos.has(comboKey)) {
                 continue;
             }
-            seenTimes.add(timeKey);
-            seenNames.add(nameKey);
+            seenCombos.add(comboKey);
             deduplicated.push(item);
         }
 
@@ -123,14 +123,14 @@ export default function AdminRosterPage() {
     }, [customPresets]);
 
     const resetToDefaultPresets = () => {
-        if (confirm('คุณต้องการรีเซ็ต Preset กะทั้งหมดกลับเป็นค่าเริ่มต้นมาตรฐานของร้าน (8 กะหลัก) ใช่หรือไม่? รายการซ้ำซ้อนจะถูกลบทั้งหมด')) {
+        if (confirm('คุณต้องการรีเซ็ต Preset กะทั้งหมดกลับเป็นค่าเริ่มต้นมาตรฐานของร้าน (ตามเวลาเปิดร้านใหม่ 11:00-21:30 ครัวปิด 20:45) ใช่หรือไม่? รายการซ้ำซ้อนจะถูกลบทั้งหมด')) {
             setCustomPresets([]);
             try {
                 localStorage.removeItem('roster_custom_presets');
             } catch (e) {
                 console.error(e);
             }
-            showToast('รีเซ็ต Preset ทั้งหมดเป็นค่าเริ่มต้นมาตรฐาน 8 กะเรียบร้อยแล้ว', 'success');
+            showToast('รีเซ็ต Preset ทั้งหมดเป็นค่ามาตรฐานเรียบร้อยแล้ว (ร้าน 11:00-21:30)', 'success');
         }
     };
 
@@ -2133,9 +2133,9 @@ export default function AdminRosterPage() {
                                                             type="button"
                                                             onClick={resetToDefaultPresets}
                                                             className="text-[9px] font-mono text-rams-ink-muted hover:text-rams-red underline transition-colors cursor-pointer"
-                                                            title="ล้างแคชและคืนค่ากะมาตรฐาน 8 กะ"
+                                                            title="ล้างแคชและคืนค่ากะมาตรฐานตามเวลาเปิดร้านใหม่ (11:00-21:30 ครัวปิด 20:45)"
                                                         >
-                                                            ↺ คืนค่ามาตรฐาน 8 กะ
+                                                            ↺ คืนค่ากะมาตรฐานร้านใหม่
                                                         </button>
                                                     </div>
 
