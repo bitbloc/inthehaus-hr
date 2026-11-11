@@ -675,6 +675,8 @@ export default function AdminRosterPage() {
                 const shiftObj = shifts.find(sh => sh.id === s.shift_id);
                 return {
                     ...s,
+                    shift_id: s.shift_id ? String(s.shift_id) : '',
+                    preset_id: s.shift_id ? (allPresets.find(p => p.shiftId && String(p.shiftId) === String(s.shift_id))?.id || null) : null,
                     custom_start_time: (s.custom_start_time || shiftObj?.start_time || '').slice(0, 5),
                     custom_end_time: (s.custom_end_time || shiftObj?.end_time || '').slice(0, 5),
                 };
@@ -682,6 +684,7 @@ export default function AdminRosterPage() {
                 slot_type: 'MAIN',
                 is_off: false,
                 shift_id: '',
+                preset_id: null,
                 custom_start_time: '',
                 custom_end_time: '',
                 status: 'PUBLISHED',
@@ -714,11 +717,15 @@ export default function AdminRosterPage() {
                             updated.custom_start_time = (found.start_time || '').slice(0, 5);
                             updated.custom_end_time = (found.end_time || '').slice(0, 5);
                             updated.is_off = false;
+                            updated.preset_id = allPresets.find(p => p.shiftId && String(p.shiftId) === String(value))?.id || null;
                         }
                     }
                 }
                 if (field === 'is_off' && value) {
+                    updated.custom_start_time = '';
+                    updated.custom_end_time = '';
                     updated.shift_id = '';
+                    updated.preset_id = null;
                 }
                 return updated;
             });
@@ -731,14 +738,28 @@ export default function AdminRosterPage() {
             if (!prev) return prev;
             const newSlots = prev.slots.map((slot, i) => {
                 if (i !== index) return slot;
-                const matchedShift = shifts.find(s => 
-                    (s.start_time || '').slice(0, 5) === (preset.start || '').slice(0, 5) && 
-                    (s.end_time || '').slice(0, 5) === (preset.end || '').slice(0, 5)
-                );
+                
+                // Directly use preset's shiftId if available
+                let targetShiftId = preset.shiftId ? String(preset.shiftId) : '';
+                
+                // If custom preset without shiftId, match by BOTH name and times against DB shifts
+                if (!targetShiftId) {
+                    const normPre = (preset.name || '').replace(/[\s\(\)\:\-0-9\.🍳☀️🕒🌙🔥🍴⚡⏰👑✨🍸💼]/g, '').toLowerCase();
+                    const matchedShift = shifts.find(s => {
+                        const sameTime = (s.start_time || '').slice(0, 5) === (preset.start || '').slice(0, 5) && 
+                                         (s.end_time || '').slice(0, 5) === (preset.end || '').slice(0, 5);
+                        const normS = (s.name || '').replace(/[\s\(\)\:\-0-9\.🍳☀️🕒🌙🔥🍴⚡⏰👑✨🍸💼]/g, '').toLowerCase();
+                        return sameTime && (normPre === normS || normPre.includes(normS) || normS.includes(normPre));
+                    });
+                    if (matchedShift) targetShiftId = String(matchedShift.id);
+                }
+
                 return {
                     ...slot,
                     is_off: false,
-                    shift_id: matchedShift ? String(matchedShift.id) : (preset.shiftId ? String(preset.shiftId) : ''),
+                    shift_id: targetShiftId,
+                    preset_id: preset.id || null,
+                    preset_name: preset.name || null,
                     custom_start_time: (preset.start || '').slice(0, 5),
                     custom_end_time: (preset.end || '').slice(0, 5)
                 };
@@ -1656,12 +1677,20 @@ export default function AdminRosterPage() {
                                                             const endClean = (s.custom_end_time || shiftObj?.end_time || '').slice(0, 5);
                                                             const timeStr = startClean && endClean ? `${startClean}-${endClean}` : (shiftObj ? `${shiftObj.start_time.slice(0,5)}-${shiftObj.end_time.slice(0,5)}` : '');
 
-                                                            // Match against all standard & custom presets
-                                                            const matchedPreset = (!s.is_off && startClean && endClean)
-                                                                ? allPresets.find(p => (p.start || '').slice(0, 5) === startClean && (p.end || '').slice(0, 5) === endClean)
+                                                            // Match against presets prioritizing shift_id and exact role
+                                                            const matchedPreset = (!s.is_off && (s.shift_id || (startClean && endClean)))
+                                                                ? allPresets.find(p => {
+                                                                    if (s.shift_id && p.shiftId && String(p.shiftId) === String(s.shift_id)) return true;
+                                                                    if (shiftObj && (p.start || '').slice(0, 5) === startClean && (p.end || '').slice(0, 5) === endClean) {
+                                                                        const normP = (p.name || '').replace(/[\s\(\)\:\-0-9\.🍳☀️🕒🌙🔥🍴⚡⏰👑✨🍸💼]/g, '').toLowerCase();
+                                                                        const normS = (shiftObj.name || '').replace(/[\s\(\)\:\-0-9\.🍳☀️🕒🌙🔥🍴⚡⏰👑✨🍸💼]/g, '').toLowerCase();
+                                                                        return normP === normS || normP.includes(normS) || normS.includes(normP);
+                                                                    }
+                                                                    return false;
+                                                                })
                                                                 : null;
 
-                                                            // Match against DB shifts by start and end time if shiftObj is missing
+                                                            // Match against DB shifts only when shiftObj is missing
                                                             const matchedDbShift = (!shiftObj && !s.is_off && startClean && endClean)
                                                                 ? shifts.find(sh => (sh.start_time || '').slice(0, 5) === startClean && (sh.end_time || '').slice(0, 5) === endClean)
                                                                 : null;
@@ -1677,7 +1706,7 @@ export default function AdminRosterPage() {
                                                                 ? (approvedLeave
                                                                     ? `OFF (LEAVE: ${approvedLeave.leave_type === 'sick' ? 'SICK' : approvedLeave.leave_type === 'business' ? 'BIZ' : 'VACATION'})`
                                                                     : 'OFF')
-                                                                : (matchedPreset ? matchedPreset.name : (shiftObj?.name || matchedDbShift?.name || (timeStr ? `กะ ${timeStr}` : 'CUSTOM')));
+                                                                : (shiftObj ? shiftObj.name : (matchedPreset ? matchedPreset.name : (matchedDbShift?.name || (timeStr ? `กะ ${timeStr}` : 'CUSTOM'))));
 
                                                             return (
                                                                 <div key={idx} className={`p-1.5 rounded-sm text-[10px] font-mono border ${bgColor} ${s.status === 'DRAFT' ? 'border-dashed border-2' : ''}`}>
@@ -2163,10 +2192,38 @@ export default function AdminRosterPage() {
                                                                 <div className="grid grid-cols-2 gap-1.5">
                                                                     {groupPresets.map((preset, pIdx) => {
                                                                         const pc = getPresetColor(preset.color);
-                                                                        const isSelected = !slot.is_off && (
-                                                                            (startClean === (preset.start || '').slice(0, 5) && endClean === (preset.end || '').slice(0, 5)) ||
-                                                                            (slot.shift_id && String(slot.shift_id) === String(preset.shiftId))
-                                                                        );
+                                                                        const isSelected = !slot.is_off && (() => {
+                                                                            // 1. Explicit preset ID match
+                                                                            if (slot.preset_id && preset.id && slot.preset_id === preset.id) return true;
+
+                                                                            // 2. Direct shift_id match
+                                                                            if (slot.shift_id && preset.shiftId && String(slot.shift_id) === String(preset.shiftId)) return true;
+
+                                                                            // 3. Match via assigned shiftObj (matches both role name and working hours)
+                                                                            if (slot.shift_id) {
+                                                                                const curShift = shifts.find(sh => String(sh.id) === String(slot.shift_id));
+                                                                                if (curShift) {
+                                                                                    const sameTime = (curShift.start_time || '').slice(0, 5) === (preset.start || '').slice(0, 5) &&
+                                                                                                     (curShift.end_time || '').slice(0, 5) === (preset.end || '').slice(0, 5);
+                                                                                    const normCur = (curShift.name || '').replace(/[\s\(\)\:\-0-9\.🍳☀️🕒🌙🔥🍴⚡⏰👑✨🍸💼]/g, '').toLowerCase();
+                                                                                    const normPre = (preset.name || '').replace(/[\s\(\)\:\-0-9\.🍳☀️🕒🌙🔥🍴⚡⏰👑✨🍸💼]/g, '').toLowerCase();
+                                                                                    return sameTime && (normCur === normPre || normCur.includes(normPre) || normPre.includes(normCur));
+                                                                                }
+                                                                            }
+
+                                                                            // 4. Custom time match: match by preset_name or unique timing
+                                                                            if (startClean && endClean && startClean === (preset.start || '').slice(0, 5) && endClean === (preset.end || '').slice(0, 5)) {
+                                                                                if (slot.preset_name) {
+                                                                                    const normSlotName = (slot.preset_name || '').replace(/[\s\(\)\:\-0-9\.🍳☀️🕒🌙🔥🍴⚡⏰👑✨🍸💼]/g, '').toLowerCase();
+                                                                                    const normPre = (preset.name || '').replace(/[\s\(\)\:\-0-9\.🍳☀️🕒🌙🔥🍴⚡⏰👑✨🍸💼]/g, '').toLowerCase();
+                                                                                    return normSlotName === normPre;
+                                                                                }
+                                                                                const presetsWithSameTime = allPresets.filter(p => (p.start || '').slice(0, 5) === startClean && (p.end || '').slice(0, 5) === endClean);
+                                                                                if (presetsWithSameTime.length === 1) return true;
+                                                                            }
+
+                                                                            return false;
+                                                                        })();
 
                                                                         return (
                                                                             <div
@@ -2180,7 +2237,7 @@ export default function AdminRosterPage() {
                                                                             >
                                                                                 <div className="flex items-center gap-1.5 min-w-0">
                                                                                     <span className="text-sm shrink-0">{preset.icon || '⏰'}</span>
-                                                                                    <span className="font-bold truncate">{preset.name.replace(/[\(（].*?[\)）]/g, '').trim()}</span>
+                                                                                    <span className="font-bold truncate">{preset.name}</span>
                                                                                 </div>
                                                                                 <div className="flex items-center gap-1.5 shrink-0 pl-1">
                                                                                     <span className="text-[10px] font-mono text-rams-ink-muted bg-rams-bg/80 px-1.5 py-0.5 rounded-sm border border-rams-rule-light">

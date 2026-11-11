@@ -17,12 +17,14 @@ export const SYSTEM_STANDARD_PRESETS = [
 
     // 2. กะครัว & ประจำตำแหน่ง (Kitchen) - ครัวปิด 20:45
     { id: 'sys_chef', shiftId: 5, start: '10:00', end: '20:30', name: 'CHEF 🍳', category: 'kitchen', categoryName: 'ครัว & ประจำตำแหน่ง', color: 'emerald', hex: '#15803d', icon: '🍳', label: 'CHEF (20:30)' },
-    { id: 'sys_chef_close', shiftId: 9, start: '10:00', end: '21:30', name: 'CHEF (ปิดร้าน) 🍳', category: 'kitchen', categoryName: 'ครัว & ประจำตำแหน่ง', color: 'emerald', hex: '#047857', icon: '🍳', label: 'CHEF (21:30)' },
+    { id: 'sys_chef_close', shiftId: 9, start: '10:00', end: '21:30', name: 'CHEF 🍳', category: 'kitchen', categoryName: 'ครัว & ประจำตำแหน่ง', color: 'emerald', hex: '#047857', icon: '🍳', label: 'CHEF (21:30)' },
+    { id: 'sys_assistant_2130', shiftId: 12, start: '10:00', end: '21:30', name: 'ผู้ช่วยครัว 🍴', category: 'kitchen', categoryName: 'ครัว & ประจำตำแหน่ง', color: 'violet', hex: '#9c4221', icon: '🍴', label: 'ผู้ช่วยครัว (21:30)' },
     { id: 'sys_assistant', shiftId: 6, start: '12:30', end: '23:30', name: 'ผู้ช่วยครัว 🍴', category: 'kitchen', categoryName: 'ครัว & ประจำตำแหน่ง', color: 'violet', hex: '#9c4221', icon: '🍴', label: 'ผู้ช่วยครัว' },
 
     // 3. ผู้บริหาร & พาร์ตไทม์ (Roles & Part-time)
     { id: 'sys_inthehaus', shiftId: 7, start: '18:00', end: '22:30', name: 'INTHEHAUS ⚡', category: 'management', categoryName: 'ผู้บริหาร / พาร์ตไทม์', color: 'indigo', hex: '#4f46e5', icon: '⚡', label: 'INTHEHAUS' },
-    { id: 'sys_parttime', shiftId: 8, start: '12:30', end: '21:30', name: 'PART-TIME ⏰', category: 'parttime', categoryName: 'ผู้บริหาร / พาร์ตไทม์', color: 'rose', hex: '#ca8a04', icon: '⏰', label: 'Part-Time' }
+    { id: 'sys_parttime_10', shiftId: 13, start: '10:00', end: '21:30', name: 'PART-TIME ⏰', category: 'parttime', categoryName: 'ผู้บริหาร / พาร์ตไทม์', color: 'rose', hex: '#ca8a04', icon: '⏰', label: 'Part-Time (10:00-21:30)' },
+    { id: 'sys_parttime', shiftId: 8, start: '12:30', end: '21:30', name: 'PART-TIME ⏰', category: 'parttime', categoryName: 'ผู้บริหาร / พาร์ตไทม์', color: 'rose', hex: '#ca8a04', icon: '⏰', label: 'Part-Time (12:30-21:30)' }
 ];
 
 export const PRESET_COLORS = [
