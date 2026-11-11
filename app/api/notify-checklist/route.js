@@ -1,10 +1,8 @@
 import { NextResponse } from 'next/server';
 import { Client } from '@line/bot-sdk';
 
-// ✅ Group IDs (กลุ่มหลัก และ กลุ่มแผนกอื่น)
 const GROUP_IDS = [
-  'C1210c7a0601b5a675060e312efe10bff',
-  'C71db3c7339b11f43dc8f1ec34bf46f43'
+  'C1210c7a0601b5a675060e312efe10bff'
 ];
 
 const client = new Client({
@@ -12,71 +10,113 @@ const client = new Client({
   channelSecret: process.env.CHANNEL_SECRET,
 });
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request) {
   try {
-    const { shiftName, statusDetail, staffName, cashAmount, timestamp } = await request.json();
+    const body = await request.json();
+    const {
+      shiftName = 'ตรวจสอบร้าน',
+      statusDetail = 'บันทึกข้อมูลเรียบร้อย',
+      staffName = 'พนักงาน',
+      cashAmount,
+      timestamp,
+      itemsCount
+    } = body;
 
-    // Determine shift emoji/styling
-    let shiftEmoji = "☀️";
-    if (shiftName && (shiftName.includes("ปิด") || shiftName.includes("เย็น") || shiftName.includes("night") || shiftName.includes("evening"))) {
-      shiftEmoji = "🌙";
-    }
+    const formattedTime = timestamp || new Date().toLocaleString('th-TH', {
+      timeZone: 'Asia/Bangkok',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
 
+    const checklistStatus = itemsCount
+      ? `เช็คครบถ้วน (${itemsCount} รายการ)`
+      : statusDetail;
+
+    // Dieter Rams + Thai Modern Clean Aesthetic (No Image / Zero-Icon)
     const messageContents = {
       type: 'bubble',
       size: 'mega',
       styles: {
-        body: { backgroundColor: '#F5F5F3' },
-        footer: { backgroundColor: '#F5F5F3' }
+        body: { backgroundColor: '#FBF9F5' },
+        footer: { backgroundColor: '#FBF9F5', separator: true, separatorColor: '#E6E1D6' }
       },
       body: {
         type: 'box',
         layout: 'vertical',
         paddingAll: '20px',
         contents: [
-          // Header (ONHAUS SYSTEM & Accent dot)
+          // Header / Eyebrow
           {
             type: 'box',
             layout: 'horizontal',
+            alignItems: 'center',
             contents: [
-              { type: 'text', text: 'ONHAUS SYSTEM', weight: 'bold', size: 'xxs', color: '#7C7C7C' },
-              { type: 'box', layout: 'vertical', width: '8px', height: '8px', cornerRadius: '4px', backgroundColor: '#E05A36' }
+              {
+                type: 'text',
+                text: 'SYSTEM // REPORT',
+                size: 'xxs',
+                color: '#78736A',
+                weight: 'bold',
+                flex: 1
+              },
+              {
+                type: 'box',
+                layout: 'horizontal',
+                backgroundColor: '#F4F1EA',
+                cornerRadius: 'xs',
+                paddingStart: 'sm',
+                paddingEnd: 'sm',
+                paddingTop: 'xs',
+                paddingBottom: 'xs',
+                contents: [
+                  {
+                    type: 'text',
+                    text: 'CHECKLIST RECEIVED',
+                    size: 'xxs',
+                    weight: 'bold',
+                    color: '#4A6B3D'
+                  }
+                ]
+              }
             ]
           },
-          { type: 'separator', color: '#1A1A1A', margin: 'md' },
-          
-          // Checklist Title & Status
+          // Main Title (Shift Name)
           {
             type: 'text',
-            text: 'CHECKLIST REPORT',
-            weight: 'bold',
-            size: 'xxs',
-            color: '#7C7C7C',
-            margin: 'md'
-          },
-          {
-            type: 'text',
-            text: `${shiftEmoji} ${shiftName || 'ไม่ระบุชื่อกะ'}`,
-            weight: 'bold',
+            text: shiftName,
             size: 'xl',
-            color: '#1A1A1A',
-            margin: 'sm',
+            weight: 'bold',
+            color: '#1E1B18',
+            margin: 'md',
             wrap: true
           },
+          // Subtitle Confirmation
           {
             type: 'text',
-            text: `✅ ${statusDetail || 'ตรวจสอบครบถ้วน'}`,
-            weight: 'bold',
-            size: 'sm',
-            color: '#1DB446',
+            text: 'ระบบได้รับบันทึกข้อมูลการตรวจสอบร้านเรียบร้อยแล้ว',
+            size: 'xs',
+            color: '#78736A',
+            wrap: true,
             margin: 'xs'
           },
-          { type: 'separator', color: '#CCCCCC', margin: 'md' },
-
-          // Details grid
+          // Divider
+          {
+            type: 'separator',
+            color: '#E6E1D6',
+            margin: 'md'
+          },
+          // Details Grid (Elevated Card)
           {
             type: 'box',
             layout: 'vertical',
+            backgroundColor: '#F4F1EA',
+            cornerRadius: 'sm',
+            paddingAll: '12px',
             margin: 'md',
             spacing: 'xs',
             contents: [
@@ -84,8 +124,16 @@ export async function POST(request) {
                 type: 'box',
                 layout: 'horizontal',
                 contents: [
-                  { type: 'text', text: 'พนักงาน', size: 'xs', color: '#7C7C7C', flex: 1 },
-                  { type: 'text', text: staffName || '-', size: 'xs', weight: 'bold', color: '#1A1A1A', flex: 2, wrap: true }
+                  { type: 'text', text: 'พนักงานผู้ส่ง', size: 'xs', color: '#78736A', flex: 4 },
+                  { type: 'text', text: staffName, size: 'xs', weight: 'bold', color: '#1E1B18', align: 'end', flex: 6, wrap: true }
+                ]
+              },
+              {
+                type: 'box',
+                layout: 'horizontal',
+                contents: [
+                  { type: 'text', text: 'สถานะตรวจสอบ', size: 'xs', color: '#78736A', flex: 4 },
+                  { type: 'text', text: checklistStatus, size: 'xs', weight: 'bold', color: '#1E1B18', align: 'end', flex: 6, wrap: true }
                 ]
               },
               ...(cashAmount ? [
@@ -93,40 +141,50 @@ export async function POST(request) {
                   type: 'box',
                   layout: 'horizontal',
                   contents: [
-                    { type: 'text', text: 'ยอดเงิน', size: 'xs', color: '#7C7C7C', flex: 1 },
-                    { type: 'text', text: `฿ ${cashAmount}`, size: 'xs', weight: 'bold', color: '#1A1A1A', flex: 2 }
+                    { type: 'text', text: 'เงินสดในลิ้นชัก', size: 'xs', color: '#78736A', flex: 4 },
+                    { type: 'text', text: `฿ ${Number(cashAmount).toLocaleString('th-TH')}`, size: 'xs', weight: 'bold', color: '#C85A32', align: 'end', flex: 6 }
                   ]
                 }
-              ] : [])
+              ] : []),
+              {
+                type: 'box',
+                layout: 'horizontal',
+                contents: [
+                  { type: 'text', text: 'เวลาบันทึก', size: 'xs', color: '#78736A', flex: 4 },
+                  { type: 'text', text: formattedTime, size: 'xs', color: '#78736A', align: 'end', flex: 6 }
+                ]
+              }
             ]
-          },
-          { type: 'separator', color: '#CCCCCC', margin: 'md' },
-
-          // Timestamp
-          {
-            type: 'text',
-            text: `บันทึก: ${timestamp || new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })}`,
-            size: 'xxs',
-            color: '#7C7C7C',
-            align: 'end',
-            margin: 'sm'
           }
         ]
       },
       footer: {
         type: 'box',
         layout: 'vertical',
-        paddingStart: '20px',
-        paddingEnd: '20px',
-        paddingBottom: '15px',
+        paddingAll: '16px',
+        spacing: 'sm',
         contents: [
+          // Primary Action Link to Operations Portal
+          {
+            type: 'button',
+            action: {
+              type: 'uri',
+              label: 'IN THE HAUS · Operations Portal',
+              uri: 'https://inthehaus-hr.vercel.app/checklist'
+            },
+            style: 'primary',
+            color: '#1E1B18',
+            height: 'sm'
+          },
+          // Footnote
           {
             type: 'text',
-            text: 'ONHAUS SYSTEM ©',
+            text: 'ONHAUS SYSTEM // DIETER RAMS PROTOCOL',
             size: 'xxs',
-            color: '#7C7C7C',
+            color: '#A09B90',
+            weight: 'bold',
             align: 'center',
-            weight: 'bold'
+            margin: 'sm'
           }
         ]
       }
@@ -134,7 +192,7 @@ export async function POST(request) {
 
     const message = {
       type: 'flex',
-      altText: `📋 Checklist Report: ${shiftName || 'ตรวจสอบกะ'} โดย ${staffName || 'พนักงาน'}`,
+      altText: `CHECKLIST RECEIVED: ${shiftName} โดย ${staffName}`,
       contents: messageContents
     };
 
