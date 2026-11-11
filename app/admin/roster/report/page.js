@@ -14,7 +14,15 @@ function RosterPDFReportContent() {
     const [shifts, setShifts] = useState([]);
     const [transactions, setTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [customPresets, setCustomPresets] = useState([]);
+    const [customPresets, setCustomPresets] = useState(() => {
+        if (typeof window === 'undefined') return [];
+        try {
+            const saved = localStorage.getItem('roster_custom_presets');
+            return saved ? JSON.parse(saved) : [];
+        } catch {
+            return [];
+        }
+    });
 
     const SYSTEM_STANDARD_PRESETS = [
         { start: '18:00', end: '22:30', name: 'INTHEHAUS', color: 'indigo', icon: '' },
@@ -39,16 +47,6 @@ function RosterPDFReportContent() {
     ];
     const getPresetColor = (colorId) => PRESET_COLORS.find(c => c.id === colorId) || PRESET_COLORS[0];
 
-    useEffect(() => {
-        try {
-            const saved = localStorage.getItem('roster_custom_presets');
-            if (saved) {
-                setCustomPresets(JSON.parse(saved));
-            }
-        } catch (e) {
-            console.error(e);
-        }
-    }, []);
 
     const allPresets = useMemo(() => {
         const presetsMap = new Map();

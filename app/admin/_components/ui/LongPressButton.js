@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import clsx from "clsx";
 
 export function LongPressButton({ onLongPress, className, label = "Delete", duration = 1500 }) {
@@ -8,7 +8,14 @@ export function LongPressButton({ onLongPress, className, label = "Delete", dura
     const reqRef = useRef(null);
     const startTimeRef = useRef(0);
 
-    const start = () => {
+    const stop = useCallback(() => {
+        clearTimeout(timerRef.current);
+        cancelAnimationFrame(reqRef.current);
+        setPressing(false);
+        setProgress(0);
+    }, []);
+
+    const start = useCallback(() => {
         setPressing(true);
         startTimeRef.current = Date.now();
         timerRef.current = setTimeout(() => {
@@ -23,14 +30,14 @@ export function LongPressButton({ onLongPress, className, label = "Delete", dura
             if (p < 100) reqRef.current = requestAnimationFrame(animate);
         };
         reqRef.current = requestAnimationFrame(animate);
-    };
+    }, [duration, onLongPress, stop]);
 
-    const stop = () => {
-        clearTimeout(timerRef.current);
-        cancelAnimationFrame(reqRef.current);
-        setPressing(false);
-        setProgress(0);
-    };
+    useEffect(() => {
+        return () => {
+            clearTimeout(timerRef.current);
+            cancelAnimationFrame(reqRef.current);
+        };
+    }, []);
 
     return (
         <button

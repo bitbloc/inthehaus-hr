@@ -144,7 +144,7 @@ export default function Marketplace({ currentUser, initialRequests, onRefresh })
 
                 {req.notes && (
                   <p className="text-xs font-sans text-rams-ink-muted italic mb-3 pl-2 border-l-2 border-rams-orange">
-                    "{req.notes}"
+                    &ldquo;{req.notes}&rdquo;
                   </p>
                 )}
               </div>

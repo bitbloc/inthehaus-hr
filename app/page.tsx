@@ -10,10 +10,9 @@ import { format } from "date-fns";
 import { th } from "date-fns/locale";
 
 export default function OperationsHub() {
-  const [time, setTime] = useState<Date | null>(null);
+  const [time, setTime] = useState<Date | null>(() => (typeof window !== 'undefined' ? new Date() : null));
 
   useEffect(() => {
-    setTime(new Date());
     const timer = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);

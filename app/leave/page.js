@@ -456,7 +456,7 @@ export default function LeaveRequest() {
                       {h.leave_type === "sick" ? "SICK" : h.leave_type === "business" ? "BUSINESS" : "VACATION"}
                     </span>
                   </div>
-                  <p className="text-xs font-sans text-rams-ink">"{h.reason}"</p>
+                  <p className="text-xs font-sans text-rams-ink">&ldquo;{h.reason}&rdquo;</p>
                   {h.replacement_employee && (
                     <div className="text-[10px] font-mono text-rams-ink-muted flex items-center gap-1 mt-1">
                       <span>คนแทน:</span>

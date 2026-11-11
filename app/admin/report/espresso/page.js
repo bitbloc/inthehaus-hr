@@ -211,7 +211,7 @@ function EspressoPDFReportContent() {
                                                         <div>
                                                             <h4 className="text-[9px] font-bold tracking-widest uppercase text-neutral-400 mb-2">บทวิเคราะห์จาก Yuzu AI</h4>
                                                             <p className="text-xs leading-relaxed text-neutral-800 italic whitespace-pre-wrap">
-                                                                "{report.recommendation}"
+                                                                &ldquo;{report.recommendation}&rdquo;
                                                             </p>
                                                         </div>
                                                         <div className="text-[8px] font-bold text-neutral-400 mt-4 uppercase tracking-widest">

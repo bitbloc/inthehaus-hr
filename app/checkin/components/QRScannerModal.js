@@ -11,13 +11,12 @@ export default function QRScannerModal({ isOpen, onClose, onScanSuccess }) {
   const [errorMsg, setErrorMsg] = useState('');
   const [manualCode, setManualCode] = useState('');
 
-  useEffect(() => {
-    if (isOpen) {
-      setErrorMsg('');
-      setManualCode('');
-      tryLiffScan();
-    }
-  }, [isOpen]);
+  const handleSuccess = (code) => {
+    const clean = (code || '').trim();
+    if (!clean) return;
+    onScanSuccess(clean);
+    onClose();
+  };
 
   const tryLiffScan = async () => {
     setScanning(true);
@@ -38,12 +37,21 @@ export default function QRScannerModal({ isOpen, onClose, onScanSuccess }) {
     setScanning(false);
   };
 
-  const handleSuccess = (code) => {
-    const clean = (code || '').trim();
-    if (!clean) return;
-    onScanSuccess(clean);
-    onClose();
-  };
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+  if (isOpen !== prevIsOpen) {
+    setPrevIsOpen(isOpen);
+    setErrorMsg('');
+    setManualCode('');
+  }
+
+  useEffect(() => {
+    if (isOpen) {
+      const timer = setTimeout(() => {
+        tryLiffScan();
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]);
 
   const handleManualSubmit = (e) => {
     e.preventDefault();

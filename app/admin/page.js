@@ -2994,12 +2994,14 @@ export default function AdminDashboard() {
 // A reusable component to handle profile image loading errors gracefully.
 // It falls back to a text-based initial avatar if the image fails to load.
 const EmployeeAvatar = ({ employee, className = "w-9 h-9 rounded-xl", textClassName = "text-xs font-bold" }) => {
-    const [imgError, setImgError] = useState(false);
     const photoUrl = employee?.photo_url;
+    const [prevPhotoUrl, setPrevPhotoUrl] = useState(photoUrl);
+    const [imgError, setImgError] = useState(false);
 
-    useEffect(() => {
+    if (prevPhotoUrl !== photoUrl) {
+        setPrevPhotoUrl(photoUrl);
         setImgError(false);
-    }, [photoUrl]);
+    }
 
     if (photoUrl && !imgError) {
         return (

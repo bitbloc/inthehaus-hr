@@ -1206,7 +1206,7 @@ export default function ChecklistPage() {
                             </span>
                             {item.note ? (
                               <p className="text-xs text-rams-ink leading-relaxed font-sans bg-rams-panel p-2.5 rounded-sm border border-rams-rule-light flex-1 italic">
-                                "{item.note}"
+                                &ldquo;{item.note}&rdquo;
                               </p>
                             ) : (
                               <p className="text-rams-ink-muted text-xs italic font-sans flex-1">

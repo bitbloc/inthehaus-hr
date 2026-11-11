@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { QrCode, Sparkles, RefreshCw, ShieldCheck, Clock, Store } from 'lucide-react';
 
@@ -9,7 +9,7 @@ export default function ShopQRDisplay() {
   const [countdown, setCountdown] = useState(15);
   const [loading, setLoading] = useState(true);
 
-  const fetchToken = async () => {
+  const fetchToken = useCallback(async () => {
     try {
       const res = await fetch('/api/checkins/shop-token');
       const json = await res.json();
@@ -19,9 +19,10 @@ export default function ShopQRDisplay() {
       }
     } catch (e) {
       console.error("Fetch shop token error:", e);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  };
+  }, []);
 
   useEffect(() => {
     fetchToken();
@@ -36,7 +37,7 @@ export default function ShopQRDisplay() {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchToken]);
 
   const qrUrl = tokenData?.token 
     ? `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(tokenData.token)}&color=0-0-0&bgcolor=255-255-255`

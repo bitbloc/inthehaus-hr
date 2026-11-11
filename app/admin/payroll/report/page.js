@@ -105,7 +105,7 @@ function PayrollPDFReportContent() {
         return 'bg-rams-green/10 text-rams-green border-rams-green/30 font-bold';
     };
 
-    const MasterReport = () => (
+    const renderMasterReport = () => (
         <div className="bg-[#fafaf9] text-neutral-900 p-8 md:p-14 font-mono selection:bg-neutral-900 selection:text-white max-w-6xl mx-auto">
             {/* Header */}
             <div className="flex justify-between items-start border-b-2 border-neutral-900 pb-6 mb-8">
@@ -271,7 +271,7 @@ function PayrollPDFReportContent() {
         </div>
     );
 
-    const IndividualReport = () => (
+    const renderIndividualReport = () => (
         <div className="bg-[#fafaf9] min-h-screen py-6 font-mono selection:bg-neutral-900 selection:text-white">
             {filteredIndividualData.length === 0 ? (
                 <div className="max-w-4xl mx-auto p-12 text-center text-neutral-400 font-mono text-xs uppercase tracking-wider bg-white rounded-2xl border border-neutral-200">
@@ -556,7 +556,7 @@ function PayrollPDFReportContent() {
                 </div>
             </div>
 
-            {reportType === 'individual' ? <IndividualReport /> : <MasterReport />}
+            {reportType === 'individual' ? renderIndividualReport() : renderMasterReport()}
         </div>
     );
 }

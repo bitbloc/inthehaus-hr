@@ -165,9 +165,8 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
   const cleanReceiverAcc = cleanText(result.receiverAccount);
   const cleanBank = cleanText(result.bankName);
 
-  // Determine Thailand date string (YYYY-MM-DD)
-  const bkkNow = addHours(new Date(), 7);
-  const todayStr = format(bkkNow, 'yyyy-MM-dd');
+  // Determine Thailand date string (YYYY-MM-DD) bulletproof
+  const todayStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Bangkok' });
   let dateStr = todayStr;
   if (result.transDate && /^\d{4}-\d{2}-\d{2}$/.test(result.transDate)) {
     dateStr = result.transDate;

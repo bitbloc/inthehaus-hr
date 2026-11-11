@@ -1863,7 +1863,7 @@ export default function YuzuKnowledgeManager() {
                                                         </div>
                                                         {log.mood_note && (
                                                             <p className="text-xs bg-rams-bg text-rams-ink-muted p-2.5 rounded-sm border border-rams-rule-light italic font-mono">
-                                                                "{log.mood_note}"
+                                                                &ldquo;{log.mood_note}&rdquo;
                                                             </p>
                                                         )}
                                                     </div>
@@ -2619,57 +2619,4 @@ export default function YuzuKnowledgeManager() {
     );
 }
 
-// Minimal Plus icon for the button since it wasn't in HausIcon
-if (!Icons.Plus) {
-    Icons.Plus = ({ size }) => (
-        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19"></line>
-            <line x1="5" y1="12" x2="19" y2="12"></line>
-        </svg>
-    );
-}
-
-// Minimal Money icon for the slips
-if (!Icons.Money) {
-    Icons.Money = ({ size }) => (
-        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="1" x2="12" y2="23"></line>
-            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-        </svg>
-    );
-}
-
-// Minimal Alert icon
-if (!Icons.Alert) {
-    Icons.Alert = ({ size, className }) => (
-        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-            <circle cx="12" cy="12" r="10"></circle>
-            <line x1="12" y1="8" x2="12" y2="12"></line>
-            <line x1="12" y1="16" x2="12.01" y2="16"></line>
-        </svg>
-    );
-}
-
-// Minimal Coffee icon
-if (!Icons.Coffee) {
-    Icons.Coffee = ({ size }) => (
-        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M18 8h1a4 4 0 0 1 0 8h-1"></path>
-            <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path>
-            <line x1="6" y1="1" x2="6" y2="4"></line>
-            <line x1="10" y1="1" x2="10" y2="4"></line>
-            <line x1="14" y1="1" x2="14" y2="4"></line>
-        </svg>
-    );
-}
-
-// Minimal Lock icon
-if (!Icons.Lock) {
-    Icons.Lock = ({ size, className }) => (
-        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-        </svg>
-    );
-}
 

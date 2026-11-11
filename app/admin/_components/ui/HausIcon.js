@@ -25,11 +25,13 @@ import {
     Trash,
     Sparkles,
     Lock,
-    Coffee
+    Coffee,
+    Plus
 } from "lucide-react";
 
 // Re-export specific icons to keep the main code clean and consistent
 export const Icons = {
+    Plus,
     Sun,
     Moon,
     Check,

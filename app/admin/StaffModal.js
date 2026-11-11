@@ -6,8 +6,6 @@ import {
 } from "lucide-react";
 
 export default function StaffModal({ isOpen, onClose, onSave, initialData, isEditing }) {
-    if (!isOpen) return null;
-
     const [activeTab, setActiveTab] = useState("core");
     const [formData, setFormData] = useState({
         name: "", 
@@ -172,6 +170,8 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
     ];
 
     const currentWageType = formData.shift_rates?.wage_type || 'daily';
+
+    if (!isOpen) return null;
 
     return (
         <div className="fixed inset-0 bg-rams-ink/40 backdrop-blur-xs flex items-center justify-center z-50 p-3 sm:p-4 overflow-y-auto selection:bg-rams-ink/10">

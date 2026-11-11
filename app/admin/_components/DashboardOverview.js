@@ -9,12 +9,14 @@ import { formatDate, formatCurrency, formatTime } from "../../../utils/format";
 
 // Graceful Staff Avatar Component handling image loading errors & Dieter Rams initial fallbacks
 function StaffAvatar({ employee, className = "w-10 h-10", textClassName = "text-sm", isWorking = false }) {
-    const [imgError, setImgError] = useState(false);
     const photoUrl = employee?.photo_url;
+    const [prevPhotoUrl, setPrevPhotoUrl] = useState(photoUrl);
+    const [imgError, setImgError] = useState(false);
 
-    useEffect(() => {
+    if (prevPhotoUrl !== photoUrl) {
+        setPrevPhotoUrl(photoUrl);
         setImgError(false);
-    }, [photoUrl]);
+    }
 
     const initialChar = (employee?.name || employee?.nickname || "E").charAt(0);
 
@@ -428,7 +430,10 @@ export default function DashboardOverview({
 
     // Reservations & Orders for today
     const todayReservations = (data.reservations || []).filter(r => r.reservation_date === todayStr);
-    const todayOrders = (data.orders || []).filter(o => format(new Date(o.created_at || o.timestamp || Date.now()), 'yyyy-MM-dd') === todayStr);
+    const todayOrders = (data.orders || []).filter(o => {
+        const orderTime = o.created_at || o.timestamp;
+        return orderTime ? format(new Date(orderTime), 'yyyy-MM-dd') === todayStr : false;
+    });
 
     return (
         <div className="space-y-6 animate-fade-in pb-12 font-sans">

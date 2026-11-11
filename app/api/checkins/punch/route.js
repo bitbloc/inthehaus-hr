@@ -151,14 +151,21 @@ export async function POST(request) {
     }
 
     // 4. Calculate Punctuality & Shift Context (ICT / Bangkok Time: UTC+7)
-    const bangkokNow = addHours(serverNow, 7);
-    const todayDateStr = format(bangkokNow, 'yyyy-MM-dd');
-    const dayOfWeek = bangkokNow.getUTCDay(); // 0=Sun, 1=Mon, ..., 6=Sat
-    const dayIndex = (dayOfWeek + 6) % 7; // 0=Mon, ..., 6=Sun
-    const punchHours = bangkokNow.getUTCHours();
-    const punchMins = bangkokNow.getUTCMinutes();
+    // Use bulletproof Bangkok Timezone calculation (immune to server OS timezone)
+    const todayDateStr = serverNow.toLocaleDateString('sv-SE', { timeZone: 'Asia/Bangkok' });
+    const bkkTimeFormatter = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Bangkok',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
+    const timeFormatted = bkkTimeFormatter.format(serverNow);
+    const [punchHours, punchMins] = timeFormatted.split(':').map(Number);
     const punchMinutes = punchHours * 60 + punchMins;
-    const timeFormatted = `${String(punchHours).padStart(2, '0')}:${String(punchMins).padStart(2, '0')}`;
+
+    const bkkDayFormatter = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Bangkok', weekday: 'short' });
+    const weekdayMap = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+    const dayOfWeek = weekdayMap[bkkDayFormatter.format(serverNow)] ?? serverNow.getDay();
 
     const empPos = (employee.position || '').toLowerCase();
     const isOwner = empPos.includes('owner') || empPos.includes('ceo');
@@ -208,12 +215,12 @@ export async function POST(request) {
             shiftEndTime = override.custom_end_time;
             shiftName = 'กะพิเศษ (Override)';
           } else {
-            // 3. Check Weekly Schedule
+            // 3. Check Weekly Schedule (day_of_week in DB: 0=Sun, 1=Mon, ..., 6=Sat)
             const { data: weekly } = await supabase
               .from('employee_schedules')
               .select('shift_id, is_off, shifts(*)')
               .eq('employee_id', employee.id)
-              .eq('day_of_week', dayIndex)
+              .eq('day_of_week', dayOfWeek)
               .maybeSingle();
 
             if (weekly) {
