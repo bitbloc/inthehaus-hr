@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { supabase } from "../../lib/supabaseClient";
 import { Lock, Mail, Key, Eye, EyeOff, ShieldCheck, UserPlus, LogIn, AlertCircle, CheckCircle2, HelpCircle } from "lucide-react";
 
@@ -17,13 +17,29 @@ export default function AdminLoginForm() {
         if (!msg) return "เกิดข้อผิดพลาดในการเข้าสู่ระบบ";
         const lower = msg.toLowerCase();
         if (lower.includes("invalid login credentials")) return "อีเมลหรือรหัสผ่านไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง";
-        if (lower.includes("email not confirmed")) return "อีเมลนี้ยังไม่ได้ยืนยัน กรุณาตรวจสอบกล่องข้อความหรือปิด Require Email Confirmation ใน Supabase Dashboard";
+        if (lower.includes("email not confirmed")) return "อีเมลนี้ยังไม่ได้ยืนยัน กรุณาเข้าไปกดยืนยันใน Supabase Dashboard > Authentication > Users";
+        if (lower.includes("otp_expired") || lower.includes("link is invalid") || lower.includes("has expired")) {
+            return "ลิงก์ยืนยันในอีเมลหมดอายุแล้ว แนะนำให้เข้าไปกด 'Confirm user' ใน Supabase Dashboard ได้เลยทันที";
+        }
         if (lower.includes("user already registered")) return "อีเมลนี้ถูกลงทะเบียนแล้ว กรุณาใช้แท็บเข้าสู่ระบบ";
         if (lower.includes("password should be at least")) return "รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร";
         if (lower.includes("signup requires a valid password")) return "กรุณากรอกรหัสผ่านที่ถูกต้อง";
         if (lower.includes("rate limit")) return "คุณพยายามเข้าสู่ระบบบ่อยเกินไป กรุณารอสักครู่แล้วลองใหม่";
         return msg;
     };
+
+    useEffect(() => {
+        if (typeof window !== "undefined" && window.location.hash) {
+            const hash = window.location.hash.substring(1);
+            const params = new URLSearchParams(hash);
+            const errorDesc = params.get("error_description");
+            const errorCode = params.get("error_code");
+            if (errorDesc || errorCode) {
+                setErrorMessage(formatError(decodeURIComponent(errorDesc || errorCode).replace(/\+/g, " ")));
+                window.history.replaceState(null, "", window.location.pathname);
+            }
+        }
+    }, []);
 
     const handleLogin = async (e) => {
         e.preventDefault();
@@ -53,9 +69,13 @@ export default function AdminLoginForm() {
         setLoading(true);
 
         try {
+            const emailRedirectTo = typeof window !== "undefined" ? `${window.location.origin}/admin` : undefined;
             const { data, error } = await supabase.auth.signUp({
                 email: email.trim(),
                 password: password,
+                options: {
+                    emailRedirectTo,
+                },
             });
 
             if (error) throw error;
