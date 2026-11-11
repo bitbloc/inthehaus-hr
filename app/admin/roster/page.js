@@ -6,6 +6,7 @@ import { supabase } from '../../../lib/supabaseClient';
 import { useRealtimeSync } from '../../../lib/useRealtimeSync';
 import { startOfWeek, endOfWeek, addDays, format, subWeeks, addWeeks, parseISO } from 'date-fns';
 import { ChevronLeft, ChevronRight, Copy, CheckCircle, Save, Plus, Trash2, Printer, Search, Settings, Filter, UserCheck, UserX, AlertCircle, Sun, Sparkles, Brain, Wand2, RefreshCw } from 'lucide-react';
+import { SYSTEM_STANDARD_PRESETS, PRESET_COLORS } from '../../../utils/roster';
 
 export default function AdminRosterPage() {
     const [currentDate, setCurrentDate] = useState(new Date());
@@ -49,27 +50,6 @@ export default function AdminRosterPage() {
         setTimeout(() => setToast(null), 4000);
     };
 
-    const SYSTEM_STANDARD_PRESETS = [
-        { id: 'sys_inthehaus', start: '18:00', end: '22:30', name: 'INTHEHAUS', color: 'indigo', icon: '⚡' },
-        { id: 'sys_double', start: '10:00', end: '00:30', name: 'ควบกะ 🔥', color: 'rose', icon: '🔥' },
-        { id: 'sys_night', start: '16:30', end: '00:30', name: 'กะค่ำ 🌙', color: 'sky', icon: '🌙' },
-        { id: 'sys_morning', start: '10:00', end: '18:00', name: 'กะเช้า ☀️', color: 'amber', icon: '☀️' },
-        { id: 'sys_chef', start: '10:00', end: '20:30', name: 'CHEF', color: 'emerald', icon: '🍳' },
-        { id: 'sys_assistant', start: '12:30', end: '23:30', name: 'ผู้ช่วยครัว', color: 'violet', icon: '🍴' },
-        { id: 'sys_mid', start: '12:00', end: '20:00', name: 'กลางกะ', color: 'sky', icon: '⏰' },
-        { id: 'sys_parttime', start: '12:30', end: '21:30', name: 'PART-TIME', color: 'rose', icon: '⏰' },
-    ];
-
-    const PRESET_COLORS = [
-        { id: 'sky', label: 'SKY', bg: 'bg-sky-50', text: 'text-sky-800', border: 'border-sky-200', dot: 'bg-sky-500' },
-        { id: 'amber', label: 'AMBER', bg: 'bg-amber-50', text: 'text-amber-800', border: 'border-amber-200', dot: 'bg-amber-500' },
-        { id: 'indigo', label: 'INDIGO', bg: 'bg-indigo-50', text: 'text-indigo-800', border: 'border-indigo-200', dot: 'bg-indigo-500' },
-        { id: 'rose', label: 'ROSE', bg: 'bg-rose-50', text: 'text-rose-800', border: 'border-rose-200', dot: 'bg-rose-500' },
-        { id: 'emerald', label: 'EMERALD', bg: 'bg-emerald-50', text: 'text-emerald-800', border: 'border-emerald-200', dot: 'bg-emerald-500' },
-        { id: 'violet', label: 'VIOLET', bg: 'bg-violet-50', text: 'text-violet-800', border: 'border-violet-200', dot: 'bg-violet-500' },
-        { id: 'slate', label: 'SLATE', bg: 'bg-slate-100', text: 'text-slate-800', border: 'border-slate-300', dot: 'bg-slate-500' },
-        { id: 'teal', label: 'TEAL', bg: 'bg-teal-50', text: 'text-teal-800', border: 'border-teal-200', dot: 'bg-teal-500' },
-    ];
     const PRESET_ICONS = ['⏰', '🔥', '🌙', '☀️', '🍳', '🍸', '👑', '💼', '⚡', '☕', '🍴', '✨', '🎯', '📦'];
 
     const getPresetColor = (colorId) => PRESET_COLORS.find(c => c.id === colorId) || PRESET_COLORS[0];
@@ -85,28 +65,74 @@ export default function AdminRosterPage() {
         }
     }, []);
 
+    // Strict Master Deduplication: Guarantees zero duplicate presets by time and normalized name
     const allPresets = useMemo(() => {
-        const presetsMap = new Map();
-        SYSTEM_STANDARD_PRESETS.forEach(p => {
-            presetsMap.set(p.id, { ...p, isSystem: true });
-        });
+        const cleanList = SYSTEM_STANDARD_PRESETS.map(p => ({ ...p, isSystem: true }));
+
+        const normalizeName = (s) => (s || '').replace(/[\s\(\)\:\-0-9\.]/g, '').toLowerCase();
+        const normalizeTime = (st, en) => `${(st || '').slice(0, 5)}-${(en || '').slice(0, 5)}`;
 
         (customPresets || []).forEach(cp => {
-            const key = cp.id || cp.name;
-            if (presetsMap.has(key)) {
-                presetsMap.set(key, { ...presetsMap.get(key), ...cp, isEdited: true });
+            if (!cp || !cp.start || !cp.end) return;
+            const timeKey = normalizeTime(cp.start, cp.end);
+            const nameKey = normalizeName(cp.name);
+
+            const existingIdx = cleanList.findIndex(p =>
+                (cp.id && p.id === cp.id) ||
+                (cp.originalName && (p.name === cp.originalName || normalizeName(p.name) === normalizeName(cp.originalName))) ||
+                (timeKey && normalizeTime(p.start, p.end) === timeKey) ||
+                (nameKey && normalizeName(p.name) === nameKey)
+            );
+
+            if (existingIdx >= 0) {
+                cleanList[existingIdx] = {
+                    ...cleanList[existingIdx],
+                    ...cp,
+                    id: cleanList[existingIdx].id,
+                    isSystem: true,
+                    isEdited: true
+                };
             } else {
-                const sysMatch = SYSTEM_STANDARD_PRESETS.find(sp => sp.name === cp.originalName || sp.name === cp.name);
-                if (sysMatch) {
-                    presetsMap.set(sysMatch.id, { ...sysMatch, ...cp, id: sysMatch.id, isEdited: true });
-                } else {
-                    presetsMap.set(key, { ...cp, isCustom: true });
-                }
+                cleanList.push({
+                    ...cp,
+                    id: cp.id || `custom_${timeKey}`,
+                    category: 'custom',
+                    categoryName: 'กะกำหนดเอง',
+                    isCustom: true
+                });
             }
         });
 
-        return Array.from(presetsMap.values());
+        const seenTimes = new Set();
+        const seenNames = new Set();
+        const deduplicated = [];
+
+        for (const item of cleanList) {
+            const timeKey = normalizeTime(item.start, item.end);
+            const nameKey = normalizeName(item.name);
+
+            if (seenTimes.has(timeKey) || seenNames.has(nameKey)) {
+                continue;
+            }
+            seenTimes.add(timeKey);
+            seenNames.add(nameKey);
+            deduplicated.push(item);
+        }
+
+        return deduplicated;
     }, [customPresets]);
+
+    const resetToDefaultPresets = () => {
+        if (confirm('คุณต้องการรีเซ็ต Preset กะทั้งหมดกลับเป็นค่าเริ่มต้นมาตรฐานของร้าน (8 กะหลัก) ใช่หรือไม่? รายการซ้ำซ้อนจะถูกลบทั้งหมด')) {
+            setCustomPresets([]);
+            try {
+                localStorage.removeItem('roster_custom_presets');
+            } catch (e) {
+                console.error(e);
+            }
+            showToast('รีเซ็ต Preset ทั้งหมดเป็นค่าเริ่มต้นมาตรฐาน 8 กะเรียบร้อยแล้ว', 'success');
+        }
+    };
 
     const openPresetModal = (start = '', end = '') => {
         setPresetModal({
@@ -705,10 +731,14 @@ export default function AdminRosterPage() {
             if (!prev) return prev;
             const newSlots = prev.slots.map((slot, i) => {
                 if (i !== index) return slot;
+                const matchedShift = shifts.find(s => 
+                    (s.start_time || '').slice(0, 5) === (preset.start || '').slice(0, 5) && 
+                    (s.end_time || '').slice(0, 5) === (preset.end || '').slice(0, 5)
+                );
                 return {
                     ...slot,
                     is_off: false,
-                    shift_id: '',
+                    shift_id: matchedShift ? String(matchedShift.id) : (preset.shiftId ? String(preset.shiftId) : ''),
                     custom_start_time: (preset.start || '').slice(0, 5),
                     custom_end_time: (preset.end || '').slice(0, 5)
                 };
@@ -1955,8 +1985,8 @@ export default function AdminRosterPage() {
 
             {/* Edit Cell Modal */}
             {editingCell && (
-                <div className="fixed inset-0 bg-rams-ink/40 backdrop-blur-[2px] flex items-center justify-center z-50 p-4">
-                    <div className="bg-rams-panel border border-rams-rule rounded-sm w-full max-w-md overflow-hidden shadow-none flex flex-col">
+                <div className="fixed inset-0 bg-rams-ink/40 backdrop-blur-[2px] flex items-center justify-center z-50 p-3 sm:p-4">
+                    <div className="bg-rams-panel border border-rams-rule rounded-sm w-full max-w-lg overflow-hidden shadow-2xl flex flex-col">
                         <div className="px-6 py-4 border-b border-rams-rule-light flex justify-between items-center bg-rams-bg/30">
                             <h3 className="font-mono font-bold text-sm uppercase tracking-wider text-rams-ink">
                                 จัดตาราง: {editingCell.employee.nickname} <br/>
@@ -2091,75 +2121,128 @@ export default function AdminRosterPage() {
                                         </div>
 
                                         {!slot.is_off && (
-                                            <div className="space-y-3 pt-1">
-                                                {/* Presets Grid */}
-                                                {allPresets.length > 0 && (
-                                                    <div>
-                                                        <div className="flex justify-between items-center mb-1.5">
-                                                            <label className="block text-[9px] font-mono font-bold text-rams-ink uppercase tracking-widest">
-                                                                ⚡ Preset กะมาตรฐาน & กะร้าน (คลิกเพื่อเลือกทันที):
-                                                            </label>
-                                                            <span className="text-[9px] font-mono text-rams-ink-muted">
-                                                                กด ⚙️ เพื่อแก้ไขเวลา
-                                                            </span>
-                                                        </div>
-                                                        <div className="flex flex-wrap gap-1.5">
-                                                            {allPresets.map((preset, pIdx) => {
-                                                                const pc = getPresetColor(preset.color);
-                                                                const isSelected = !slot.is_off && !slot.shift_id && startClean === (preset.start || '').slice(0,5) && endClean === (preset.end || '').slice(0,5);
-
-                                                                return (
-                                                                    <div 
-                                                                        key={preset.id || pIdx}
-                                                                        className={`group flex items-center gap-1.5 pl-2.5 pr-1.5 py-1.5 rounded-sm text-[10px] font-mono font-bold border transition-all uppercase tracking-wider select-none ${pc.bg} ${pc.text} ${
-                                                                            isSelected 
-                                                                                ? `ring-2 ring-rams-ink ${pc.border} shadow-sm font-black scale-[1.02]` 
-                                                                                : `${pc.border} hover:border-rams-ink/40 opacity-90 hover:opacity-100`
-                                                                        }`}
-                                                                    >
-                                                                        <div 
-                                                                            className="flex items-center gap-1.5 cursor-pointer"
-                                                                            onClick={() => applyPreset(index, preset)}
-                                                                        >
-                                                                            <span>{preset.icon || (preset.name.includes('ควบ') ? '🔥' : preset.name.includes('ค่ำ') ? '🌙' : preset.name.includes('เช้า') ? '☀️' : '⏰')}</span>
-                                                                            <span>{preset.name || `${preset.start}-${preset.end}`}</span>
-                                                                            <span className="opacity-75 text-[9px] font-normal">({preset.start}-{preset.end})</span>
-                                                                            {isSelected && (
-                                                                                <span className="text-rams-ink ml-0.5 font-black">✓</span>
-                                                                            )}
-                                                                        </div>
-                                                                        
-                                                                        {/* Inline Edit Timing / Name Button */}
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={(e) => {
-                                                                                e.stopPropagation();
-                                                                                openEditPresetModal(preset);
-                                                                            }}
-                                                                            className="opacity-40 group-hover:opacity-100 hover:text-rams-orange p-1 ml-0.5 rounded-sm hover:bg-rams-ink/5 transition-all cursor-pointer"
-                                                                            title={`แก้ไขเวลา/ชื่อของ Preset ${preset.name}`}
-                                                                        >
-                                                                            <Settings size={12} />
-                                                                        </button>
-                                                                    </div>
-                                                                );
-                                                            })}
-
-                                                            {/* Quick Add Preset Button */}
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => openPresetModal(slot.custom_start_time || '10:00', slot.custom_end_time || '18:00')}
-                                                                className="flex items-center gap-1 px-2.5 py-1.5 rounded-sm text-[10px] font-mono font-bold border border-dashed border-rams-rule-light hover:border-rams-orange text-rams-ink-muted hover:text-rams-orange bg-rams-bg/50 transition-all uppercase cursor-pointer"
-                                                                title="สร้าง Preset ใหม่"
-                                                            >
-                                                                <Plus size={12} /> เพิ่ม Preset
-                                                            </button>
-                                                        </div>
+                                            <div className="space-y-4 pt-1">
+                                                {/* Presets Grid - Organized Cleanly by Role/Category (Zero Duplicates) */}
+                                                <div className="space-y-3">
+                                                    <div className="flex justify-between items-center pb-1 border-b border-rams-rule-light">
+                                                        <label className="text-[10px] font-mono font-bold text-rams-ink uppercase tracking-wider flex items-center gap-1.5">
+                                                            <Sparkles size={12} className="text-rams-orange" />
+                                                            PRESET กะงานประจำร้าน (คลิกเพื่อเลือกทันที):
+                                                        </label>
+                                                        <button
+                                                            type="button"
+                                                            onClick={resetToDefaultPresets}
+                                                            className="text-[9px] font-mono text-rams-ink-muted hover:text-rams-red underline transition-colors cursor-pointer"
+                                                            title="ล้างแคชและคืนค่ากะมาตรฐาน 8 กะ"
+                                                        >
+                                                            ↺ คืนค่ามาตรฐาน 8 กะ
+                                                        </button>
                                                     </div>
-                                                )}
+
+                                                    {/* Categorized Shift Groups */}
+                                                    {[
+                                                        { key: 'floor', title: '☕ หน้าร้าน & บาร์ (Bar & Floor)' },
+                                                        { key: 'kitchen', title: '🍳 ครัวหลัก & ผู้ช่วย (Kitchen)' },
+                                                        { key: 'roles', title: '👑 กะร้าน & พาร์ตไทม์ (Roles & Part-time)' },
+                                                        { key: 'custom', title: '✨ กะกำหนดเอง (Custom)' }
+                                                    ].map(group => {
+                                                        const groupPresets = allPresets.filter(p => {
+                                                            if (group.key === 'floor') return p.category === 'floor';
+                                                            if (group.key === 'kitchen') return p.category === 'kitchen';
+                                                            if (group.key === 'roles') return p.category === 'management' || p.category === 'parttime';
+                                                            return p.category === 'custom' || p.isCustom;
+                                                        });
+
+                                                        if (groupPresets.length === 0) return null;
+
+                                                        return (
+                                                            <div key={group.key} className="space-y-1.5">
+                                                                <div className="text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-wider pl-0.5">
+                                                                    {group.title}
+                                                                </div>
+                                                                <div className="grid grid-cols-2 gap-1.5">
+                                                                    {groupPresets.map((preset, pIdx) => {
+                                                                        const pc = getPresetColor(preset.color);
+                                                                        const isSelected = !slot.is_off && (
+                                                                            (startClean === (preset.start || '').slice(0, 5) && endClean === (preset.end || '').slice(0, 5)) ||
+                                                                            (slot.shift_id && String(slot.shift_id) === String(preset.shiftId))
+                                                                        );
+
+                                                                        return (
+                                                                            <div
+                                                                                key={preset.id || pIdx}
+                                                                                className={`group flex items-center justify-between px-2.5 py-2 rounded-sm border transition-all text-xs font-mono select-none cursor-pointer ${
+                                                                                    isSelected
+                                                                                        ? `${pc.bg} ${pc.text} border-rams-ink ring-2 ring-rams-ink shadow-xs font-bold`
+                                                                                        : 'bg-rams-panel text-rams-ink border-rams-rule-light hover:border-rams-rule hover:bg-rams-bg'
+                                                                                }`}
+                                                                                onClick={() => applyPreset(index, preset)}
+                                                                            >
+                                                                                <div className="flex items-center gap-1.5 min-w-0">
+                                                                                    <span className="text-sm shrink-0">{preset.icon || '⏰'}</span>
+                                                                                    <span className="font-bold truncate">{preset.name.replace(/[\(（].*?[\)）]/g, '').trim()}</span>
+                                                                                </div>
+                                                                                <div className="flex items-center gap-1.5 shrink-0 pl-1">
+                                                                                    <span className="text-[10px] font-mono text-rams-ink-muted bg-rams-bg/80 px-1.5 py-0.5 rounded-sm border border-rams-rule-light">
+                                                                                        {(preset.start || '').slice(0, 5)}-{(preset.end || '').slice(0, 5)}
+                                                                                    </span>
+                                                                                    {isSelected ? (
+                                                                                        <span className="text-rams-green font-black text-xs">✓</span>
+                                                                                    ) : (
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            onClick={(e) => {
+                                                                                                e.stopPropagation();
+                                                                                                openEditPresetModal(preset);
+                                                                                            }}
+                                                                                            className="opacity-0 group-hover:opacity-70 hover:opacity-100 hover:text-rams-orange p-0.5 rounded-sm transition-all"
+                                                                                            title="แก้ไขเวลากะนี้"
+                                                                                        >
+                                                                                            <Settings size={12} />
+                                                                                        </button>
+                                                                                    )}
+                                                                                </div>
+                                                                            </div>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+
+                                                    {/* Quick Add Preset Link */}
+                                                    <div className="pt-0.5 flex justify-end">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => openPresetModal(slot.custom_start_time || '10:00', slot.custom_end_time || '18:00')}
+                                                            className="flex items-center gap-1 px-2.5 py-1 rounded-sm text-[10px] font-mono font-bold border border-dashed border-rams-rule-light hover:border-rams-orange text-rams-ink-muted hover:text-rams-orange transition-all uppercase cursor-pointer"
+                                                        >
+                                                            <Plus size={11} /> เพิ่มกะใหม่
+                                                        </button>
+                                                    </div>
+                                                </div>
 
                                                 {/* Manual Timing Adjustment */}
-                                                <div className="space-y-2 border-t border-rams-rule-light pt-2.5">
+                                                <div className="space-y-2 border-t border-rams-rule-light pt-3">
+                                                    <div className="flex justify-between items-center mb-1">
+                                                        <label className="text-[10px] font-mono font-bold text-rams-ink-muted uppercase tracking-wider">
+                                                            ปรับเวลาละเอียด (Manual Adjustment)
+                                                        </label>
+                                                        {slot.custom_start_time && slot.custom_end_time && (() => {
+                                                            const [sh, sm] = slot.custom_start_time.split(':').map(Number);
+                                                            const [eh, em] = slot.custom_end_time.split(':').map(Number);
+                                                            let diff = (eh * 60 + em) - (sh * 60 + sm);
+                                                            if (diff < 0) diff += 24 * 60;
+                                                            const h = Math.floor(diff / 60);
+                                                            const m = diff % 60;
+                                                            const durationStr = m > 0 ? `${h} ชม. ${m} น.` : `${h} ชั่วโมง`;
+                                                            return (
+                                                                <span className="text-[10px] font-mono font-bold text-rams-ink bg-rams-bg px-2 py-0.5 rounded-sm border border-rams-rule-light">
+                                                                    ⏱️ รวม: {durationStr}
+                                                                </span>
+                                                            );
+                                                        })()}
+                                                    </div>
                                                     <div className="grid grid-cols-2 gap-3">
                                                         <div>
                                                             <label className="block text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1">เวลาเริ่ม (Start)</label>
@@ -2167,7 +2250,7 @@ export default function AdminRosterPage() {
                                                                 type="time" 
                                                                 value={slot.custom_start_time || ''}
                                                                 onChange={e => updateSlot(index, { custom_start_time: e.target.value, shift_id: '', is_off: false })}
-                                                                className="w-full border border-rams-rule-light rounded-sm p-2 text-xs font-mono text-rams-ink bg-rams-bg outline-none focus:border-rams-rule"
+                                                                className="w-full border border-rams-rule-light rounded-sm p-2 text-xs font-mono text-rams-ink bg-rams-bg outline-none focus:border-rams-rule font-bold"
                                                             />
                                                         </div>
                                                         <div>
@@ -2176,38 +2259,23 @@ export default function AdminRosterPage() {
                                                                 type="time" 
                                                                 value={slot.custom_end_time || ''}
                                                                 onChange={e => updateSlot(index, { custom_end_time: e.target.value, shift_id: '', is_off: false })}
-                                                                className="w-full border border-rams-rule-light rounded-sm p-2 text-xs font-mono text-rams-ink bg-rams-bg outline-none focus:border-rams-rule"
+                                                                className="w-full border border-rams-rule-light rounded-sm p-2 text-xs font-mono text-rams-ink bg-rams-bg outline-none focus:border-rams-rule font-bold"
                                                             />
                                                         </div>
                                                     </div>
 
                                                     {slot.custom_start_time && slot.custom_end_time && (
-                                                        <button 
-                                                            type="button" 
-                                                            onClick={() => openPresetModal(slot.custom_start_time, slot.custom_end_time)}
-                                                            className="text-[10px] font-mono font-bold text-rams-orange hover:text-rams-orange-active uppercase tracking-wider flex items-center gap-1 mt-1 transition-colors cursor-pointer"
-                                                        >
-                                                            💾 บันทึกเวลานี้เป็น Preset ({slot.custom_start_time} - {slot.custom_end_time})
-                                                        </button>
+                                                        <div className="pt-1">
+                                                            <button 
+                                                                type="button" 
+                                                                onClick={() => openPresetModal(slot.custom_start_time, slot.custom_end_time)}
+                                                                className="text-[10px] font-mono font-bold text-rams-orange hover:text-rams-orange-active uppercase tracking-wider flex items-center gap-1 transition-colors cursor-pointer"
+                                                            >
+                                                                💾 บันทึกเวลานี้เป็น Preset ({slot.custom_start_time} - {slot.custom_end_time})
+                                                            </button>
+                                                        </div>
                                                     )}
                                                 </div>
-
-                                                {/* Optional Database Shift selector */}
-                                                {shifts.length > 0 && (
-                                                    <div className="border-t border-rams-rule-light pt-2">
-                                                        <label className="block text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1">หรือเลือกจาก Master Shifts ในระบบ</label>
-                                                        <select 
-                                                            value={slot.shift_id || ''}
-                                                            onChange={e => handleSlotChange(index, 'shift_id', e.target.value)}
-                                                            className="w-full border border-rams-rule-light rounded-sm p-2 text-xs font-mono text-rams-ink bg-rams-bg outline-none focus:border-rams-rule cursor-pointer"
-                                                        >
-                                                            <option value="">-- กะกำหนดเอง / ตาม Preset ข้างต้น --</option>
-                                                            {shifts.map(sh => (
-                                                                <option key={sh.id} value={sh.id}>{sh.name} ({(sh.start_time || '').slice(0,5)} - {(sh.end_time || '').slice(0,5)})</option>
-                                                            ))}
-                                                        </select>
-                                                    </div>
-                                                )}
                                             </div>
                                         )}
                                     </div>

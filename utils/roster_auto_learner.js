@@ -180,9 +180,11 @@ export async function learnEmployeePatterns(options = { weeksBack: 8, client: su
  */
 export async function syncLearnedToTemplates(learnedHabits, client = supabase) {
     const db = client || supabase;
+    const habitsMap = learnedHabits?.learnedHabits || learnedHabits || {};
     const upserts = [];
 
-    Object.values(learnedHabits).forEach(item => {
+    Object.values(habitsMap).forEach(item => {
+        if (!item || !item.routine) return;
         const empId = item.employee_id;
         for (let d = 0; d < 7; d++) {
             const shiftInfo = item.routine[d];
