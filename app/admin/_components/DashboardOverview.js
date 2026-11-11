@@ -458,6 +458,16 @@ export default function DashboardOverview({
                     {/* Quick Command Bar */}
                     <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
                         <button
+                            onClick={() => {
+                                window.location.href = '/admin/roster';
+                            }}
+                            className="px-3.5 py-2 bg-rams-ink hover:bg-rams-ink/90 text-rams-panel text-xs font-mono font-bold uppercase tracking-wider rounded-sm border border-rams-rule shadow-[0_2px_0_0_var(--color-rams-rule)] active:translate-y-[2px] active:shadow-none transition-all cursor-pointer flex items-center gap-1.5"
+                            title="จัดตารางอัตโนมัติ / ตรวจสอบ Roster"
+                        >
+                            <span className="text-rams-orange font-bold">✨</span>
+                            <span>Auto-Roster</span>
+                        </button>
+                        <button
                             onClick={() => handleNotify('/api/notify')}
                             className="px-3.5 py-2 bg-rams-bg hover:bg-rams-ink-muted/10 text-rams-ink text-xs font-mono font-bold uppercase tracking-wider rounded-sm border border-rams-rule-light transition-all cursor-pointer flex items-center gap-1.5"
                             title="ส่งสรุปเข้า LINE กลุ่ม"

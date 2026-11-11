@@ -741,6 +741,126 @@ export async function generateStCalendarFlex(start) {
 }
 
 export async function handleRosterCommand(event, client, text, rawText, userId) {
+  const isAutoGenCommand = text.includes('จัดตารางสัปดาห์หน้า') || 
+                           text.includes('สร้างตารางสัปดาห์หน้า') || 
+                           text.includes('สร้างตารางอัตโนมัติ') ||
+                           text.includes('จัดตารางอัตโนมัติ') ||
+                           text === 'auto roster' ||
+                           text === 'autogenerate roster';
+
+  if (isAutoGenCommand) {
+    const isBoss = await checkIsBoss(userId);
+    if (!isBoss) {
+      await client.replyMessage(event.replyToken, { type: 'text', text: 'ขออภัยครับ คำสั่งจัดตารางงานอัตโนมัติสงวนสิทธิ์เฉพาะผู้บริหาร (บอส) เท่านั้นครับ' });
+      return true;
+    }
+
+    try {
+      const today = addHours(new Date(), 7);
+      const nextWeekMon = startOfWeek(addDays(today, 7), { weekStartsOn: 1 });
+      const nextWeekSun = addDays(nextWeekMon, 6);
+      
+      const { autoGenerateWeeklyRoster } = await import('../../../../utils/roster_auto_learner');
+      const genResult = await autoGenerateWeeklyRoster({
+        startDate: nextWeekMon,
+        endDate: nextWeekSun,
+        overwrite: true,
+        applyLeaves: true,
+        syncTemplate: true
+      });
+
+      const startFmt = format(nextWeekMon, 'dd/MM/yyyy');
+      const endFmt = format(nextWeekSun, 'dd/MM/yyyy');
+
+      const flexMessage = {
+        type: 'flex',
+        altText: `🤖 จัดตารางสัปดาห์หน้าอัตโนมัติ (${startFmt} - ${endFmt})`,
+        contents: {
+          type: 'bubble',
+          styles: {
+            header: { backgroundColor: '#181818' },
+            body: { backgroundColor: '#f9f9f9' },
+            footer: { backgroundColor: '#f0f0f0' }
+          },
+          header: {
+            type: 'box',
+            layout: 'vertical',
+            paddingAll: '20px',
+            contents: [
+              { type: 'text', text: '🤖 AUTO ROSTER GENERATED', weight: 'bold', color: '#ffffff', size: 'sm' },
+              { type: 'text', text: `ช่วงวันที่: ${startFmt} - ${endFmt}`, color: '#aaaaaa', size: 'xs', margin: 'xs' }
+            ]
+          },
+          body: {
+            type: 'box',
+            layout: 'vertical',
+            paddingAll: '20px',
+            spacing: 'sm',
+            contents: [
+              { type: 'text', text: '✨ ยูซุจัดตารางงานสัปดาห์หน้าอัตโนมัติให้แล้วครับบอส!', weight: 'bold', size: 'xs', color: '#1a1a1a' },
+              { type: 'separator', margin: 'sm' },
+              {
+                type: 'box', layout: 'horizontal', margin: 'sm',
+                contents: [
+                  { type: 'text', text: 'กะงานทั้งหมด', size: 'xs', color: '#666666', flex: 2 },
+                  { type: 'text', text: `${genResult.totalSlots} กะ (ปฏิบัติงาน ${genResult.workingSlots})`, size: 'xs', weight: 'bold', align: 'end', flex: 3 }
+                ]
+              },
+              {
+                type: 'box', layout: 'horizontal',
+                contents: [
+                  { type: 'text', text: 'ซิงค์ใบลาอนุมัติ', size: 'xs', color: '#666666', flex: 2 },
+                  { type: 'text', text: `${genResult.leavesApplied.length} รายการ`, size: 'xs', weight: 'bold', align: 'end', color: '#ea580c', flex: 3 }
+                ]
+              },
+              {
+                type: 'box', layout: 'horizontal',
+                contents: [
+                  { type: 'text', text: 'สถานะปัจจุบัน', size: 'xs', color: '#666666', flex: 2 },
+                  { type: 'text', text: 'DRAFT (แบบร่าง)', size: 'xs', weight: 'bold', align: 'end', color: '#b45309', flex: 3 }
+                ]
+              },
+              {
+                type: 'text',
+                text: 'บอสไม่ต้องนั่งคีย์เองทั้งหมดครับ แค่เปิดหน้าเว็บตรวจทานและปรับแก้บางจุดในสัปดาห์นี้ แล้วกดประกาศได้เลยครับ!',
+                size: 'xxs',
+                color: '#888888',
+                wrap: true,
+                margin: 'md'
+              }
+            ]
+          },
+          footer: {
+            type: 'box',
+            layout: 'vertical',
+            paddingAll: '15px',
+            spacing: 'sm',
+            contents: [
+              {
+                type: 'button',
+                style: 'primary',
+                color: '#181818',
+                height: 'sm',
+                action: {
+                  type: 'uri',
+                  label: '🔍 ตรวจและปรับแก้บนเว็บ',
+                  uri: 'https://inthehaus-hr.vercel.app/admin/roster'
+                }
+              }
+            ]
+          }
+        }
+      };
+
+      await client.replyMessage(event.replyToken, flexMessage);
+      return true;
+    } catch (err) {
+      console.error('Auto Roster Error in LINE command:', err);
+      await client.replyMessage(event.replyToken, { type: 'text', text: `เกิดข้อผิดพลาดในการจัดตารางอัตโนมัติ: ${err.message}` });
+      return true;
+    }
+  }
+
   if (text === 'stcalendar' || text === 'ตารางทั้งสัปดาห์' || text === 'วีคนี้' || text.includes('calendar')) {
     const today = addHours(new Date(), 7);
     const tomorrow = addDays(today, 1);
@@ -966,6 +1086,30 @@ export async function handleRosterPostback(event, client, action, queryParams, u
     try {
       const payload = JSON.parse(Buffer.from(queryParams.get('payload'), 'base64').toString());
       const isBoss = await checkIsBoss(userId);
+
+      if (payload.type === 'AUTO_GENERATE') {
+        if (!isBoss) {
+          await client.replyMessage(event.replyToken, { type: 'text', text: 'ขออภัยครับ การดำเนินการนี้สงวนสิทธิ์เฉพาะผู้บริหาร (บอส) เท่านั้นครับ' });
+          return true;
+        }
+        const { startOfWeek, addDays } = await import('date-fns');
+        const { autoGenerateWeeklyRoster } = await import('../../../../utils/roster_auto_learner');
+        const bkkNow = addHours(new Date(), 7);
+        const targetMon = startOfWeek(addDays(bkkNow, 7), { weekStartsOn: 1 });
+        const targetSun = addDays(targetMon, 6);
+        const genResult = await autoGenerateWeeklyRoster({
+          startDate: targetMon,
+          endDate: targetSun,
+          overwrite: true,
+          applyLeaves: true,
+          syncTemplate: true
+        });
+        await client.replyMessage(event.replyToken, {
+          type: 'text',
+          text: `🤖 ยูซุจัดตารางสัปดาห์หน้า (${format(targetMon, 'dd/MM')} - ${format(targetSun, 'dd/MM')}) เรียบร้อยแล้วครับ!\n\n• จัดกะงานทั้งหมด: ${genResult.totalSlots} กะ\n• นำเข้าใบลาอนุมัติ: ${genResult.leavesApplied.length} รายการ\n• บันทึกเป็นแบบร่าง (Draft) ในระบบแล้วครับ\n\nบอสสามารถเข้าไปดูและปรับแก้บางจุดบนเว็บได้เลยครับ:\nhttps://inthehaus-hr.vercel.app/admin/roster`
+        });
+        return true;
+      }
       
       let targetEmpId = null;
       let targetNickname = payload.employee_name;

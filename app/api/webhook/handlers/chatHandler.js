@@ -342,6 +342,25 @@ ${dailyLogs || 'ไม่มีความเคลื่อนไหว'}
           if (actionData.type === 'LEAVE') summaryText = `ขอลาหยุด: ${actionData.employee_name}\nวันที่: ${actionData.date}\nเหตุผล: ${actionData.reason || '-'}`;
           else if (actionData.type === 'SWAP') summaryText = `ขอสลับกะ: ${actionData.from} ↔️ ${actionData.to}\nวันที่: ${actionData.date}`;
           else if (actionData.type === 'CHANGE') summaryText = `ขอปรับกะงาน: ${actionData.employee_name}\nวันที่: ${actionData.date}\nรายละเอียด: ${actionData.details?.note || '-'}`;
+          else if (actionData.type === 'AUTO_GENERATE') {
+            if (isBossUser) {
+              const { startOfWeek, addDays } = await import('date-fns');
+              const { autoGenerateWeeklyRoster } = await import('../../../../utils/roster_auto_learner');
+              const bkkNow = addHours(new Date(), 7);
+              const targetMon = startOfWeek(addDays(bkkNow, 7), { weekStartsOn: 1 });
+              const targetSun = addDays(targetMon, 6);
+              const genResult = await autoGenerateWeeklyRoster({
+                startDate: targetMon,
+                endDate: targetSun,
+                overwrite: true,
+                applyLeaves: true,
+                syncTemplate: true
+              });
+              summaryText = `🤖 จัดตารางสัปดาห์หน้าอัตโนมัติสำเร็จ ${genResult.totalSlots} กะ (นำเข้าใบลา ${genResult.leavesApplied?.length || 0} รายการ) บันทึกเป็นสถานะ Draft เรียบร้อยครับ`;
+            } else {
+              summaryText = "คำสั่งจัดตารางงานอัตโนมัติ (สงวนสิทธิ์เฉพาะบอส)";
+            }
+          }
 
           const confirmFlex = {
             type: 'bubble',

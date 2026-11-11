@@ -3,6 +3,7 @@ import { supabase } from '../../../../lib/supabaseClient';
 import { Client } from '@line/bot-sdk';
 import { format, parseISO } from 'date-fns';
 import { generateStCalendarFlex } from '../../webhook/handlers/rosterHandler';
+import { autoGenerateWeeklyRoster } from '../../../../utils/roster_auto_learner';
 
 const client = new Client({
   channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN,
@@ -156,6 +157,16 @@ export async function POST(request) {
             .match({ employee_id, date, slot_type });
         if (error) throw error;
         return NextResponse.json({ success: true, message: 'Deleted successfully' });
+
+    } else if (action === 'AUTO_GENERATE') {
+        const result = await autoGenerateWeeklyRoster({
+            startDate,
+            endDate,
+            overwrite: body.overwrite !== false,
+            applyLeaves: body.applyLeaves !== false,
+            syncTemplate: !!body.syncTemplate
+        });
+        return NextResponse.json(result);
     }
 
     return NextResponse.json({ success: false, message: 'Invalid action' }, { status: 400 });

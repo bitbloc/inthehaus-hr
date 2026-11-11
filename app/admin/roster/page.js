@@ -5,7 +5,7 @@ import { Badge } from '../_components/ui/Badge';
 import { supabase } from '../../../lib/supabaseClient';
 import { useRealtimeSync } from '../../../lib/useRealtimeSync';
 import { startOfWeek, endOfWeek, addDays, format, subWeeks, addWeeks, parseISO } from 'date-fns';
-import { ChevronLeft, ChevronRight, Copy, CheckCircle, Save, Plus, Trash2, Printer, Search, Settings, Filter, UserCheck, UserX, AlertCircle, Sun } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Copy, CheckCircle, Save, Plus, Trash2, Printer, Search, Settings, Filter, UserCheck, UserX, AlertCircle, Sun, Sparkles, Brain, Wand2, RefreshCw } from 'lucide-react';
 
 export default function AdminRosterPage() {
     const [currentDate, setCurrentDate] = useState(new Date());
@@ -30,6 +30,12 @@ export default function AdminRosterPage() {
     const [saving, setSaving] = useState(false);
     const [customPresets, setCustomPresets] = useState([]);
     const [presetModal, setPresetModal] = useState(null); // { start, end } or null
+
+    // Smart Auto-Generate Roster State
+    const [showAutoGenModal, setShowAutoGenModal] = useState(false);
+    const [autoGenForm, setAutoGenForm] = useState({ applyLeaves: true, syncTemplate: true, overwrite: true });
+    const [learnedHabitsModal, setLearnedHabitsModal] = useState(null);
+    const [isAutoGenerating, setIsAutoGenerating] = useState(false);
 
     // Employee Status, Vacation & Audit Filter State
     const [statusFilter, setStatusFilter] = useState('ALL'); // 'ALL' | 'ACTIVE' | 'SUSPENDED' | 'VACATION'
@@ -849,6 +855,48 @@ export default function AdminRosterPage() {
         }
     };
 
+    const handleExecuteAutoGenerate = async () => {
+        setIsAutoGenerating(true);
+        try {
+            const res = await fetch('/api/roster/auto-generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'GENERATE',
+                    startDate: format(weekStart, 'yyyy-MM-dd'),
+                    endDate: format(weekEnd, 'yyyy-MM-dd'),
+                    overwrite: autoGenForm.overwrite,
+                    applyLeaves: autoGenForm.applyLeaves,
+                    syncTemplate: autoGenForm.syncTemplate
+                })
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message || 'Auto-generate failed');
+
+            setShowAutoGenModal(false);
+            showToast(`จัดตารางอัตโนมัติสำเร็จ ${data.totalSlots} กะ (นำเข้าใบลา ${data.leavesApplied?.length || 0} รายการ)`, 'success');
+            await fetchData();
+        } catch (e) {
+            showToast('เกิดข้อผิดพลาด: ' + e.message, 'error');
+        } finally {
+            setIsAutoGenerating(false);
+        }
+    };
+
+    const handleViewLearnedHabits = async () => {
+        try {
+            const res = await fetch('/api/roster/auto-generate?action=LEARN');
+            const data = await res.json();
+            if (data.success) {
+                setLearnedHabitsModal(data);
+            } else {
+                throw new Error(data.message || 'Failed to fetch learned habits');
+            }
+        } catch (e) {
+            showToast('ไม่สามารถดึงข้อมูลแบบแผนได้: ' + e.message, 'error');
+        }
+    };
+
     const handleApproveAndSyncLeave = async (req) => {
         setLoading(true);
         try {
@@ -1286,6 +1334,12 @@ export default function AdminRosterPage() {
                 
                 <div className="flex flex-wrap gap-2.5">
                     <button 
+                        onClick={() => setShowAutoGenModal(true)} 
+                        className="flex items-center gap-2 px-4 py-2.5 bg-rams-ink hover:bg-rams-ink/90 text-rams-panel rounded-sm border border-rams-rule text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer min-h-[40px] shadow-[0_2px_0_0_var(--color-rams-rule)] active:translate-y-[1px] active:shadow-none"
+                    >
+                        <Sparkles size={14} className="text-rams-orange animate-pulse" /> Auto-Generate (จัดตารางอัตโนมัติ)
+                    </button>
+                    <button 
                         onClick={copyLastWeek} 
                         className="flex items-center gap-2 px-4 py-2.5 bg-rams-bg hover:bg-rams-ink-muted/10 text-rams-ink rounded-sm border border-rams-rule-light text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer min-h-[40px] active:translate-y-[1px]"
                     >
@@ -1332,6 +1386,61 @@ export default function AdminRosterPage() {
                     {auditExceptionsOnly ? 'SHOWING EXCEPTIONS ONLY' : 'FILTER: EXCEPTIONS ONLY'}
                 </button>
             </div>
+
+            {/* Smart Auto-Roster & Draft Notification Banner */}
+            {(() => {
+                const weekDrafts = transactions.filter(t => t.status === 'DRAFT');
+                const weekPublished = transactions.filter(t => t.status === 'PUBLISHED');
+
+                if (weekDrafts.length > 0) {
+                    return (
+                        <div className="bg-rams-amber/10 border border-rams-amber/30 p-4 rounded-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                            <div className="flex items-center gap-3 font-mono text-xs text-rams-ink">
+                                <span className="text-rams-amber font-bold text-base">📝</span>
+                                <div>
+                                    <div className="font-bold flex items-center gap-2">
+                                        <span>สัปดาห์นี้มีตารางแบบร่าง (Draft) ทั้งหมด {weekDrafts.length} กะ</span>
+                                        <span className="text-[10px] px-2 py-0.5 rounded-sm bg-rams-amber/20 text-rams-amber font-bold">รอการประกาศ</span>
+                                    </div>
+                                    <p className="text-[10px] text-rams-ink-muted mt-0.5">
+                                        ระบบจัดเตรียมไว้ให้แล้ว บอสสามารถคลิกปรับเปลี่ยนบางช่องได้ตามต้องการ แล้วกด [Publish & Notify] ด้านบนเมื่อตรวจทานเสร็จ
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={publishWeek}
+                                className="px-4 py-2 bg-rams-orange hover:bg-rams-orange-active text-rams-panel font-mono font-bold text-xs uppercase tracking-wider rounded-sm border border-rams-rule cursor-pointer shrink-0 shadow-[0_2px_0_0_var(--color-rams-rule)] active:translate-y-[1px] active:shadow-none transition-all"
+                            >
+                                อนุมัติ & ประกาศ (Publish)
+                            </button>
+                        </div>
+                    );
+                }
+
+                if (transactions.length === 0) {
+                    return (
+                        <div className="bg-rams-ink/5 border border-dashed border-rams-rule-light p-4 rounded-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                            <div className="flex items-center gap-3 font-mono text-xs text-rams-ink">
+                                <Sparkles size={18} className="text-rams-orange" />
+                                <div>
+                                    <div className="font-bold text-rams-ink">สัปดาห์นี้ยังไม่มีตารางงาน</div>
+                                    <p className="text-[10px] text-rams-ink-muted mt-0.5">
+                                        คลิก &ldquo;จัดตารางอัตโนมัติ&rdquo; เพื่อให้ระบบเรียนรู้แบบแผนเวลาเข้างานปกติ + ซิงค์ใบลาที่อนุมัติมาลงกะให้ทันที
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setShowAutoGenModal(true)}
+                                className="px-4 py-2 bg-rams-ink hover:bg-rams-ink/90 text-rams-panel font-mono font-bold text-xs uppercase tracking-wider rounded-sm border border-rams-rule cursor-pointer flex items-center gap-2 shrink-0 shadow-[0_2px_0_0_var(--color-rams-rule)] active:translate-y-[1px] active:shadow-none transition-all"
+                            >
+                                <Sparkles size={14} className="text-rams-orange" /> จัดตารางอัตโนมัติ
+                            </button>
+                        </div>
+                    );
+                }
+
+                return null;
+            })()}
 
             <div className="bg-rams-panel border border-rams-rule rounded-sm overflow-hidden shadow-none">
                 {/* Status Filter Bar & Search */}
@@ -2475,6 +2584,215 @@ export default function AdminRosterPage() {
                 </div>
             )}
             {/* End Employee Status Adjuster Modal */}
+
+            {/* Smart Auto-Generate Roster Modal */}
+            {showAutoGenModal && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-rams-ink/40 backdrop-blur-[2px] p-4">
+                    <div className="bg-rams-panel border border-rams-rule rounded-sm w-full max-w-lg overflow-hidden shadow-none flex flex-col animate-in fade-in zoom-in-95 duration-150">
+                        {/* Header */}
+                        <div className="px-6 py-4 border-b border-rams-rule-light flex justify-between items-center bg-rams-bg/30">
+                            <div>
+                                <h3 className="font-mono font-bold text-sm uppercase tracking-wider text-rams-ink flex items-center gap-2">
+                                    <Sparkles size={16} className="text-rams-orange animate-pulse" />
+                                    จัดตารางงานอัตโนมัติ (AI & Smart Auto-Roster)
+                                </h3>
+                                <p className="text-[10px] font-mono text-rams-ink-muted uppercase tracking-widest mt-0.5">
+                                    สัปดาห์: {format(weekStart, 'dd/MM/yyyy')} — {format(weekEnd, 'dd/MM/yyyy')}
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setShowAutoGenModal(false)}
+                                className="w-7 h-7 flex items-center justify-center border border-rams-rule-light hover:border-rams-rule bg-rams-bg text-rams-ink font-mono text-xs transition-all cursor-pointer rounded-sm"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        {/* Body */}
+                        <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto font-sans text-xs text-rams-ink custom-scrollbar">
+                            <div className="bg-rams-bg/60 border border-rams-rule-light p-3.5 rounded-sm space-y-2 font-mono text-[11px]">
+                                <div className="font-bold text-rams-ink flex items-center gap-1.5">
+                                    <span>🧠</span>
+                                    <span>ระบบจะเรียนรู้และจัดตารางให้อัตโนมัติ:</span>
+                                </div>
+                                <ul className="space-y-1.5 text-rams-ink-muted list-disc list-inside">
+                                    <li>วิเคราะห์เวลาเข้างานและวันหยุดประจำของพนักงานทั้ง {employees.length} คน จากสถิติย้อนหลัง 8 สัปดาห์</li>
+                                    <li>ดึงใบลาที่อนุมัติแล้ว ({leaveRequests.filter(l => l.status === 'approved').length} รายการในสัปดาห์นี้) มาเป็นวันหยุด (OFF) อัตโนมัติ</li>
+                                    <li>หากในใบระบุคนแทน จะสลับกะให้พนักงานปฏิบัติหน้าที่แทนโดยตรง</li>
+                                    <li>บันทึกเป็น <strong className="text-rams-ink">แบบร่าง (Draft)</strong> เพื่อให้บอสเข้ามาตรวจและปรับแต่งบางจุดได้ตามต้องการ</li>
+                                </ul>
+                            </div>
+
+                            <div className="space-y-2.5 pt-1">
+                                <label className="block text-[10px] font-mono font-bold text-rams-ink uppercase tracking-widest">
+                                    ⚙️ ตัวเลือกการจัดตาราง:
+                                </label>
+
+                                <label className="flex items-center gap-2.5 p-2.5 rounded-sm border border-rams-rule-light bg-rams-bg/30 cursor-pointer select-none">
+                                    <input
+                                        type="checkbox"
+                                        checked={autoGenForm.applyLeaves}
+                                        onChange={e => setAutoGenForm(prev => ({ ...prev, applyLeaves: e.target.checked }))}
+                                        className="w-4 h-4 rounded-sm border-rams-rule bg-rams-bg accent-rams-orange focus:ring-0 cursor-pointer"
+                                    />
+                                    <div>
+                                        <div className="font-mono font-bold text-xs text-rams-ink">รวมใบลาที่อนุมัติแล้ว (Apply Approved Leaves)</div>
+                                        <div className="text-[10px] font-mono text-rams-ink-muted">ปรับเป็นวันหยุด (OFF) และจัดกะให้คนแทนตามข้อมูลใบลา</div>
+                                    </div>
+                                </label>
+
+                                <label className="flex items-center gap-2.5 p-2.5 rounded-sm border border-rams-rule-light bg-rams-bg/30 cursor-pointer select-none">
+                                    <input
+                                        type="checkbox"
+                                        checked={autoGenForm.syncTemplate}
+                                        onChange={e => setAutoGenForm(prev => ({ ...prev, syncTemplate: e.target.checked }))}
+                                        className="w-4 h-4 rounded-sm border-rams-rule bg-rams-bg accent-rams-orange focus:ring-0 cursor-pointer"
+                                    />
+                                    <div>
+                                        <div className="font-mono font-bold text-xs text-rams-ink">ซิงค์แบบแผนเข้าสู่ตารางฐาน (Sync to Template)</div>
+                                        <div className="text-[10px] font-mono text-rams-ink-muted">อัปเดตตารางเวลาประจำ (employee_schedules) ในระบบให้ตรงกับสถิติล่าสุด</div>
+                                    </div>
+                                </label>
+
+                                <label className="flex items-center gap-2.5 p-2.5 rounded-sm border border-rams-rule-light bg-rams-bg/30 cursor-pointer select-none">
+                                    <input
+                                        type="checkbox"
+                                        checked={autoGenForm.overwrite}
+                                        onChange={e => setAutoGenForm(prev => ({ ...prev, overwrite: e.target.checked }))}
+                                        className="w-4 h-4 rounded-sm border-rams-rule bg-rams-bg accent-rams-orange focus:ring-0 cursor-pointer"
+                                    />
+                                    <div>
+                                        <div className="font-mono font-bold text-xs text-rams-ink">เขียนทับกะที่เป็นแบบร่าง (Draft) เดิม</div>
+                                        <div className="text-[10px] font-mono text-rams-ink-muted">ล้างกะ Draft เก่าในสัปดาห์นี้และลงชุดใหม่ที่ระบบเรียนรู้</div>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="px-6 py-4 border-t border-rams-rule-light flex flex-wrap justify-between items-center gap-2 bg-rams-bg/30 shrink-0">
+                            <button
+                                type="button"
+                                onClick={handleViewLearnedHabits}
+                                className="px-3 py-2 bg-rams-bg hover:bg-rams-ink-muted/10 text-rams-ink border border-rams-rule-light rounded-sm font-mono font-bold text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5"
+                            >
+                                <Brain size={14} className="text-rams-orange" /> ดูแบบแผนที่ระบบเรียนรู้
+                            </button>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowAutoGenModal(false)}
+                                    className="px-4 py-2 text-rams-ink hover:bg-rams-ink-muted/10 border border-rams-rule-light rounded-sm font-mono font-bold text-xs uppercase tracking-wider transition-all cursor-pointer"
+                                >
+                                    ยกเลิก
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleExecuteAutoGenerate}
+                                    disabled={isAutoGenerating}
+                                    className="px-5 py-2 bg-rams-ink hover:bg-rams-ink/90 text-rams-panel font-mono font-bold text-xs uppercase tracking-wider rounded-sm border border-rams-rule shadow-[0_2px_0_0_var(--color-rams-rule)] active:translate-y-[1px] active:shadow-none transition-all cursor-pointer flex items-center gap-2"
+                                >
+                                    {isAutoGenerating ? (
+                                        <>กำลังสร้างตาราง...</>
+                                    ) : (
+                                        <>
+                                            <Sparkles size={14} className="text-rams-orange" /> ยืนยันจัดตารางอัตโนมัติ
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Learned Habits Modal */}
+            {learnedHabitsModal && (
+                <div className="fixed inset-0 z-[70] flex items-center justify-center bg-rams-ink/40 backdrop-blur-[2px] p-4">
+                    <div className="bg-rams-panel border border-rams-rule rounded-sm w-full max-w-3xl overflow-hidden shadow-none flex flex-col animate-in fade-in zoom-in-95 duration-150">
+                        <div className="px-6 py-4 border-b border-rams-rule-light flex justify-between items-center bg-rams-bg/30">
+                            <div>
+                                <h3 className="font-mono font-bold text-sm uppercase tracking-wider text-rams-ink flex items-center gap-2">
+                                    <Brain size={16} className="text-rams-orange" />
+                                    แบบแผนเวลาทำงานที่ระบบเรียนรู้ (Learned Regular Habits)
+                                </h3>
+                                <p className="text-[10px] font-mono text-rams-ink-muted uppercase tracking-widest mt-0.5">
+                                    วิเคราะห์จากสถิติย้อนหลัง {learnedHabitsModal.weeksAnalyzed} สัปดาห์ (ข้อมูล {learnedHabitsModal.totalHistoricalTxs} กะ)
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setLearnedHabitsModal(null)}
+                                className="w-7 h-7 flex items-center justify-center border border-rams-rule-light hover:border-rams-rule bg-rams-bg text-rams-ink font-mono text-xs transition-all cursor-pointer rounded-sm"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        <div className="p-6 max-h-[65vh] overflow-y-auto custom-scrollbar">
+                            <table className="w-full text-xs text-left border-collapse font-mono">
+                                <thead className="bg-rams-bg/60 text-rams-ink-muted border-b border-rams-rule-light text-[9px] uppercase tracking-widest">
+                                    <tr>
+                                        <th className="px-3 py-2">พนักงาน</th>
+                                        <th className="px-2 py-2 text-center">จันทร์</th>
+                                        <th className="px-2 py-2 text-center">อังคาร</th>
+                                        <th className="px-2 py-2 text-center">พุธ</th>
+                                        <th className="px-2 py-2 text-center">พฤหัส</th>
+                                        <th className="px-2 py-2 text-center">ศุกร์</th>
+                                        <th className="px-2 py-2 text-center">เสาร์</th>
+                                        <th className="px-2 py-2 text-center">อาทิตย์</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-rams-rule-light">
+                                    {Object.values(learnedHabitsModal.learnedHabits || {}).map(empHabit => {
+                                        const dayOrder = [1, 2, 3, 4, 5, 6, 0]; // Mon to Sun
+                                        return (
+                                            <tr key={empHabit.employee_id} className="hover:bg-rams-bg/30">
+                                                <td className="px-3 py-2.5 font-bold text-rams-ink">
+                                                    <div>{empHabit.name}</div>
+                                                    <div className="text-[9px] text-rams-ink-muted font-normal uppercase">{empHabit.position}</div>
+                                                </td>
+                                                {dayOrder.map(d => {
+                                                    const shiftInfo = empHabit.routine[d] || { is_off: true };
+                                                    const isOff = shiftInfo.is_off;
+                                                    const timeStr = shiftInfo.custom_start_time
+                                                        ? `${shiftInfo.custom_start_time.slice(0, 5)}-${shiftInfo.custom_end_time.slice(0, 5)}`
+                                                        : (shiftInfo.shift_id ? `กะ ${shiftInfo.shift_id}` : 'OFF');
+
+                                                    return (
+                                                        <td key={d} className="px-2 py-2 text-center border-l border-rams-rule-light">
+                                                            <div className={`p-1 rounded-sm text-[10px] font-bold ${isOff ? 'bg-rams-red/10 text-rams-red' : 'bg-rams-green/10 text-rams-green'}`}>
+                                                                {isOff ? 'OFF' : timeStr}
+                                                            </div>
+                                                            <div className="text-[8px] text-rams-ink-muted mt-0.5">
+                                                                {shiftInfo.confidence}%
+                                                            </div>
+                                                        </td>
+                                                    );
+                                                })}
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div className="px-6 py-4 border-t border-rams-rule-light flex justify-between items-center bg-rams-bg/30 shrink-0">
+                            <span className="text-[10px] font-mono text-rams-ink-muted">
+                                *ระบบจะนำแบบแผนเหล่านี้ไปลงกะอัตโนมัติเมื่อกดจัดตาราง และสามารถปรับแก้รายกะได้ตลอดเวลา
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => setLearnedHabitsModal(null)}
+                                className="px-4 py-2 bg-rams-ink text-rams-panel font-mono font-bold text-xs uppercase tracking-wider rounded-sm border border-rams-rule cursor-pointer"
+                            >
+                                ปิดหน้าต่าง
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
