@@ -14,12 +14,12 @@ const client = new Client({
 export const dynamic = 'force-dynamic';
 
 function buildFlexMessage(type = 'checklist') {
-  // Dieter Rams + Thai Modern Clean Aesthetic (OKLCH-mapped hex)
+  // Dieter Rams + Thai Modern Clean Aesthetic (Zero-Icon / Pure Typography)
   let badgeText = '17:30 ROUND';
   let badgeColor = '#C85A32';
   let titleText = 'เช็คลิสต์ร้าน & ส่งมอบกะ';
   let subtitleText = 'รอบตรวจสอบความเรียบร้อยช่วงบ่าย-เย็น ส่งมอบงานระหว่างกะ และเตรียมพร้อมรอบค่ำ';
-  let altText = '📋 CHECKLIST PROTOCOL: บันทึกเช็คลิสต์และตรวจความเรียบร้อยร้าน';
+  let altText = 'CHECKLIST PROTOCOL: บันทึกเช็คลิสต์และตรวจความเรียบร้อยร้าน';
   let taskItems = [
     'ตรวจเช็คความพร้อมสเตชั่น บาร์ และครัว',
     'ตรวจนับสต็อกวัตถุดิบ & เบเกอรี่ช่วงบ่าย',
@@ -32,7 +32,7 @@ function buildFlexMessage(type = 'checklist') {
     badgeColor = '#C85A32';
     titleText = 'เตรียมเปิดร้าน & ตรวจสต็อก';
     subtitleText = 'บันทึกเวลาเข้างาน เช็คความพร้อมหน้าร้าน และตรวจสต็อกก่อนเปิดบริการ 11:00 น.';
-    altText = '☀️ OPENING PROTOCOL: อย่าลืมลงเวลาเข้างานและตรวจสต็อก';
+    altText = 'OPENING PROTOCOL: ลงเวลาเข้างานและตรวจสต็อก';
     taskItems = [
       'ลงเวลาเข้างานและเตรียมพร้อมเปิดระบบ',
       'ตรวจเช็คสต็อกวัตถุดิบและเบเกอรี่หน้าร้าน',
@@ -44,7 +44,7 @@ function buildFlexMessage(type = 'checklist') {
     badgeColor = '#C85A32';
     titleText = 'เตรียมปิดร้าน & สรุปกะ';
     subtitleText = 'สิ้นสุดการรับออเดอร์ครัว 20:45 น. เคลียร์บิล สรุปยอดเงิน และตรวจปิดร้าน 21:30 น.';
-    altText = '🌙 CLOSING PROTOCOL: บันทึกเช็คลิสต์ปิดร้านและสรุปกะ';
+    altText = 'CLOSING PROTOCOL: บันทึกเช็คลิสต์ปิดร้านและสรุปกะ';
     taskItems = [
       'เคลียร์บิลโต๊ะค้างและปิดกะ POS สิ้นวัน',
       'ตรวจนับสต็อกสินค้าและวัตถุดิบปิดร้าน',
@@ -155,7 +155,7 @@ function buildFlexMessage(type = 'checklist') {
               }
             ]
           },
-          // Protocol Task List
+          // Protocol Task List (Clean typographic dash - Zero-Icon)
           {
             type: 'box',
             layout: 'vertical',
@@ -166,7 +166,7 @@ function buildFlexMessage(type = 'checklist') {
               layout: 'horizontal',
               spacing: 'sm',
               contents: [
-                { type: 'text', text: '•', size: 'xs', color: '#C85A32', flex: 0 },
+                { type: 'text', text: '—', size: 'xs', color: '#78736A', flex: 0 },
                 { type: 'text', text: task, size: 'xs', color: '#1E1B18', flex: 1, wrap: true }
               ]
             }))
@@ -179,19 +179,19 @@ function buildFlexMessage(type = 'checklist') {
         paddingAll: '16px',
         spacing: 'sm',
         contents: [
-          // Primary Action Button (Stark contrast ink)
+          // Primary Action Button (Pure Typography - No Icon)
           {
             type: 'button',
             action: {
               type: 'uri',
-              label: '📋 บันทึกแบบฟอร์ม CHECKLIST',
+              label: 'บันทึกแบบฟอร์ม CHECKLIST',
               uri: 'https://forms.gle/8agnXqC7ZSojmqra6'
             },
             style: 'primary',
             color: '#1E1B18',
             height: 'sm'
           },
-          // Secondary Action Pair
+          // Secondary Action Pair (Pure Typography - No Icon)
           {
             type: 'box',
             layout: 'horizontal',
@@ -201,7 +201,7 @@ function buildFlexMessage(type = 'checklist') {
                 type: 'button',
                 action: {
                   type: 'uri',
-                  label: '📦 ตรวจสต็อก',
+                  label: 'ตรวจสต็อก',
                   uri: 'https://haustable.vercel.app/staff/stock'
                 },
                 style: 'secondary',
@@ -212,7 +212,7 @@ function buildFlexMessage(type = 'checklist') {
                 type: 'button',
                 action: {
                   type: 'uri',
-                  label: '⏱️ ลงเวลาเข้า-ออก',
+                  label: 'ลงเวลาเข้า-ออก',
                   uri: 'https://inthehaus-hr.vercel.app/checkin'
                 },
                 style: 'secondary',
