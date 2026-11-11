@@ -19,6 +19,7 @@ import StaffDirectoryManager from "./_components/StaffDirectoryManager";
 import YuzuKnowledgeManager from "./_components/YuzuKnowledgeManager";
 import DashboardOverview from "./_components/DashboardOverview";
 import IndividualHistoryManager from "./_components/IndividualHistoryManager";
+import { useAdminAuth } from "./AdminAuthContext";
 
 // --- Reducer for Cleaner State ---
 const initialState = {
@@ -59,20 +60,13 @@ function dataReducer(state, action) {
 }
 
 export default function AdminDashboard() {
-    const [isAuthenticated, setIsAuthenticated] = useState(false);
-    const [isCheckingAuth, setIsCheckingAuth] = useState(true);
-    const [loginUser, setLoginUser] = useState("");
-    const [loginPass, setLoginPass] = useState("");
+    const { user, signOut } = useAdminAuth();
     const [activeTab, setActiveTab] = useState("dashboard");
     const [selectedMonth, setSelectedMonth] = useState(format(new Date(), "yyyy-MM"));
     const [data, dispatch] = useReducer(dataReducer, initialState);
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
     useEffect(() => {
-        if (sessionStorage.getItem("adminAuth") === "true") {
-            setIsAuthenticated(true);
-        }
-        setIsCheckingAuth(false);
         const stored = localStorage.getItem("dismissed_draft_weeks");
         if (stored) {
             try {
@@ -1112,56 +1106,7 @@ export default function AdminDashboard() {
     }, [data.transactions, dismissedDraftWeeks]);
 
 
-    const handleLogin = (e) => {
-        e.preventDefault();
-        if (loginUser === "inthehaus" && loginPass === "inthehaus1120100144907") {
-            sessionStorage.setItem("adminAuth", "true");
-            setIsAuthenticated(true);
-        } else {
-            alert("Invalid username or password");
-        }
-    };
 
-    if (isCheckingAuth) return null;
-
-    if (!isAuthenticated) {
-        return (
-            <div className="min-h-screen bg-rams-bg flex flex-col items-center justify-center p-4 text-rams-ink font-sans">
-                <div className="w-full max-w-sm p-8 space-y-6 bg-rams-panel border border-rams-rule rounded-sm shadow-none">
-                    <div className="text-center space-y-2">
-                        <div className="w-12 h-12 bg-rams-ink rounded-sm mx-auto flex items-center justify-center text-rams-panel text-xl font-mono font-black border border-rams-rule">H</div>
-                        <h1 className="text-xl font-mono font-bold tracking-wider text-rams-ink uppercase">Admin Login</h1>
-                        <p className="text-[10px] font-mono text-rams-ink-muted uppercase tracking-widest">Please enter your credentials</p>
-                    </div>
-                    <form onSubmit={handleLogin} className="space-y-4">
-                        <div>
-                            <label className="text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest ml-1">Username</label>
-                            <input
-                                type="text"
-                                className="w-full p-3.5 bg-rams-bg border border-rams-rule-light rounded-sm mt-1 text-xs font-mono font-bold text-rams-ink outline-none focus:border-rams-rule transition-all"
-                                value={loginUser}
-                                onChange={e => setLoginUser(e.target.value)}
-                                required
-                            />
-                        </div>
-                        <div>
-                            <label className="text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest ml-1">Password</label>
-                            <input
-                                type="password"
-                                className="w-full p-3.5 bg-rams-bg border border-rams-rule-light rounded-sm mt-1 text-xs font-mono font-bold text-rams-ink outline-none focus:border-rams-rule transition-all"
-                                value={loginPass}
-                                onChange={e => setLoginPass(e.target.value)}
-                                required
-                            />
-                        </div>
-                        <button type="submit" className="w-full py-3.5 bg-rams-orange text-rams-panel border border-rams-rule rounded-sm font-mono font-bold uppercase tracking-wider hover:bg-rams-orange-active shadow-[0_2px_0_0_var(--color-rams-rule)] active:translate-y-[2px] active:shadow-none transition-all cursor-pointer mt-4">
-                            Access Dashboard
-                        </button>
-                    </form>
-                </div>
-            </div>
-        );
-    }
 
     const handlePublishRoster = async (startDateStr, endDateStr) => {
         if (!confirm(`ต้องการอนุมัติและประกาศตารางงานจากกะ Draft ในวันที่ ${startDateStr} ถึง ${endDateStr} ใช่หรือไม่?`)) return;
@@ -1286,19 +1231,18 @@ export default function AdminDashboard() {
                 <div className="p-4 border-t border-rams-rule-light bg-rams-bg/50 shrink-0">
                     <div className="flex items-center gap-3 px-2 py-1.5">
                         <div className="w-8 h-8 rounded-sm bg-rams-ink border border-rams-rule flex items-center justify-center text-xs font-mono font-black text-rams-panel">
-                            AD
+                            {user?.email ? user.email.slice(0, 2).toUpperCase() : "AD"}
                         </div>
                         <div className="flex-1 min-w-0">
                             <p className="text-xs font-mono font-bold text-rams-ink truncate">Administrator</p>
-                            <p className="text-[9px] font-mono text-rams-ink-muted uppercase tracking-widest truncate">inthehaus</p>
+                            <p className="text-[9px] font-mono text-rams-ink-muted uppercase tracking-widest truncate" title={user?.email || "admin"}>
+                                {user?.email || "admin"}
+                            </p>
                         </div>
                         <button 
-                            onClick={() => {
-                                sessionStorage.removeItem("adminAuth");
-                                window.location.reload();
-                            }}
+                            onClick={signOut}
                             className="p-1.5 border border-rams-rule-light hover:border-rams-rule hover:bg-rams-bg text-rams-ink-muted hover:text-rams-ink rounded-sm transition-all cursor-pointer"
-                            title="Log Out"
+                            title="Log Out (Supabase Auth)"
                         >
                             <Icons.Out size={14} />
                         </button>
@@ -1383,19 +1327,18 @@ export default function AdminDashboard() {
                         <div className="p-4 border-t border-rams-rule-light bg-rams-bg/50 shrink-0">
                             <div className="flex items-center gap-3 px-2 py-1.5">
                                 <div className="w-8 h-8 rounded-sm bg-rams-ink border border-rams-rule flex items-center justify-center text-xs font-mono font-black text-rams-panel">
-                                    AD
+                                    {user?.email ? user.email.slice(0, 2).toUpperCase() : "AD"}
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <p className="text-xs font-mono font-bold text-rams-ink truncate">Administrator</p>
-                                    <p className="text-[9px] font-mono text-rams-ink-muted uppercase tracking-widest truncate">inthehaus</p>
+                                    <p className="text-[9px] font-mono text-rams-ink-muted uppercase tracking-widest truncate" title={user?.email || "admin"}>
+                                        {user?.email || "admin"}
+                                    </p>
                                 </div>
                                 <button 
-                                    onClick={() => {
-                                        sessionStorage.removeItem("adminAuth");
-                                        window.location.reload();
-                                    }}
+                                    onClick={signOut}
                                     className="p-1.5 border border-rams-rule-light hover:border-rams-rule hover:bg-rams-bg text-rams-ink-muted hover:text-rams-ink rounded-sm transition-all cursor-pointer"
-                                    title="Log Out"
+                                    title="Log Out (Supabase Auth)"
                                 >
                                     <Icons.Out size={14} />
                                 </button>
