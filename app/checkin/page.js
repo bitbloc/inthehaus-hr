@@ -21,6 +21,8 @@ function cn(...inputs) {
 }
 
 import WeatherCard from "./components/WeatherCard";
+import HydrationWidget from "./components/HydrationWidget";
+import { sfx } from "../../utils/soundEffects";
 
 // --- Clean Technical SVG Icons (Dieter Rams Precision Icons) ---
 const SunIcon = ({ className = "w-5 h-5 stroke-current" }) => (
@@ -150,6 +152,7 @@ export default function CheckIn() {
   // Dev Mode State (Disabled for plain security)
   const [devMode, setDevMode] = useState(false);
   const fileInputRef = useRef(null);
+  const watchIdRef = useRef(null);
 
   // --- Constants ---
   const OFFICIAL_LIFF_URL = "https://liff.line.me/2008567449-W868y8RY";
@@ -195,6 +198,11 @@ export default function CheckIn() {
     const dist = getDistanceFromLatLonInKm(latitude, longitude, SHOP_LAT, SHOP_LONG);
     if (dist <= ALLOWED_RADIUS_KM) {
       if (!status.includes("Ready") && !status.includes("พร้อม")) setStatus("พร้อมลงเวลา (อยู่ในพื้นที่ร้าน)");
+      // Clear watch to preserve mobile battery once locked securely within shop
+      if (accuracy <= 35 && watchIdRef.current) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
     } else {
       const distMeters = Math.round(dist * 1000);
       if (!devMode) setStatus(`อยู่นอกพื้นที่ร้าน (${distMeters} ม.)`);
@@ -248,8 +256,6 @@ export default function CheckIn() {
   useEffect(() => {
     setCurrentTime(new Date()); // Init on client
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    let watchId;
-
     const init = async () => {
       try {
         await liff.init({ liffId: process.env.NEXT_PUBLIC_LIFF_ID || "2008567449-W868y8RY" });
@@ -302,7 +308,7 @@ export default function CheckIn() {
       }
 
       if (navigator.geolocation) {
-        watchId = navigator.geolocation.watchPosition(onGeoSuccess, onGeoError, { enableHighAccuracy: true });
+        watchIdRef.current = navigator.geolocation.watchPosition(onGeoSuccess, onGeoError, { enableHighAccuracy: true });
       } else {
         setStatus("GPS Not Supported");
       }
@@ -314,7 +320,7 @@ export default function CheckIn() {
 
     return () => {
       clearInterval(timer);
-      if (watchId) navigator.geolocation.clearWatch(watchId);
+      if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current);
     };
   }, []);
 
@@ -707,6 +713,9 @@ export default function CheckIn() {
   };
 
   const handleStartCheckIn = () => {
+    sfx.playTactileClick();
+    sfx.triggerHaptic([20, 35]);
+
     if (!profile?.userId) {
       if (typeof liff !== 'undefined' && !liff.isLoggedIn?.()) {
         handleLineLogin();
@@ -721,7 +730,7 @@ export default function CheckIn() {
       return;
     }
     if (lastAction === 'pending') {
-      alert("Your account is pending approval from admin.");
+      alert("บัญชีของคุณอยู่ระหว่างรอการอนุมัติสิทธิ์จากผู้จัดการ");
       return;
     }
 
@@ -904,6 +913,10 @@ export default function CheckIn() {
         setLastCheckInTime(null);
       }
 
+      // Audio & Haptic celebration
+      sfx.playSuccessChime();
+      sfx.triggerHaptic([25, 50, 25]);
+
       // Show Punch Confirmation / Attendance Status Modal
       setPunchFeedback({
         ...(json.punchResult || {}),
@@ -990,10 +1003,6 @@ export default function CheckIn() {
     }
   };
 
-  const handleDevLogin = () => {
-    // Plaintext dev password removed for security
-  };
-
   function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
     var R = 6371;
     var dLat = deg2rad(lat2 - lat1);
@@ -1064,8 +1073,11 @@ export default function CheckIn() {
         initial={{ y: -10, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
       >
-        <div className="flex items-center z-10">
-          <button onClick={handleDevLogin} className="text-rams-ink-muted hover:text-rams-ink transition-colors text-xs" aria-label="Dev settings">🛠️</button>
+        <div className="flex items-center gap-1.5 z-10">
+          <span className="w-2 h-2 rounded-full bg-rams-green animate-pulse"></span>
+          <span className="text-[10px] font-mono font-bold text-rams-ink uppercase tracking-wider">
+            HAUS OPS
+          </span>
         </div>
 
         {/* Center: Logo */}
@@ -1074,7 +1086,7 @@ export default function CheckIn() {
         </div>
 
         <div className="flex items-center gap-3 z-10">
-          <Link href="https://forms.gle/3LdW9zdjdTCpfpTe8" target="_blank" className="text-[10px] font-mono font-bold text-rams-ink-muted hover:text-rams-ink border border-rams-rule-light bg-rams-bg px-2.5 py-1 transition-colors mr-1 rounded-sm">
+          <Link href="https://forms.gle/3LdW9zdjdTCpfpTe8" target="_blank" className="text-[10px] font-mono font-bold text-rams-ink-muted hover:text-rams-ink border border-rams-rule-light bg-rams-bg px-2.5 py-1.5 transition-colors mr-1 rounded-sm">
             คำขอเบิกเงินล่วงหน้า
           </Link>
           {profile ? (
@@ -1087,11 +1099,11 @@ export default function CheckIn() {
                     alert("Copied User ID");
                   }}
                   className={cn(
-                    "text-[9px] font-mono cursor-pointer transition-colors",
+                    "text-[10px] font-mono cursor-pointer transition-colors",
                     isOwner ? "text-rams-amber font-extrabold" : "text-rams-ink-muted hover:text-rams-orange"
                   )}
                 >
-                  {isOwner ? `👑 ${employeeData?.position || 'Owner'}` : (employeeData?.position || (lastAction === 'pending' ? 'Pending' : 'Guest'))}
+                  {isOwner ? `👑 ${employeeData?.position || 'Owner'}` : (employeeData?.position || (lastAction === 'pending' ? 'Pending' : 'Staff'))}
                 </span>
               </div>
               {profile.pictureUrl ? (
@@ -1142,7 +1154,7 @@ export default function CheckIn() {
                   {isLate ? <ClockIcon className="w-5 h-5 text-rams-red" /> : <SunIcon className="w-5 h-5 text-rams-orange" />}
                 </div>
                 <div>
-                  <h4 className="text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest leading-tight">
+                  <h4 className="text-[10px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest leading-tight">
                     {isLate ? "Running Late" : "Current Shift"}
                   </h4>
                   <p className="text-sm font-mono font-bold text-rams-ink">
@@ -1151,7 +1163,7 @@ export default function CheckIn() {
                 </div>
               </div>
               {isLate && (
-                <span className="px-2 py-0.5 bg-rams-red text-rams-panel text-[9px] font-mono font-bold rounded-sm border border-rams-rule-light">LATE</span>
+                <span className="px-2 py-0.5 bg-rams-red text-rams-panel text-[10px] font-mono font-bold rounded-sm border border-rams-rule-light">LATE</span>
               )}
             </div>
           </motion.div>
@@ -1170,14 +1182,14 @@ export default function CheckIn() {
             <h2 className="text-[4.5rem] md:text-[5.5rem] leading-none font-mono font-bold text-rams-ink tracking-tight select-none">
               {currentTime ? format(currentTime, "HH:mm") : "--:--"}
             </h2>
-            <p className="text-[10px] font-mono font-bold text-rams-ink-muted mt-2 tracking-widest uppercase">
+            <p className="text-[11px] font-mono font-bold text-rams-ink-muted mt-2 tracking-widest uppercase">
               {currentTime ? format(currentTime, "EEEEที่ d MMMM yyyy", { locale: th }) : "Loading..."}
             </p>
           </div>
 
           <motion.div
             className={cn(
-              "inline-flex items-center gap-2 px-3 py-1 rounded-sm text-[10px] font-mono font-bold tracking-wider uppercase border border-rams-rule-light bg-rams-panel",
+              "inline-flex items-center gap-2 px-3.5 py-1.5 rounded-sm text-[11px] font-mono font-bold tracking-wider uppercase border border-rams-rule-light bg-rams-panel",
               isOwner ? "border-rams-amber/40 text-rams-ink bg-rams-amber/10" : ""
             )}
           >
@@ -1194,7 +1206,7 @@ export default function CheckIn() {
               <motion.div
                 initial={{ opacity: 0, y: 5 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="px-3 py-1 bg-rams-orange/10 text-rams-orange border border-rams-rule-light rounded-sm text-[10px] font-mono font-bold flex items-center gap-1.5"
+                className="px-3.5 py-1 bg-rams-orange/10 text-rams-orange border border-rams-rule-light rounded-sm text-[11px] font-mono font-bold flex items-center gap-1.5"
               >
                 <span>🔥</span>
                 <span>มาเช้าจัง เยี่ยมไปเลย!</span>
@@ -1220,7 +1232,7 @@ export default function CheckIn() {
                       <span className="w-1.5 h-1.5 rounded-full bg-rams-amber"></span>
                       <span>OWNER / MANAGEMENT</span>
                     </span>
-                    <span className="text-[9px] font-mono font-bold text-rams-green bg-rams-green/10 border border-rams-green/30 px-2 py-0.5 rounded-sm">
+                    <span className="text-[10px] font-mono font-bold text-rams-green bg-rams-green/10 border border-rams-green/30 px-2 py-0.5 rounded-sm">
                       EXEMPT ✓
                     </span>
                   </div>
@@ -1234,11 +1246,11 @@ export default function CheckIn() {
 
                   <div className="mt-3 pt-3 border-t border-rams-rule-light grid grid-cols-2 divide-x divide-rams-rule-light text-center">
                     <div className="pr-2">
-                      <span className="text-[8px] font-mono font-bold text-rams-ink-muted uppercase block">สิทธิ์การใช้งาน</span>
+                      <span className="text-[10px] font-mono font-bold text-rams-ink-muted uppercase block">สิทธิ์การใช้งาน</span>
                       <span className="text-xs font-mono font-bold text-rams-ink mt-0.5 block">ผู้บริหารระดับสูง</span>
                     </div>
                     <div className="pl-2">
-                      <span className="text-[8px] font-mono font-bold text-rams-ink-muted uppercase block">การลงเวลา</span>
+                      <span className="text-[10px] font-mono font-bold text-rams-ink-muted uppercase block">การลงเวลา</span>
                       <span className="text-xs font-mono font-bold text-rams-green mt-0.5 block">ทางเลือก (Optional)</span>
                     </div>
                   </div>
@@ -1257,7 +1269,7 @@ export default function CheckIn() {
                       <div className="text-xs font-mono font-bold text-rams-ink group-hover:text-rams-orange transition-colors">
                         Admin Console
                       </div>
-                      <div className="text-[9px] font-mono text-rams-ink-muted mt-0.5">
+                      <div className="text-[10px] font-mono text-rams-ink-muted mt-0.5">
                         ระบบ HR & หลังบ้าน
                       </div>
                     </div>
@@ -1274,7 +1286,7 @@ export default function CheckIn() {
                       <div className="text-xs font-mono font-bold text-rams-ink group-hover:text-rams-orange transition-colors">
                         Master Roster
                       </div>
-                      <div className="text-[9px] font-mono text-rams-ink-muted mt-0.5">
+                      <div className="text-[10px] font-mono text-rams-ink-muted mt-0.5">
                         ตารางกะ & เวรทีมงาน
                       </div>
                     </div>
@@ -1291,7 +1303,7 @@ export default function CheckIn() {
                       <div className="text-xs font-mono font-bold text-rams-ink group-hover:text-rams-orange transition-colors">
                         Espresso Report
                       </div>
-                      <div className="text-[9px] font-mono text-rams-ink-muted mt-0.5">
+                      <div className="text-[10px] font-mono text-rams-ink-muted mt-0.5">
                         รายงานบาร์ & สกัดช็อต
                       </div>
                     </div>
@@ -1308,7 +1320,7 @@ export default function CheckIn() {
                       <div className="text-xs font-mono font-bold text-rams-ink group-hover:text-rams-orange transition-colors">
                         Stock Audit
                       </div>
-                      <div className="text-[9px] font-mono text-rams-ink-muted mt-0.5">
+                      <div className="text-[10px] font-mono text-rams-ink-muted mt-0.5">
                         เช็คสต็อกวัตถุดิบ
                       </div>
                     </div>
@@ -1319,7 +1331,7 @@ export default function CheckIn() {
                 <div className="pt-1">
                   <button
                     onClick={() => setShowOptionalPunch(!showOptionalPunch)}
-                    className="w-full py-2 px-3 bg-rams-panel hover:bg-rams-bg border border-rams-rule-light rounded-sm flex items-center justify-between text-[10px] font-mono font-bold text-rams-ink-muted hover:text-rams-ink transition-[transform,background-color,color] duration-150 ease-out active:translate-y-[1px] tactile-btn-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rams-ink"
+                    className="w-full py-2 px-3 bg-rams-panel hover:bg-rams-bg border border-rams-rule-light rounded-sm flex items-center justify-between text-[11px] font-mono font-bold text-rams-ink-muted hover:text-rams-ink transition-[transform,background-color,color] duration-150 ease-out active:translate-y-[1px] tactile-btn-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rams-ink"
                   >
                     <span className="flex items-center gap-1.5">
                       <CameraIcon className="w-3.5 h-3.5 stroke-current" />
@@ -1373,7 +1385,7 @@ export default function CheckIn() {
                     <span className="text-xl font-mono font-bold uppercase tracking-wider">
                       {isSubmitting ? "Processing..." : mainButtonConfig.label}
                     </span>
-                    <span className="text-[10px] font-mono opacity-85 mt-1 font-bold uppercase tracking-widest">
+                    <span className="text-[11px] font-mono opacity-85 mt-1 font-bold uppercase tracking-widest">
                       {mainButtonConfig.sub}
                     </span>
                   </div>
@@ -1445,11 +1457,11 @@ export default function CheckIn() {
                       <MegaphoneIcon className={cn("w-4 h-4 stroke-current shrink-0 mt-0.5", isUrgent ? "text-rams-red" : "text-rams-orange")} />
                       <div className="flex-1 min-w-0 pr-6">
                         <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
-                          <span className={`text-[9px] font-mono font-extrabold border border-rams-rule-light ${isUrgent ? 'bg-rams-red/10 text-rams-red' : 'bg-rams-orange/10 text-rams-orange'} px-2 py-0.5 rounded-sm uppercase tracking-widest`}>
+                          <span className={`text-[10px] font-mono font-extrabold border border-rams-rule-light ${isUrgent ? 'bg-rams-red/10 text-rams-red' : 'bg-rams-orange/10 text-rams-orange'} px-2 py-0.5 rounded-sm uppercase tracking-widest`}>
                             {isUrgent ? 'Important' : 'News'}
                           </span>
                           {expLabel && (
-                            <span className="text-[9px] font-mono font-bold text-rams-ink-muted flex items-center gap-1">
+                            <span className="text-[10px] font-mono font-bold text-rams-ink-muted flex items-center gap-1">
                               <ClockIcon className="w-3 h-3 stroke-current" />
                               {expLabel}
                             </span>
@@ -1458,14 +1470,14 @@ export default function CheckIn() {
                         <p className="text-xs font-semibold text-rams-ink leading-relaxed break-words">{a.message}</p>
                         <button
                           onClick={() => handleDismissAnnouncement(a.id)}
-                          className="mt-2 py-1 px-3 bg-rams-bg hover:bg-rams-panel active:translate-y-[1px] text-[10px] font-mono font-extrabold text-rams-ink border border-rams-rule-light rounded-sm transition-[background-color,transform] duration-150 ease-out tactile-btn-sm"
+                          className="mt-2 py-1 px-3 bg-rams-bg hover:bg-rams-panel active:translate-y-[1px] text-[11px] font-mono font-extrabold text-rams-ink border border-rams-rule-light rounded-sm transition-[background-color,transform] duration-150 ease-out tactile-btn-sm"
                         >
                           รับทราบ
                         </button>
                       </div>
                       <button 
                         onClick={() => handleDismissAnnouncement(a.id)}
-                        className="absolute top-3.5 right-3.5 w-6 h-6 rounded-sm flex items-center justify-center text-rams-ink-muted hover:text-rams-ink hover:bg-rams-bg border border-rams-rule-light transition-colors duration-150 text-xs font-bold"
+                        className="absolute top-3 right-3 w-8 h-8 rounded-sm flex items-center justify-center text-rams-ink-muted hover:text-rams-ink hover:bg-rams-bg border border-rams-rule-light transition-colors duration-150 text-sm font-bold active:translate-y-[1px]"
                         aria-label="Dismiss announcement"
                       >
                         ✕
@@ -1479,15 +1491,15 @@ export default function CheckIn() {
               {(approvedLeaves.length > 0 || myPendingLeaves.length > 0) && (
                 <div className="w-full bg-rams-panel border border-rams-rule-light p-4 shadow-none flex flex-col gap-3 rounded-sm">
                   <div className="flex items-center justify-between pb-2 border-b border-rams-rule-light">
-                    <span className="text-[9px] font-mono font-extrabold text-rams-ink-muted uppercase tracking-widest">ข้อมูลการลาหยุด</span>
-                    <span className="text-[9px] font-mono font-bold text-rams-ink-muted">{format(currentTime || new Date(), "dd MMMM yyyy", { locale: th })}</span>
+                    <span className="text-[10px] font-mono font-extrabold text-rams-ink-muted uppercase tracking-widest">ข้อมูลการลาหยุด</span>
+                    <span className="text-[10px] font-mono font-bold text-rams-ink-muted">{format(currentTime || new Date(), "dd MMMM yyyy", { locale: th })}</span>
                   </div>
 
                   {/* Approved Leaves List (Sleek Avatar Cards) */}
                   <div className="flex flex-col gap-2">
-                    <p className="text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-wider mb-1">รายชื่อลางานล่าสุด</p>
+                    <p className="text-[10px] font-mono font-bold text-rams-ink-muted uppercase tracking-wider mb-1">รายชื่อลางานล่าสุด</p>
                     {approvedLeaves.length > 0 ? (
-                      <div className="flex flex-col gap-2">
+                      <div className="flex flex-col gap-1.5">
                         {approvedLeaves.map((l) => {
                           const empName = l.employees?.nickname || l.employees?.name?.split(' ')[0] || 'Staff';
                           const typeLabel = l.leave_type === 'sick' ? 'ลาป่วย 😷' : l.leave_type === 'business' ? 'ลากิจ 💼' : 'พักร้อน 🏖️';
@@ -1502,7 +1514,7 @@ export default function CheckIn() {
                           const dateStrFormatted = format(dateObj, 'd MMM', { locale: th });
 
                           return (
-                            <div key={l.id} className="flex items-center justify-between p-2 bg-rams-bg rounded-sm border border-rams-rule-light">
+                            <div key={l.id} className="flex items-center justify-between py-2 px-2.5 bg-rams-bg rounded-sm border border-rams-rule-light">
                               <div className="flex items-center gap-2.5 min-w-0">
                                 {/* Employee Avatar with Fallback */}
                                 <div className="relative w-8 h-8 shrink-0">
@@ -1530,17 +1542,17 @@ export default function CheckIn() {
                                   )}
                                 </div>
                                 <div className="flex flex-col min-w-0 ml-1">
-                                  <span className="text-xs font-bold text-rams-ink truncate leading-none mb-1">{empName}</span>
-                                  <span className="text-[9px] font-mono text-rams-ink-muted truncate leading-none">{l.reason || 'ทำธุระส่วนตัว'}</span>
+                                  <span className="text-xs font-bold text-rams-ink truncate leading-tight mb-0.5">{empName}</span>
+                                  <span className="text-[10px] font-mono text-rams-ink-muted truncate leading-none">{l.reason || 'ทำธุระส่วนตัว'}</span>
                                 </div>
                               </div>
 
                               <div className="flex items-center gap-1.5 shrink-0">
-                                <span className={`text-[9px] font-mono font-extrabold px-2 py-0.5 rounded-sm border border-rams-rule-light ${badgeColor}`}>
+                                <span className={`text-[10px] font-mono font-extrabold px-2 py-0.5 rounded-sm border border-rams-rule-light ${badgeColor}`}>
                                   {typeLabel}
                                 </span>
                                 <span className={cn(
-                                  "text-[9px] font-mono font-extrabold px-1.5 py-0.5 rounded-sm border border-rams-rule-light",
+                                  "text-[10px] font-mono font-extrabold px-1.5 py-0.5 rounded-sm border border-rams-rule-light",
                                   isTodayLeave 
                                     ? "bg-rams-red text-rams-panel animate-pulse" 
                                     : "bg-rams-panel text-rams-ink-muted"
@@ -1553,7 +1565,7 @@ export default function CheckIn() {
                         })}
                       </div>
                     ) : (
-                      <span className="text-rams-ink-muted font-mono font-bold italic text-[10px] block mt-0.5">ช่วงนี้ไม่มีคนลาหยุด ☀️</span>
+                      <span className="text-rams-ink-muted font-mono font-bold italic text-[11px] block mt-0.5">ช่วงนี้ไม่มีคนลาหยุด ☀️</span>
                     )}
                   </div>
 
@@ -1562,7 +1574,7 @@ export default function CheckIn() {
                     <div className="flex items-start gap-2.5 min-w-0 pt-2 border-t border-rams-rule-light">
                       <span className="text-sm shrink-0">⏳</span>
                       <div className="flex-1 min-w-0">
-                        <p className="text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-wider">คำขอลาของคุณที่ค้างอยู่</p>
+                        <p className="text-[10px] font-mono font-bold text-rams-ink-muted uppercase tracking-wider">คำขอลาของคุณที่ค้างอยู่</p>
                         <div className="flex flex-col gap-1 mt-1">
                           {myPendingLeaves.slice(0, 2).map((l, idx) => {
                             const dateFormatted = format(new Date(l.leave_date), 'dd/MM');
@@ -1575,7 +1587,7 @@ export default function CheckIn() {
                             );
                           })}
                           {myPendingLeaves.length > 2 && (
-                            <span className="text-[9px] font-mono font-bold text-rams-ink-muted pl-3">และรายการอื่นอีก {myPendingLeaves.length - 2} รายการ</span>
+                            <span className="text-[10px] font-mono font-bold text-rams-ink-muted pl-3">และรายการอื่นอีก {myPendingLeaves.length - 2} รายการ</span>
                           )}
                         </div>
                       </div>
@@ -1587,7 +1599,7 @@ export default function CheckIn() {
               {/* Weekly Schedule Row */}
               {weeklySchedule.length > 0 && (
                 <div className="w-full bg-rams-panel border border-rams-rule-light p-4 shadow-none flex flex-col gap-2.5 rounded-sm">
-                  <span className="text-[9px] font-mono font-extrabold text-rams-ink-muted uppercase tracking-widest pb-1 border-b border-rams-rule-light">ตารางงานสัปดาห์นี้</span>
+                  <span className="text-[10px] font-mono font-extrabold text-rams-ink-muted uppercase tracking-widest pb-1 border-b border-rams-rule-light">ตารางงานสัปดาห์นี้</span>
                   <div className="grid grid-cols-7 gap-1">
                     {weeklySchedule.map((day, idx) => {
                       const dayInitialsMap = { Mon: 'จ', Tue: 'อ', Wed: 'พ', Thu: 'พฤ', Fri: 'ศ', Sat: 'ส', Sun: 'อา' };
@@ -1629,14 +1641,14 @@ export default function CheckIn() {
                               transition={{ duration: 0.15, ease: "easeOut" }}
                             />
                           )}
-                          <span className={cn("text-[9px] font-mono font-bold", day.isToday ? "text-rams-panel/75" : "text-rams-ink-muted")}>
+                          <span className={cn("text-[10px] font-mono font-bold", day.isToday ? "text-rams-panel/75" : "text-rams-ink-muted")}>
                             {thaiInitial}
                           </span>
                           <span className="text-xs font-mono font-black tracking-tight mt-0.5">
                             {day.dateNum}
                           </span>
                           <span className={cn(
-                            "text-[8px] font-mono font-extrabold mt-1 px-1 py-0.5 rounded-sm text-center tracking-tighter whitespace-nowrap border border-rams-rule-light", 
+                            "text-[9px] font-mono font-extrabold mt-1 px-1 py-0.5 rounded-sm text-center tracking-tighter whitespace-nowrap border border-rams-rule-light", 
                             day.isToday 
                               ? (day.isLeave ? "bg-rams-red text-rams-panel border-rams-rule" : day.isOff ? "bg-rams-bg text-rams-ink-muted" : "bg-rams-orange text-rams-panel border-rams-rule")
                               : (day.isLeave ? "bg-rams-red/10 text-rams-red" : day.isOff ? "bg-rams-bg text-rams-ink-muted/55" : "bg-rams-orange/10 text-rams-orange")
@@ -1672,7 +1684,7 @@ export default function CheckIn() {
                               : (((selectedDaySchedule.shiftName || '').includes('ค่ำ') || (selectedDaySchedule.shiftName || '').includes('เย็น') || (selectedDaySchedule.shiftTime || '').startsWith('18') || (selectedDaySchedule.shiftTime || '').startsWith('17') || (selectedDaySchedule.shiftTime || '').startsWith('16')) ? '🌙' : '☀️')}
                         </div>
                         <div className="min-w-0">
-                          <h5 className="text-[9px] font-mono font-extrabold text-rams-ink-muted uppercase tracking-widest leading-none mb-1.5 truncate">
+                          <h5 className="text-[10px] font-mono font-extrabold text-rams-ink-muted uppercase tracking-widest leading-none mb-1.5 truncate">
                             {format(selectedDaySchedule.date, 'EEEE d MMMM yyyy', { locale: th })} {selectedDaySchedule.isToday && '(วันนี้)'}
                           </h5>
                           <p className="text-xs font-mono font-bold text-rams-ink leading-none truncate">
@@ -1702,8 +1714,11 @@ export default function CheckIn() {
 
       </div>
 
-      {/* 4. Recent Checkins (Dieter Rams Panels) */}
-      <div className="w-full max-w-sm px-6 z-10 mb-8">
+      {/* 4. Hydration Station & Recent Activity (Dieter Rams Panels) */}
+      <div className="w-full max-w-sm px-6 z-10 mb-8 space-y-4">
+        {/* Cold Water Animation Widget */}
+        <HydrationWidget />
+
         <AnimatePresence>
           {userPosition && (
             <WeatherCard
@@ -1714,8 +1729,11 @@ export default function CheckIn() {
           )}
         </AnimatePresence>
 
-        <h3 className="text-[10px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-4 pl-2">Recent Activity</h3>
-        <div className="flex flex-col gap-2">
+        <div>
+          <h3 className="text-[11px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-3 pl-1">
+            Recent Activity // กิจกรรมล่าสุด
+          </h3>
+          <div className="flex flex-col gap-2">
           <AnimatePresence>
             {recentCheckins.slice(0, 3).map((log, i) => {
               const namePart = log.employees?.nickname || log.employees?.name?.split(' ')[0] || 'Staff';
@@ -1760,22 +1778,19 @@ export default function CheckIn() {
               );
             })}
           </AnimatePresence>
+          </div>
         </div>
       </div>
 
       {/* Brand Footer */}
-      <footer className="w-full text-center py-6 mt-4 text-[9px] font-mono tracking-[0.2em] text-rams-ink-muted uppercase select-none z-10">
+      <footer className="w-full text-center py-6 mt-4 text-[10px] font-mono tracking-[0.2em] text-rams-ink-muted uppercase select-none z-10">
         ONHAUS SYSTEM © {new Date().getFullYear()}
       </footer>
 
       {/* 5. Navigation Dock (The "Haus" Dock) */}
       <NavigationDock />
 
-
-
-
-
-      {/* Camera & Mood (Modals in Dieter Rams Style) */}
+      {/* Camera & Punch Feedback (Modals in Dieter Rams Style) */}
       <AnimatePresence>
         {showCamera && (
           <motion.div
@@ -1829,7 +1844,7 @@ export default function CheckIn() {
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 10 }}
               transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-              className="w-full max-w-sm bg-rams-panel border-2 border-rams-rule rounded-sm p-6 shadow-2xl relative overflow-hidden z-10 space-y-4"
+              className="w-full max-w-sm bg-rams-panel border-2 border-rams-rule rounded-sm p-5 shadow-2xl relative overflow-hidden z-10 space-y-3.5 max-h-[90vh] overflow-y-auto custom-scrollbar"
             >
               {/* Rams Decorative Status Top Bar */}
               <div className={cn(
@@ -1840,30 +1855,30 @@ export default function CheckIn() {
               )} />
 
               {/* Status Header */}
-              <div className="text-center pt-2">
+              <div className="text-center pt-1">
                 <div className={cn(
-                  "w-14 h-14 rounded-sm mx-auto flex items-center justify-center mb-2.5 border shadow-sm",
+                  "w-12 h-12 rounded-sm mx-auto flex items-center justify-center mb-2 border shadow-sm",
                   punchFeedback.action === 'check_in'
                     ? (punchFeedback.isLate ? "bg-rams-amber/10 border-rams-amber/30 text-rams-amber" : "bg-rams-green/10 border-rams-green/30 text-rams-green")
                     : "bg-rams-ink text-rams-panel border-rams-rule"
                 )}>
                   {punchFeedback.action === 'check_in' 
-                    ? (punchFeedback.isLate ? <ClockIcon className="w-8 h-8 stroke-current" /> : <SunIcon className="w-8 h-8 stroke-current" />) 
-                    : <MoonIcon className="w-8 h-8 stroke-current" />}
+                    ? (punchFeedback.isLate ? <ClockIcon className="w-7 h-7 stroke-current" /> : <SunIcon className="w-7 h-7 stroke-current" />) 
+                    : <MoonIcon className="w-7 h-7 stroke-current" />}
                 </div>
 
                 <span className="text-[10px] font-mono font-bold tracking-widest text-rams-ink-muted uppercase block">
                   {punchFeedback.action === 'check_in' ? 'CHECK-IN CONFIRMED' : 'CHECK-OUT CONFIRMED'}
                 </span>
 
-                <h3 className="text-lg font-mono font-extrabold text-rams-ink mt-0.5">
+                <h3 className="text-base font-mono font-extrabold text-rams-ink mt-0.5">
                   {punchFeedback.action === 'check_in' ? 'ลงเวลาเข้างานสำเร็จ!' : 'ลงเวลาออกงานสำเร็จ!'}
                 </h3>
               </div>
 
               {/* Attendance Status Badge Card */}
-              <div className="p-3.5 bg-rams-bg rounded-sm border border-rams-rule-light space-y-2.5">
-                <div className="flex items-center justify-between pb-2 border-b border-rams-rule-light">
+              <div className="p-3 bg-rams-bg rounded-sm border border-rams-rule-light space-y-2">
+                <div className="flex items-center justify-between pb-1.5 border-b border-rams-rule-light">
                   <span className="text-[10px] font-mono font-bold text-rams-ink-muted uppercase">สถานะการลงเวลา</span>
                   <span className={cn(
                     "px-2 py-0.5 rounded-sm text-[10px] font-mono font-bold tracking-wide border",
@@ -1882,14 +1897,14 @@ export default function CheckIn() {
                 {/* Details Grid */}
                 <div className="grid grid-cols-2 divide-x divide-rams-rule-light text-center">
                   <div className="pr-2">
-                    <span className="text-[9px] font-mono text-rams-ink-muted block">เวลาบันทึก</span>
+                    <span className="text-[10px] font-mono text-rams-ink-muted block">เวลาบันทึก</span>
                     <span className="text-xs font-mono font-bold text-rams-ink mt-0.5 block">
                       {punchFeedback.timeFormatted ? `${punchFeedback.timeFormatted} น.` : format(new Date(), 'HH:mm น.')}
                     </span>
                   </div>
 
                   <div className="pl-2">
-                    <span className="text-[9px] font-mono text-rams-ink-muted block">
+                    <span className="text-[10px] font-mono text-rams-ink-muted block">
                       {punchFeedback.action === 'check_in' ? 'กะการทำงาน' : 'รวมเวลาทำงาน'}
                     </span>
                     <span className="text-xs font-mono font-bold text-rams-ink mt-0.5 block truncate">
@@ -1901,8 +1916,44 @@ export default function CheckIn() {
                 </div>
               </div>
 
+              {/* Special Check-in Cold Water Toast OR Check-out Wrap Up Card */}
+              {punchFeedback.action === 'check_in' ? (
+                <div className="p-3 bg-sky-500/10 border border-sky-400/40 rounded-sm flex items-center justify-between">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="text-2xl select-none animate-bounce">🧊</span>
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-mono font-bold text-sky-800 leading-tight">
+                        รับน้ำเย็นเจี๊ยบจากยูซุสักแก้ว!
+                      </p>
+                      <p className="text-[10px] font-sans text-sky-700/80 mt-0.5">
+                        เติมความสดชื่นก่อนเริ่มกะงานนะ 🐾
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      sfx.playWaterDrop();
+                      sfx.triggerHaptic([20, 40]);
+                      alert("💧 ชื่นใจ! ยูซุเติมพลังให้ 100% แล้ว ลุยเลยทาส!");
+                    }}
+                    className="shrink-0 px-2.5 py-1 bg-white hover:bg-sky-50 active:translate-y-[1px] text-[10px] font-mono font-extrabold text-sky-700 border border-sky-300 rounded-sm transition-[transform,background-color] tactile-btn-sm"
+                  >
+                    จิบเลย 💧
+                  </button>
+                </div>
+              ) : (
+                <div className="p-3 bg-rams-bg border border-rams-rule-light rounded-sm">
+                  <p className="text-xs font-bold text-rams-ink">
+                    &ldquo;ทำได้ดีมาก! ขอบคุณสำหรับความทุ่มเทในวันนี้นะครับ 🐾&rdquo;
+                  </p>
+                  <p className="text-[10px] font-mono text-rams-orange mt-1">
+                    💡 Yuzu says: พักผ่อนเยอะๆ ดื่มน้ำอุ่นๆ แล้วเจอกันกะหน้านะ!
+                  </p>
+                </div>
+              )}
+
               {/* Mood Selector Section */}
-              <div className="space-y-2 pt-0.5">
+              <div className="space-y-1.5 pt-0.5">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-mono font-bold text-rams-ink-muted uppercase">
                     {selectedMood ? 'บันทึกอารมณ์แล้ว:' : 'รู้สึกอย่างไรตอนนี้?'}
@@ -1937,7 +1988,7 @@ export default function CheckIn() {
                       )}
                     >
                       <span className="text-lg font-emoji mb-0.5">{m.emoji}</span>
-                      <span className="text-[8px] font-mono font-bold opacity-85">{m.label}</span>
+                      <span className="text-[10px] font-mono font-bold opacity-85">{m.label}</span>
                     </button>
                   ))}
                 </div>
@@ -1952,99 +2003,6 @@ export default function CheckIn() {
                 className="w-full py-3 bg-rams-ink hover:bg-neutral-800 text-rams-panel rounded-sm text-xs font-mono font-bold border border-rams-rule transition-[transform,background-color] duration-150 active:translate-y-[1px] tactile-btn shadow-sm cursor-pointer"
               >
                 ตกลง / เรียบร้อย ✓
-              </button>
-            </motion.div>
-          </div>
-        )}
-
-        {showMoodSelector && (
-          <div className="fixed inset-x-0 bottom-0 z-50 flex flex-col items-center justify-end pointer-events-none">
-            <motion.div
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-black/20 backdrop-blur-sm pointer-events-auto"
-              onClick={() => {
-                setShowMoodSelector(false);
-                if (wrapUpData) setShowWrapUp(true);
-              }}
-            />
-            <motion.div
-              initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
-              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-              className="w-full bg-rams-panel border-t-2 border-rams-rule p-8 pb-12 pointer-events-auto relative rounded-t-sm"
-            >
-              <div className="w-12 h-1.5 bg-rams-rule rounded-full mx-auto mb-8"></div>
-              <h3 className="text-lg font-mono font-bold text-rams-ink text-center mb-8 uppercase tracking-wider">How are you feeling?</h3>
-              <div className="flex justify-center gap-4 flex-wrap">
-                {['🔥', '😊', '😐', '😴', '🤒'].map((m) => (
-                  <button
-                    key={m}
-                    onClick={() => handleMoodSelect(m)}
-                    className="w-16 h-16 text-3xl flex items-center justify-center rounded-sm bg-rams-bg border-2 border-rams-rule hover:bg-rams-ink hover:text-rams-panel active:translate-y-[2px] transition-[transform,background-color,color] duration-150 tactile-btn font-emoji"
-                  >
-                    {m}
-                  </button>
-                ))}
-              </div>
-              <button
-                onClick={() => {
-                  setShowMoodSelector(false);
-                  if (wrapUpData) setShowWrapUp(true);
-                }}
-                className="w-full mt-8 text-rams-ink-muted text-xs font-mono font-bold tracking-widest uppercase hover:text-rams-ink transition-colors"
-              >
-                Skip This
-              </button>
-            </motion.div>
-          </div>
-        )}
-
-        {showWrapUp && wrapUpData && (
-          <div className="fixed inset-x-0 bottom-0 z-50 flex flex-col items-center justify-end pointer-events-none">
-            <motion.div
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-black/40 backdrop-blur-sm pointer-events-auto"
-              onClick={() => {
-                setShowWrapUp(false);
-                setWrapUpData(null);
-              }}
-            />
-            <motion.div
-              initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
-              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-              className="w-full bg-rams-panel border-t-2 border-rams-rule p-8 pb-12 pointer-events-auto relative overflow-hidden rounded-t-sm"
-            >
-              <div className="absolute top-0 right-0 p-4 text-6xl opacity-5">🐾</div>
-              <div className="w-12 h-1.5 bg-rams-rule rounded-full mx-auto mb-6"></div>
-              
-              <div className="text-center mb-6">
-                <span className="inline-block p-4 bg-rams-orange/10 text-rams-orange border border-rams-rule rounded-sm text-4xl mb-4">🏆</span>
-                <h3 className="text-xl font-mono font-bold text-rams-ink mb-2 uppercase tracking-wide">เลิกงานแล้ว!</h3>
-                <p className="text-rams-ink-muted text-sm font-mono">
-                  กะที่ผ่านมาคุณทำงานไป <strong className="text-rams-ink font-bold">{wrapUpData.hours} ชั่วโมง {wrapUpData.minutes} นาที</strong>
-                </p>
-              </div>
-
-              <div className="bg-rams-bg border border-rams-rule-light p-5 mb-6 relative rounded-sm">
-                <p className="text-sm font-bold text-rams-ink leading-relaxed">
-                  &ldquo;ทำได้ดีมาก! ขอบคุณสำหรับความทุ่มเทในวันนี้นะ 🐾&rdquo;
-                </p>
-                {(wrapUpData.mood === '😴' || wrapUpData.mood === '🤒') && (
-                  <div className="mt-3 pt-3 border-t border-rams-rule-light">
-                    <p className="text-xs text-rams-orange font-mono font-bold">
-                      💡 Yuzu says: พักผ่อนเยอะๆ นะ ดื่มน้ำอุ่นๆ ด้วยล่ะ!
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              <button
-                onClick={() => {
-                  setShowWrapUp(false);
-                  setWrapUpData(null);
-                }}
-                className="w-full py-4 bg-rams-ink text-rams-panel rounded-sm text-sm font-mono font-bold border border-rams-rule hover:bg-neutral-800 active:translate-y-[2px] transition-[transform,background-color] duration-150 tactile-btn"
-              >
-                ปิดหน้าต่าง
               </button>
             </motion.div>
           </div>
