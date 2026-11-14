@@ -65,13 +65,13 @@ export default function AdminDashboard() {
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
     useEffect(() => {
-        const stored = localStorage.getItem("dismissed_draft_weeks");
-        if (stored) {
-            try {
+        try {
+            const stored = typeof window !== "undefined" ? localStorage.getItem("dismissed_draft_weeks") : null;
+            if (stored) {
                 setDismissedDraftWeeks(JSON.parse(stored));
-            } catch (e) {
-                console.error(e);
             }
+        } catch (e) {
+            console.warn("Storage access restricted or unavailable:", e);
         }
     }, []);
 
@@ -1100,7 +1100,13 @@ export default function AdminDashboard() {
     const handleDismissDraftWeek = (weekStart) => {
         const updated = [...dismissedDraftWeeks, weekStart];
         setDismissedDraftWeeks(updated);
-        localStorage.setItem("dismissed_draft_weeks", JSON.stringify(updated));
+        try {
+            if (typeof window !== "undefined") {
+                localStorage.setItem("dismissed_draft_weeks", JSON.stringify(updated));
+            }
+        } catch (e) {
+            console.warn("Storage access restricted or unavailable:", e);
+        }
     };
 
 

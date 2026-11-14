@@ -55,7 +55,11 @@ export function AdminAuthProvider({ children }) {
             setSession(null);
             // Clear any legacy sessionStorage if present
             if (typeof window !== "undefined") {
-                sessionStorage.removeItem("adminAuth");
+                try {
+                    sessionStorage.removeItem("adminAuth");
+                } catch {
+                    // ignore storage restriction
+                }
             }
         }
     };

@@ -27,11 +27,13 @@ import {
     Lock,
     Coffee,
     Plus,
-    Hash
+    Hash,
+    RotateCw,
+    ClipboardList
 } from "lucide-react";
 
 // Re-export specific icons to keep the main code clean and consistent
-export const Icons = {
+const iconMap = {
     Plus,
     Sun,
     Moon,
@@ -61,5 +63,24 @@ export const Icons = {
     Lock,
     Coffee,
     Hash,
-    Tag: Hash
+    Tag: Hash,
+    Audit: ClipboardList,
+    Refresh: RotateCw
 };
+
+// Safe proxy to prevent React Minified error #130 if an icon is accidentally missing
+export const Icons = new Proxy(iconMap, {
+    get(target, prop) {
+        if (typeof prop === "string" && prop in target) {
+            return target[prop];
+        }
+        if (typeof prop === "symbol" || prop === "$$typeof") {
+            return target[prop];
+        }
+        if (typeof prop === "string") {
+            console.warn(`[HausIcon] Icon "${prop}" is missing from registry. Falling back to AlertCircle.`);
+            return AlertCircle;
+        }
+        return target[prop];
+    }
+});
