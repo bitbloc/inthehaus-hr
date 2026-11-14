@@ -131,7 +131,7 @@ export default function QRScannerModal({ isOpen, onClose, onScanSuccess, onNfcSu
               <QrCode className="w-6 h-6" />
             </div>
             <h3 className="text-base font-mono font-bold text-rams-ink uppercase tracking-wide pt-1">
-              ยืนยันพิกัดร้าน (NFC / QR)
+              ยืนยันพิกัดร้าน (NFC หรือ QR)
             </h3>
             <p className="text-xs text-rams-ink-muted leading-relaxed">
               ใช้ในกรณีสัญญาณ GPS ในอาคารคลาดเคลื่อน แตะแผ่น NFC ที่บาร์หรือสแกน QR จากจอ POS

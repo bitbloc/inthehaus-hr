@@ -21,7 +21,6 @@ function cn(...inputs) {
 }
 
 import WeatherCard from "./components/WeatherCard";
-import HydrationWidget from "./components/HydrationWidget";
 import QRScannerModal from "./components/QRScannerModal";
 import { sfx } from "../../utils/soundEffects";
 
@@ -777,7 +776,7 @@ export default function CheckIn() {
     if (isUploading || isSubmitting) return;
     const isHardwareVerified = Boolean(verifiedNfc?.nfcToken || verifiedQrToken);
     if (!devMode && !isHardwareVerified && !status.includes("Ready") && !status.includes("พร้อม")) {
-      alert("คุณอยู่นอกพื้นที่ร้าน หรือสัญญาณ GPS ในอาคารยังไม่นิ่ง\n💡 สามารถแตะแผ่น NFC ที่เคาน์เตอร์บาร์ หรือกดปุ่ม 'ยืนยันพิกัดด้วย NFC / QR' ด้านล่างเพื่อลงเวลาได้ทันที");
+      alert("คุณอยู่นอกพื้นที่ร้าน หรือสัญญาณ GPS ในอาคารยังไม่นิ่ง\n💡 สามารถแตะแผ่น NFC ที่เคาน์เตอร์บาร์ หรือกดปุ่ม 'ยืนยันพิกัดด้วย NFC หรือ QR' ด้านล่างเพื่อลงเวลาได้ทันที");
       return;
     }
     setShowCamera(true);
@@ -872,12 +871,12 @@ export default function CheckIn() {
           // Header line: System, Action & Staff Identifier
           ctx.fillStyle = '#FFFFFF';
           ctx.font = `bold ${Math.max(13, Math.round(barH * 0.22))}px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace`;
-          ctx.fillText(`IN THE HAUS // ${actionLabel.toUpperCase()} · ${staffName || 'STAFF'}`, pad + dotRadius * 2 + 8, h - barH + Math.round(barH * 0.38));
+          ctx.fillText(`IN THE HAUS · ${actionLabel.toUpperCase()} · ${staffName || 'STAFF'}`, pad + dotRadius * 2 + 8, h - barH + Math.round(barH * 0.38));
 
           // Sub line: High-Precision Timestamp & Telemetry
           ctx.fillStyle = '#9ca3af'; // Rams Ink Muted
           ctx.font = `${Math.max(10, Math.round(barH * 0.165))}px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace`;
-          ctx.fillText(`TIMESTAMP: ${dateText} ICT | LOC: ${locText.toUpperCase()}`, pad, h - barH + Math.round(barH * 0.74));
+          ctx.fillText(`TIMESTAMP: ${dateText} ICT · LOC: ${locText.toUpperCase()}`, pad, h - barH + Math.round(barH * 0.74));
 
           cleanup();
           resolve(canvas.toDataURL('image/jpeg', 0.85));
@@ -1263,7 +1262,7 @@ export default function CheckIn() {
           )}
         </motion.div>
 
-        {/* Check-In / Check-Out Section */}
+        {/* Main Check-In Action Button */}
         {!status.includes('Checking') && (
           <>
             {isOwner ? (
@@ -1278,7 +1277,7 @@ export default function CheckIn() {
                   <div className="flex items-center justify-between mb-2.5">
                     <span className="px-2 py-0.5 bg-rams-amber/15 text-rams-ink border border-rams-amber/40 rounded-sm text-[10px] font-mono font-bold tracking-wider uppercase flex items-center gap-1.5">
                       <span className="w-1.5 h-1.5 rounded-full bg-rams-amber"></span>
-                      <span>OWNER / MANAGEMENT</span>
+                      <span>OWNER · MANAGEMENT</span>
                     </span>
                     <span className="text-[10px] font-mono font-bold text-rams-green bg-rams-green/10 border border-rams-green/30 px-2 py-0.5 rounded-sm">
                       EXEMPT ✓
@@ -1397,13 +1396,16 @@ export default function CheckIn() {
                         transition={{ duration: 0.15, ease: "easeOut" }}
                         className="pt-2 space-y-2 overflow-hidden"
                       >
-                        <button
+                        <motion.button
+                          whileHover={{ scale: 1.01 }}
+                          whileTap={{ scale: 0.985, y: 1 }}
+                          transition={{ type: "spring", stiffness: 400, damping: 25 }}
                           onClick={handleStartCheckIn}
                           disabled={isSubmitting}
-                          className="w-full active:translate-y-[2px] transition-[transform,opacity] duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rams-ink"
+                          className="w-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rams-ink"
                         >
                           <div className={cn(
-                            "w-full py-3 rounded-sm flex items-center justify-center gap-2 border-2 border-rams-rule text-center select-none cursor-pointer tactile-btn",
+                            "w-full py-3.5 rounded-sm flex items-center justify-center gap-2 border border-rams-rule text-center select-none cursor-pointer transition-shadow",
                             mainButtonConfig.color
                           )}>
                             <span className="scale-90">{mainButtonConfig.icon}</span>
@@ -1411,40 +1413,57 @@ export default function CheckIn() {
                               {isSubmitting ? "Processing..." : `${mainButtonConfig.label} (ทางเลือก)`}
                             </span>
                           </div>
-                        </button>
+                        </motion.button>
                       </motion.div>
                     )}
                   </AnimatePresence>
                 </div>
               </div>
             ) : (
-              /* Standard Staff Check-in / Check-out Button */
+              /* Standard Staff Check-in / Check-out Button with Smooth Motion */
               <div className="w-full max-w-sm px-6 mb-6 z-30 space-y-2.5">
                 {verifiedNfc && (
-                  <div className="flex items-center justify-between px-3.5 py-2 bg-rams-green/10 border border-rams-green rounded-sm text-xs font-mono font-bold text-rams-green">
+                  <motion.div
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex items-center justify-between px-3.5 py-2 bg-rams-green/10 border border-rams-green rounded-sm text-xs font-mono font-bold text-rams-green"
+                  >
                     <span className="flex items-center gap-1.5">
                       <span className="w-2 h-2 rounded-full bg-rams-green animate-pulse" />
                       <span>NFC STATION VERIFIED: {verifiedNfc.nfcStation}</span>
                     </span>
                     <span className="text-[10px] uppercase">READY ✓</span>
-                  </div>
+                  </motion.div>
                 )}
                 {verifiedQrToken && !verifiedNfc && (
-                  <div className="flex items-center justify-between px-3.5 py-2 bg-rams-green/10 border border-rams-green rounded-sm text-xs font-mono font-bold text-rams-green">
+                  <motion.div
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex items-center justify-between px-3.5 py-2 bg-rams-green/10 border border-rams-green rounded-sm text-xs font-mono font-bold text-rams-green"
+                  >
                     <span>POS QR TOKEN VERIFIED</span>
                     <span className="text-[10px] uppercase">READY ✓</span>
-                  </div>
+                  </motion.div>
                 )}
-                <button
+                <motion.button
+                  whileHover={{ scale: 1.012 }}
+                  whileTap={{ scale: 0.98, y: 1.5 }}
+                  transition={{ type: "spring", stiffness: 420, damping: 26 }}
                   onClick={handleStartCheckIn}
                   disabled={isSubmitting}
-                  className="w-full active:translate-y-[2px] transition-[transform,opacity] duration-150 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rams-ink group"
+                  className="w-full disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rams-ink group"
                 >
                   <div className={cn(
-                    "w-full py-5 rounded-sm flex flex-col items-center justify-center border-2 border-rams-rule text-center select-none cursor-pointer tactile-btn",
+                    "w-full py-5 rounded-sm flex flex-col items-center justify-center border-2 border-rams-rule text-center select-none cursor-pointer transition-all duration-150",
                     mainButtonConfig.color
                   )}>
-                    <span className="mb-1">{mainButtonConfig.icon}</span>
+                    <motion.span
+                      animate={{ y: [0, -2, 0] }}
+                      transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+                      className="mb-1"
+                    >
+                      {mainButtonConfig.icon}
+                    </motion.span>
                     <span className="text-xl font-mono font-bold uppercase tracking-wider">
                       {isSubmitting ? "Processing..." : mainButtonConfig.label}
                     </span>
@@ -1452,20 +1471,23 @@ export default function CheckIn() {
                       {verifiedNfc ? `NFC: ${verifiedNfc.nfcStation} · กดเพื่อถ่ายรูปลงเวลา` : mainButtonConfig.sub}
                     </span>
                   </div>
-                </button>
+                </motion.button>
 
-                {/* Hardware Fallback Trigger (NFC / QR) when GPS is indoor-drifting */}
-                <button
+                {/* Hardware Fallback Trigger (NFC or QR) when GPS is indoor-drifting */}
+                <motion.button
                   type="button"
+                  whileHover={{ y: -1 }}
+                  whileTap={{ scale: 0.985 }}
+                  transition={{ duration: 0.12 }}
                   onClick={() => setShowQRScanner(true)}
-                  className="w-full py-2.5 px-3 bg-rams-panel hover:bg-rams-bg border border-rams-rule-light hover:border-rams-rule rounded-sm flex items-center justify-between text-xs font-mono font-bold text-rams-ink-muted hover:text-rams-ink transition cursor-pointer tactile-btn-sm"
+                  className="w-full py-2.5 px-3 bg-rams-panel hover:bg-rams-bg border border-rams-rule-light hover:border-rams-rule rounded-sm flex items-center justify-between text-xs font-mono font-bold text-rams-ink-muted hover:text-rams-ink transition cursor-pointer"
                 >
                   <span className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-rams-orange" />
-                    <span>GPS ในร้านคลาดเคลื่อน? ยืนยันด้วยแผ่น NFC / QR</span>
+                    <span>GPS ในร้านคลาดเคลื่อน? ยืนยันด้วยแผ่น NFC หรือ QR</span>
                   </span>
                   <span className="text-[10px] font-mono uppercase text-rams-orange font-bold">OPEN →</span>
-                </button>
+                </motion.button>
               </div>
             )}
           </>
@@ -1790,11 +1812,8 @@ export default function CheckIn() {
 
       </div>
 
-      {/* 4. Hydration Station & Recent Activity (Dieter Rams Panels) */}
+      {/* 4. Weather & Recent Activity (Dieter Rams Clean Panels) */}
       <div className="w-full max-w-sm px-6 z-10 mb-8 space-y-4">
-        {/* Cold Water Animation Widget */}
-        <HydrationWidget />
-
         <AnimatePresence>
           {userPosition && (
             <WeatherCard
@@ -1807,7 +1826,7 @@ export default function CheckIn() {
 
         <div>
           <h3 className="text-[11px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-3 pl-1">
-            Recent Activity // กิจกรรมล่าสุด
+            Recent Activity · กิจกรรมล่าสุด
           </h3>
           <div className="flex flex-col gap-2">
           <AnimatePresence>
@@ -2085,7 +2104,7 @@ export default function CheckIn() {
                 </div>
               </div>
 
-              {/* Close / Acknowledge Button */}
+              {/* Close · Acknowledge Button */}
               <button
                 onClick={() => {
                   setShowPunchModal(false);
@@ -2093,7 +2112,7 @@ export default function CheckIn() {
                 }}
                 className="w-full py-3 bg-rams-ink hover:bg-neutral-800 text-rams-panel rounded-sm text-xs font-mono font-bold border border-rams-rule transition-[transform,background-color] duration-150 active:translate-y-[1px] tactile-btn shadow-sm cursor-pointer"
               >
-                ตกลง / เรียบร้อย ✓
+                ตกลง · เรียบร้อย ✓
               </button>
             </motion.div>
           </div>
