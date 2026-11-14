@@ -597,17 +597,17 @@ export default function DashboardOverview({
                         </div>
                     </div>
                 </Card>
-                <Card className="shadow-none border-rams-rule-light" onClick={() => onTabChange?.('reservations')}>
+                <Card className="shadow-none border-rams-rule-light cursor-pointer" onClick={() => onTabChange?.('nfc_stations')}>
                     <div className="flex justify-between items-start">
                         <div className="space-y-1">
-                            <p className="text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest">Ops Radar</p>
+                            <p className="text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest">NFC Stations</p>
                             <div className="flex items-baseline gap-1.5">
-                                <h3 className="text-3xl font-mono font-black text-rams-ink">{todayReservations.length}</h3>
-                                <span className="text-xs font-mono font-bold text-rams-ink-muted">โต๊ะจอง</span>
+                                <h3 className="text-3xl font-mono font-black text-rams-ink">9</h3>
+                                <span className="text-xs font-mono font-bold text-rams-ink-muted">จุดแตะ</span>
                             </div>
-                            <p className="text-[10px] font-mono text-rams-ink-muted">Orders: {todayOrders.length}</p>
+                            <p className="text-[10px] font-mono text-rams-green font-bold">Tap-to-Punch Ready</p>
                         </div>
-                        <div className="w-9 h-9 bg-rams-bg border border-rams-rule-light rounded-sm flex items-center justify-center text-rams-ink-muted shrink-0">
+                        <div className="w-9 h-9 bg-rams-bg border border-rams-rule-light rounded-sm flex items-center justify-center text-rams-orange shrink-0">
                             <Icons.Clock size={18} />
                         </div>
                     </div>
