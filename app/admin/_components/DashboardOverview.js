@@ -428,13 +428,6 @@ export default function DashboardOverview({
         return logs;
     }, [data.logs, activityFilter, activitySearch, todayStr]);
 
-    // Reservations & Orders for today
-    const todayReservations = (data.reservations || []).filter(r => r.reservation_date === todayStr);
-    const todayOrders = (data.orders || []).filter(o => {
-        const orderTime = o.created_at || o.timestamp;
-        return orderTime ? format(new Date(orderTime), 'yyyy-MM-dd') === todayStr : false;
-    });
-
     return (
         <div className="space-y-6 animate-fade-in pb-12 font-sans">
             {/* --- SECTION 1: HEADER & QUICK ACTIONS STATION --- */}
@@ -835,64 +828,67 @@ export default function DashboardOverview({
                     <div className="flex justify-between items-center mb-4 pb-3 border-b border-rams-rule-light -mx-5 -mt-5 p-5 bg-rams-bg/40">
                         <div>
                             <h3 className="font-mono font-bold text-rams-ink text-sm uppercase tracking-wider flex items-center gap-2">
-                                <Icons.Calendar size={15} className="text-rams-orange" />
-                                <span>Operations Radar · โต๊ะจอง & ออเดอร์</span>
+                                <Icons.Clock size={15} className="text-rams-orange" />
+                                <span>Hardware & NFC Stations · จุดแตะบัตรร้าน</span>
                             </h3>
                             <p className="text-[10px] font-mono text-rams-ink-muted mt-0.5">
-                                รายการจองโต๊ะและออเดอร์โทรสั่งของวันนี้ ({todayStr})
+                                ระบบจุดแตะแผ่น NFC ลงเวลา เช็กลิสต์ และนับสต็อก ({todayStr})
                             </p>
                         </div>
                         <button
-                            onClick={() => onTabChange?.('reservations')}
-                            className="text-[9px] font-mono font-bold text-rams-orange hover:underline cursor-pointer uppercase tracking-wider bg-rams-bg px-2.5 py-1 rounded-sm border border-rams-rule-light"
+                            onClick={() => onTabChange?.('nfc_stations')}
+                            className="text-[10px] font-mono font-bold text-rams-orange hover:underline cursor-pointer uppercase tracking-wider bg-rams-bg px-2.5 py-1 rounded-sm border border-rams-rule-light"
                         >
-                            ดูตารางโต๊ะ →
+                            จัดการแผ่น NFC →
                         </button>
                     </div>
 
                     <div className="space-y-4 flex-1">
-                        {/* Reservations List */}
-                        <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1 custom-scrollbar">
-                            <div className="text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest">
-                                จองโต๊ะวันนี้ ({todayReservations.length} โต๊ะ)
+                        <div className="space-y-2">
+                            <div className="p-3 bg-rams-bg/50 border border-rams-rule-light rounded-sm flex justify-between items-center text-xs">
+                                <div>
+                                    <span className="font-mono font-bold text-rams-ink">BAR_PUNCH & KITCHEN_PUNCH</span>
+                                    <p className="text-[10px] font-mono text-rams-ink-muted mt-0.5">จุดแตะลงเวลาเข้า-ออกงาน (แก้ปัญหา GPS ในอาคาร)</p>
+                                </div>
+                                <Badge color="emerald" className="text-[9px]">ACTIVE</Badge>
                             </div>
-                            {todayReservations.length === 0 ? (
-                                <p className="text-[11px] font-mono text-rams-ink-muted text-center py-4 bg-rams-bg/30 rounded-sm border border-rams-rule-light/50">
-                                    ไม่มีรายการจองโต๊ะสำหรับวันนี้
-                                </p>
-                            ) : (
-                                todayReservations.slice(0, 5).map(res => (
-                                    <div key={res.id} className="p-2.5 bg-rams-bg/50 border border-rams-rule-light rounded-sm flex justify-between items-center text-xs">
-                                        <div>
-                                            <span className="font-bold text-rams-ink">{res.customer_name}</span>
-                                            <span className="text-[10px] font-mono text-rams-ink-muted ml-2">({res.guest_count || res.pax || 2} ท่าน)</span>
-                                        </div>
-                                        <Badge color={res.status === 'confirmed' ? 'emerald' : 'slate'} className="text-[8px]">
-                                            {res.reservation_time || res.status}
-                                        </Badge>
-                                    </div>
-                                ))
-                            )}
+                            <div className="p-3 bg-rams-bg/50 border border-rams-rule-light rounded-sm flex justify-between items-center text-xs">
+                                <div>
+                                    <span className="font-mono font-bold text-rams-ink">ESPRESSO_CAL & ZONE SOP</span>
+                                    <p className="text-[10px] font-mono text-rams-ink-muted mt-0.5">จุดแตะเครื่องชงกาแฟ & ตรวจเช็กลิสต์ 4 โซน</p>
+                                </div>
+                                <Badge color="amber" className="text-[9px]">4 ZONES</Badge>
+                            </div>
                         </div>
 
                         {/* Store Quick Telemetry */}
                         <div className="pt-3 border-t border-rams-rule-light/50 grid grid-cols-2 gap-3">
-                            <div className="p-3 bg-rams-bg/40 border border-rams-rule-light rounded-sm">
+                            <a
+                                href="/checkin/qr-display"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-3 bg-rams-bg/40 hover:bg-rams-bg border border-rams-rule-light hover:border-rams-rule rounded-sm transition block"
+                            >
                                 <div className="text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest">
-                                    Phone Orders
+                                    POS QR Display
                                 </div>
-                                <div className="text-lg font-mono font-black text-rams-ink mt-0.5">
-                                    {todayOrders.length} <span className="text-xs font-normal text-rams-ink-muted">สาย</span>
+                                <div className="text-xs font-mono font-bold text-rams-orange mt-1">
+                                    เปิดจอ QR ร้าน →
                                 </div>
-                            </div>
-                            <div className="p-3 bg-rams-bg/40 border border-rams-rule-light rounded-sm">
+                            </a>
+                            <a
+                                href="/checklist"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-3 bg-rams-bg/40 hover:bg-rams-bg border border-rams-rule-light hover:border-rams-rule rounded-sm transition block"
+                            >
                                 <div className="text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest">
-                                    Checklist Status
+                                    Checklist & SOP
                                 </div>
                                 <div className="text-xs font-mono font-bold text-rams-green mt-1 flex items-center gap-1">
-                                    <span>✓ เปิดร้านพร้อม</span>
+                                    <span>✓ เปิดหน้าเช็กลิสต์ →</span>
                                 </div>
-                            </div>
+                            </a>
                         </div>
                     </div>
                 </div>

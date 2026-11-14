@@ -346,7 +346,9 @@ export default function AdminRosterPage() {
         return sessions[targetDateStr] || { checkIn: null, checkOut: null };
     };
 
-    const getCellAttendanceStatus = (empId, date, slots) => {
+    const getCellAttendanceStatus = (empId, date, slots, empObj = null) => {
+        const emp = empObj || (employees || []).find(e => e.id === empId);
+        const isOwner = Boolean(emp && ((emp.position || '').toLowerCase().includes('owner') || (emp.position || '').toLowerCase().includes('ceo')));
         const { checkIn, checkOut } = getAttendanceOnDate(empId, date);
         const dateStr = format(date, 'yyyy-MM-dd');
         const todayStr = format(new Date(), 'yyyy-MM-dd');
@@ -373,6 +375,7 @@ export default function AdminRosterPage() {
                         badgeColor: 'bg-rams-ink text-rams-panel border-rams-ink'
                     };
                 }
+                if (isOwner) return null;
                 return {
                     type: 'MISSED_OUT',
                     label: `MISSED OUT (IN ${format(checkIn, 'HH:mm')})`,
@@ -380,6 +383,7 @@ export default function AdminRosterPage() {
                 };
             }
             if (!checkIn && checkOut) {
+                if (isOwner) return null;
                 return {
                     type: 'MISSED_IN',
                     label: `MISSED IN (OUT ${format(checkOut, 'HH:mm')})`,
@@ -387,6 +391,8 @@ export default function AdminRosterPage() {
                 };
             }
             if (!checkIn && !checkOut && isPast) {
+                // Owner / Executive is exempt from check-in and should not be marked as ABSENT
+                if (isOwner) return null;
                 return {
                     type: 'ABSENT',
                     label: 'ABSENT / NO CLOCK-IN',
@@ -403,6 +409,7 @@ export default function AdminRosterPage() {
                 };
             }
             if (checkIn && !checkOut) {
+                if (isOwner) return null;
                 return {
                     type: 'OFF_DAY_MISSED_OUT',
                     label: `OFF-DAY: MISSED OUT (IN ${format(checkIn, 'HH:mm')})`,
@@ -410,6 +417,7 @@ export default function AdminRosterPage() {
                 };
             }
             if (!checkIn && checkOut) {
+                if (isOwner) return null;
                 return {
                     type: 'OFF_DAY_MISSED_IN',
                     label: `OFF-DAY: MISSED IN (OUT ${format(checkOut, 'HH:mm')})`,
@@ -448,7 +456,7 @@ export default function AdminRosterPage() {
             dates.forEach(d => {
                 const dateStr = format(d, 'yyyy-MM-dd');
                 const slots = transactions.filter(t => t.employee_id === emp.id && t.date === dateStr);
-                const att = getCellAttendanceStatus(emp.id, d, slots);
+                const att = getCellAttendanceStatus(emp.id, d, slots, emp);
                 if (att) {
                     if (att.type === 'MISSED_OUT' || att.type === 'MISSED_IN' || att.type === 'OFF_DAY_MISSED_OUT' || att.type === 'OFF_DAY_MISSED_IN') {
                         missedCount++;
@@ -1624,7 +1632,7 @@ export default function AdminRosterPage() {
                                             const slots = getCellSlots(emp.id, date);
                                             const dateStr = format(date, 'yyyy-MM-dd');
                                             const empLeaves = leaveRequests.filter(l => l.employee_id === emp.id && l.leave_date === dateStr);
-                                            const attendanceStatus = getCellAttendanceStatus(emp.id, date, slots);
+                                            const attendanceStatus = getCellAttendanceStatus(emp.id, date, slots, emp);
                                             const hasDiscrepancy = attendanceStatus && (attendanceStatus.type === 'OFF_DAY_WORK' || attendanceStatus.type.includes('MISSED') || attendanceStatus.type === 'ABSENT');
 
                                             return (

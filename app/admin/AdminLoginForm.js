@@ -119,7 +119,7 @@ export default function AdminLoginForm() {
                 
                 {/* Header */}
                 <div className="text-center mb-6">
-                    <div className="w-12 h-12 bg-rams-yellow border border-rams-rule rounded-sm mx-auto flex items-center justify-center mb-3 shadow-[0_2px_0_0_var(--color-rams-rule)]">
+                    <div className="w-12 h-12 bg-rams-amber border border-rams-rule rounded-sm mx-auto flex items-center justify-center mb-3 shadow-[0_2px_0_0_var(--color-rams-rule)]">
                         <Lock className="w-6 h-6 text-rams-ink" />
                     </div>
                     <h1 className="text-xl font-mono font-bold tracking-wider text-rams-ink uppercase">

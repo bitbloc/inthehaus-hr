@@ -9,7 +9,6 @@ import { handleStockPostback } from './handlers/stockHandler';
 import { handleSlipImage, handleFakeSlipAlert } from './handlers/slipHandler';
 import { handleBusinessCardImage } from './handlers/ocrHandler';
 import { verifySlipWithEasySlip, reconcileSlipVerification } from '../../../utils/easyslip';
-import { handleOrderAndReservationDetection, handleOrderAndReservationPostback } from './handlers/orderHandler';
 import { handleChatCommand, handleChatPostback } from './handlers/chatHandler';
 import { isEspressoShotReport, handleEspressoShotAnalysis } from './handlers/espressoHandler';
 import sharp from 'sharp';
@@ -428,15 +427,9 @@ export async function POST(request) {
               handledLocally = true;
             } 
             
-            // 5. Delegate Order and Table Reservation detection
+            // 5. Save non-yuzu regular chats to daily logs
             else {
-              const isOrderOrReserve = await handleOrderAndReservationDetection(event, client, rawText, userId, groupId);
-              if (isOrderOrReserve) {
-                handledLocally = true;
-              } else {
-                // Save non-yuzu regular chats to daily logs
-                await saveMessage(groupId, userId, 'user', rawText, 'text');
-              }
+              await saveMessage(groupId, userId, 'user', rawText, 'text');
             }
           } 
           
@@ -915,11 +908,7 @@ export async function POST(request) {
             if (stockResult.handled) {
               handledLocally = true;
             } 
-            // 3. Order postbacks
-            else if (await handleOrderAndReservationPostback(event, client, action, queryParams)) {
-              handledLocally = true;
-            } 
-            // 4. Chat postbacks
+            // 3. Chat postbacks
             else if (await handleChatPostback(event, client, action, queryParams, userId)) {
               handledLocally = true;
             }

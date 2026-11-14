@@ -2,12 +2,15 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { QrCode, Sparkles, RefreshCw, ShieldCheck, Clock, Store } from 'lucide-react';
+import { RefreshCw, ShieldCheck, Clock, Store, Wifi } from 'lucide-react';
+import { format } from 'date-fns';
+import { th } from 'date-fns/locale';
 
 export default function ShopQRDisplay() {
   const [tokenData, setTokenData] = useState(null);
   const [countdown, setCountdown] = useState(15);
   const [loading, setLoading] = useState(true);
+  const [currentTime, setCurrentTime] = useState(null);
 
   const fetchToken = useCallback(async () => {
     try {
@@ -25,8 +28,10 @@ export default function ShopQRDisplay() {
   }, []);
 
   useEffect(() => {
+    setCurrentTime(new Date());
     fetchToken();
     const interval = setInterval(() => {
+      setCurrentTime(new Date());
       setCountdown((prev) => {
         if (prev <= 1) {
           fetchToken();
@@ -40,93 +45,115 @@ export default function ShopQRDisplay() {
   }, [fetchToken]);
 
   const qrUrl = tokenData?.token 
-    ? `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(tokenData.token)}&color=0-0-0&bgcolor=255-255-255`
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(tokenData.token)}&color=25-25-24&bgcolor=255-255-255`
     : '';
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-6 select-none font-sans relative overflow-hidden">
-      {/* Ambient background glows */}
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-indigo-600/15 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-emerald-600/10 rounded-full blur-3xl pointer-events-none" />
-
-      {/* Main Display Container */}
-      <div className="w-full max-w-md bg-slate-900/80 backdrop-blur-xl border border-indigo-900/40 rounded-3xl p-8 shadow-2xl flex flex-col items-center text-center space-y-6 relative z-10">
+    <div className="min-h-screen bg-rams-bg text-rams-ink flex flex-col items-center justify-center p-6 select-none font-sans">
+      {/* Main Braun / Dieter Rams Terminal Container */}
+      <div className="w-full max-w-md bg-rams-panel border-2 border-rams-rule rounded-sm p-7 shadow-[0_4px_0_0_var(--color-rams-rule)] flex flex-col items-center text-center space-y-6 relative">
         
-        {/* Header */}
-        <div className="space-y-2">
-          <div className="inline-flex items-center gap-2 text-xs font-black tracking-widest uppercase text-indigo-400 bg-indigo-500/10 px-3.5 py-1 rounded-full border border-indigo-500/20">
-            <Store className="w-3.5 h-3.5" />
-            In The Haus (Nakhon Phanom)
+        {/* Top Hardware Bezel Header */}
+        <div className="w-full flex items-center justify-between border-b border-rams-rule-light pb-4">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-rams-green animate-pulse" />
+            <span className="text-[11px] font-mono font-bold tracking-widest uppercase text-rams-ink">
+              IN THE HAUS · POS TERMINAL
+            </span>
           </div>
-          <h1 className="text-2xl font-black text-white tracking-tight">
-            จุดลงเวลาเข้า-ออกงาน
+          <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 bg-rams-bg border border-rams-rule-light rounded-sm text-rams-ink-muted">
+            STATION 01
+          </span>
+        </div>
+
+        {/* Digital Clock Readout */}
+        <div className="w-full bg-rams-bg border border-rams-rule p-4 rounded-sm">
+          <div className="text-4xl font-mono font-bold text-rams-ink tracking-tight leading-none">
+            {currentTime ? format(currentTime, 'HH:mm:ss') : '--:--:--'}
+          </div>
+          <div className="text-[11px] font-mono font-bold text-rams-ink-muted uppercase tracking-wider mt-1.5">
+            {currentTime ? format(currentTime, 'EEEE d MMMM yyyy', { locale: th }) : 'SYSTEM INITIALIZING'}
+          </div>
+        </div>
+
+        {/* Title */}
+        <div className="space-y-1">
+          <h1 className="text-lg font-mono font-bold text-rams-ink uppercase tracking-wide">
+            จุดยืนยันพิกัดลงเวลาเข้า-ออกงาน
           </h1>
-          <p className="text-xs text-slate-400 font-medium">
-            เปิดกล้องหรือแอป Check-in ใน LINE แล้วสแกนเพื่อยืนยันตัวตน
+          <p className="text-xs text-rams-ink-muted">
+            สแกนรหัส QR ด้านล่าง หรือแตะแผ่น NFC ที่เคาน์เตอร์บาร์
           </p>
         </div>
 
         {/* QR Code Frame */}
-        <div className="relative p-4 bg-white rounded-3xl shadow-xl border-4 border-indigo-500/30">
+        <div className="relative p-4 bg-white rounded-sm border-2 border-rams-rule shadow-[0_2px_0_0_var(--color-rams-rule)]">
           {loading ? (
-            <div className="w-64 h-64 flex flex-col items-center justify-center gap-3">
-              <RefreshCw className="w-8 h-8 text-indigo-600 animate-spin" />
-              <span className="text-xs font-bold text-slate-700">กำลังสร้างรหัสความปลอดภัย...</span>
+            <div className="w-60 h-60 flex flex-col items-center justify-center gap-3">
+              <RefreshCw className="w-7 h-7 text-rams-orange animate-spin" />
+              <span className="text-xs font-mono font-bold text-rams-ink-muted">GENERATING TOKEN...</span>
             </div>
           ) : qrUrl ? (
             <motion.div
               key={tokenData?.token}
-              initial={{ scale: 0.95, opacity: 0 }}
+              initial={{ scale: 0.98, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              transition={{ duration: 0.2 }}
+              transition={{ duration: 0.15 }}
               className="relative"
             >
               <img
                 src={qrUrl}
                 alt="Shop Dynamic QR"
-                className="w-64 h-64 object-contain rounded-xl"
+                className="w-60 h-60 object-contain"
               />
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="w-12 h-12 bg-white/95 rounded-xl p-1.5 shadow-lg border border-slate-200 flex items-center justify-center">
-                  <ShieldCheck className="w-7 h-7 text-indigo-600" />
+                <div className="w-11 h-11 bg-rams-panel rounded-sm p-1.5 border-2 border-rams-rule flex items-center justify-center">
+                  <ShieldCheck className="w-6 h-6 text-rams-orange" />
                 </div>
               </div>
             </motion.div>
           ) : (
-            <div className="w-64 h-64 flex items-center justify-center text-slate-400 text-xs font-bold">
-              ไม่สามารถโหลด QR Code ได้
+            <div className="w-60 h-60 flex items-center justify-center text-rams-ink-muted text-xs font-mono font-bold">
+              QR TOKEN UNAVAILABLE
             </div>
           )}
         </div>
 
         {/* Countdown & Security Token Indicator */}
-        <div className="w-full space-y-3">
-          <div className="flex items-center justify-between px-2 text-xs">
-            <div className="flex items-center gap-1.5 font-bold text-slate-300">
-              <Clock className="w-3.5 h-3.5 text-indigo-400" />
-              <span>รหัสหมุนเวียนอัตโนมัติ</span>
+        <div className="w-full space-y-2.5 bg-rams-bg border border-rams-rule-light p-3.5 rounded-sm">
+          <div className="flex items-center justify-between text-xs font-mono">
+            <div className="flex items-center gap-1.5 font-bold text-rams-ink">
+              <Clock className="w-3.5 h-3.5 text-rams-orange" />
+              <span>AUTO-ROTATE</span>
             </div>
-            <div className="font-mono font-black text-amber-400 bg-amber-500/10 px-2.5 py-0.5 rounded-lg border border-amber-500/20">
-              {countdown} วินาที
+            <div className="font-mono font-bold text-rams-ink bg-rams-panel px-2.5 py-0.5 rounded-sm border border-rams-rule-light">
+              {countdown}s
             </div>
           </div>
 
-          <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden border border-slate-700">
+          <div className="w-full bg-rams-panel h-2 rounded-sm overflow-hidden border border-rams-rule-light">
             <motion.div
-              className="h-full bg-gradient-to-r from-indigo-500 via-indigo-400 to-emerald-400"
+              className="h-full bg-rams-orange"
               animate={{ width: `${(countdown / 15) * 100}%` }}
-              transition={{ duration: 1, ease: 'linear' }}
+              transition={{ duration: 0.9, ease: 'linear' }}
             />
           </div>
 
-          <div className="pt-2 text-[11px] font-mono text-slate-400">
-            Token: <span className="font-bold text-indigo-300">{tokenData?.token || '------'}</span>
+          <div className="pt-1 flex items-center justify-between text-[11px] font-mono text-rams-ink-muted">
+            <span>KEY ID:</span>
+            <span className="font-bold text-rams-ink tracking-wider">{tokenData?.token || '------'}</span>
           </div>
         </div>
 
+        {/* NFC Hardware Hint */}
+        <div className="w-full flex items-center justify-center gap-2 py-2 px-3 bg-rams-orange/10 border border-rams-orange/30 rounded-sm text-[11px] font-mono font-bold text-rams-orange">
+          <Wifi className="w-3.5 h-3.5 rotate-90" />
+          <span>รองรับการแตะแผ่น NFC (TAP-TO-PUNCH) ที่บาร์</span>
+        </div>
+
         {/* Footer */}
-        <div className="text-[10px] text-slate-500 font-mono tracking-wider uppercase border-t border-indigo-900/30 pt-4 w-full">
-          ONHAUS DYNAMIC VERIFICATION ENGINE © 2026
+        <div className="text-[10px] text-rams-ink-muted font-mono tracking-widest uppercase border-t border-rams-rule-light pt-3 w-full">
+          ONHAUS HARDWARE VERIFICATION · VER 2.6
         </div>
       </div>
     </div>

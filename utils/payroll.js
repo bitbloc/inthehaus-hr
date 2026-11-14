@@ -132,6 +132,7 @@ export const calculatePayroll = (employees, logs, transactions, shifts, payrollC
         const defaultOtRate = payrollConfig?.ot_rate || (defaultHourlyRate * 1.5);
         
         // Parse rates from JSON or use defaults
+        const isOwner = Boolean(emp && ((emp.position || '').toLowerCase().includes('owner') || (emp.position || '').toLowerCase().includes('ceo')));
         const rates = emp.shift_rates || {};
         const wageType = rates.wage_type || (emp.employment_status === 'Fulltime' && emp.base_salary > 0 ? 'monthly' : (rates.morning || rates.evening ? 'daily' : 'hourly'));
         const baseSalary = Number(emp.base_salary || rates.base_salary || 0);
@@ -285,7 +286,7 @@ export const calculatePayroll = (employees, logs, transactions, shifts, payrollC
 
                     } else if (checkIn && !checkOut) {
                         // Missed check-out
-                        incompleteCount++;
+                        if (!isOwner) incompleteCount++;
                         const shiftLabel = `${startTimeStr}-${endTimeStr}${shift?.name ? ` (${shift.name})` : ''}`;
                         dailyDetails.push({
                             date: dateStr,
@@ -296,11 +297,11 @@ export const calculatePayroll = (employees, logs, transactions, shifts, payrollC
                             in: formatTime(checkIn),
                             out: '-',
                             wage: 0, ot: 0, ot_hours: 0, regular_hours: 0,
-                            status: 'MISSED CHECK-OUT'
+                            status: isOwner ? 'EXEMPT' : 'MISSED CHECK-OUT'
                         });
                     } else if (!checkIn && checkOut) {
                         // Missed check-in
-                        incompleteCount++;
+                        if (!isOwner) incompleteCount++;
                         const shiftLabel = `${startTimeStr}-${endTimeStr}${shift?.name ? ` (${shift.name})` : ''}`;
                         dailyDetails.push({
                             date: dateStr,
@@ -311,7 +312,7 @@ export const calculatePayroll = (employees, logs, transactions, shifts, payrollC
                             in: '-',
                             out: formatTime(checkOut),
                             wage: 0, ot: 0, ot_hours: 0, regular_hours: 0,
-                            status: 'MISSED CHECK-IN'
+                            status: isOwner ? 'EXEMPT' : 'MISSED CHECK-IN'
                         });
                     } else {
                         // No punches found for this scheduled shift: Check if date is in future, today, or past
@@ -350,7 +351,7 @@ export const calculatePayroll = (employees, logs, transactions, shifts, payrollC
                             });
                         } else {
                             // Past shift that ended without punches
-                            if (tx.status === 'PUBLISHED') {
+                            if (tx.status === 'PUBLISHED' && !isOwner) {
                                 absentCount++;
                             }
                             dailyDetails.push({
@@ -362,7 +363,7 @@ export const calculatePayroll = (employees, logs, transactions, shifts, payrollC
                                 in: '-',
                                 out: '-',
                                 wage: 0, ot: 0, ot_hours: 0, regular_hours: 0,
-                                status: tx.status === 'PUBLISHED' ? 'ABSENT' : 'DRAFT'
+                                status: isOwner ? 'EXEMPT' : (tx.status === 'PUBLISHED' ? 'ABSENT' : 'DRAFT')
                             });
                         }
                     }

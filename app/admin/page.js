@@ -19,6 +19,7 @@ import StaffDirectoryManager from "./_components/StaffDirectoryManager";
 import YuzuKnowledgeManager from "./_components/YuzuKnowledgeManager";
 import DashboardOverview from "./_components/DashboardOverview";
 import IndividualHistoryManager from "./_components/IndividualHistoryManager";
+import NfcStationManager from "./_components/NfcStationManager";
 import { useAdminAuth } from "./AdminAuthContext";
 
 // --- Reducer for Cleaner State ---
@@ -38,10 +39,7 @@ const initialState = {
     deductions: [],
     // Individual History
     individualLogs: [],
-    individualStats: { work_days: 0, late: 0, absent: 0 },
-    // Logistics
-    phoneOrders: [],
-    tableReservations: []
+    individualStats: { work_days: 0, late: 0, absent: 0 }
 };
 
 function dataReducer(state, action) {
@@ -194,16 +192,6 @@ export default function AdminDashboard() {
         dispatch({ type: 'SET_DATA', payload: { individualStats: { work_days: workDaysSet.size, late, absent } } });
     };
 
-    const fetchOrders = async () => {
-        const { data: orders } = await supabase.from("phone_orders").select("*").order("created_at", { ascending: false });
-        dispatch({ type: 'SET_DATA', payload: { phoneOrders: orders || [] } });
-    };
-
-    const fetchReservations = async () => {
-        const { data: res } = await supabase.from("table_reservations").select("*").order("reservation_date", { ascending: true });
-        dispatch({ type: 'SET_DATA', payload: { tableReservations: res || [] } });
-    };
-
     // --- Tab-based Lazy Loading ---
     useEffect(() => {
         fetchData('shifts', 'shifts');
@@ -223,8 +211,6 @@ export default function AdminDashboard() {
             fetchTransactions();
             fetchData('leave_requests', 'leaveRequests');
             fetchData('job_applications', 'jobApplications');
-            fetchReservations();
-            fetchOrders();
             supabase.from('shift_swap_requests').select('*, requester:employees!requester_id(name, position), peer:employees!target_peer_id(name), shift:shifts!old_shift_id(name, start_time, end_time)').order('created_at', { ascending: false })
                 .then(({ data }) => dispatch({ type: 'SET_DATA', payload: { swapRequests: data || [] } }));
             supabase.from("employees").select("*").eq("is_active", false).order("created_at", { ascending: false })
@@ -245,8 +231,6 @@ export default function AdminDashboard() {
             fetchData('leave_requests', 'leaveRequests');
             fetchIndividualLogs();
         }
-        if (activeTab === 'orders') fetchOrders();
-        if (activeTab === 'reservations') fetchReservations();
     }, [activeTab, selectedMonth]);
 
     useEffect(() => {
@@ -979,21 +963,6 @@ export default function AdminDashboard() {
         XLSX.writeFile(wb, `Payroll_Detailed_${selectedMonth}.xlsx`);
     };
 
-    // Logistics Actions
-    const handleUpdateOrderStatus = async (id, status) => {
-        const { error } = await supabase.from('phone_orders').update({ 
-            status, 
-            confirmed_at: status === 'CONFIRMED' ? new Date().toISOString() : undefined,
-            done_at: status === 'DONE' ? new Date().toISOString() : undefined
-        }).eq('id', id);
-        if (!error) fetchOrders();
-    };
-
-    const handleUpdateReservationStatus = async (id, status) => {
-        const { error } = await supabase.from('table_reservations').update({ status }).eq('id', id);
-        if (!error) fetchReservations();
-    };
-
     // --- Helpers ---
     const getShiftStatus = (log) => {
         const date = new Date(log.timestamp);
@@ -1149,8 +1118,7 @@ export default function AdminDashboard() {
         {
             title: "Restaurant Operations",
             items: [
-                { id: 'orders', label: 'Phone Orders', icon: Icons.Clock },
-                { id: 'reservations', label: 'Table Bookings', icon: Icons.Calendar },
+                { id: 'nfc_stations', label: 'NFC Stations', icon: Icons.Clock },
                 { id: 'applications', label: 'Hiring', icon: Icons.Job },
             ]
         },
@@ -1498,143 +1466,6 @@ export default function AdminDashboard() {
                                     </button>
                                 </div>
                             </div>
-                        </div>
-                    )}
-
-                    {/* --- PAYROLL FALLBACK --- */}
-                    {activeTab === 'payroll' && (
-                        <div className="space-y-6">
-                            <div className="flex justify-between items-end">
-                                <div>
-                                    <h2 className="text-xl font-extrabold text-slate-800">Payroll Overview</h2>
-                                    <p className="text-slate-600 text-xs font-bold">Salary calculation period: {selectedMonth}</p>
-                                </div>
-                                <div className="flex gap-2">
-                                    <button onClick={() => setShowDeductModal(true)} className="text-xs font-bold text-rose-600 bg-rose-50 px-4 py-2 rounded-xl border border-rose-100 hover:bg-rose-100">- Deduct</button>
-                                    <button onClick={handleExportExcel} className="text-xs font-bold text-emerald-600 bg-emerald-50 px-4 py-2 rounded-xl border border-emerald-100 hover:bg-emerald-100">Export Excel</button>
-                                </div>
-                            </div>
-
-                            <Card className="p-0 overflow-hidden">
-                                <table className="w-full text-sm text-left">
-                                    <thead className="bg-slate-50 text-slate-600 font-bold text-[10px] uppercase tracking-wider">
-                                        <tr>
-                                            <th className="px-6 py-4 w-10"></th>
-                                            <th className="px-6 py-4">Employee</th>
-                                            <th className="px-6 py-4 text-center">Days</th>
-                                            <th className="px-6 py-4 text-right">Base Pay</th>
-                                            <th className="px-6 py-4 text-right">OT Pay</th>
-                                            <th className="px-6 py-4 text-right text-rose-500">Deduct</th>
-                                            <th className="px-6 py-4 text-right text-emerald-600">Net Total</th>
-                                            <th className="px-6 py-4 text-center">Stats</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {payrollData.map((row) => (
-                                            <React.Fragment key={row.emp.id}>
-                                                <tr onClick={() => setExpandedPayrollRow(expandedPayrollRow === row.emp.id ? null : row.emp.id)} className={`cursor-pointer transition-colors hover:bg-slate-50 ${expandedPayrollRow === row.emp.id ? 'bg-slate-50' : ''}`}>
-                                                    <td className="px-6 py-4 text-center text-slate-400 text-xs">{expandedPayrollRow === row.emp.id ? '▼' : '▶'}</td>
-                                                    <td className="px-6 py-4 font-bold text-slate-900 flex items-center gap-3">
-                                                        <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center text-xs">{row.emp.name.charAt(0)}</div>
-                                                        <div>{row.emp.name}<div className="text-[10px] font-bold text-slate-600">{row.emp.position}</div></div>
-                                                    </td>
-                                                    <td className="px-6 py-4 text-center font-bold text-slate-700">{row.workDays}</td>
-                                                    <td className="px-6 py-4 text-right font-mono text-slate-900 font-bold">{row.totalSalary.toLocaleString()}</td>
-                                                    <td className="px-6 py-4 text-right font-mono text-blue-700 font-bold">{row.totalOTPay.toLocaleString()}</td>
-                                                    <td className="px-6 py-4 text-right font-mono text-rose-500 font-bold">{row.totalDeduct > 0 ? `-${row.totalDeduct}` : '-'}</td>
-                                                    <td className="px-6 py-4 text-right font-mono text-emerald-600 font-black text-base">{row.netSalary.toLocaleString()} ฿</td>
-                                                    <td className="px-6 py-4 text-center">
-                                                        <div className="flex flex-wrap justify-center gap-1 font-mono text-[10px]">
-                                                            {row.incompleteCount > 0 && <Badge color="rose">MISSED:{row.incompleteCount}</Badge>}
-                                                            {row.offDayWorkCount > 0 && <Badge color="purple">OFF-DAY:{row.offDayWorkCount}</Badge>}
-                                                            {row.lateCount > 0 && <Badge color="amber">L:{row.lateCount}</Badge>}
-                                                            {row.absentCount > 0 && <Badge color="rose">A:{row.absentCount}</Badge>}
-                                                            {!row.incompleteCount && !row.offDayWorkCount && !row.lateCount && !row.absentCount && <span className="text-slate-400">-</span>}
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                                {expandedPayrollRow === row.emp.id && (
-                                                    <tr className="bg-slate-50/50">
-                                                        <td colSpan="8" className="p-6">
-                                                            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-inner">
-                                                                <div className="p-3 bg-slate-100 flex justify-between items-center text-xs font-bold text-slate-500">
-                                                                    <span className="font-mono uppercase tracking-wider">DAILY ATTENDANCE BREAKDOWN</span>
-                                                                    <span className="font-mono text-slate-800 font-bold">Wage: {row.totalSalary.toLocaleString()} | OT: {row.totalOTPay.toLocaleString()} ({row.totalOTHours}h)</span>
-                                                                </div>
-                                                                <table className="w-full text-xs text-left">
-                                                                    <thead className="border-b border-slate-100 bg-white text-slate-900 font-mono text-[10px] uppercase">
-                                                                        <tr><th className="p-3">Date</th><th className="p-3">Shift</th><th className="p-3 text-center">Time</th><th className="p-3 text-right">Wage</th><th className="p-3 text-right">OT</th><th className="p-3">Status</th></tr>
-                                                                    </thead>
-                                                                    <tbody className="divide-y divide-slate-100 font-mono">
-                                                                        {row.dailyDetails.map((day, idx) => (
-                                                                            <tr key={idx} className="hover:bg-slate-50">
-                                                                                <td className="p-3 text-slate-900 font-black">{formatDate(day.date, "dd MMM")}</td>
-                                                                                <td className="p-3 font-bold text-slate-800">{day.shift}</td>
-                                                                                <td className="p-3 text-center text-slate-900 font-extrabold">{day.in} - {day.out}</td>
-                                                                                <td className="p-3 text-right font-bold text-slate-900">{day.wage > 0 ? day.wage.toLocaleString() : '-'}</td>
-                                                                                <td className="p-3 text-right text-blue-600 font-bold">{day.ot > 0 ? `+${day.ot.toLocaleString()}` : '-'}</td>
-                                                                                <td className="p-3">
-                                                                                    <Badge color={day.status.includes('LATE') ? 'amber' : day.status.includes('ABSENT') || day.status.includes('MISSED') ? 'rose' : day.status.includes('OFF-DAY') ? 'purple' : day.status.includes('UNSCHEDULED') ? 'orange' : day.status === 'NORMAL' ? 'emerald' : 'slate'}>
-                                                                                        {day.status}
-                                                                                    </Badge>
-                                                                                </td>
-                                                                            </tr>
-                                                                        ))}
-                                                                    </tbody>
-                                                                </table>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                )}
-                                            </React.Fragment>
-                                        ))}
-                                    </tbody>
-                                </table>
-                                {showDeductModal && (<div className="fixed inset-0 bg-black/55 flex items-center justify-center z-50 p-4"><Card className="w-full max-w-sm"><h3 className="font-extrabold mb-4 text-slate-850">Add Deduction</h3><div className="space-y-2"><select className="w-full p-2 border rounded" onChange={e => setDeductForm({ ...deductForm, empId: e.target.value })}><option value="">Select Staff</option>{data.employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}</select><input type="number" placeholder="Amount" className="w-full p-2 border rounded" onChange={e => setDeductForm({ ...deductForm, amount: e.target.value })} /><input type="text" placeholder="Reason" className="w-full p-2 border rounded" onChange={e => setDeductForm({ ...deductForm, reason: e.target.value })} /><div className="flex gap-2"><button onClick={handleAddDeduction} className="bg-slate-800 text-white flex-1 py-2 rounded">Save</button><button onClick={() => setShowDeductModal(false)} className="bg-slate-100 flex-1 py-2 rounded">Cancel</button></div></div></Card></div>)}
-                            </Card>
-                        </div>
-                    )}
-
-                    {/* --- ROSTER FALLBACK --- */}
-                    {activeTab === 'roster' && (
-                        <div className="space-y-6">
-                            <div className="flex justify-between items-center bg-white p-4 rounded-3xl shadow-sm border border-slate-100">
-                                <div className="font-extrabold text-slate-800 text-sm">Weekly Template Schedule</div>
-                                <button onClick={handleNotifySchedule} className="bg-slate-800 text-white px-4 py-2 rounded-xl text-xs font-bold">Publish to LINE</button>
-                            </div>
-                            <Card className="p-0 overflow-hidden">
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-sm border-collapse">
-                                        <thead><tr><th className="p-4 text-left bg-slate-50 font-bold text-slate-500 text-xs">Staff</th>{["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map(d => <th key={d} className="p-4 bg-slate-50 text-center text-slate-500 text-xs">{d}</th>)}</tr></thead>
-                                        <tbody>
-                                            {data.employees.map(emp => (
-                                                <tr key={emp.id} className="border-b border-slate-100 hover:bg-slate-50/50">
-                                                    <td className="p-4 font-black text-slate-800 bg-white sticky left-0 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">{emp.name}</td>
-                                                    {[0, 1, 2, 3, 4, 5, 6].map(i => {
-                                                        const s = data.schedules[emp.id]?.[i];
-                                                        return (
-                                                            <td key={i} className="p-2 text-center min-w-[120px]">
-                                                                <select
-                                                                    className={`w-full p-2 rounded-lg text-xs font-bold outline-none cursor-pointer transition appearance-none text-center border ${s?.is_off
-                                                                        ? 'bg-slate-100 text-slate-600 border-slate-200'
-                                                                        : 'bg-indigo-50 text-indigo-600 border-indigo-100'
-                                                                        }`}
-                                                                    value={s?.is_off ? 'OFF' : (s?.shift_id || '')}
-                                                                    onChange={(e) => handleUpdateSchedule(emp.id, i, e.target.value === 'OFF' ? null : e.target.value, e.target.value === 'OFF')}
-                                                                >
-                                                                    <option value="" disabled>-</option>
-                                                                    {data.shifts.map(sh => <option key={sh.id} value={sh.id}>{sh.name}</option>)}
-                                                                    <option value="OFF">OFF</option>
-                                                                </select>
-                                                            </td>
-                                                        )
-                                                    })}
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </Card>
                         </div>
                     )}
 
@@ -2662,105 +2493,9 @@ export default function AdminDashboard() {
                         </div>
                     )}
 
-                    {/* --- PHONE ORDERS --- */}
-                    {activeTab === 'orders' && (
-                        <div className="space-y-6">
-                            <div className="flex justify-between items-end">
-                                <h2 className="text-xl font-extrabold text-slate-800">Phone Orders</h2>
-                            </div>
-                            <Card className="p-0 overflow-hidden">
-                                <table className="w-full text-sm text-left">
-                                    <thead className="bg-slate-50 text-slate-500 font-extrabold text-[10px] uppercase tracking-wider">
-                                        <tr>
-                                            <th className="px-6 py-4">Created At</th>
-                                            <th className="px-6 py-4">Customer</th>
-                                            <th className="px-6 py-4">Items</th>
-                                            <th className="px-6 py-4">Status</th>
-                                            <th className="px-6 py-4 text-right">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {data.phoneOrders.map(order => (
-                                            <tr key={order.id} className="hover:bg-slate-50">
-                                                <td className="px-6 py-4 font-mono text-slate-900 font-extrabold text-xs">{formatDate(order.created_at)} {formatTime(order.created_at)}</td>
-                                                <td className="px-6 py-4">
-                                                    <div className="font-black text-slate-900">{order.customer_name || 'Anonymous'}</div>
-                                                    <div className="text-xs text-slate-800 font-bold">{order.customer_phone || '-'}</div>
-                                                </td>
-                                                <td className="px-6 py-4 font-bold text-slate-850 italic">
-                                                    {order.items_json?.map(i => `${i.name} x${i.qty}`).join(', ')}
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <Badge color={order.status === 'DONE' ? 'emerald' : order.status === 'CONFIRMED' ? 'blue' : 'amber'}>
-                                                        {order.status}
-                                                    </Badge>
-                                                </td>
-                                                <td className="px-6 py-4 text-right space-x-2">
-                                                    {order.status === 'PENDING' && (
-                                                        <button onClick={() => handleUpdateOrderStatus(order.id, 'CONFIRMED')} className="text-blue-600 font-black text-xs hover:bg-blue-50 px-2 py-1 rounded">Confirm</button>
-                                                    )}
-                                                    {order.status !== 'DONE' && (
-                                                        <button onClick={() => handleUpdateOrderStatus(order.id, 'DONE')} className="text-emerald-600 font-black text-xs hover:bg-emerald-50 px-2 py-1 rounded">Done</button>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                                {data.phoneOrders.length === 0 && <div className="p-12 text-center text-slate-400">No orders recorded yet.</div>}
-                            </Card>
-                        </div>
-                    )}
-
-                    {/* --- TABLE BOOKINGS --- */}
-                    {activeTab === 'reservations' && (
-                        <div className="space-y-6">
-                            <div className="flex justify-between items-end">
-                                <h2 className="text-xl font-extrabold text-slate-800">Table Bookings</h2>
-                            </div>
-                            <Card className="p-0 overflow-hidden">
-                                <table className="w-full text-sm text-left">
-                                    <thead className="bg-slate-50 text-slate-500 font-extrabold text-[10px] uppercase tracking-wider">
-                                        <tr>
-                                            <th className="px-6 py-4">Date/Time</th>
-                                            <th className="px-6 py-4">Customer</th>
-                                            <th className="px-6 py-4 text-center">Guests</th>
-                                            <th className="px-6 py-4">Status</th>
-                                            <th className="px-6 py-4 text-right">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {data.tableReservations.map(res => (
-                                            <tr key={res.id} className="hover:bg-slate-50">
-                                                <td className="px-6 py-4">
-                                                    <div className="font-black text-slate-900">{formatDate(res.reservation_date)}</div>
-                                                    <div className="font-mono text-xs text-slate-900 font-extrabold">{res.reservation_time || '-'}</div>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="font-black text-slate-900">{res.customer_name || 'Anonymous'}</div>
-                                                    <div className="text-xs text-slate-800 font-medium">{res.customer_phone || '-'}</div>
-                                                </td>
-                                                <td className="px-6 py-4 text-center font-black text-slate-900 text-lg">{res.guests}</td>
-                                                <td className="px-6 py-4">
-                                                    <Badge color={res.status === 'COMPLETED' ? 'emerald' : res.status === 'CONFIRMED' ? 'blue' : res.status === 'CANCELLED' ? 'rose' : 'amber'}>
-                                                        {res.status}
-                                                    </Badge>
-                                                </td>
-                                                <td className="px-6 py-4 text-right space-x-2">
-                                                    {res.status === 'PENDING' && (
-                                                        <button onClick={() => handleUpdateReservationStatus(res.id, 'CONFIRMED')} className="text-blue-600 font-black text-xs hover:bg-blue-50 px-2 py-1 rounded">Confirm</button>
-                                                    )}
-                                                    {res.status !== 'CANCELLED' && res.status !== 'COMPLETED' && (
-                                                        <button onClick={() => handleUpdateReservationStatus(res.id, 'CANCELLED')} className="text-rose-500 font-black text-xs hover:bg-rose-50 px-2 py-1 rounded border border-rose-100">Cancel</button>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                                {data.tableReservations.length === 0 && <div className="p-12 text-center text-slate-400">No bookings yet.</div>}
-                            </Card>
-                        </div>
+                    {/* --- NFC STATIONS MANAGER --- */}
+                    {activeTab === 'nfc_stations' && (
+                        <NfcStationManager />
                     )}
 
                     {/* --- STAFF INDIVIDUAL HISTORY --- */}

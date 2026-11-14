@@ -13,6 +13,8 @@ export default function StockAuditPage() {
   const [items, setItems] = useState([]);
   const [counts, setCounts] = useState({});
   const [searchQuery, setSearchQuery] = useState("");
+  const [zoneFilter, setZoneFilter] = useState("ALL"); // 'ALL' | 'BAR' | 'KITCHEN'
+  const [nfcStation, setNfcStation] = useState(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -39,6 +41,16 @@ export default function StockAuditPage() {
   };
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const z = (params.get("zone") || "").toUpperCase();
+      const st = params.get("nfc_station");
+      if (st) setNfcStation(st.toUpperCase());
+      if (z === "BAR" || z === "KITCHEN") {
+        setZoneFilter(z);
+      }
+    }
+
     const initLiff = async () => {
       try {
         if (typeof liff !== "undefined" && LIFF_ID) {
@@ -65,6 +77,16 @@ export default function StockAuditPage() {
 
   const filteredItems = items.filter((i) => {
     if (i.is_active === false) return false;
+    if (zoneFilter !== "ALL") {
+      const cat = `${i.category || ""} ${i.name || ""}`.toLowerCase();
+      if (zoneFilter === "BAR") {
+        const isBar = cat.includes("bar") || cat.includes("บาร์") || cat.includes("กาแฟ") || cat.includes("coffee") || cat.includes("นม") || cat.includes("ไซรัป") || cat.includes("ชา") || cat.includes("แก้ว") || cat.includes("น้ำ");
+        if (!isBar) return false;
+      } else if (zoneFilter === "KITCHEN") {
+        const isBarOnly = cat.includes("กาแฟ") || cat.includes("coffee") || cat.includes("ไซรัป");
+        if (isBarOnly) return false;
+      }
+    }
     if (!searchQuery.trim()) return true;
     return (
       i.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -192,6 +214,38 @@ export default function StockAuditPage() {
       </header>
 
       <main className="p-4 sm:p-6 max-w-2xl mx-auto space-y-4">
+        {nfcStation && (
+          <div className="px-3.5 py-2.5 bg-rams-green/10 border border-rams-green rounded-sm flex items-center justify-between text-xs font-mono font-bold text-rams-green">
+            <span className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-rams-green animate-pulse" />
+              <span>NFC STATION VERIFIED: {nfcStation}</span>
+            </span>
+            <span className="text-[10px] uppercase">ZONE: {zoneFilter}</span>
+          </div>
+        )}
+
+        {/* Zone Quick Filter Tabs */}
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { id: "ALL", label: "ทั้งหมด (ALL)" },
+            { id: "BAR", label: "☕ โซนบาร์น้ำ (BAR)" },
+            { id: "KITCHEN", label: "🍳 โซนครัว (KITCHEN)" }
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setZoneFilter(tab.id)}
+              className={`py-2 px-3 rounded-sm font-mono font-bold text-xs border transition cursor-pointer ${
+                zoneFilter === tab.id
+                  ? "bg-rams-ink text-rams-panel border-rams-rule"
+                  : "bg-rams-panel text-rams-ink-muted border-rams-rule-light hover:text-rams-ink"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
         {/* Search Bar */}
         <div className="relative">
           <Search className="w-3.5 h-3.5 text-rams-ink-muted absolute left-3 top-1/2 -translate-y-1/2" />

@@ -15,6 +15,7 @@ import { Calendar, ArrowRightLeft, Users, RefreshCw } from "lucide-react";
 
 export default function ShiftsPage() {
   const [currentUser, setCurrentUser] = useState(null);
+  const [isAdminSession, setIsAdminSession] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
 
@@ -69,38 +70,58 @@ export default function ShiftsPage() {
 
       if (empData && empData.length > 0) {
         let resolvedEmp = currentUser;
+        let adminAuthed = isAdminSession;
+
+        if (!adminAuthed) {
+          try {
+            const { data: sessionData } = await supabase.auth.getSession();
+            if (sessionData?.session?.user) {
+              adminAuthed = true;
+              setIsAdminSession(true);
+            }
+          } catch (e) {}
+        }
 
         if (!resolvedEmp) {
           try {
             if (typeof liff !== "undefined" && liff.isLoggedIn && liff.isLoggedIn()) {
-              const prof = await liff.getProfile();
-              const matched = empData.find(
-                (e) =>
-                  (e.line_bot_id && e.line_bot_id === prof.userId) ||
-                  (e.line_user_id && e.line_user_id === prof.userId)
-              );
-              if (matched) resolvedEmp = matched;
+              let lineUid = null;
+              try {
+                const prof = await liff.getProfile();
+                lineUid = prof?.userId;
+              } catch (profErr) {
+                const decoded = liff.getDecodedIDToken?.();
+                lineUid = decoded?.sub;
+              }
+              if (lineUid) {
+                const matched = empData.find(
+                  (e) =>
+                    (e.line_bot_id && e.line_bot_id === lineUid) ||
+                    (e.line_user_id && e.line_user_id === lineUid)
+                );
+                if (matched) resolvedEmp = matched;
+              }
             }
           } catch (e) {
             console.warn("LIFF Profile lookup skipped:", e);
           }
 
-          if (!resolvedEmp) {
-            let storedId = null;
-            try {
-              storedId = localStorage.getItem("demo_user_id");
-            } catch (e) {}
-            resolvedEmp = storedId ? empData.find((e) => String(e.id) === String(storedId)) : empData[0];
+          if (!resolvedEmp && adminAuthed) {
+            resolvedEmp = empData[0];
           }
         }
 
-        const finalUser = resolvedEmp || empData[0];
-        setCurrentUser(finalUser);
-        setMyRequests(
-          reqData?.filter(
-            (r) => String(r.requester_id) === String(finalUser.id) || String(r.target_peer_id) === String(finalUser.id)
-          ) || []
-        );
+        if (resolvedEmp) {
+          setCurrentUser(resolvedEmp);
+          setMyRequests(
+            reqData?.filter(
+              (r) => String(r.requester_id) === String(resolvedEmp.id) || String(r.target_peer_id) === String(resolvedEmp.id)
+            ) || []
+          );
+        } else {
+          setCurrentUser(null);
+          setMyRequests([]);
+        }
       }
     } catch (err) {
       console.error("Error fetching shifts data:", err);
@@ -176,17 +197,44 @@ export default function ShiftsPage() {
 
           <div className="flex items-center gap-2">
             {isSyncing && <RefreshCw className="w-3.5 h-3.5 text-rams-orange animate-spin" />}
-            <select
-              className="text-xs font-mono font-bold border border-rams-rule rounded-sm bg-rams-bg text-rams-ink p-2 outline-none focus:border-rams-orange cursor-pointer"
-              value={currentUser?.id || ""}
-              onChange={handleUserSwitch}
-            >
-              {employees.map((e) => (
-                <option key={e.id} value={e.id}>
-                  {e.nickname ? `${e.nickname} (${e.name})` : e.name}
-                </option>
-              ))}
-            </select>
+            {isAdminSession ? (
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-mono font-bold uppercase px-2 py-1 bg-rams-amber/20 text-rams-ink border border-rams-rule rounded-sm">
+                  ADMIN VIEW
+                </span>
+                <select
+                  className="text-xs font-mono font-bold border border-rams-rule rounded-sm bg-rams-bg text-rams-ink p-2 outline-none focus:border-rams-orange cursor-pointer"
+                  value={currentUser?.id || ""}
+                  onChange={handleUserSwitch}
+                >
+                  {employees.map((e) => (
+                    <option key={e.id} value={e.id}>
+                      {e.nickname ? `${e.nickname} (${e.name})` : e.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : currentUser ? (
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-rams-bg border border-rams-rule-light rounded-sm">
+                <span className="w-2 h-2 rounded-full bg-rams-green"></span>
+                <span className="text-xs font-mono font-bold text-rams-ink">
+                  {currentUser.nickname ? `${currentUser.nickname} (${currentUser.name})` : currentUser.name}
+                </span>
+              </div>
+            ) : (
+              <button
+                onClick={() => {
+                  if (typeof liff !== "undefined" && liff.login) {
+                    liff.login();
+                  } else {
+                    window.location.href = "https://liff.line.me/2008567449-W868y8RY";
+                  }
+                }}
+                className="px-3.5 py-2 bg-[#06C755] hover:bg-[#05b34c] text-white rounded-sm text-xs font-mono font-bold border border-rams-rule tactile-btn-sm cursor-pointer"
+              >
+                LINE Login เพื่อจัดการกะ
+              </button>
+            )}
           </div>
         </div>
 

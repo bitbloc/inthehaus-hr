@@ -34,6 +34,7 @@ import {
   Sparkles
 } from "lucide-react";
 import NavigationDock from "../_components/NavigationDock";
+import { supabase } from "../../lib/supabaseClient";
 
 const GOOGLE_FORM_URL = "https://forms.gle/8agnXqC7ZSojmqra6";
 const SHEET_CSV_URL =
@@ -259,11 +260,117 @@ export default function ChecklistPage() {
   const [countdown, setCountdown] = useState(30);
   const [lastSyncedTime, setLastSyncedTime] = useState(null);
 
+  // NFC Zone & In-App Quick Log State
+  const [nfcStation, setNfcStation] = useState(null);
+  const [activeZone, setActiveZone] = useState(null); // 'ESPRESSO' | 'BAR' | 'KITCHEN' | 'HALL' | 'CLOSING'
+  const [showEspressoModal, setShowEspressoModal] = useState(false);
+  const [espressoForm, setEspressoForm] = useState({
+    staffName: "",
+    dose: "18.5",
+    yieldWeight: "36",
+    shotTime: "28",
+    tasteNotes: "Balanced, หวานคาราเมล ครีม่าเนียน",
+    grinderAdjust: "คงเดิม"
+  });
+  const [espressoSubmitting, setEspressoSubmitting] = useState(false);
+  const [zoneCheckedItems, setZoneCheckedItems] = useState({});
+  const [zoneSubmitting, setZoneSubmitting] = useState(false);
+
   const logsContainerRef = useRef(null);
 
   useEffect(() => {
     fetchData();
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const z = (params.get("zone") || "").toUpperCase();
+      const st = params.get("nfc_station");
+      if (st) setNfcStation(st.toUpperCase());
+      if (z) {
+        setActiveZone(z);
+        if (z === "ESPRESSO") {
+          setShowEspressoModal(true);
+        }
+      }
+    }
   }, []);
+
+  const ZONE_SOP_ITEMS = {
+    BAR: [
+      "เปิดเครื่องชงกาแฟ เช็กแรงดันหม้อต้มและล้างหัวกรุ๊ป (Flush)",
+      "ตรวจสอบความสะอาดก้านสตีมนมและถังน้ำทิ้ง",
+      "เช็กสต็อกนมสด ไซรัป และเมล็ดกาแฟในโถบดพร้อมขาย",
+      "ตรวจความสะอาดเคาน์เตอร์บาร์และหน้าจอ POS"
+    ],
+    KITCHEN: [
+      "ตรวจสอบวาล์วถังแก๊ส พัดลมดูดควัน และความสะอาดเตา",
+      "เช็กอุณหภูมิตู้แช่เนื้อสัตว์และวัตถุดิบสด",
+      "ตักไขมันและทำความสะอาดถังดักไขมัน / ซิงก์ล้างจาน",
+      "ตรวจสอบความสะอาดเขียง มีด และพื้นที่เตรียมอาหาร"
+    ],
+    HALL: [
+      "เปิดแอร์/พัดลม จัดระเบียบโต๊ะและเก้าอี้โซนลูกค้า",
+      "ตรวจความสะอาดห้องน้ำ กระดาษทิชชู่ และสบู่ล้างมือ",
+      "เช็ดกระจกหน้าร้านและกวาดถูพื้นห้องอาหาร"
+    ],
+    CLOSING: [
+      "แบล็กฟลัช (Backflush) เครื่องชงกาแฟและแช่อุปกรณ์บาร์",
+      "ปิดวาล์วถังแก๊สและสับเบรกเกอร์เครื่องใช้ไฟฟ้าในครัว",
+      "เคลียร์ถังขยะทั้งหมดออกนอกตัวอาคารและปิดฝามิดชิด",
+      "ปิดแอร์ทุกตัว ปิดไฟหน้าร้าน และล็อกประตูทุกบานเรียบร้อย"
+    ]
+  };
+
+  const handleEspressoSubmit = async (e) => {
+    e.preventDefault();
+    if (!espressoForm.staffName.trim()) {
+      alert("กรุณาระบุชื่อบาริสต้าผู้สกัดช็อต");
+      return;
+    }
+    setEspressoSubmitting(true);
+    try {
+      const summaryContent = `☕ [NFC ESPRESSO CALIBRATION] โดย ${espressoForm.staffName} | Dose: ${espressoForm.dose}g | Yield: ${espressoForm.yieldWeight}g | Time: ${espressoForm.shotTime}s | รสชาติ: ${espressoForm.tasteNotes} | การปรับบด: ${espressoForm.grinderAdjust}`;
+      const { error: dbErr } = await supabase.from("yuzu_chat_history").insert({
+        group_id: "NFC_ESPRESSO_STATION",
+        user_id: espressoForm.staffName.trim(),
+        role: "model",
+        content: summaryContent,
+        message_type: "espresso_report"
+      });
+      if (dbErr) throw dbErr;
+      alert("☕ บันทึกผล Calibration ช็อตกาแฟเข้าสู่ระบบเรียบร้อยแล้ว!");
+      setShowEspressoModal(false);
+    } catch (err) {
+      alert("เกิดข้อผิดพลาด: " + err.message);
+    } finally {
+      setEspressoSubmitting(false);
+    }
+  };
+
+  const handleZoneSopSubmit = async () => {
+    if (!activeZone || !ZONE_SOP_ITEMS[activeZone]) return;
+    const items = ZONE_SOP_ITEMS[activeZone];
+    const checkedList = items.filter((_, idx) => zoneCheckedItems[`${activeZone}_${idx}`]);
+    if (checkedList.length === 0) {
+      alert("กรุณาติ๊กเลือกรายการที่ตรวจสอบแล้วอย่างน้อย 1 รายการ");
+      return;
+    }
+    setZoneSubmitting(true);
+    try {
+      const { error: taskErr } = await supabase.from("staff_tasks").insert({
+        description: `[NFC ZONE: ${activeZone}] ตรวจเช็กสำเร็จ (${checkedList.length}/${items.length} ข้อ): ${checkedList.join(", ")}`,
+        assigned_to: nfcStation || activeZone,
+        status: "DONE",
+        created_at: new Date().toISOString()
+      });
+      if (taskErr) console.warn("staff_tasks insert warning:", taskErr);
+      alert(`✅ บันทึกการตรวจโซน ${activeZone} (${checkedList.length}/${items.length} รายการ) สำเร็จ!`);
+      setZoneCheckedItems({});
+    } catch (err) {
+      alert("เกิดข้อผิดพลาด: " + err.message);
+    } finally {
+      setZoneSubmitting(false);
+    }
+  };
 
   // Handle ESC for Lightbox
   useEffect(() => {
@@ -652,6 +759,15 @@ export default function ChecklistPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
+            {/* Espresso Quick Calibration Button */}
+            <button
+              type="button"
+              onClick={() => setShowEspressoModal(true)}
+              className="flex items-center gap-2 bg-rams-ink hover:bg-neutral-800 text-rams-panel border border-rams-rule px-3.5 py-2.5 rounded-sm font-mono font-bold text-xs uppercase tracking-wider transition-all tactile-btn cursor-pointer"
+            >
+              <span>☕ บันทึกช็อตกาแฟ (NFC)</span>
+            </button>
+
             {/* Primary Action Button to Google Form */}
             <Link
               href={GOOGLE_FORM_URL}
@@ -659,7 +775,7 @@ export default function ChecklistPage() {
               rel="noopener noreferrer"
               className="flex items-center gap-2 bg-rams-orange hover:bg-rams-orange-active text-rams-panel border border-rams-rule px-4 py-2.5 rounded-sm font-mono font-bold text-xs uppercase tracking-wider transition-all tactile-btn shadow-none cursor-pointer"
             >
-              <span>📋 เปิด Google Form Checklist</span>
+              <span>📋 เปิดฟอร์มเปิด-ปิดร้าน</span>
               <ExternalLink className="w-3.5 h-3.5" />
             </Link>
 
@@ -714,6 +830,229 @@ export default function ChecklistPage() {
 
       {/* Main Container */}
       <main className="max-w-6xl mx-auto p-4 sm:p-6 space-y-6">
+        {/* In-App NFC Zone Verification & Quick SOP Panel */}
+        <section className="bg-rams-panel border-2 border-rams-rule rounded-sm p-4 sm:p-5 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-rams-rule-light pb-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-rams-green animate-pulse" />
+                <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-rams-ink-muted">
+                  NFC ZONE PROOF OF PRESENCE · ระบบแตะเช็กตามจุดปฏิบัติงานจริง
+                </span>
+              </div>
+              <h2 className="text-sm sm:text-base font-mono font-bold text-rams-ink mt-1">
+                {nfcStation
+                  ? `ยืนยันจุดแตะแผ่น NFC สำเร็จ: ${nfcStation} (โซน ${activeZone || "BAR"})`
+                  : "เลือกโซนปฏิบัติงาน (หรือนำโทรศัพท์แตะแผ่น NFC ประจำจุด)"}
+              </h2>
+            </div>
+
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                { id: "BAR", label: "☕ โซนบาร์น้ำ" },
+                { id: "KITCHEN", label: "🍳 โซนครัว" },
+                { id: "HALL", label: "🪑 โซนลูกค้า/ห้องน้ำ" },
+                { id: "CLOSING", label: "🔒 ล็อกร้านก่อนกลับ" }
+              ].map((z) => (
+                <button
+                  key={z.id}
+                  type="button"
+                  onClick={() => setActiveZone(activeZone === z.id ? null : z.id)}
+                  className={`px-3 py-1.5 rounded-sm text-xs font-mono font-bold border transition cursor-pointer ${
+                    activeZone === z.id
+                      ? "bg-rams-orange text-rams-panel border-rams-rule"
+                      : "bg-rams-bg text-rams-ink border-rams-rule-light hover:border-rams-rule"
+                  }`}
+                >
+                  {z.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {activeZone && ZONE_SOP_ITEMS[activeZone] && (
+            <div className="space-y-3 pt-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {ZONE_SOP_ITEMS[activeZone].map((itemText, idx) => {
+                  const key = `${activeZone}_${idx}`;
+                  const checked = Boolean(zoneCheckedItems[key]);
+                  return (
+                    <label
+                      key={key}
+                      onClick={() =>
+                        setZoneCheckedItems((prev) => ({ ...prev, [key]: !prev[key] }))
+                      }
+                      className={`p-3 rounded-sm border flex items-start gap-3 cursor-pointer select-none transition ${
+                        checked
+                          ? "bg-rams-green/10 border-rams-green text-rams-ink"
+                          : "bg-rams-bg border-rams-rule-light text-rams-ink hover:border-rams-rule"
+                      }`}
+                    >
+                      <div
+                        className={`w-5 h-5 rounded-sm border flex items-center justify-center shrink-0 mt-0.5 font-mono text-xs font-bold ${
+                          checked
+                            ? "bg-rams-green text-rams-panel border-rams-rule"
+                            : "bg-rams-panel border-rams-rule-light"
+                        }`}
+                      >
+                        {checked ? "✓" : ""}
+                      </div>
+                      <span className="text-xs font-medium leading-relaxed">{itemText}</span>
+                    </label>
+                  );
+                })}
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={handleZoneSopSubmit}
+                  disabled={zoneSubmitting}
+                  className="px-5 py-2.5 bg-rams-ink hover:bg-neutral-800 text-rams-panel border border-rams-rule rounded-sm font-mono font-bold text-xs uppercase tracking-wider cursor-pointer tactile-btn-sm"
+                >
+                  {zoneSubmitting
+                    ? "กำลังบันทึก..."
+                    : `ยืนยันการตรวจโซน ${activeZone} →`}
+                </button>
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* Espresso Calibration Modal (Triggered by NFC tag ESPRESSO_CAL or Header button) */}
+        <AnimatePresence>
+          {showEspressoModal && (
+            <div className="fixed inset-0 z-50 bg-rams-ink/60 backdrop-blur-[2px] flex items-center justify-center p-4">
+              <motion.div
+                initial={{ scale: 0.96, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.96, opacity: 0 }}
+                className="w-full max-w-md bg-rams-panel border-2 border-rams-rule rounded-sm p-6 shadow-[0_4px_0_0_var(--color-rams-rule)] space-y-4"
+              >
+                <div className="flex items-center justify-between border-b border-rams-rule-light pb-3">
+                  <div>
+                    <span className="text-[10px] font-mono font-bold text-rams-orange uppercase tracking-widest block">
+                      NFC STATION · ESPRESSO_CAL
+                    </span>
+                    <h3 className="text-base font-mono font-bold text-rams-ink">
+                      ☕ บันทึกการตั้งช็อตกาแฟประจำวัน
+                    </h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowEspressoModal(false)}
+                    className="w-8 h-8 bg-rams-bg border border-rams-rule-light rounded-sm flex items-center justify-center font-mono text-xs cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <form onSubmit={handleEspressoSubmit} className="space-y-3">
+                  <div>
+                    <label className="block text-[10px] font-mono font-bold text-rams-ink-muted uppercase mb-1">
+                      ชื่อบาริสต้าผู้สกัดช็อต
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="เช่น พี่บอส / น้อง..."
+                      value={espressoForm.staffName}
+                      onChange={(e) =>
+                        setEspressoForm({ ...espressoForm, staffName: e.target.value })
+                      }
+                      className="w-full p-2.5 bg-rams-bg border border-rams-rule-light rounded-sm text-xs font-mono font-bold text-rams-ink outline-none focus:border-rams-orange"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2.5">
+                    <div>
+                      <label className="block text-[10px] font-mono font-bold text-rams-ink-muted uppercase mb-1">
+                        Dose (กรัม)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        required
+                        value={espressoForm.dose}
+                        onChange={(e) =>
+                          setEspressoForm({ ...espressoForm, dose: e.target.value })
+                        }
+                        className="w-full p-2.5 bg-rams-bg border border-rams-rule-light rounded-sm text-xs font-mono font-bold text-center text-rams-ink outline-none focus:border-rams-orange"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-mono font-bold text-rams-ink-muted uppercase mb-1">
+                        Yield (กรัม)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        required
+                        value={espressoForm.yieldWeight}
+                        onChange={(e) =>
+                          setEspressoForm({ ...espressoForm, yieldWeight: e.target.value })
+                        }
+                        className="w-full p-2.5 bg-rams-bg border border-rams-rule-light rounded-sm text-xs font-mono font-bold text-center text-rams-ink outline-none focus:border-rams-orange"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-mono font-bold text-rams-ink-muted uppercase mb-1">
+                        Time (วินาที)
+                      </label>
+                      <input
+                        type="number"
+                        step="1"
+                        required
+                        value={espressoForm.shotTime}
+                        onChange={(e) =>
+                          setEspressoForm({ ...espressoForm, shotTime: e.target.value })
+                        }
+                        className="w-full p-2.5 bg-rams-bg border border-rams-rule-light rounded-sm text-xs font-mono font-bold text-center text-rams-ink outline-none focus:border-rams-orange"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-mono font-bold text-rams-ink-muted uppercase mb-1">
+                      คาแรกเตอร์รสชาติ / ครีม่า
+                    </label>
+                    <input
+                      type="text"
+                      value={espressoForm.tasteNotes}
+                      onChange={(e) =>
+                        setEspressoForm({ ...espressoForm, tasteNotes: e.target.value })
+                      }
+                      className="w-full p-2.5 bg-rams-bg border border-rams-rule-light rounded-sm text-xs font-mono text-rams-ink outline-none focus:border-rams-orange"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-mono font-bold text-rams-ink-muted uppercase mb-1">
+                      การปรับเบอร์บด (Grinder Adjustment)
+                    </label>
+                    <input
+                      type="text"
+                      value={espressoForm.grinderAdjust}
+                      onChange={(e) =>
+                        setEspressoForm({ ...espressoForm, grinderAdjust: e.target.value })
+                      }
+                      className="w-full p-2.5 bg-rams-bg border border-rams-rule-light rounded-sm text-xs font-mono text-rams-ink outline-none focus:border-rams-orange"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={espressoSubmitting}
+                    className="w-full py-3 bg-rams-orange hover:bg-rams-orange-active text-rams-panel border border-rams-rule rounded-sm font-mono font-bold text-xs uppercase tracking-wider shadow-[0_2px_0_0_var(--color-rams-rule)] cursor-pointer"
+                  >
+                    {espressoSubmitting ? "กำลังบันทึก..." : "บันทึกผลช็อตกาแฟเข้าสู่ระบบ →"}
+                  </button>
+                </form>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
         {/* Error Alert */}
         {error && (
           <div className="p-4 rounded-sm bg-rams-red/10 border border-rams-red text-rams-red text-xs font-mono font-bold flex items-center justify-between">

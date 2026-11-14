@@ -19,10 +19,10 @@ export default function OperationsHub() {
 
   const CORE_MODULES = [
     {
-      href: "https://liff.line.me/2008567449-W868y8RY",
+      href: "/checkin",
       code: "MOD-01",
       title: "ลงเวลาเข้า-ออกงาน",
-      subtitle: "GPS Attendance with Live Shift Context",
+      subtitle: "NFC Tag / QR / GPS Attendance with Live Shift Context",
       badge: "LIVE PUNCH",
       badgeColor: "bg-rams-green text-rams-panel",
       icon: (

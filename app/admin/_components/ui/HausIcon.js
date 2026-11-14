@@ -26,7 +26,8 @@ import {
     Sparkles,
     Lock,
     Coffee,
-    Plus
+    Plus,
+    Hash
 } from "lucide-react";
 
 // Re-export specific icons to keep the main code clean and consistent
@@ -58,5 +59,7 @@ export const Icons = {
     Trash,
     Yuzu: Sparkles,
     Lock,
-    Coffee
+    Coffee,
+    Hash,
+    Tag: Hash
 };

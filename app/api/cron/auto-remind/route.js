@@ -253,17 +253,29 @@ export async function GET(request) {
 
     console.log(`🕒 Cron Check at: ${timeString} (${currentTotalMinutes}) | type: ${queryType}`);
 
-    // Auto-detect targetType if not explicitly passed
-    let targetType = queryType;
-    if (!targetType) {
-      if (hours === 17 && minutes >= 20 && minutes <= 40) {
+    // If request specifies morning or evening without force, skip (consolidated to single round at 17:30)
+    if ((queryType === 'morning' || queryType === 'evening' || queryType === 'closing') && !isForce) {
+      console.log(`ℹ️ Push reminder '${queryType}' is disabled. System is consolidated to 1 round/day at 17:30.`);
+      return NextResponse.json({
+        success: true,
+        message: `Push reminder '${queryType}' is disabled (consolidated to single daily round at 17:30).`,
+        skipped: true
+      });
+    }
+
+    // Determine targetType (Single daily round = 'checklist' at 17:30)
+    let targetType = queryType || 'checklist';
+    if (!queryType && !isForce) {
+      // If called without type parameter, only proceed if within the 17:30 window (17:20 - 17:45)
+      if (hours === 17 && minutes >= 20 && minutes <= 45) {
         targetType = 'checklist';
-      } else if (hours === 10 && minutes >= 0 && minutes <= 9) {
-        targetType = 'morning';
-      } else if (hours === 20 && minutes >= 40 && minutes <= 55) {
-        targetType = 'evening';
       } else {
-        targetType = 'checklist';
+        console.log(`ℹ️ No type specified and outside 17:30 window (${timeString}). Skipping.`);
+        return NextResponse.json({
+          success: true,
+          message: `Outside 17:30 window (${timeString}), skipped.`,
+          skipped: true
+        });
       }
     }
 
@@ -277,19 +289,21 @@ export async function GET(request) {
       return NextResponse.json({ success: true, message: `Ignored request from host: ${host}` });
     }
 
-    // B. Supabase lock to prevent duplicate sends on the same day
+    // B. Supabase lock to prevent duplicate sends on the same day (Strict single daily reminder)
     const todayStr = thaiTime.toISOString().split('T')[0]; // YYYY-MM-DD in Thai time
-    const configKey = `last_cron_${targetType}`;
+    const configKey = 'last_cron_daily_reminder';
 
     if (!isForce) {
-      const { data: configRow } = await supabase
+      // Check both global lock and legacy checklist lock
+      const { data: configRows } = await supabase
         .from('yuzu_config')
-        .select('value')
-        .eq('key', configKey)
-        .maybeSingle();
+        .select('key, value')
+        .in('key', [configKey, 'last_cron_checklist']);
 
-      if (configRow && configRow.value === todayStr) {
-        console.log(`⚠️ Cron for ${configKey} already sent today (${todayStr}). Skipping.`);
+      const alreadySent = configRows?.some((row) => row.value === todayStr);
+
+      if (alreadySent) {
+        console.log(`⚠️ Daily reminder already sent today (${todayStr}). Skipping.`);
         return NextResponse.json({ success: true, message: `Already sent today: ${todayStr}`, results: [] });
       }
     }
@@ -312,7 +326,10 @@ export async function GET(request) {
     if (!isForce) {
       await supabase
         .from('yuzu_config')
-        .upsert({ key: configKey, value: todayStr, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+        .upsert([
+          { key: configKey, value: todayStr, updated_at: new Date().toISOString() },
+          { key: 'last_cron_checklist', value: todayStr, updated_at: new Date().toISOString() }
+        ], { onConflict: 'key' });
     }
 
     return NextResponse.json({ success: true, sent: targetType, time: timeString, results });

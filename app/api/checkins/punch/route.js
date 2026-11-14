@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '../../../../lib/supabaseClient';
-import { verifyShopToken } from '../shop-token/route';
+import { verifyShopToken, verifyNfcStationToken } from '../shop-token/route';
 import { format, addHours } from 'date-fns';
 
 // Shop Coordinates (In The Haus Nakhon Phanom)
@@ -32,6 +32,8 @@ export async function POST(request) {
       longitude,
       accuracy,
       qrToken,
+      nfcToken,
+      nfcStation,
       photoBase64,
       moodStatus,
       deviceInfo,
@@ -63,11 +65,18 @@ export async function POST(request) {
       }, { status: 403 });
     }
 
-    // 2. Validate Proof of Presence (Multi-Factor: QR Token OR Geofence)
+    // 2. Validate Proof of Presence (Multi-Factor: NFC Tag OR QR Token OR Geofence)
     let verificationMethod = 'GPS';
+    let verifiedNfcStation = null;
     let isLocationValid = false;
 
-    if (qrToken && verifyShopToken(qrToken)) {
+    const nfcCheck = nfcToken ? verifyNfcStationToken(nfcToken, nfcStation) : { valid: false, stationId: null };
+
+    if (nfcCheck.valid) {
+      verificationMethod = 'NFC_TAG';
+      verifiedNfcStation = nfcCheck.stationId || nfcStation || 'SHOP_NFC';
+      isLocationValid = true;
+    } else if (qrToken && verifyShopToken(qrToken)) {
       verificationMethod = 'QR_CODE';
       isLocationValid = true;
     } else if (latitude !== undefined && longitude !== undefined && latitude !== null && longitude !== null) {
@@ -82,14 +91,14 @@ export async function POST(request) {
       } else {
         return NextResponse.json({
           success: false,
-          error: `คุณอยู่ห่างจากร้าน In The Haus เกินกำหนด (${(distanceKm * 1000).toFixed(0)} เมตร) กรุณาอยู่ในพื้นที่ร้านก่อนลงเวลา`,
+          error: `คุณอยู่ห่างจากร้าน In The Haus เกินกำหนด (${(distanceKm * 1000).toFixed(0)} เมตร) กรุณาอยู่ในพื้นที่ร้าน หรือแตะแผ่น NFC ที่เคาน์เตอร์เพื่อลงเวลา`,
           distanceMeters: Math.round(distanceKm * 1000)
         }, { status: 400 });
       }
     } else {
       return NextResponse.json({
         success: false,
-        error: "ไม่สามารถระบุตำแหน่งพิกัดได้ กรุณาเปิด GPS และอนุญาตสิทธิ์ตำแหน่งที่ตั้งในโทรศัพท์"
+        error: "ไม่สามารถระบุตำแหน่งพิกัดได้ กรุณาเปิด GPS หรือแตะแผ่น NFC ของร้านเพื่อลงเวลา"
       }, { status: 400 });
     }
 
@@ -315,7 +324,9 @@ export async function POST(request) {
       verification_method: verificationMethod,
       accuracy_meters: accuracy || null,
       mood_status: moodStatus || null,
-      device_info: deviceInfo || null
+      device_info: verifiedNfcStation
+        ? { ...(typeof deviceInfo === 'object' && deviceInfo ? deviceInfo : {}), nfcStation: verifiedNfcStation }
+        : (deviceInfo || null)
     };
 
     const { data: insertedLog, error: insertErr } = await supabase
@@ -334,6 +345,7 @@ export async function POST(request) {
       action,
       timestamp: serverTimestamp,
       verificationMethod,
+      nfcStation: verifiedNfcStation,
       duration,
       punchResult: {
         action,

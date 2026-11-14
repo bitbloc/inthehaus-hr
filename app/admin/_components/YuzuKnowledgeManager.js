@@ -5,6 +5,7 @@ import { Badge } from "./ui/Badge";
 import { TabButton } from "./ui/TabButton";
 import { Icons } from "./ui/HausIcon";
 import { format, addHours } from "date-fns";
+import HashtagIncidentManager from "./HashtagIncidentManager";
 
 export default function YuzuKnowledgeManager() {
     const [activeTab, setActiveTab] = useState('knowledge'); // 'knowledge', 'insights', 'config', 'employees', 'slips'
@@ -1401,6 +1402,7 @@ export default function YuzuKnowledgeManager() {
                     {[
                         { id: 'knowledge', label: 'Knowledge', icon: Icons.File },
                         { id: 'insights', label: 'AI Dashboard', icon: Icons.Yuzu },
+                        { id: 'hashtags', label: 'Hashtag Reports', icon: Icons.Tag },
                         { id: 'config', label: 'System Config', icon: Icons.Settings },
                         { id: 'employees', label: 'Staff Roles', icon: Icons.Staff },
                         { id: 'slips', label: 'Transfer Slips', icon: Icons.Money },
@@ -2607,6 +2609,11 @@ export default function YuzuKnowledgeManager() {
                         </div>
                     </Card>
                 </div>
+            )}
+
+            {/* TAB: HASHTAG REPORTS & INCIDENTS */}
+            {activeTab === 'hashtags' && (
+                <HashtagIncidentManager />
             )}
 
             {message && !loading && (

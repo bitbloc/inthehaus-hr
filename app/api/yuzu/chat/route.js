@@ -13,7 +13,6 @@ import {
     getElectricityPrice, 
     getIngredientPrices
 } from '../../../../utils/price';
-import { getPriceComparison } from '../../../../utils/price_scraper';
 import { getAccurateNews } from '../../../../utils/news';
 import { createClient } from '@supabase/supabase-js';
 
@@ -80,11 +79,7 @@ export async function POST(request) {
         // Ingredients
         const ingredientKeywords = ['วัตถุดิบ', 'ราคาอาหาร', 'หมู', 'ไก่', 'เนื้อ', 'ปลา', 'ไข่', 'ผัก', 'ผลไม้', 'ข้าว'];
         if (ingredientKeywords.some(kw => message.includes(kw))) {
-            if (message.includes('ขึ้น') || message.includes('ลง') || message.includes('ไหม') || message.includes('เปรียบเทียบ')) {
-                context += await getPriceComparison() + "\n";
-            } else {
-                context += await getIngredientPrices() + "\n";
-            }
+            context += await getIngredientPrices() + "\n";
         }
 
         // News

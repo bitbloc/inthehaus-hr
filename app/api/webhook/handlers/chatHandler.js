@@ -1,7 +1,6 @@
 import { format, addHours, subDays } from 'date-fns';
 import { getGeminiResponse, getDailySummary, generateImage } from '../../../../utils/gemini';
 import { getGoldPrice, getOilPrice, getElectricityPrice, getIngredientPrices } from '../../../../utils/price';
-import { getPriceComparison } from '../../../../utils/price_scraper';
 import { getSchemaWeather, formatWeatherMessage, getCompactWeather } from '../../../../utils/weather';
 import { getAccurateNews } from '../../../../utils/news';
 import { saveMessage, getChatHistory, getDailyContent, saveLearnedFact, getEmployeeByLineId, getAllEmployeesData, getYuzuConfigs, checkIsBoss } from '../../../../utils/memory';
@@ -250,11 +249,7 @@ ${dailyLogs || 'ไม่มีความเคลื่อนไหว'}
       
       const ingredientKeywords = ['วัตถุดิบ', 'ราคาอาหาร', 'หมู', 'ไก่', 'เนื้อ', 'ปลา', 'ไข่', 'ผัก', 'ผลไม้', 'ข้าว'];
       if (ingredientKeywords.some(kw => text.includes(kw))) {
-         if (text.includes('ขึ้น') || text.includes('ลง') || text.includes('ไหม') || text.includes('เปรียบเทียบ')) {
-            context += await getPriceComparison() + "\n";
-         } else {
-            context += await getIngredientPrices() + "\n";
-         }
+         context += await getIngredientPrices() + "\n";
       }
       if (text.includes('อากาศ')) context += formatWeatherMessage(await getSchemaWeather()) + "\n";
     }

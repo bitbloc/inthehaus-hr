@@ -22,6 +22,7 @@ function cn(...inputs) {
 
 import WeatherCard from "./components/WeatherCard";
 import HydrationWidget from "./components/HydrationWidget";
+import QRScannerModal from "./components/QRScannerModal";
 import { sfx } from "../../utils/soundEffects";
 
 // --- Clean Technical SVG Icons (Dieter Rams Precision Icons) ---
@@ -136,6 +137,9 @@ export default function CheckIn() {
 
   // Interaction State
   const [showCamera, setShowCamera] = useState(false);
+  const [showQRScanner, setShowQRScanner] = useState(false);
+  const [verifiedQrToken, setVerifiedQrToken] = useState(null);
+  const [verifiedNfc, setVerifiedNfc] = useState(null); // { nfcToken, nfcStation }
   const [showMoodSelector, setShowMoodSelector] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -183,11 +187,47 @@ export default function CheckIn() {
     }
   };
 
-  // Load Acknowledged Announcements
+  // Load Acknowledged Announcements & Detect NFC Tag Parameters
   useEffect(() => {
     const saved = safeStorage.getItem("acknowledged_announcements");
     if (saved) {
       try { setDismissedIds(JSON.parse(saved)); } catch (e) {}
+    }
+
+    if (typeof window !== 'undefined') {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        let nfcToken = params.get('nfc_token');
+        let nfcStation = params.get('nfc_station') || 'BAR_PUNCH';
+
+        // Also check inside liff.state if LINE redirected with encoded query
+        const liffState = params.get('liff.state');
+        if (!nfcToken && liffState) {
+          const stateSearch = liffState.includes('?') ? liffState.split('?')[1] : liffState;
+          const stateParams = new URLSearchParams(stateSearch);
+          nfcToken = stateParams.get('nfc_token');
+          nfcStation = stateParams.get('nfc_station') || nfcStation;
+        }
+
+        if (nfcToken) {
+          const nfcPayload = { nfcToken, nfcStation };
+          setVerifiedNfc(nfcPayload);
+          safeStorage.setItem("active_nfc_session", JSON.stringify({ ...nfcPayload, ts: Date.now() }));
+          setStatus(`พร้อมลงเวลา (NFC: ${nfcStation})`);
+        } else {
+          // Recover recent NFC tap across LIFF login redirect (valid for 5 minutes)
+          const cachedNfc = safeStorage.getItem("active_nfc_session");
+          if (cachedNfc) {
+            const parsed = JSON.parse(cachedNfc);
+            if (parsed?.nfcToken && (Date.now() - (parsed.ts || 0)) < 5 * 60 * 1000) {
+              setVerifiedNfc({ nfcToken: parsed.nfcToken, nfcStation: parsed.nfcStation || 'BAR_PUNCH' });
+              setStatus(`พร้อมลงเวลา (NFC: ${parsed.nfcStation || 'BAR_PUNCH'})`);
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("NFC param parse warning:", e);
+      }
     }
   }, []);
 
@@ -735,8 +775,9 @@ export default function CheckIn() {
     }
 
     if (isUploading || isSubmitting) return;
-    if (!devMode && !status.includes("Ready") && !status.includes("พร้อม")) {
-      alert("คุณอยู่นอกพื้นที่ร้าน หรือระบบกำลังจับสัญญาณ GPS กรุณาอยู่ภายในพื้นที่ร้าน In The Haus ก่อนลงเวลา");
+    const isHardwareVerified = Boolean(verifiedNfc?.nfcToken || verifiedQrToken);
+    if (!devMode && !isHardwareVerified && !status.includes("Ready") && !status.includes("พร้อม")) {
+      alert("คุณอยู่นอกพื้นที่ร้าน หรือสัญญาณ GPS ในอาคารยังไม่นิ่ง\n💡 สามารถแตะแผ่น NFC ที่เคาน์เตอร์บาร์ หรือกดปุ่ม 'ยืนยันพิกัดด้วย NFC / QR' ด้านล่างเพื่อลงเวลาได้ทันที");
       return;
     }
     setShowCamera(true);
@@ -888,6 +929,9 @@ export default function CheckIn() {
           latitude: userPosition?.lat,
           longitude: userPosition?.lon,
           accuracy: userPosition?.accuracy,
+          qrToken: verifiedQrToken || null,
+          nfcToken: verifiedNfc?.nfcToken || null,
+          nfcStation: verifiedNfc?.nfcStation || null,
           photoBase64: photoBase64 || null,
           deviceInfo: {
             userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
@@ -948,7 +992,11 @@ export default function CheckIn() {
     try {
       setIsUploading(true);
       const nowStr = format(new Date(), 'yyyy-MM-dd HH:mm:ss');
-      const locText = status.includes('Ready') || status.includes('พร้อม') ? 'IN THE HAUS HQ (VERIFIED)' : 'GPS VERIFIED';
+      const locText = verifiedNfc?.nfcStation
+        ? `NFC STATION: ${verifiedNfc.nfcStation} (VERIFIED)`
+        : verifiedQrToken
+          ? 'POS QR TERMINAL (VERIFIED)'
+          : (status.includes('Ready') || status.includes('พร้อม') ? 'IN THE HAUS HQ (VERIFIED)' : 'GPS VERIFIED');
       const staffName = employeeData?.nickname ? `${employeeData.name} (${employeeData.nickname})` : (employeeData?.name || profile?.displayName);
       const actionName = lastAction === 'check_in' ? 'CHECK-OUT' : 'CHECK-IN';
 
@@ -1371,7 +1419,22 @@ export default function CheckIn() {
               </div>
             ) : (
               /* Standard Staff Check-in / Check-out Button */
-              <div className="w-full max-w-sm px-6 mb-6 z-30 space-y-3">
+              <div className="w-full max-w-sm px-6 mb-6 z-30 space-y-2.5">
+                {verifiedNfc && (
+                  <div className="flex items-center justify-between px-3.5 py-2 bg-rams-green/10 border border-rams-green rounded-sm text-xs font-mono font-bold text-rams-green">
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-rams-green animate-pulse" />
+                      <span>NFC STATION VERIFIED: {verifiedNfc.nfcStation}</span>
+                    </span>
+                    <span className="text-[10px] uppercase">READY ✓</span>
+                  </div>
+                )}
+                {verifiedQrToken && !verifiedNfc && (
+                  <div className="flex items-center justify-between px-3.5 py-2 bg-rams-green/10 border border-rams-green rounded-sm text-xs font-mono font-bold text-rams-green">
+                    <span>POS QR TOKEN VERIFIED</span>
+                    <span className="text-[10px] uppercase">READY ✓</span>
+                  </div>
+                )}
                 <button
                   onClick={handleStartCheckIn}
                   disabled={isSubmitting}
@@ -1386,9 +1449,22 @@ export default function CheckIn() {
                       {isSubmitting ? "Processing..." : mainButtonConfig.label}
                     </span>
                     <span className="text-[11px] font-mono opacity-85 mt-1 font-bold uppercase tracking-widest">
-                      {mainButtonConfig.sub}
+                      {verifiedNfc ? `NFC: ${verifiedNfc.nfcStation} · กดเพื่อถ่ายรูปลงเวลา` : mainButtonConfig.sub}
                     </span>
                   </div>
+                </button>
+
+                {/* Hardware Fallback Trigger (NFC / QR) when GPS is indoor-drifting */}
+                <button
+                  type="button"
+                  onClick={() => setShowQRScanner(true)}
+                  className="w-full py-2.5 px-3 bg-rams-panel hover:bg-rams-bg border border-rams-rule-light hover:border-rams-rule rounded-sm flex items-center justify-between text-xs font-mono font-bold text-rams-ink-muted hover:text-rams-ink transition cursor-pointer tactile-btn-sm"
+                >
+                  <span className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-rams-orange" />
+                    <span>GPS ในร้านคลาดเคลื่อน? ยืนยันด้วยแผ่น NFC / QR</span>
+                  </span>
+                  <span className="text-[10px] font-mono uppercase text-rams-orange font-bold">OPEN →</span>
                 </button>
               </div>
             )}
@@ -1789,6 +1865,21 @@ export default function CheckIn() {
 
       {/* 5. Navigation Dock (The "Haus" Dock) */}
       <NavigationDock />
+
+      {/* Hardware QR & NFC Scanner Modal */}
+      <QRScannerModal
+        isOpen={showQRScanner}
+        onClose={() => setShowQRScanner(false)}
+        onScanSuccess={(token) => {
+          setVerifiedQrToken(token);
+          setStatus("พร้อมลงเวลา (ยืนยันผ่าน QR ร้าน)");
+        }}
+        onNfcSuccess={({ nfcToken, nfcStation }) => {
+          setVerifiedNfc({ nfcToken, nfcStation });
+          safeStorage.setItem("active_nfc_session", JSON.stringify({ nfcToken, nfcStation, ts: Date.now() }));
+          setStatus(`พร้อมลงเวลา (NFC: ${nfcStation})`);
+        }}
+      />
 
       {/* Camera & Punch Feedback (Modals in Dieter Rams Style) */}
       <AnimatePresence>
