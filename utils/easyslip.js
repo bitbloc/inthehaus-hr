@@ -9,7 +9,7 @@ import { extractQrFromImage } from './qrScanner.js';
  * 4. Shop Receiver Account Verification (น.ส. ธัญญธร ศรีวิเศษ / พร้อมเพย์ 2455)
  */
 
-const DEFAULT_API_KEY = 'e0650eb6-a4c8-4e25-b109-54bf3a10256e';
+const DEFAULT_API_KEY = 'cfa856de-5095-46a4-8a86-7191009843ba';
 
 export const BANK_CODE_MAP = {
   '002': 'ธนาคารกรุงเทพ',
@@ -243,8 +243,16 @@ export function areTransactionRefsCompatible(refA, refB) {
   return similarity >= 0.75;
 }
 
+const EXPIRED_API_KEYS = new Set([
+  'e0650eb6-a4c8-4e25-b109-54bf3a10256e'
+]);
+
 export function getEasySlipApiKey() {
-  return process.env.EASYSLIP_API_KEY || DEFAULT_API_KEY;
+  const envKey = process.env.EASYSLIP_API_KEY?.trim();
+  if (envKey && !EXPIRED_API_KEYS.has(envKey)) {
+    return envKey;
+  }
+  return DEFAULT_API_KEY;
 }
 
 /**
