@@ -82,7 +82,7 @@ export default function OperationsHub() {
       )
     },
     {
-      href: "/stock/audit",
+      href: "https://haustable.vercel.app/staff/stock",
       code: "MOD-05",
       title: "นับสต็อกวัตถุดิบ",
       subtitle: "Daily & Weekly Bar/Kitchen Inventory Audit",

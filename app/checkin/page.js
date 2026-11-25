@@ -61,6 +61,26 @@ export default function CheckIn() {
   const [showPunchModal, setShowPunchModal] = useState(false);
   const [selectedMood, setSelectedMood] = useState(null);
   const [waterSipped, setWaterSipped] = useState(false);
+  const [hasNewMeeting, setHasNewMeeting] = useState(false);
+
+  // "ใหม่" marker on the meeting-notes link: newest note is later than the last
+  // time this phone opened /meetings (never opened: posted in the last 7 days).
+  useEffect(() => {
+    if (!profile?.userId) return;
+    let cancelled = false;
+    fetch(`/api/meetings?userId=${encodeURIComponent(profile.userId)}&latest=1`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((json) => {
+        if (cancelled || !json?.success || !json.latestAt) return;
+        let lastSeen = null;
+        try { lastSeen = window.localStorage.getItem("meetings_last_seen"); } catch {}
+        const latest = new Date(json.latestAt).getTime();
+        const isNew = lastSeen ? latest > new Date(lastSeen).getTime() : Date.now() - latest < 7 * 24 * 60 * 60 * 1000;
+        setHasNewMeeting(isNew);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [profile?.userId]);
 
   // Dev Mode State (Disabled for plain security)
   const [devMode, setDevMode] = useState(false);
@@ -106,6 +126,15 @@ export default function CheckIn() {
     if (typeof window !== 'undefined') {
       try {
         const params = new URLSearchParams(window.location.search);
+
+        // Deep link from the LINE "new meeting note" card: liff.line.me/<id>?open=meetings
+        const liffStateRaw = params.get('liff.state') || '';
+        const openTarget = params.get('open') || new URLSearchParams(liffStateRaw.includes('?') ? liffStateRaw.split('?')[1] : liffStateRaw).get('open');
+        if (openTarget === 'meetings') {
+          window.location.replace('/meetings');
+          return;
+        }
+
         let nfcToken = params.get('nfc_token');
         let nfcStation = params.get('nfc_station') || 'BAR_PUNCH';
 
@@ -1032,9 +1061,9 @@ export default function CheckIn() {
       {/* 1. Header: plum bar, two cells */}
       <header className="w-full sticky top-0 z-20 bg-plum text-cream border-b border-plum-3">
         <div className="mx-auto max-w-sm px-4 flex items-stretch">
-          <div className="flex-1 px-4 py-3 flex flex-col justify-center min-w-0">
-            <span className="font-head text-2xl">ในบ้าน</span>
-            <span className="font-num text-xs tracking-[0.12em] text-on-plum-2">HAUS OPS</span>
+          <div className="flex-1 pr-4 py-2 flex items-center min-w-0">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-inbaan-wordmark-cream-96.png" alt="ในบ้าน" width={80} height={44} className="h-11 w-auto shrink-0" />
           </div>
           <div className="border-l border-plum-3 px-4 py-3 flex items-center gap-3 min-w-0">
             {profile ? (
@@ -1157,7 +1186,7 @@ export default function CheckIn() {
                   { href: '/admin', th: 'หลังบ้าน HR', en: 'ADMIN' },
                   { href: '/shifts', th: 'ตารางกะทีม', en: 'ROSTER' },
                   { href: '/admin/report/espresso', th: 'รายงานบาร์', en: 'ESPRESSO' },
-                  { href: '/stock/audit', th: 'เช็คสต็อก', en: 'STOCK' },
+                  { href: 'https://haustable.vercel.app/staff/stock', th: 'เช็คสต็อก', en: 'STOCK' },
                 ].map((l) => (
                   <Link
                     key={l.href}
@@ -1441,15 +1470,31 @@ export default function CheckIn() {
           );
         })()}
 
-        {/* Links */}
-        <Link
-          href="https://forms.gle/3LdW9zdjdTCpfpTe8"
-          target="_blank"
-          className="w-full min-h-12 px-4 py-3 bg-cream hover:bg-paper-2 border border-charcoal flex items-center justify-between gap-3 transition-colors duration-150"
-        >
-          <span className="text-base text-charcoal">ขอเบิกเงินล่วงหน้า</span>
-          <span className="font-num text-xs text-neutral tracking-[0.08em] shrink-0">GOOGLE FORM</span>
-        </Link>
+        {/* Links: one bordered group, rows split by 1px rules */}
+        <nav aria-label="ลิงก์อื่น ๆ" className="w-full border border-charcoal divide-y divide-rule bg-cream">
+          <Link
+            href="/meetings"
+            className="min-h-12 px-4 py-3 flex items-center justify-between gap-3 hover:bg-paper-2 transition-colors duration-150"
+          >
+            <span className="min-w-0">
+              <span className="block text-base font-semibold text-charcoal">บันทึกการประชุม</span>
+              <span className="block text-sm text-neutral">{hasNewMeeting ? "มีบันทึกใหม่ที่ยังไม่ได้อ่าน" : "อ่านสรุปการประชุมของทีม"}</span>
+            </span>
+            {hasNewMeeting ? (
+              <span className="shrink-0 bg-plum text-cream px-2 py-1 text-sm font-semibold">ใหม่</span>
+            ) : (
+              <span className="font-num text-xs text-neutral tracking-[0.08em] shrink-0">PDF</span>
+            )}
+          </Link>
+          <Link
+            href="https://forms.gle/3LdW9zdjdTCpfpTe8"
+            target="_blank"
+            className="min-h-12 px-4 py-3 flex items-center justify-between gap-3 hover:bg-paper-2 transition-colors duration-150"
+          >
+            <span className="text-base text-charcoal">ขอเบิกเงินล่วงหน้า</span>
+            <span className="font-num text-xs text-neutral tracking-[0.08em] shrink-0">GOOGLE FORM</span>
+          </Link>
+        </nav>
 
         {/* 4. Weather */}
         <AnimatePresence>

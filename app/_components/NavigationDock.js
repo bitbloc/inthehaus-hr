@@ -10,7 +10,7 @@ const NAV_ITEMS = [
   { href: "/shifts", label: "ตารางกะ" },
   { href: "/checkin", label: "ลงเวลา" },
   { href: "/checklist", label: "เช็กลิสต์" },
-  { href: "/stock/audit", label: "สต็อก" },
+  { href: "https://haustable.vercel.app/staff/stock", label: "สต็อก" },
 ];
 
 export default function NavigationDock() {
