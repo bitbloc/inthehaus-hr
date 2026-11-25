@@ -235,7 +235,7 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
   const fileName = `slip_${Date.now()}_${mappedDbUserId}.jpg`;
   const { data: { publicUrl: slipUrl } } = supabase.storage.from('yuzu-slips').getPublicUrl(fileName);
 
-  const { error: insertError } = await supabase.from('slip_transactions').insert({
+  const slipRow = {
     group_id: groupId,
     user_id: mappedDbUserId,
     amount: parsedAmount,
@@ -244,7 +244,14 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
     sender_name: cleanSender || null,
     bank_name: cleanBank || null,
     date: dateStr
-  });
+  };
+  // How the slip was verified (monthly report). The column comes from
+  // migrations/20261126_slip_verify_tier.sql; until it is applied, retry without it.
+  const verifyTier = result.verificationTier || (result.source === 'easyslip' ? 'BANK_VERIFIED' : null);
+  let { error: insertError } = await supabase.from('slip_transactions').insert({ ...slipRow, verify_tier: verifyTier });
+  if (insertError && /verify_tier/.test(insertError.message || '')) {
+    ({ error: insertError } = await supabase.from('slip_transactions').insert(slipRow));
+  }
 
   if (insertError) {
     console.error("Slip Insert Error:", insertError);

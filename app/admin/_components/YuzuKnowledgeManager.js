@@ -3,6 +3,7 @@ import { supabase } from "../../../lib/supabaseClient";
 import { Card } from "./ui/Card";
 import { Badge } from "./ui/Badge";
 import { TabButton } from "./ui/TabButton";
+import { YuzuSlipMonth, YuzuEspressoMonth } from "./reports/YuzuMonthTabs";
 import { Icons } from "./ui/HausIcon";
 import { format, addHours } from "date-fns";
 import HashtagIncidentManager from "./HashtagIncidentManager";
@@ -12,7 +13,6 @@ export default function YuzuKnowledgeManager() {
     const [knowledge, setKnowledge] = useState([]);
     const [insights, setInsights] = useState([]);
     const [employees, setEmployees] = useState([]);
-    const [slips, setSlips] = useState([]);
     const [config, setConfig] = useState({ father_uid: '', mother_uid: '' });
     
     const [newContent, setNewContent] = useState('');
@@ -22,9 +22,7 @@ export default function YuzuKnowledgeManager() {
     const [editingContent, setEditingContent] = useState('');
     const [editingImageUrl, setEditingImageUrl] = useState('');
     const [loading, setLoading] = useState(false);
-    const [slipLoading, setSlipLoading] = useState(false);
-    const [espressoLoading, setEspressoLoading] = useState(false);
-    const [espressoReports, setEspressoReports] = useState([]);
+    const [, setSlipLoading] = useState(false);
     const [message, setMessage] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
     const [showCleanupConfirm, setShowCleanupConfirm] = useState(false);
@@ -950,101 +948,9 @@ export default function YuzuKnowledgeManager() {
                 if (empData) setEmployees(empData);
             }
 
-            // DIRECT QUERY WITHOUT JOIN TO AVOID 400 ERROR
-            const { data, error } = await supabase
-                .from('slip_transactions')
-                .select('id, amount, slip_url, timestamp, is_deleted, sender_name, user_id, bank_name')
-                .eq('is_deleted', false)
-                .eq('date', selectedDate)
-                .order('timestamp', { ascending: false });
-            
-            if (!error && data) {
-                setSlips(data);
-            } else if (error) {
-                console.error("Slip fetch error:", error);
-                setMessage('Error: ' + error.message);
-            }
             setSlipLoading(false);
-        } else if (activeTab === 'espresso') {
-            setEspressoLoading(true);
-            
-            if (employees.length === 0) {
-                const { data: empData } = await supabase
-                    .from('employees')
-                    .select('id, name, nickname, line_bot_id, line_user_id')
-                    .eq('is_active', true);
-                if (empData) setEmployees(empData);
-            }
-
-            const start = new Date(selectedDate + 'T00:00:00+07:00').toISOString();
-            const end = new Date(selectedDate + 'T23:59:59.999+07:00').toISOString();
-
-            const { data: chatData, error } = await supabase
-                .from('yuzu_chat_history')
-                .select('id, created_at, user_id, role, content, message_type')
-                .gte('created_at', start)
-                .lte('created_at', end)
-                .order('created_at', { ascending: true });
-
-            if (!error && chatData) {
-                const rawReports = chatData.filter(m => m.message_type === 'espresso_report');
-                const photos = chatData.filter(m => m.message_type === 'image_description' && m.content.includes('[ภาพประกอบช็อตกาแฟ]'));
-                const analyses = chatData.filter(m => m.role === 'model' && m.content.includes('[Espresso Analysis]'));
-
-                const matchedReports = rawReports.map(report => {
-                    const reportTime = new Date(report.created_at);
-
-                    const matchingPhotos = photos.filter(p => {
-                        const pTime = new Date(p.created_at);
-                        const diffMin = Math.abs(pTime - reportTime) / 60000;
-                        return p.user_id === report.user_id && diffMin <= 5;
-                    });
-
-                    const photoUrls = matchingPhotos.map(p => {
-                        const match = p.content.match(/\[ภาพประกอบช็อตกาแฟ\] (https?:\/\/[^\s]+)/);
-                        return match ? match[1] : null;
-                    }).filter(Boolean);
-
-                    const analysis = analyses.find(a => {
-                        const aTime = new Date(a.created_at);
-                        const diffMin = (aTime - reportTime) / 60000;
-                        return diffMin >= 0 && diffMin <= 2;
-                    });
-
-                    const recommendation = analysis 
-                        ? analysis.content.replace('[Espresso Analysis]', '').trim() 
-                        : 'ไม่มีบทวิเคราะห์ช็อตกาแฟ';
-
-                    return {
-                        id: report.id,
-                        timestamp: report.created_at,
-                        userId: report.user_id,
-                        rawText: report.content,
-                        photos: photoUrls,
-                        recommendation
-                    };
-                });
-
-                setEspressoReports(matchedReports);
-            } else if (error) {
-                console.error("Espresso fetch error:", error);
-                setMessage('Error: ' + error.message);
-            }
-            setEspressoLoading(false);
         }
     }
-
-    // Helper to get employee name from ID
-    const getEmployeeName = (userId, senderName) => {
-        if (!userId) return senderName || 'External';
-        const emp = employees.find(e => 
-            String(e.id) === String(userId) ||
-            (e.line_bot_id && e.line_bot_id.toLowerCase() === String(userId).toLowerCase()) ||
-            (e.line_user_id && e.line_user_id.toLowerCase() === String(userId).toLowerCase())
-        );
-        if (emp) return emp.nickname || emp.name;
-        return senderName || `Staff (ID: ${userId})`;
-    };
 
     async function handleAddKnowledge() {
         if (!newContent && !newFile) return;
@@ -1165,15 +1071,6 @@ export default function YuzuKnowledgeManager() {
         const { error } = await supabase
             .from('yuzu_knowledge')
             .update({ metadata: newMetadata })
-            .eq('id', id);
-        if (!error) fetchData();
-    }
-
-    async function handleDeleteSlip(id) {
-        if (!confirm('ยืนยันการลบรายการสลิปนี้?')) return;
-        const { error } = await supabase
-            .from('slip_transactions')
-            .update({ is_deleted: true })
             .eq('id', id);
         if (!error) fetchData();
     }
@@ -2337,24 +2234,7 @@ export default function YuzuKnowledgeManager() {
             {/* TAB: SLIPS */}
             {activeTab === 'slips' && (
                 <div className="space-y-6">
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                        <div className="flex items-center gap-4 bg-cream p-2 px-4 border border-rule w-fit">
-                            <span className="text-xs font-semibold text-neutral">เลือกวันที่:</span>
-                            <input 
-                                type="date" 
-                                value={selectedDate}
-                                onChange={(e) => setSelectedDate(e.target.value)}
-                                className="bg-transparent font-num font-semibold text-charcoal outline-none text-xs cursor-pointer"
-                            />
-                        </div>
-                        
-                        <a 
-                            href={`/admin/report/slips?date=${selectedDate}`} 
-                            target="_blank"
-                            className="bg-charcoal text-cream border border-charcoal px-6 py-3 font-num font-semibold text-xs hover:bg-charcoal-2 transition-colors duration-150 flex items-center gap-2 cursor-pointer"
-                        >รายงาน PDF</a>
-                    </div>
-
+                    <YuzuSlipMonth />
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-cream p-3 px-4 border border-rule text-xs font-num gap-2">
                         <div className="flex flex-wrap items-center gap-2 text-charcoal">
                                                         <span className="text-neutral">สิทธิ์ตำแหน่งที่ส่งสลิปได้:</span>
@@ -2370,172 +2250,11 @@ export default function YuzuKnowledgeManager() {
                         </button>
                     </div>
 
-                    <Card className="p-0 overflow-hidden">
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-xs text-left">
-                                <thead className="bg-cream text-charcoal font-num font-semibold text-xs border-b border-charcoal">
-                                    <tr>
-                                        <th className="px-6 py-4">เวลา</th>
-                                        <th className="px-6 py-4">ผู้โอน</th>
-                                        <th className="px-6 py-4">พนักงาน</th>
-                                        <th className="px-6 py-4">ธนาคาร</th>
-                                        <th className="px-6 py-4">ยอด (บาท)</th>
-                                        <th className="px-6 py-4">หลักฐาน</th>
-                                        <th className="px-6 py-4 text-center">จัดการ</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-rule bg-cream">
-                                    {slipLoading ? (
-                                        <tr>
-                                            <td colSpan="7" className="p-12 text-center text-neutral">กำลังดึงข้อมูลสลิป...</td>
-                                        </tr>
-                                    ) : slips.length === 0 ? (
-                                        <tr>
-                                            <td colSpan="7" className="p-20 text-center">
-                                                <p className="text-neutral font-num font-semibold mb-1">No Transactions</p>
-                                                <p className="text-neutral text-xs">ไม่พบข้อมูลสลิปในวันที่เลือก</p>
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        slips.map((slip) => (
-                                            <tr key={slip.id} className="hover:bg-paper-2 transition-colors group">
-                                                <td className="px-6 py-4">
-                                                    <div className="font-num font-semibold text-charcoal text-xs">{format(new Date(slip.timestamp), 'HH:mm:ss')}</div>
-                                                    <div className="text-xs text-neutral font-num">{format(new Date(slip.timestamp), 'dd MMM yyyy')}</div>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="font-num text-xs text-charcoal">
-                                                        {slip.sender_name || 'External'}
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="font-num text-neutral text-xs font-semibold">
-                                                        {getEmployeeName(slip.user_id, '-')}
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="font-num text-neutral text-xs">
-                                                        {slip.bank_name || '-'}
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <span className="text-base font-num font-semibold text-charcoal">
-                                                        {Number(slip.amount).toLocaleString('th-TH', {minimumFractionDigits: 2})}
-                                                    </span>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    {slip.slip_url ? (
-                                                        <a href={slip.slip_url} target="_blank" rel="noreferrer" className="text-xs font-num font-semibold py-2 px-4 border border-rule bg-cream text-charcoal hover:bg-charcoal hover:text-cream transition-colors duration-150">ดูสลิป</a>
-                                                    ) : <span className="text-neutral font-num">-</span>}
-                                                </td>
-                                                <td className="px-6 py-4 text-center">
-                                                    <button 
-                                                        onClick={() => handleDeleteSlip(slip.id)}
-                                                        className="hover:bg-cream transition-colors duration-150 cursor-pointer min-h-11 px-3 text-sm font-semibold underline-offset-4 hover:underline text-error"
-                                                    >ลบ</button>
-                                                </td>
-                                            </tr>
-                                        ))
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </Card>
                 </div>
             )}
 
             {/* TAB: ESPRESSO */}
-            {activeTab === 'espresso' && (
-                <div className="space-y-6">
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                        <div className="flex items-center gap-4 bg-cream p-2 px-4 border border-rule w-fit">
-                            <span className="text-xs font-semibold text-neutral">เลือกวันที่:</span>
-                            <input 
-                                type="date" 
-                                value={selectedDate}
-                                onChange={(e) => setSelectedDate(e.target.value)}
-                                className="bg-transparent font-num font-semibold text-charcoal outline-none text-xs cursor-pointer"
-                            />
-                        </div>
-                        
-                        <a 
-                            href={`/admin/report/espresso?date=${selectedDate}`} 
-                            target="_blank"
-                            className="bg-charcoal text-cream border border-charcoal px-6 py-3 font-num font-semibold text-xs hover:bg-charcoal-2 transition-colors duration-150 flex items-center gap-2 cursor-pointer"
-                        >รายงาน PDF</a>
-                    </div>
-
-                    <Card className="p-0 overflow-hidden">
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-xs text-left">
-                                <thead className="bg-cream text-charcoal font-num font-semibold text-xs border-b border-charcoal">
-                                    <tr>
-                                        <th className="px-6 py-4">เวลา</th>
-                                        <th className="px-6 py-4">บาริสต้า</th>
-                                        <th className="px-6 py-4">ค่าที่บันทึก</th>
-                                        <th className="px-6 py-4">ยูซุแนะนำ</th>
-                                        <th className="px-6 py-4">รูป</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-rule bg-cream">
-                                    {espressoLoading ? (
-                                        <tr>
-                                            <td colSpan="5" className="p-12 text-center text-neutral">กำลังดึงข้อมูลรายงานช็อตกาแฟ...</td>
-                                        </tr>
-                                    ) : espressoReports.length === 0 ? (
-                                        <tr>
-                                            <td colSpan="5" className="p-20 text-center">
-                                                <p className="text-neutral font-num font-semibold mb-1">No Espresso Reports</p>
-                                                <p className="text-neutral text-xs">ไม่พบรายงานการสกัดช็อตกาแฟในวันที่เลือก</p>
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        espressoReports.map((report) => (
-                                            <tr key={report.id} className="hover:bg-paper-2 transition-colors group">
-                                                <td className="px-6 py-4 whitespace-nowrap">
-                                                    <div className="font-num font-semibold text-charcoal text-xs">{format(new Date(report.timestamp), 'HH:mm:ss')}</div>
-                                                    <div className="text-xs text-neutral font-num">{format(new Date(report.timestamp), 'dd MMM yyyy')}</div>
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap">
-                                                    <div className="font-num font-semibold text-charcoal text-xs">
-                                                        {getEmployeeName(report.userId, '-')}
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="font-num text-xs text-charcoal max-w-xs overflow-hidden text-ellipsis whitespace-nowrap" title={report.rawText}>
-                                                        {report.rawText}
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="font-num text-xs text-neutral max-w-sm overflow-hidden text-ellipsis whitespace-nowrap" title={report.recommendation}>
-                                                        {report.recommendation}
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap">
-                                                    {report.photos.length > 0 ? (
-                                                        <div className="flex gap-1.5 items-center">
-                                                            <span className="text-xs font-num font-semibold bg-cream text-plum border border-plum/20 px-2 py-0.5">
-                                                                {report.photos.length} Photo(s)
-                                                            </span>
-                                                            <div className="flex gap-1">
-                                                                {report.photos.map((url, i) => (
-                                                                    <a key={i} href={url} target="_blank" rel="noreferrer" className="w-6 h-6 border border-rule overflow-hidden block">
-                                                                        <img src={url} className="w-full h-full object-cover" />
-                                                                    </a>
-                                                                ))}
-                                                            </div>
-                                                        </div>
-                                                    ) : <span className="text-neutral font-num">-</span>}
-                                                </td>
-                                            </tr>
-                                        ))
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </Card>
-                </div>
-            )}
+            {activeTab === 'espresso' && <YuzuEspressoMonth />}
 
             {/* TAB: HASHTAG REPORTS & INCIDENTS */}
             {activeTab === 'hashtags' && (
