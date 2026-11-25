@@ -1,15 +1,20 @@
 import { NextResponse } from 'next/server';
+import { requireAdmin } from '../../../../lib/supabaseServer';
 import { autoGenerateWeeklyRoster, learnEmployeePatterns, syncLearnedToTemplates } from '../../../../utils/roster_auto_learner';
 
 export async function POST(request) {
+    const auth = await requireAdmin(request);
+    if (auth.response) return auth.response;
+    const db = auth.db;
+
     try {
         const body = await request.json().catch(() => ({}));
         const { action = 'GENERATE', startDate, endDate, overwrite = true, applyLeaves = true, syncTemplate = false, weeksBack = 8 } = body;
 
         if (action === 'LEARN') {
-            const result = await learnEmployeePatterns({ weeksBack });
+            const result = await learnEmployeePatterns({ weeksBack, client: db });
             if (syncTemplate) {
-                await syncLearnedToTemplates(result.learnedHabits);
+                await syncLearnedToTemplates(result.learnedHabits, db);
             }
             return NextResponse.json({
                 success: true,
@@ -27,7 +32,8 @@ export async function POST(request) {
                 endDate,
                 overwrite,
                 applyLeaves,
-                syncTemplate
+                syncTemplate,
+                client: db
             });
 
             return NextResponse.json(result);
@@ -42,8 +48,11 @@ export async function POST(request) {
 }
 
 export async function GET(request) {
+    const auth = await requireAdmin(request);
+    if (auth.response) return auth.response;
+
     try {
-        const result = await learnEmployeePatterns({ weeksBack: 8 });
+        const result = await learnEmployeePatterns({ weeksBack: 8, client: auth.db });
         return NextResponse.json({
             success: true,
             employees: result.employees,

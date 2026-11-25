@@ -22,6 +22,7 @@ import IndividualHistoryManager from "./_components/IndividualHistoryManager";
 import NfcStationManager from "./_components/NfcStationManager";
 import MeetingNotesManager from "./_components/MeetingNotesManager";
 import { useAdminAuth } from "./AdminAuthContext";
+import { adminFetch } from "../../lib/adminFetch";
 
 // --- Reducer for Cleaner State ---
 const initialState = {
@@ -316,7 +317,7 @@ export default function AdminDashboard() {
         }
     };
 
-    const handleNotify = async (api) => { if (confirm("Send?")) await fetch(api, { method: 'POST' }); };
+    const handleNotify = async (api) => { if (confirm("Send?")) await adminFetch(api, { method: 'POST' }); };
 
     const handleDeleteLog = async (logId) => {
         if (!confirm("Are you sure you want to delete this activity log?")) return;
@@ -359,7 +360,7 @@ export default function AdminDashboard() {
             fetchSchedules(); // Revert
         }
     };
-    const handleNotifySchedule = async () => { if (confirm("Publish?")) try { await fetch('/api/notify-schedule', { method: 'POST' }); alert("Success"); } catch (e) { } };
+    const handleNotifySchedule = async () => { if (confirm("Publish?")) try { await adminFetch('/api/notify-schedule', { method: 'POST' }); alert("Success"); } catch (e) { } };
 
     // Employee Action
     const handleDeleteEmployee = async (id) => {
@@ -420,7 +421,7 @@ export default function AdminDashboard() {
     // Swap Action
     const handleSwapDecision = async (id, action) => {
         if (!confirm(`Confirm ${action}?`)) return;
-        await fetch('/api/shift-swap/approve', { method: 'POST', body: JSON.stringify({ request_id: id, action }), headers: { 'Content-Type': 'application/json' } });
+        await adminFetch('/api/shift-swap/approve', { method: 'POST', body: JSON.stringify({ request_id: id, action }), headers: { 'Content-Type': 'application/json' } });
         fetchData('shift_swap_requests', 'swapRequests');
     };
 
@@ -516,7 +517,7 @@ export default function AdminDashboard() {
             }
             try {
                 const repName = req.replacement_employee?.nickname || req.replacement_employee?.name || "";
-                const notifyRes = await fetch('/api/notify-leave-status', {
+                const notifyRes = await adminFetch('/api/notify-leave-status', {
                     method: 'POST',
                     body: JSON.stringify({
                         name: req.employees?.name,
@@ -1081,7 +1082,7 @@ export default function AdminDashboard() {
     const handlePublishRoster = async (startDateStr, endDateStr) => {
         if (!confirm(`ต้องการอนุมัติและประกาศตารางงานจากกะ Draft ในวันที่ ${startDateStr} ถึง ${endDateStr} ใช่หรือไม่?`)) return;
         try {
-            const res = await fetch('/api/notify-schedule', {
+            const res = await adminFetch('/api/notify-schedule', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ startDate: startDateStr, endDate: endDateStr })

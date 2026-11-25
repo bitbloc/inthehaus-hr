@@ -5,6 +5,7 @@ import { getSchemaWeather, formatWeatherMessage, getCompactWeather } from '../..
 import { getAccurateNews } from '../../../../utils/news';
 import { saveMessage, getChatHistory, getDailyContent, saveLearnedFact, getEmployeeByLineId, getAllEmployeesData, getYuzuConfigs, checkIsBoss } from '../../../../utils/memory';
 import { supabase } from '../../../../lib/supabaseClient';
+import { getServiceClient } from '../../../../lib/supabaseServer';
 
 export async function handleChatCommand(event, client, text, rawText, userId, groupId, request) {
   if (text.startsWith('yuzu') || text.startsWith('ยูซุ')) {
@@ -349,7 +350,8 @@ ${dailyLogs || 'ไม่มีความเคลื่อนไหว'}
                 endDate: targetSun,
                 overwrite: true,
                 applyLeaves: true,
-                syncTemplate: true
+                syncTemplate: true,
+                client: getServiceClient()
               });
               summaryText = `🤖 จัดตารางสัปดาห์หน้าอัตโนมัติสำเร็จ ${genResult.totalSlots} กะ (นำเข้าใบลา ${genResult.leavesApplied?.length || 0} รายการ) บันทึกเป็นสถานะ Draft เรียบร้อยครับ`;
             } else {

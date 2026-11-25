@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { requireAdmin } from '../../../lib/supabaseServer';
 import { Client } from '@line/bot-sdk';
 import { supabase } from '../../../lib/supabaseClient';
 import { BRAND, plain } from '../webhook/handlers/slipFlex.js';
@@ -83,6 +84,9 @@ function buildMeetingNoteFlex(note) {
 }
 
 export async function POST(request) {
+  // Admin-only route: verify the Supabase Auth session sent by adminFetch().
+  const auth = await requireAdmin(request);
+  if (auth.response) return auth.response;
   try {
     const { noteId } = await request.json().catch(() => ({}));
     if (!noteId || typeof noteId !== 'string' || !/^[0-9a-f-]{36}$/i.test(noteId)) {
