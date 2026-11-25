@@ -7,6 +7,7 @@ import { useRealtimeSync } from '../../../lib/useRealtimeSync';
 import { startOfWeek, endOfWeek, addDays, format, subWeeks, addWeeks, parseISO } from 'date-fns';
 import { th } from 'date-fns/locale';
 import { SYSTEM_STANDARD_PRESETS, PRESET_COLORS } from '../../../utils/roster';
+import { adminFetch } from '../../../lib/adminFetch';
 
 const weekLabelOf = (ws, we) => `${format(ws, 'd MMM', { locale: th })} – ${format(we, 'd MMM', { locale: th })} ${we.getFullYear() + 543}`;
 
@@ -674,7 +675,7 @@ export default function AdminRosterPage() {
                         }));
 
                         // Bulk insert roster transactions via bulk API or direct upsert
-                        await fetch('/api/roster/bulk', {
+                        await adminFetch('/api/roster/bulk', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ action: 'UPSERT', transactions: empOffTransactions })
@@ -711,7 +712,7 @@ export default function AdminRosterPage() {
                                 };
                             });
 
-                            await fetch('/api/roster/bulk', {
+                            await adminFetch('/api/roster/bulk', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ action: 'UPSERT', transactions: repTransactions })
@@ -940,7 +941,7 @@ export default function AdminRosterPage() {
     };
 
     const postSaveCell = async (empId, dateStr, transactions) => {
-        const res = await fetch('/api/roster/bulk', {
+        const res = await adminFetch('/api/roster/bulk', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action: 'SAVE_CELL', employee_id: empId, date: dateStr, transactions })
@@ -1118,7 +1119,7 @@ export default function AdminRosterPage() {
                 };
             });
 
-            await fetch('/api/roster/bulk', {
+            await adminFetch('/api/roster/bulk', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'UPSERT', transactions: newTrans })
@@ -1135,7 +1136,7 @@ export default function AdminRosterPage() {
         if (!confirm('ยืนยันประกาศตารางงานสัปดาห์นี้? พนักงานจะได้รับการแจ้งเตือนผ่าน LINE')) return;
         setLoading(true);
         try {
-            const res = await fetch('/api/roster/bulk', {
+            const res = await adminFetch('/api/roster/bulk', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
@@ -1156,7 +1157,7 @@ export default function AdminRosterPage() {
     const handleExecuteAutoGenerate = async () => {
         setIsAutoGenerating(true);
         try {
-            const res = await fetch('/api/roster/auto-generate', {
+            const res = await adminFetch('/api/roster/auto-generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -1183,7 +1184,7 @@ export default function AdminRosterPage() {
 
     const handleViewLearnedHabits = async () => {
         try {
-            const res = await fetch('/api/roster/auto-generate?action=LEARN');
+            const res = await adminFetch('/api/roster/auto-generate?action=LEARN');
             const data = await res.json();
             if (data.success) {
                 setLearnedHabitsModal(data);

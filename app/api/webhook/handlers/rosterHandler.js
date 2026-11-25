@@ -1,7 +1,11 @@
 import { format, addHours, startOfTomorrow, parseISO, startOfWeek, addDays } from 'date-fns';
 import { getEffectiveRoster } from '../../../../utils/roster';
 import { getEmployeeByLineId, checkIsBoss } from '../../../../utils/memory';
-import { supabase } from '../../../../lib/supabaseClient';
+import { getServiceClient } from '../../../../lib/supabaseServer';
+
+// LINE webhook has no user session: use the service-role client (falls back to anon until
+// SUPABASE_SERVICE_ROLE_KEY is set) so roster writes keep working once anon writes are revoked.
+const supabase = getServiceClient();
 
 function getShiftColorHex(shiftName, isOff, isCustomOrExtra) {
   if (isOff) return '#dc2626'; // Red
@@ -766,7 +770,8 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
         endDate: nextWeekSun,
         overwrite: true,
         applyLeaves: true,
-        syncTemplate: true
+        syncTemplate: true,
+        client: supabase
       });
 
       const startFmt = format(nextWeekMon, 'dd/MM/yyyy');
@@ -1102,7 +1107,8 @@ export async function handleRosterPostback(event, client, action, queryParams, u
           endDate: targetSun,
           overwrite: true,
           applyLeaves: true,
-          syncTemplate: true
+          syncTemplate: true,
+          client: supabase
         });
         await client.replyMessage(event.replyToken, {
           type: 'text',

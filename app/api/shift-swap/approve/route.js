@@ -1,10 +1,6 @@
-import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
+import { requireAdmin } from '../../../../lib/supabaseServer';
 import { Client } from '@line/bot-sdk';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Shared Group ID (Consider moving to env or DB config in future)
 // ✅ Group IDs (กลุ่มหลัก และ กลุ่มแผนกอื่น)
@@ -19,6 +15,10 @@ const client = new Client({
 });
 
 export async function POST(req) {
+  // Admin-only route: verify the Supabase Auth session sent by adminFetch().
+  const auth = await requireAdmin(req);
+  if (auth.response) return auth.response;
+  const supabase = auth.db; // write roster as the signed-in admin
     try {
         const body = await req.json();
         const { request_id, action, manager_note } = body;

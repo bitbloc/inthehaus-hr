@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { requireAdmin } from '../../../lib/supabaseServer';
 import { Client } from '@line/bot-sdk';
 
 // ✅ Group IDs (กลุ่มหลัก และ กลุ่มแผนกอื่น)
@@ -13,6 +14,9 @@ const client = new Client({
 });
 
 export async function POST(request) {
+  // Admin-only route: verify the Supabase Auth session sent by adminFetch().
+  const auth = await requireAdmin(request);
+  if (auth.response) return auth.response;
   try {
     // รับข้อมูลจากหน้า Admin
     const { name, date, type, reason, status, replacementName } = await request.json();

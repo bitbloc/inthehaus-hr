@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { format } from "date-fns";
 import { supabase } from "../../../lib/supabaseClient";
 import { useAdminAuth } from "../AdminAuthContext";
+import { adminFetch } from "../../../lib/adminFetch";
 
 const BUCKET = "meeting-notes";
 const MAX_BYTES = 20 * 1024 * 1024;
@@ -128,7 +129,7 @@ export default function MeetingNotesManager() {
         let notifyText = "";
         if (notifyTeam && inserted?.id) {
           try {
-            const res = await fetch("/api/notify-meeting", {
+            const res = await adminFetch("/api/notify-meeting", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ noteId: inserted.id })

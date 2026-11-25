@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { requireAdmin } from '../../../lib/supabaseServer';
 import { supabase } from '../../../lib/supabaseClient';
 import { Client } from '@line/bot-sdk';
 
@@ -14,6 +15,9 @@ const client = new Client({
 });
 
 export async function POST(request) {
+  // Admin-only route: verify the Supabase Auth session sent by adminFetch().
+  const auth = await requireAdmin(request);
+  if (auth.response) return auth.response;
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);

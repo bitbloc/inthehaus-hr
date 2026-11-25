@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { requireAdmin } from '../../../lib/supabaseServer';
 import { supabase } from '../../../lib/supabaseClient';
 import { Client } from '@line/bot-sdk';
 import { format, startOfWeek, endOfWeek, addDays, parseISO } from 'date-fns';
@@ -30,6 +31,10 @@ function getShiftColorHex(shiftName) {
 }
 
 export async function POST(request) {
+  // Admin-only route: verify the Supabase Auth session sent by adminFetch().
+  const auth = await requireAdmin(request);
+  if (auth.response) return auth.response;
+  const db = auth.db;
   try {
     let startDateParam, endDateParam;
     try {
@@ -72,7 +77,7 @@ export async function POST(request) {
     }
 
     // 2. Publish all drafts in this week
-    const { error: updateError } = await supabase
+    const { error: updateError } = await db
       .from('roster_transactions')
       .update({ status: 'PUBLISHED' })
       .gte('date', startStr)

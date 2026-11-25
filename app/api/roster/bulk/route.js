@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '../../../../lib/supabaseClient';
+import { requireAdmin } from '../../../../lib/supabaseServer';
 import { Client } from '@line/bot-sdk';
 import { format, parseISO } from 'date-fns';
 import { generateStCalendarFlex } from '../../webhook/handlers/rosterHandler';
@@ -16,6 +16,12 @@ const GROUP_IDS = [
 ];
 
 export async function POST(request) {
+  // Admin-only: verify the Supabase Auth session sent by adminFetch().
+  const auth = await requireAdmin(request);
+  if (auth.response) return auth.response;
+  // Writes run as the signed-in admin (RLS role "authenticated"), not anon.
+  const supabase = auth.db;
+
   try {
     const body = await request.json();
     const { action, transactions, startDate, endDate } = body;
@@ -164,7 +170,8 @@ export async function POST(request) {
             endDate,
             overwrite: body.overwrite !== false,
             applyLeaves: body.applyLeaves !== false,
-            syncTemplate: !!body.syncTemplate
+            syncTemplate: !!body.syncTemplate,
+            client: supabase
         });
         return NextResponse.json(result);
     }
