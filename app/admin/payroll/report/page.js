@@ -28,14 +28,20 @@ function PayrollPDFReportContent() {
             const startStr = format(startDate, 'yyyy-MM-dd');
             const endStr = format(endDate, 'yyyy-MM-dd');
 
-            const [empRes, shiftRes, transRes, logRes, schedRes, deductRes] = await Promise.all([
+            const [empRes, shiftRes, transRes, logRes, schedRes, deductRes, configRes] = await Promise.all([
                 supabase.from('employees').select('*').order('id'),
                 supabase.from('shifts').select('*').order('start_time'),
                 supabase.from('roster_transactions').select('*').gte('date', startStr).lte('date', endStr),
-                supabase.from('attendance_logs').select('*').gte('timestamp', startDate.toISOString()).lte('timestamp', addDays(endDate, 2).toISOString()),
+                // From the day before: a night shift on the last day of the previous month ends after midnight
+                supabase.from('attendance_logs').select('*').gte('timestamp', addDays(startDate, -1).toISOString()).lte('timestamp', addDays(endDate, 2).toISOString()).order('timestamp'),
                 supabase.from('employee_schedules').select('*'),
-                supabase.from('payroll_deductions').select('*')
+                supabase.from('payroll_deductions').select('*').eq('month', monthParam),
+                supabase.from('payroll_config').select('*')
             ]);
+
+            // Same rates as the payroll page (was hardcoded 50 / 75 here)
+            const payrollConfig = { hourly_rate: 50, ot_rate: 50 };
+            configRes.data?.forEach(c => { payrollConfig[c.key] = Number(c.value); });
 
             if (empRes.data && transRes.data && logRes.data) {
                 const data = calculatePayroll(
@@ -43,7 +49,7 @@ function PayrollPDFReportContent() {
                     logRes.data, 
                     transRes.data, 
                     shiftRes.data || [], 
-                    { hourly_rate: 50, ot_rate: 75 }, 
+                    payrollConfig, 
                     deductRes.data || [], 
                     monthParam,
                     schedRes.data || []
@@ -69,7 +75,8 @@ function PayrollPDFReportContent() {
         );
     }
 
-    const workingEmployees = payrollData.filter(d => d.workDays > 0 || (d.dailyDetails && d.dailyDetails.some(day => day.in !== '-' || day.out !== '-')));
+    // Everyone with pay due (monthly staff without punches included), same as the payroll page total
+    const workingEmployees = payrollData.filter(d => d.netSalary > 0 || d.workDays > 0 || (d.dailyDetails && d.dailyDetails.some(day => day.in !== '-' || day.out !== '-')));
     const filteredIndividualData = selectedEmpId === 'ALL' 
         ? workingEmployees 
         : workingEmployees.filter(d => String(d.emp.id) === String(selectedEmpId));
@@ -358,6 +365,7 @@ function PayrollPDFReportContent() {
                                                 </td>
                                                 <td className={`py-1.5 px-2 text-right ${isOff ? 'text-neutral-400' : 'text-neutral-700'}`}>
                                                     {d.regular_hours > 0 ? Number(d.regular_hours).toFixed(1) : '-'}
+                                                    {d.away_mins > 0 && <span className="block text-[9px] text-rams-red">ออก {((m) => `${Math.floor(m / 60) > 0 ? `${Math.floor(m / 60)} ชม. ` : ''}${m % 60} น.`)(d.away_mins)}</span>}
                                                 </td>
                                                 <td className={`py-1.5 px-2 text-right ${isOff ? 'text-neutral-400' : 'text-rams-orange font-medium'}`}>
                                                     {d.ot_hours > 0 ? Number(d.ot_hours).toFixed(1) : '-'}
@@ -409,6 +417,12 @@ function PayrollPDFReportContent() {
                                         <div className="flex justify-between">
                                             <span className="font-medium text-neutral-600">Tax & Other Deductions / ภาษี & รายการหักอื่นๆ</span>
                                             <span className="font-mono font-bold text-rams-red">-฿{(item.taxDeduct + item.customDeduct).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</span>
+                                        </div>
+                                    )}
+                                    {item.totalAwayMins > 0 && (
+                                        <div className="flex justify-between">
+                                            <span className="font-medium text-neutral-600">Time Away / ออกระหว่างวัน ({((m) => `${Math.floor(m / 60) > 0 ? `${Math.floor(m / 60)} ชม. ` : ''}${m % 60} น.`)(item.totalAwayMins)})</span>
+                                            <span className="font-mono font-bold text-rams-red">{item.awayDeduct > 0 ? `-฿${item.awayDeduct.toLocaleString('th-TH', { minimumFractionDigits: 2 })}` : 'หักจากชั่วโมงแล้ว'}</span>
                                         </div>
                                     )}
                                     <div className="flex justify-between border-t border-neutral-200 pt-1">

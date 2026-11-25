@@ -1254,6 +1254,12 @@ export default function CheckIn() {
                 <span className="font-num text-xs tracking-[0.14em] opacity-70 mt-1">{mainButtonConfig.en}</span>
               </motion.button>
 
+              {lastAction === 'check_in' && (
+                <p className="border border-rule bg-cream px-4 py-3 text-sm text-subtle">
+                  ออกไปธุระระหว่างวัน: กด <span className="font-semibold text-charcoal">ออกงาน</span> ก่อนออกจากร้าน แล้วกด <span className="font-semibold text-charcoal">เข้างาน</span> อีกครั้งเมื่อกลับ ระบบจะนับเวลาที่ออกไปให้ ไม่นับเป็นมาสาย
+                </p>
+              )}
+
               <button
                 type="button"
                 onClick={() => setShowQRScanner(true)}
