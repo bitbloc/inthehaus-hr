@@ -4,7 +4,7 @@
  * verify_tier is saved from 2026-11-26 (migrations/20261126_slip_verify_tier.sql);
  * older slips have none and show as "ไม่ทราบ". */
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { supabase } from "../../../../lib/supabaseClient";
 import { bkk, monthBounds, pct, baht, dayLabel, employeeNamer, Stat } from "./monthTools";
 
@@ -83,9 +83,108 @@ export function useSlipMonth(month) {
 
 const th = "py-2 font-semibold";
 
+/** Full Thai date for a "yyyy-MM-dd" string: "วันอาทิตย์ที่ 1 พฤศจิกายน 2569" */
+function longDay(dateStr) {
+    const d = new Date(`${dateStr}T00:00:00Z`);
+    return d.toLocaleDateString("th-TH", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+}
+
+/** Pop-up listing every slip of one day. Closes on Esc, backdrop click or the close button. */
+function DaySlipsModal({ date, slips, nameOf, onClose }) {
+    const closeRef = useRef(null);
+
+    useEffect(() => {
+        const opener = document.activeElement;
+        closeRef.current?.focus();
+        const onKey = (e) => { if (e.key === "Escape") onClose(); };
+        document.addEventListener("keydown", onKey);
+        const overflow = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        return () => {
+            document.removeEventListener("keydown", onKey);
+            document.body.style.overflow = overflow;
+            if (opener && typeof opener.focus === "function") opener.focus();
+        };
+    }, [onClose]);
+
+    const total = slips.reduce((a, s) => a + Number(s.amount || 0), 0);
+    const bank = slips.filter((s) => s.verify_tier === "BANK_VERIFIED").length;
+
+    // Keep Tab inside the dialog.
+    const trap = (e) => {
+        if (e.key !== "Tab") return;
+        const f = e.currentTarget.querySelectorAll("a[href], button:not([disabled])");
+        if (!f.length) return;
+        const first = f[0], last = f[f.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
+
+    return (
+        <div
+            className="brand-v2 no-print !bg-charcoal/50 fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4"
+            onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+        >
+            <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="day-slips-title"
+                onKeyDown={trap}
+                className="bg-cream border border-charcoal w-full sm:max-w-xl max-h-[88vh] flex flex-col"
+            >
+                <div className="bg-plum text-cream flex items-stretch shrink-0">
+                    <div className="flex-1 px-4 py-3 min-w-0">
+                        <h3 id="day-slips-title" className="font-head text-2xl">สลิปวันที่ {dayLabel(date)}</h3>
+                        <p className="text-sm text-on-plum-2">{longDay(date)}</p>
+                    </div>
+                    <button ref={closeRef} type="button" onClick={onClose} className="min-w-16 px-4 border-l border-plum-3 text-base font-semibold hover:bg-plum-2 transition-colors duration-150">ปิด</button>
+                </div>
+
+                <div className="grid grid-cols-3 gap-px bg-rule border-b border-charcoal shrink-0">
+                    {[["สลิป", `${slips.length} ใบ`], ["ผ่าน EasySlip", bank ? `${bank} ใบ` : "-"], ["ยอดรวม (บาท)", baht(total)]].map(([label, value]) => (
+                        <div key={label} className="bg-cream px-3 py-2 min-w-0">
+                            <p className="text-sm text-neutral">{label}</p>
+                            <p className="font-num text-lg text-charcoal truncate">{value}</p>
+                        </div>
+                    ))}
+                </div>
+
+                <ul className="overflow-y-auto overscroll-contain divide-y divide-rule px-4">
+                    {slips.map((s) => {
+                        const tier = tierOf(s);
+                        return (
+                            <li key={s.id} className="py-3 flex gap-3">
+                                <span className="font-num text-base text-neutral w-12 shrink-0 pt-0.5">{bkk(s.timestamp).time}</span>
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-baseline justify-between gap-3">
+                                        <span className="text-base font-semibold text-charcoal break-words">{s.sender_name || "ไม่ทราบชื่อผู้โอน"}</span>
+                                        <span className="font-num text-base text-charcoal whitespace-nowrap">{baht(s.amount)}</span>
+                                    </div>
+                                    <p className="text-sm text-neutral break-words">{s.bank_name || "ไม่ทราบธนาคาร"}</p>
+                                    <p className="text-sm text-neutral">
+                                        ส่งโดย <span className="text-charcoal">{nameOf(s.user_id)}</span>
+                                        {" · "}
+                                        <span className={tier.key === "BANK_VERIFIED" ? "text-charcoal font-semibold" : ""}>{tier.label}</span>
+                                    </p>
+                                    {s.slip_url && (
+                                        <a href={s.slip_url} target="_blank" rel="noreferrer" className="mt-1 inline-flex min-h-11 items-center text-sm font-semibold text-charcoal underline underline-offset-4 hover:text-plum">ดูสลิป</a>
+                                    )}
+                                </div>
+                            </li>
+                        );
+                    })}
+                </ul>
+            </div>
+        </div>
+    );
+}
+
 /** Summary blocks. `showList` adds every slip and the rejected list (for the PDF). */
 export function SlipMonthBody({ data, showList = true }) {
     const { loading, error, slips, alerts, summary, nameOf } = data;
+    const [openDay, setOpenDay] = useState(null);
+    const closeDay = useCallback(() => setOpenDay(null), []);
+    const daySlips = useMemo(() => (openDay ? slips.filter((s) => s.date === openDay) : []), [openDay, slips]);
     if (loading) return <p className="py-16 text-center text-base text-neutral">กำลังโหลดข้อมูล…</p>;
     if (error) return <p className="py-16 text-center text-base text-error">{error}</p>;
     if (summary.n === 0 && alerts.length === 0) return <p className="py-16 text-center text-base text-neutral">เดือนนี้ยังไม่มีสลิป</p>;
@@ -159,9 +258,19 @@ export function SlipMonthBody({ data, showList = true }) {
                         </thead>
                         <tbody>
                             {summary.byDay.map((d) => (
-                                <tr key={d.key} className="border-b border-rule">
-                                    <td className="py-2 pr-2 text-charcoal">{dayLabel(d.key)}</td>
-                                    <td className="py-2 px-2 text-right font-num text-charcoal">{d.n}</td>
+                                <tr key={d.key} onClick={() => setOpenDay(d.key)} className="border-b border-rule cursor-pointer hover:bg-paper-2 transition-colors duration-150">
+                                    <td className="py-0 pr-2 text-charcoal">
+                                        <button
+                                            type="button"
+                                            onClick={(e) => { e.stopPropagation(); setOpenDay(d.key); }}
+                                            aria-label={`ดูสลิปวันที่ ${dayLabel(d.key)} ทั้งหมด ${d.n} ใบ`}
+                                            className="min-h-11 w-full flex items-center gap-2 text-left text-charcoal"
+                                        >
+                                            {dayLabel(d.key)}
+                                            <span className="no-print text-sm text-neutral" aria-hidden="true">ดูรายชื่อ ›</span>
+                                        </button>
+                                    </td>
+                                    <td className="py-2 px-2 text-right font-num text-charcoal"><span className="underline decoration-rule underline-offset-4">{d.n}</span></td>
                                     <td className="py-2 px-2 text-right font-num text-neutral">{d.bank || "-"}</td>
                                     <td className="py-2 pl-2 text-right font-num text-charcoal">{baht(d.amount)}</td>
                                 </tr>
@@ -175,7 +284,10 @@ export function SlipMonthBody({ data, showList = true }) {
                         </tbody>
                     </table>
                 </div>
+                <p className="no-print mt-2 text-sm text-neutral">แตะวันที่เพื่อดูว่าสลิปของวันนั้นมาจากใครบ้าง</p>
             </section>
+
+            {openDay && <DaySlipsModal date={openDay} slips={daySlips} nameOf={nameOf} onClose={closeDay} />}
 
             {alerts.length > 0 && (
                 <section className="avoid-break mt-8">
