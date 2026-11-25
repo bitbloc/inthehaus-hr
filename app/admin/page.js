@@ -20,6 +20,7 @@ import YuzuKnowledgeManager from "./_components/YuzuKnowledgeManager";
 import DashboardOverview from "./_components/DashboardOverview";
 import IndividualHistoryManager from "./_components/IndividualHistoryManager";
 import NfcStationManager from "./_components/NfcStationManager";
+import MeetingNotesManager from "./_components/MeetingNotesManager";
 import { useAdminAuth } from "./AdminAuthContext";
 
 // --- Reducer for Cleaner State ---
@@ -1133,6 +1134,7 @@ export default function AdminDashboard() {
             items: [
                 { id: 'employees', label: 'Staff Directory', icon: Icons.Staff },
                 { id: 'announcements', label: 'News/Alerts', icon: Icons.Alert },
+                { id: 'meetings', label: 'Meeting Notes', icon: Icons.File },
                 { id: 'history', label: 'Individual History', icon: Icons.File },
                 { id: 'yuzu', label: 'Yuzu AI', icon: Icons.Yuzu },
                 { id: 'settings', label: 'Shift Config', icon: Icons.Settings },
@@ -2497,6 +2499,11 @@ export default function AdminDashboard() {
                                 </div>
                             )}
                         </div>
+                    )}
+
+                    {/* --- MEETING NOTES (PDF) --- */}
+                    {activeTab === 'meetings' && (
+                        <MeetingNotesManager />
                     )}
 
                     {/* --- NFC STATIONS MANAGER --- */}

@@ -1814,6 +1814,21 @@ export default function CheckIn() {
 
       {/* 4. Weather & Recent Activity (Dieter Rams Clean Panels) */}
       <div className="w-full max-w-sm px-6 z-10 mb-8 space-y-4">
+        {/* Meeting Notes Entry */}
+        <Link
+          href="/meetings"
+          className="w-full p-4 bg-rams-panel hover:bg-rams-bg border border-rams-rule-light hover:border-rams-rule rounded-sm flex items-center gap-3 transition-[transform,background-color,border-color] duration-150 ease-out active:translate-y-[1px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rams-ink group"
+        >
+          <div className="w-9 h-9 shrink-0 rounded-sm bg-rams-bg border border-rams-rule-light flex items-center justify-center text-rams-ink group-hover:text-rams-orange transition-colors">
+            <RegisterIcon className="w-4 h-4 stroke-current" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-bold text-rams-ink">บันทึกการประชุม</div>
+            <div className="text-[10px] font-mono text-rams-ink-muted mt-0.5">อ่านสรุปการประชุมของทีม (PDF)</div>
+          </div>
+          <span className="text-rams-ink-muted group-hover:text-rams-ink transition-colors" aria-hidden="true">›</span>
+        </Link>
+
         <AnimatePresence>
           {userPosition && (
             <WeatherCard
