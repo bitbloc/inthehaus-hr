@@ -1,10 +1,36 @@
-import { differenceInMinutes, addDays, isAfter, format } from "date-fns";
-import { createTimeRange, resolveShiftPresetName } from "./roster.js";
+import { differenceInMinutes } from "date-fns";
 
-const formatTime = (date) => {
-    if (!date) return '-';
-    return format(date, 'HH:mm');
-};
+/*
+ * Payroll engine (rules confirmed by the owner, 2026-11-25):
+ * - Every roster row counts (no draft stage): worked = paid, no punches = absent.
+ * - One day = one unit. All slots of a day share one set of punches (no double counting).
+ * - Punches are looked for from 4 h before the first slot to 6 h after the last one
+ *   (days with no schedule: 05:00 to 05:00 next day), and a punch is used by one day only.
+ * - Time away mid-day (check out, then back in) is not paid; the first 60 min per day
+ *   are exempt (meal break). Scheduled breaks between split slots are never paid.
+ * - Forgot to check out: paid up to the scheduled end, no OT, flagged, counts as incomplete.
+ * - OT = minutes worked beyond the scheduled minutes, counted in blocks of 60+ min,
+ *   at one shop-wide rate (payroll_config.ot_rate).
+ * - Off-day / unscheduled work: hourly, OT after 8 h.
+ * - Per-shift pay: shift.rate, else double (>= 11 h, payroll_config.double_shift_rate),
+ *   short (<= 5.5 h, rush_4h or hourly), else daily_rate.
+ * - Monthly: base salary + off-day/unscheduled pay + OT − time-away deduction.
+ * - Social security only when payroll_config.sso_enabled = 1 (off for now).
+ * - Adjustments: bonus adds, deduction / advance subtract.
+ * All times are Bangkok (UTC+7) regardless of the browser's time zone.
+ */
+
+const TZ = '+07:00';
+const DAY_MS = 24 * 60 * 60 * 1000;
+const MEAL_EXEMPT_MINS = 60;
+
+const at = (dateStr, hhmm) => new Date(`${dateStr}T${String(hhmm || '00:00').slice(0, 5)}:00${TZ}`);
+const bkkDateStr = (d) => new Date(d).toLocaleDateString('sv-SE', { timeZone: 'Asia/Bangkok' });
+const nextDateStr = (dateStr) => bkkDateStr(new Date(at(dateStr, '12:00').getTime() + DAY_MS));
+const fmtTime = (d) => (d ? new Date(d).toLocaleTimeString('en-GB', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit' }) : '-');
+const minsBetween = (a, b) => Math.max(0, Math.floor((b - a) / 60000)); // whole minutes, seconds dropped (as before)
+const r2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
+const overlapMins = (a, b) => minsBetween(new Date(Math.max(a.start, b.start)), new Date(Math.min(a.end, b.end)));
 
 /**
  * Helper to extract local date string (YYYY-MM-DD) from a log timestamp with Bangkok Timezone Guard (UTC+7)
@@ -12,78 +38,54 @@ const formatTime = (date) => {
 export const getLogLocalDateStr = (timestamp) => {
     if (!timestamp) return '';
     try {
-        const d = new Date(timestamp);
-        return d.toLocaleDateString('sv-SE', { timeZone: 'Asia/Bangkok' });
+        return bkkDateStr(timestamp);
     } catch {
         return '';
     }
 };
 
+const slotRange = (dateStr, startHHMM, endHHMM) => {
+    const start = at(dateStr, startHHMM);
+    let end = at(dateStr, endHHMM);
+    if (end <= start) end = new Date(end.getTime() + DAY_MS); // overnight
+    return { start, end };
+};
+
 /**
- * Helper to find check-in and check-out on a given date for an employee with overnight pairing support.
+ * Take one day's punches from a window. Punches already used by an earlier day are skipped,
+ * and the ones taken here are marked used.
+ * Returns first check-in, final check-out (null when the day ends checked in),
+ * and the away intervals (check-out → next check-in).
  */
-function findDayPunches(empLogs, targetDateStr) {
-    const sortedLogs = [...(empLogs || [])].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-    const checkInLogs = sortedLogs.filter(l => l.action_type === 'check_in');
-    const checkOutLogs = sortedLogs.filter(l => l.action_type === 'check_out');
-
-    const sessions = {};
-    const claimedOutIds = new Set();
-
-    checkInLogs.forEach(inLog => {
-        const inTime = new Date(inLog.timestamp);
-        const inDateStr = getLogLocalDateStr(inLog.timestamp);
-        const maxOutWindow = new Date(inTime.getTime() + 20 * 60 * 60 * 1000);
-
-        const matchingOut = checkOutLogs.find(outLog => {
-            const outKey = outLog.id ? String(outLog.id) : `${outLog.timestamp}_${outLog.action_type}`;
-            if (claimedOutIds.has(outKey)) return false;
-            const outTime = new Date(outLog.timestamp);
-            return outTime > inTime && outTime <= maxOutWindow;
-        });
-
-        if (matchingOut) {
-            const outKey = matchingOut.id ? String(matchingOut.id) : `${matchingOut.timestamp}_${matchingOut.action_type}`;
-            claimedOutIds.add(outKey);
+function takeDayPunches(punches, used, winStart, winEnd) {
+    const inWin = punches.filter(p => !used.has(p.key) && p.t >= winStart && p.t <= winEnd);
+    const firstIn = inWin.findIndex(p => p.type === 'check_in');
+    if (firstIn === -1) {
+        const outs = inWin.filter(p => p.type === 'check_out');
+        const lastOut = outs[outs.length - 1];
+        outs.forEach(p => used.add(p.key));
+        return { checkIn: null, checkOut: lastOut ? lastOut.t : null, away: [], endedIn: false };
+    }
+    const seq = inWin.slice(firstIn);
+    seq.forEach(p => used.add(p.key));
+    let state = 'in';
+    let lastOut = null;
+    const away = [];
+    for (const p of seq.slice(1)) {
+        if (p.type === 'check_out') {
+            lastOut = p.t;
+            state = 'out';
+        } else if (p.type === 'check_in' && state === 'out') {
+            away.push({ start: lastOut, end: p.t });
+            state = 'in';
         }
-
-        if (!sessions[inDateStr]) {
-            sessions[inDateStr] = {
-                checkIn: inTime,
-                checkOut: matchingOut ? new Date(matchingOut.timestamp) : null
-            };
-        } else {
-            if (inTime < sessions[inDateStr].checkIn) sessions[inDateStr].checkIn = inTime;
-            if (matchingOut) {
-                const outTime = new Date(matchingOut.timestamp);
-                if (!sessions[inDateStr].checkOut || outTime > sessions[inDateStr].checkOut) {
-                    sessions[inDateStr].checkOut = outTime;
-                }
-            }
-        }
-    });
-
-    checkOutLogs.forEach(outLog => {
-        const outKey = outLog.id ? String(outLog.id) : `${outLog.timestamp}_${outLog.action_type}`;
-        if (claimedOutIds.has(outKey)) return;
-        const outTime = new Date(outLog.timestamp);
-        const outDateStr = getLogLocalDateStr(outLog.timestamp);
-
-        if (!sessions[outDateStr]) {
-            sessions[outDateStr] = {
-                checkIn: null,
-                checkOut: outTime
-            };
-        }
-    });
-
-    return sessions[targetDateStr] || { checkIn: null, checkOut: null };
+    }
+    return { checkIn: seq[0].t, checkOut: state === 'out' ? lastOut : null, away, endedIn: state === 'in' };
 }
 
 /**
- * Minutes an employee was checked out in the middle of a work day:
- * every check_out → next check_in pair strictly between the day's first
- * check-in and last check-out (staff check out when they step out on an errand).
+ * Minutes an employee was checked out in the middle of a work day (kept for callers;
+ * the engine itself uses takeDayPunches).
  */
 export function awayMinutesBetween(empLogs, checkIn, checkOut) {
     if (!checkIn || !checkOut) return 0;
@@ -108,21 +110,32 @@ export function awayMinutesBetween(empLogs, checkIn, checkOut) {
  * Calculates payroll, OT, and attendance stats for all employees using roster_transactions.
  */
 export const calculatePayroll = (employees, logs, transactions, shifts, payrollConfig, deductions, selectedMonth, weeklySchedules = []) => {
-    // 1. Pre-process logs into Map { empId: [logs] }
+    const cfg = payrollConfig || {};
+    const shopOtRate = Number(cfg.ot_rate ?? 50);
+    const shopDoubleRate = Number(cfg.double_shift_rate ?? 700);
+    const ssoEnabled = Number(cfg.sso_enabled || 0) === 1;
+    const ssoPct = Number(cfg.sso_rate_pct ?? 5);
+    const ssoCap = Number(cfg.sso_cap_thb ?? 750);
+
+    const [year, month] = selectedMonth.split('-').map(Number);
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const monthDates = Array.from({ length: daysInMonth }, (_, i) => `${year}-${String(month).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`);
+    const todayStr = bkkDateStr(new Date());
+    const now = new Date();
+
     const logsMap = new Map();
     (logs || []).forEach(log => {
         if (!logsMap.has(log.employee_id)) logsMap.set(log.employee_id, []);
         logsMap.get(log.employee_id).push(log);
     });
 
-    // 2. Pre-process deductions
     const deductionsMap = new Map();
     (deductions || []).forEach(d => {
+        if (d.month && d.month !== selectedMonth) return; // only this month's adjustments
         if (!deductionsMap.has(d.employee_id)) deductionsMap.set(d.employee_id, []);
         deductionsMap.get(d.employee_id).push(d);
     });
 
-    // 3. Pre-process Transactions { empId: { date: [transactions] } }
     const txMap = new Map();
     (transactions || []).forEach(tx => {
         const eid = String(tx.employee_id);
@@ -131,497 +144,270 @@ export const calculatePayroll = (employees, logs, transactions, shifts, payrollC
         txMap.get(eid)[tx.date].push(tx);
     });
 
-    const activeEmployees = (employees || []).filter(e => e.is_active !== false);
+    // Active staff, plus anyone deactivated who still has punches or shifts this month
+    const included = (employees || []).filter(e =>
+        e.is_active !== false ||
+        (logsMap.get(e.id) || []).some(l => monthDates.includes(bkkDateStr(l.timestamp))) ||
+        txMap.has(String(e.id))
+    );
 
-    return activeEmployees.map(emp => {
-        let totalSalary = 0;
+    return included.map(emp => {
+        let totalSalary = 0;      // shift / hourly wages (monthly: added on top of base below)
+        let extraDayPay = 0;      // off-day + unscheduled pay (kept separately for monthly staff)
         let totalOTHours = 0;
         let totalOTPay = 0;
+        let totalRegularHours = 0;
         let workDays = 0;
         let lateCount = 0;
         let absentCount = 0;
         let incompleteCount = 0;
         let offDayWorkCount = 0;
-        
-        let totalRegularHours = 0;
-        let totalAwayMins = 0;   // mid-day errands (checked out, then back in)
-        let awayDeduct = 0;      // baht, for per-shift / monthly staff whose pay does not scale with hours
-
+        let totalAwayMins = 0;    // deducted minutes (after meal exemption)
+        let awayDeduct = 0;
         const dailyDetails = [];
-        const empLogs = logsMap.get(emp.id) || [];
-        const empTxs = txMap.get(String(emp.id)) || {};
 
-        const [year, month] = selectedMonth.split('-').map(Number);
-        const daysInMonth = new Date(year, month, 0).getDate();
-
-        const defaultHourlyRate = payrollConfig?.hourly_rate || 50;
-        const defaultOtRate = payrollConfig?.ot_rate || (defaultHourlyRate * 1.5);
-        
-        // Parse rates from JSON or use defaults
-        const isOwner = Boolean(emp && ((emp.position || '').toLowerCase().includes('owner') || (emp.position || '').toLowerCase().includes('ceo')));
+        const isOwner = Boolean((emp.position || '').toLowerCase().includes('owner') || (emp.position || '').toLowerCase().includes('ceo'));
         const rates = emp.shift_rates || {};
         const wageType = rates.wage_type || (emp.employment_status === 'Fulltime' && emp.base_salary > 0 ? 'monthly' : (rates.morning || rates.evening ? 'daily' : 'hourly'));
         const baseSalary = Number(emp.base_salary || rates.base_salary || 0);
-        const hourlyRate = rates.hourly_rate || defaultHourlyRate;
-        const otRate = rates.ot_rate || defaultOtRate;
+        const hourlyRate = Number(rates.hourly_rate || cfg.hourly_rate || 50);
+        const otRate = shopOtRate;
+        const doubleRate = Number(rates.double || rates.double_shift_rate || shopDoubleRate);
 
-        for (let d = 1; d <= daysInMonth; d++) {
-            const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        const punches = (logsMap.get(emp.id) || [])
+            .map((l, i) => ({ key: l.id ?? `${l.timestamp}_${i}`, type: l.action_type, t: new Date(l.timestamp) }))
+            .filter(p => p.type === 'check_in' || p.type === 'check_out')
+            .sort((a, b) => a.t - b.t);
+        const used = new Set();
+        const empTxs = txMap.get(String(emp.id)) || {};
+
+        const pushDay = (row) => dailyDetails.push({ slot_type: 'MAIN', scheduled_in: '-', scheduled_out: '-', in: '-', out: '-', wage: 0, ot: 0, ot_hours: 0, regular_hours: 0, away_mins: 0, ...row });
+
+        // Away minutes after the daily meal exemption, and the part of it inside scheduled slots
+        // Time away outside scheduled breaks, minus the daily meal exemption.
+        // Scheduled breaks (gaps between split slots) are handled separately and never paid.
+        const awayAfterExemption = (away, slotRanges, gaps = []) => {
+            const raw = away.reduce((s, a) => s + minsBetween(a.start, a.end), 0);
+            const inGaps = away.reduce((s, a) => s + gaps.reduce((x, g) => x + overlapMins(a, g), 0), 0);
+            const outside = Math.max(0, raw - inGaps);
+            const exempt = Math.min(outside, MEAL_EXEMPT_MINS);
+            const inSlots = away.reduce((s, a) => s + slotRanges.reduce((x, r) => x + overlapMins(a, r), 0), 0);
+            return { raw, counted: outside - exempt, countedInSlots: Math.max(0, inSlots - exempt) };
+        };
+
+        // Hourly-paid day with no schedule (off day / unscheduled)
+        const payFreeDay = (dateStr, label, statusWork, statusMissedOut, statusMissedIn) => {
+            const p = takeDayPunches(punches, used, at(dateStr, '05:00'), at(nextDateStr(dateStr), '05:00'));
+            if (p.checkIn && p.checkOut) {
+                const aw = awayAfterExemption(p.away, []);
+                const worked = Math.max(0, minsBetween(p.checkIn, p.checkOut) - aw.counted);
+                if (worked <= 0) {
+                    pushDay({ date: dateStr, shift: label, in: fmtTime(p.checkIn), out: fmtTime(p.checkOut), status: 'OFF' });
+                    return;
+                }
+                const regularMins = Math.min(worked, 8 * 60);
+                let otMins = Math.max(0, worked - 8 * 60);
+                if (otMins < 60) otMins = 0;
+                const wage = r2(regularMins / 60 * hourlyRate);
+                const ot = r2(otMins / 60 * otRate);
+                totalRegularHours += regularMins / 60;
+                totalOTHours += otMins / 60;
+                extraDayPay += wage;
+                totalOTPay += ot;
+                totalAwayMins += aw.counted;
+                workDays++;
+                offDayWorkCount++;
+                pushDay({ date: dateStr, shift: label, in: fmtTime(p.checkIn), out: fmtTime(p.checkOut), wage, ot, ot_hours: otMins / 60, regular_hours: regularMins / 60, away_mins: aw.counted, status: statusWork });
+            } else if (p.checkIn && now < at(nextDateStr(dateStr), '05:00')) {
+                pushDay({ date: dateStr, shift: label, in: fmtTime(p.checkIn), status: 'IN PROGRESS' });
+            } else if (p.checkIn) {
+                if (!isOwner) incompleteCount++;
+                offDayWorkCount++;
+                pushDay({ date: dateStr, shift: label, in: fmtTime(p.checkIn), status: statusMissedOut });
+            } else if (p.checkOut) {
+                if (!isOwner) incompleteCount++;
+                offDayWorkCount++;
+                pushDay({ date: dateStr, shift: label, out: fmtTime(p.checkOut), status: statusMissedIn });
+            } else if (label === 'OFF') {
+                pushDay({ date: dateStr, shift: 'OFF', status: 'OFF' });
+            }
+        };
+
+        monthDates.forEach(dateStr => {
             let dailyTxs = empTxs[dateStr] || [];
 
-            // FALLBACK 1: If no daily transactions, check weekly template schedule
+            // Fallback: weekly template (DB day_of_week: Mon = 0 … Sun = 6)
             if (dailyTxs.length === 0 && weeklySchedules.length > 0) {
-                const dateObj = new Date(year, month - 1, d);
-                const dayOfWeekJS = dateObj.getDay(); // 0=Sun, 1=Mon...
-                const dbDayOfWeek = (dayOfWeekJS + 6) % 7; // Mon=0, ..., Sun=6
-
-                const weeklySched = weeklySchedules.find(s => s.employee_id === emp.id && s.day_of_week === dbDayOfWeek);
-                if (weeklySched) {
-                    if (weeklySched.is_off) {
-                        dailyTxs = [{
-                            is_off: true,
-                            slot_type: 'MAIN',
-                            status: 'PUBLISHED'
-                        }];
-                    } else if (weeklySched.shift_id) {
-                        dailyTxs = [{
-                            employee_id: emp.id,
-                            date: dateStr,
-                            slot_type: 'MAIN',
-                            shift_id: weeklySched.shift_id,
-                            custom_start_time: null,
-                            custom_end_time: null,
-                            is_off: false,
-                            status: 'PUBLISHED'
-                        }];
-                    }
-                }
+                const dbDow = (at(dateStr, '12:00').getUTCDay() + 6) % 7;
+                const ws = weeklySchedules.find(s => s.employee_id === emp.id && s.day_of_week === dbDow);
+                if (ws?.is_off) dailyTxs = [{ is_off: true, slot_type: 'MAIN' }];
+                else if (ws?.shift_id) dailyTxs = [{ slot_type: 'MAIN', shift_id: ws.shift_id, custom_start_time: ws.custom_start_time || null, custom_end_time: ws.custom_end_time || null, is_off: false }];
             }
 
-            // Case A: Scheduled Shift(s) that are NOT OFF
-            if (dailyTxs.length > 0 && !dailyTxs.some(t => t.is_off)) {
-                dailyTxs.forEach(tx => {
-                    let checkIn = null;
-                    let checkOut = null;
+            const workSlots = dailyTxs
+                .filter(t => !t.is_off)
+                .map(t => {
+                    const shift = (shifts || []).find(s => s.id === t.shift_id);
+                    const st = (t.custom_start_time || shift?.start_time || '').slice(0, 5);
+                    const en = (t.custom_end_time || shift?.end_time || '').slice(0, 5);
+                    if (!st || !en) return null;
+                    return { tx: t, shift, st, en, ...slotRange(dateStr, st, en) };
+                })
+                .filter(Boolean)
+                .sort((a, b) => a.start - b.start);
 
-                    const shift = shifts?.find(s => s.id === tx.shift_id);
-                    const startTimeStr = tx.custom_start_time || shift?.start_time;
-                    const endTimeStr = tx.custom_end_time || shift?.end_time;
-                    
-                    if (!startTimeStr || !endTimeStr) return;
+            // ── Case A: scheduled work ──────────────────────────────────────
+            if (workSlots.length > 0) {
+                const regular = workSlots.filter(s => s.tx.slot_type !== 'OVERTIME');
+                const base = regular.length ? regular : workSlots;
+                const schedStart = base[0].start;
+                const schedEnd = new Date(Math.max(...base.map(s => s.end.getTime())));
+                const schedMins = base.reduce((sum, s) => sum + minsBetween(s.start, s.end), 0);
+                const winStart = new Date(workSlots[0].start.getTime() - 4 * 3600000);
+                const winEnd = new Date(Math.max(...workSlots.map(s => s.end.getTime())) + 6 * 3600000);
+                const label = workSlots.map(s => `${s.st}-${s.en}${s.shift?.name ? ` (${s.shift.name})` : ''}`).join(' + ');
+                const slotType = workSlots.length > 1 ? workSlots.map(s => s.tx.slot_type || 'MAIN').join('+') : (workSlots[0].tx.slot_type || 'MAIN');
+                const dayBase = { date: dateStr, slot_type: slotType, shift: label, scheduled_in: fmtTime(schedStart), scheduled_out: fmtTime(schedEnd) };
 
-                    const { start: scheduledStart, end: scheduledEnd } = createTimeRange(dateStr, startTimeStr, endTimeStr);
-                    const scheduledMins = differenceInMinutes(scheduledEnd, scheduledStart);
+                const p = takeDayPunches(punches, used, winStart, winEnd);
 
-                    // Find matching logs within 8 hour radius from shift midpoint
-                    empLogs.forEach(log => {
-                        const logTime = new Date(log.timestamp);
-                        const centerTime = new Date((scheduledStart.getTime() + scheduledEnd.getTime()) / 2);
-                        const distance = Math.abs(logTime.getTime() - centerTime.getTime());
-                        
-                        if (distance < 8 * 60 * 60 * 1000) {
-                            if (log.action_type === 'check_in') {
-                                if (!checkIn || logTime < checkIn) checkIn = logTime;
-                            } else if (log.action_type === 'check_out') {
-                                if (!checkOut || logTime > checkOut) checkOut = logTime;
-                            }
-                        }
-                    });
+                // Per-shift wage for the scheduled slots; which part is fixed (not hour-based)
+                const slotWage = (s) => {
+                    const hrs = minsBetween(s.start, s.end) / 60;
+                    if (s.shift?.rate && Number(s.shift.rate) > 0) return { pay: Number(s.shift.rate), fixed: true };
+                    if (hrs >= 11 || s.tx.slot_type === 'DOUBLE') return { pay: doubleRate, fixed: true };
+                    if (hrs <= 5.5) return rates.rush_4h ? { pay: Number(rates.rush_4h), fixed: true } : { pay: hrs * hourlyRate, fixed: false };
+                    return { pay: Number(rates.daily_rate || rates.morning || rates.evening || 350), fixed: true };
+                };
 
-                    let actualMins = 0;
+                if (p.checkIn && !p.checkOut && now < winEnd) {
+                    pushDay({ ...dayBase, in: fmtTime(p.checkIn), status: 'IN PROGRESS' });
+                    return;
+                }
+
+                if (p.checkIn) {
+                    const missedOut = !p.checkOut;
+                    const effectiveOut = missedOut ? schedEnd : p.checkOut;  // forgot to check out: pay to scheduled end
+                    if (missedOut && !isOwner) incompleteCount++;
+                    if (missedOut && effectiveOut <= p.checkIn) {
+                        pushDay({ ...dayBase, in: fmtTime(p.checkIn), status: 'MISSED CHECK-OUT' });
+                        return;
+                    }
+
+                    // Scheduled breaks between split slots are never paid, checked out or not
+                    const gaps = [];
+                    for (let k = 1; k < base.length; k++) if (base[k].start > base[k - 1].end) gaps.push({ start: base[k - 1].end, end: base[k].start });
+                    const aw = awayAfterExemption(p.away, base, gaps);
+                    const present = { start: p.checkIn, end: effectiveOut };
+                    const breakMins = gaps.reduce((s, g) => s + overlapMins(g, present), 0);
+
+                    const actualMins = Math.max(0, minsBetween(p.checkIn, effectiveOut) - breakMins - aw.counted);
+
                     let lateMins = 0;
-                    let regularMins = 0;
-                    let otMins = 0;
-                    let dailyWage = 0;
-                    let dailyOT = 0;
-
-                    if (checkIn && checkOut) {
-                        if (isAfter(checkIn, scheduledStart)) {
-                            lateMins = differenceInMinutes(checkIn, scheduledStart);
-                            if (lateMins > 15) lateCount++; // Grace period of 15 minutes
-                        }
-
-                        const awayMins = awayMinutesBetween(empLogs, checkIn, checkOut);
-                        actualMins = Math.max(0, differenceInMinutes(checkOut, checkIn) - awayMins);
-                        
-                        // Strict Roster-bound calculation: Regular time capped at scheduled end time
-                        // Overtime (OT) = any time worked past the scheduled Roster end time
-                        if (isAfter(checkOut, scheduledEnd)) {
-                            otMins = differenceInMinutes(checkOut, scheduledEnd);
-                        } else if (actualMins > scheduledMins) {
-                            otMins = actualMins - scheduledMins;
-                        } else {
-                            otMins = 0;
-                        }
-
-                        // Time away mid-day comes out of OT first: OT can't exceed real minutes worked beyond the schedule
-                        if (awayMins > 0) {
-                            otMins = Math.max(0, Math.min(otMins, actualMins - Math.min(actualMins, scheduledMins)));
-                        }
-
-                        // Overtime Policy: OT must be at least 1 hour (>= 60 minutes) to be counted
-                        if (otMins < 60) {
-                            otMins = 0;
-                        }
-
-                        regularMins = Math.min(actualMins, scheduledMins);
-                        const rHours = regularMins / 60;
-                        const oHours = otMins / 60;
-                        const scheduledHours = scheduledMins / 60;
-
-                        // Roster-Coupled Shift Wage Calculation
-                        if (wageType === 'monthly') {
-                            dailyWage = 0; // Base salary is fixed monthly
-                        } else if (wageType === 'hourly') {
-                            dailyWage = rHours * hourlyRate;
-                        } else {
-                            // Daily Shift (รายกะ): Resolved dynamically by Roster scheduled duration
-                            if (shift?.rate && Number(shift.rate) > 0) {
-                                dailyWage = Number(shift.rate);
-                            } else if (scheduledHours >= 11 || tx.slot_type === 'DOUBLE' || tx.slot_type === 'SPLIT') {
-                                // Double Shift in Roster (>=11h e.g. 10:00-00:30)
-                                dailyWage = Number(rates.double || rates.double_shift_rate || 800);
-                            } else if (scheduledHours <= 5.5) {
-                                // Short / Part-time Shift in Roster (<=5.5h e.g. 18:00-22:30)
-                                dailyWage = rates.rush_4h ? Number(rates.rush_4h) : (rHours * hourlyRate);
-                            } else {
-                                // Standard Full Shift in Roster (6h to 10.5h e.g. 10:00-18:00, 16:30-00:30, 10:00-20:30)
-                                // Uses single unified daily shift rate
-                                dailyWage = Number(rates.daily_rate || rates.morning || rates.evening || 350);
-                            }
-                        }
-
-                        dailyOT = oHours * otRate;
-
-                        // Hourly pay already shrinks with fewer minutes; fixed-pay staff get an explicit deduction
-                        totalAwayMins += awayMins;
-                        if (awayMins > 0 && wageType !== 'hourly') {
-                            awayDeduct += (awayMins / 60) * hourlyRate;
-                        }
-
-                        totalRegularHours += rHours;
-                        totalOTHours += oHours;
-                        totalSalary += dailyWage;
-                        totalOTPay += dailyOT;
-                        workDays++;
-
-                        const shiftLabel = `${startTimeStr}-${endTimeStr}${shift?.name ? ` (${shift.name})` : ''}`;
-
-                        dailyDetails.push({
-                            date: dateStr,
-                            slot_type: tx.slot_type,
-                            shift: shiftLabel,
-                            scheduled_in: formatTime(scheduledStart),
-                            scheduled_out: formatTime(scheduledEnd),
-                            in: formatTime(checkIn),
-                            out: formatTime(checkOut),
-                            wage: dailyWage,
-                            ot: dailyOT,
-                            ot_hours: oHours,
-                            regular_hours: rHours,
-                            away_mins: awayMins,
-                            status: lateMins > 0 ? `LATE (+${lateMins}M)` : 'NORMAL'
-                        });
-
-                    } else if (checkIn && !checkOut) {
-                        // Missed check-out
-                        if (!isOwner) incompleteCount++;
-                        const shiftLabel = `${startTimeStr}-${endTimeStr}${shift?.name ? ` (${shift.name})` : ''}`;
-                        dailyDetails.push({
-                            date: dateStr,
-                            slot_type: tx.slot_type,
-                            shift: shiftLabel,
-                            scheduled_in: formatTime(scheduledStart),
-                            scheduled_out: formatTime(scheduledEnd),
-                            in: formatTime(checkIn),
-                            out: '-',
-                            wage: 0, ot: 0, ot_hours: 0, regular_hours: 0,
-                            status: isOwner ? 'EXEMPT' : 'MISSED CHECK-OUT'
-                        });
-                    } else if (!checkIn && checkOut) {
-                        // Missed check-in
-                        if (!isOwner) incompleteCount++;
-                        const shiftLabel = `${startTimeStr}-${endTimeStr}${shift?.name ? ` (${shift.name})` : ''}`;
-                        dailyDetails.push({
-                            date: dateStr,
-                            slot_type: tx.slot_type,
-                            shift: shiftLabel,
-                            scheduled_in: formatTime(scheduledStart),
-                            scheduled_out: formatTime(scheduledEnd),
-                            in: '-',
-                            out: formatTime(checkOut),
-                            wage: 0, ot: 0, ot_hours: 0, regular_hours: 0,
-                            status: isOwner ? 'EXEMPT' : 'MISSED CHECK-IN'
-                        });
-                    } else {
-                        // No punches found for this scheduled shift: Check if date is in future, today, or past
-                        const now = new Date();
-                        const todayStr = format(now, 'yyyy-MM-dd');
-                        const isFutureDate = dateStr > todayStr;
-                        const isTodayDate = dateStr === todayStr;
-                        const shiftEnded = isAfter(now, scheduledEnd);
-                        const shiftLabel = `${startTimeStr}-${endTimeStr}${shift?.name ? ` (${shift.name})` : ''}`;
-
-                        if (isFutureDate) {
-                            // Future scheduled shift (ยังไม่ถึงวัน)
-                            dailyDetails.push({
-                                date: dateStr,
-                                slot_type: tx.slot_type,
-                                shift: shiftLabel,
-                                scheduled_in: formatTime(scheduledStart),
-                                scheduled_out: formatTime(scheduledEnd),
-                                in: '-',
-                                out: '-',
-                                wage: 0, ot: 0, ot_hours: 0, regular_hours: 0,
-                                status: 'SCHEDULED'
-                            });
-                        } else if (isTodayDate && !shiftEnded) {
-                            // Today's shift in progress or upcoming today
-                            dailyDetails.push({
-                                date: dateStr,
-                                slot_type: tx.slot_type,
-                                shift: shiftLabel,
-                                scheduled_in: formatTime(scheduledStart),
-                                scheduled_out: formatTime(scheduledEnd),
-                                in: '-',
-                                out: '-',
-                                wage: 0, ot: 0, ot_hours: 0, regular_hours: 0,
-                                status: 'PENDING'
-                            });
-                        } else {
-                            // Past shift that ended without punches
-                            if (tx.status === 'PUBLISHED' && !isOwner) {
-                                absentCount++;
-                            }
-                            dailyDetails.push({
-                                date: dateStr,
-                                slot_type: tx.slot_type,
-                                shift: shiftLabel,
-                                scheduled_in: formatTime(scheduledStart),
-                                scheduled_out: formatTime(scheduledEnd),
-                                in: '-',
-                                out: '-',
-                                wage: 0, ot: 0, ot_hours: 0, regular_hours: 0,
-                                status: isOwner ? 'EXEMPT' : (tx.status === 'PUBLISHED' ? 'ABSENT' : 'DRAFT')
-                            });
-                        }
+                    if (p.checkIn > schedStart) {
+                        lateMins = minsBetween(schedStart, p.checkIn);
+                        if (lateMins > 15 && !isOwner) lateCount++;
                     }
-                });
 
-            } else if (dailyTxs.some(t => t.is_off)) {
-                // Case B: Scheduled OFF day
-                const { checkIn, checkOut } = findDayPunches(empLogs, dateStr);
+                    let otMins = missedOut ? 0 : Math.max(0, actualMins - schedMins);
+                    if (otMins < 60) otMins = 0;
+                    const regularMins = Math.min(actualMins, schedMins);
 
-                if (checkIn && checkOut) {
-                    const awayMins = awayMinutesBetween(empLogs, checkIn, checkOut);
-                    const actualMins = Math.max(0, differenceInMinutes(checkOut, checkIn) - awayMins);
-                    totalAwayMins += awayMins;
-                    if (actualMins > 0) {
-                        const maxRegularMins = 8 * 60;
-                        const regularMins = Math.min(actualMins, maxRegularMins);
-                        let otMins = actualMins > maxRegularMins ? actualMins - maxRegularMins : 0;
-                        if (otMins < 60) {
-                            otMins = 0;
-                        }
-
-                        const rHours = regularMins / 60;
-                        const oHours = otMins / 60;
-
-                        const dailyWage = rHours * hourlyRate;
-                        const dailyOT = oHours * otRate;
-
-                        totalRegularHours += rHours;
-                        totalOTHours += oHours;
-                        totalSalary += dailyWage;
-                        totalOTPay += dailyOT;
-                        workDays++;
-                        offDayWorkCount++;
-
-                        dailyDetails.push({
-                            date: dateStr,
-                            slot_type: 'MAIN',
-                            shift: 'OFF (WORK)',
-                            scheduled_in: '-',
-                            scheduled_out: '-',
-                            in: formatTime(checkIn),
-                            out: formatTime(checkOut),
-                            wage: dailyWage,
-                            ot: dailyOT,
-                            ot_hours: oHours,
-                            regular_hours: rHours,
-                            status: 'OFF-DAY WORK'
+                    let wage = 0;
+                    if (wageType === 'hourly') {
+                        wage = regularMins / 60 * hourlyRate;
+                    } else if (wageType === 'daily') {
+                        let fixedPay = 0, scaledPay = 0, fixedSched = 0;
+                        base.forEach(s => {
+                            const w = slotWage(s);
+                            if (w.fixed) { fixedPay += w.pay; fixedSched += minsBetween(s.start, s.end); } else scaledPay += w.pay;
                         });
-                    } else {
-                        dailyDetails.push({
-                            date: dateStr,
-                            slot_type: 'MAIN',
-                            shift: 'OFF',
-                            scheduled_in: '-',
-                            scheduled_out: '-',
-                            in: formatTime(checkIn),
-                            out: formatTime(checkOut),
-                            wage: 0, ot: 0, ot_hours: 0, regular_hours: 0,
-                            status: 'OFF'
-                        });
+                        const workedShare = schedMins > 0 ? regularMins / schedMins : 0;
+                        wage = fixedPay + scaledPay * workedShare;
+                        // Fixed pay doesn't shrink with hours: deduct counted time away inside the fixed slots
+                        const fixedShare = schedMins > 0 ? fixedSched / schedMins : 0;
+                        if (aw.countedInSlots > 0 && fixedShare > 0) awayDeduct += (aw.countedInSlots * fixedShare) / 60 * hourlyRate;
+                    } else if (wageType === 'monthly' && aw.countedInSlots > 0) {
+                        awayDeduct += aw.countedInSlots / 60 * hourlyRate;
                     }
-                } else if (checkIn && !checkOut) {
-                    incompleteCount++;
-                    offDayWorkCount++;
-                    dailyDetails.push({
-                        date: dateStr,
-                        slot_type: 'MAIN',
-                        shift: 'OFF',
-                        scheduled_in: '-',
-                        scheduled_out: '-',
-                        in: formatTime(checkIn),
-                        out: '-',
-                        wage: 0, ot: 0, ot_hours: 0, regular_hours: 0,
-                        status: 'MISSED CHECK-OUT (OFF-DAY)'
+                    wage = r2(wage);
+                    const ot = r2(otMins / 60 * otRate);
+
+                    totalRegularHours += regularMins / 60;
+                    totalOTHours += otMins / 60;
+                    totalSalary += wage;
+                    totalOTPay += ot;
+                    totalAwayMins += aw.counted;
+                    workDays++;
+
+                    pushDay({
+                        ...dayBase,
+                        in: fmtTime(p.checkIn),
+                        out: missedOut ? '-' : fmtTime(p.checkOut),
+                        wage, ot, ot_hours: otMins / 60, regular_hours: regularMins / 60, away_mins: aw.counted,
+                        status: missedOut ? (isOwner ? 'EXEMPT' : 'MISSED CHECK-OUT') : (lateMins > 0 ? `LATE (+${lateMins}M)` : 'NORMAL'),
+                        paid_to_schedule_end: missedOut || undefined,
                     });
-                } else if (!checkIn && checkOut) {
-                    incompleteCount++;
-                    offDayWorkCount++;
-                    dailyDetails.push({
-                        date: dateStr,
-                        slot_type: 'MAIN',
-                        shift: 'OFF',
-                        scheduled_in: '-',
-                        scheduled_out: '-',
-                        in: '-',
-                        out: formatTime(checkOut),
-                        wage: 0, ot: 0, ot_hours: 0, regular_hours: 0,
-                        status: 'MISSED CHECK-IN (OFF-DAY)'
-                    });
+                } else if (p.checkOut) {
+                    if (!isOwner) incompleteCount++;
+                    pushDay({ ...dayBase, out: fmtTime(p.checkOut), status: isOwner ? 'EXEMPT' : 'MISSED CHECK-IN' });
+                } else if (dateStr > todayStr) {
+                    pushDay({ ...dayBase, status: 'SCHEDULED' });
+                } else if (now < schedEnd) {
+                    pushDay({ ...dayBase, status: 'PENDING' });
                 } else {
-                    dailyDetails.push({
-                        date: dateStr,
-                        slot_type: 'MAIN',
-                        shift: 'OFF',
-                        scheduled_in: '-',
-                        scheduled_out: '-',
-                        in: '-',
-                        out: '-',
-                        wage: 0, ot: 0, ot_hours: 0, regular_hours: 0,
-                        status: 'OFF'
-                    });
+                    if (!isOwner) absentCount++;
+                    pushDay({ ...dayBase, status: isOwner ? 'EXEMPT' : 'ABSENT' });
                 }
-
-            } else {
-                // Case C: Unscheduled day (no roster transaction & no weekly template)
-                const { checkIn, checkOut } = findDayPunches(empLogs, dateStr);
-
-                if (checkIn && checkOut) {
-                    const awayMins = awayMinutesBetween(empLogs, checkIn, checkOut);
-                    const actualMins = Math.max(0, differenceInMinutes(checkOut, checkIn) - awayMins);
-                    totalAwayMins += awayMins;
-                    if (actualMins > 0) {
-                        const maxRegularMins = 8 * 60;
-                        const regularMins = Math.min(actualMins, maxRegularMins);
-                        let otMins = actualMins > maxRegularMins ? actualMins - maxRegularMins : 0;
-                        if (otMins < 60) {
-                            otMins = 0;
-                        }
-
-                        const rHours = regularMins / 60;
-                        const oHours = otMins / 60;
-
-                        const dailyWage = rHours * hourlyRate;
-                        const dailyOT = oHours * otRate;
-
-                        totalRegularHours += rHours;
-                        totalOTHours += oHours;
-                        totalSalary += dailyWage;
-                        totalOTPay += dailyOT;
-                        workDays++;
-                        offDayWorkCount++;
-
-                        dailyDetails.push({
-                            date: dateStr,
-                            slot_type: 'MAIN',
-                            shift: 'UNSCHEDULED',
-                            scheduled_in: '-',
-                            scheduled_out: '-',
-                            in: formatTime(checkIn),
-                            out: formatTime(checkOut),
-                            wage: dailyWage,
-                            ot: dailyOT,
-                            ot_hours: oHours,
-                            regular_hours: rHours,
-                            status: 'UNSCHEDULED WORK'
-                        });
-                    }
-                } else if (checkIn && !checkOut) {
-                    incompleteCount++;
-                    offDayWorkCount++;
-                    dailyDetails.push({
-                        date: dateStr,
-                        slot_type: 'MAIN',
-                        shift: 'UNSCHEDULED',
-                        scheduled_in: '-',
-                        scheduled_out: '-',
-                        in: formatTime(checkIn),
-                        out: '-',
-                        wage: 0, ot: 0, ot_hours: 0, regular_hours: 0,
-                        status: 'MISSED CHECK-OUT (UNSCHEDULED)'
-                    });
-                } else if (!checkIn && checkOut) {
-                    incompleteCount++;
-                    offDayWorkCount++;
-                    dailyDetails.push({
-                        date: dateStr,
-                        slot_type: 'MAIN',
-                        shift: 'UNSCHEDULED',
-                        scheduled_in: '-',
-                        scheduled_out: '-',
-                        in: '-',
-                        out: formatTime(checkOut),
-                        wage: 0, ot: 0, ot_hours: 0, regular_hours: 0,
-                        status: 'MISSED CHECK-IN (UNSCHEDULED)'
-                    });
-                }
+                return;
             }
-        }
 
-        // Deductions & Allowances Calculation
-        // If Monthly staff and active, set totalSalary to baseSalary
-        if (wageType === 'monthly' && baseSalary > 0) {
-            totalSalary = baseSalary;
-        }
+            // ── Case B: scheduled OFF ────────────────────────────────────────
+            if (dailyTxs.some(t => t.is_off)) {
+                payFreeDay(dateStr, 'OFF', 'OFF-DAY WORK', 'MISSED CHECK-OUT (OFF-DAY)', 'MISSED CHECK-IN (OFF-DAY)');
+                return;
+            }
+
+            // ── Case C: nothing scheduled ────────────────────────────────────
+            payFreeDay(dateStr, 'UNSCHEDULED', 'UNSCHEDULED WORK', 'MISSED CHECK-OUT (UNSCHEDULED)', 'MISSED CHECK-IN (UNSCHEDULED)');
+        });
+
+        // Monthly staff: base salary, plus off-day / unscheduled pay on top
+        if (wageType === 'monthly' && baseSalary > 0) totalSalary = baseSalary + extraDayPay;
+        else totalSalary += extraDayPay;
+        totalSalary = r2(totalSalary);
+        totalOTPay = r2(totalOTPay);
 
         // Allowances
         const monthlyAllowance = Number(rates.monthly_allowance || 0);
         const diligenceAllowance = Number(rates.diligence_allowance || 0);
         const isDiligenceEarned = diligenceAllowance > 0 && workDays > 0 && absentCount === 0 && lateCount === 0 && incompleteCount === 0;
-        const totalAllowances = monthlyAllowance + (isDiligenceEarned ? diligenceAllowance : 0);
 
-        // Gross before statutory deductions
-        const grossEarnings = totalSalary + totalOTPay + totalAllowances;
+        // Adjustments for this month. Type comes from the `type` column, or from a reason prefix
+        // ("[โบนัส] …", "[เบิกล่วงหน้า] …") saved before that column existed.
+        const adjType = (d) => d.type || ((d.reason || "").startsWith("[โบนัส]") ? "bonus" : (d.reason || "").startsWith("[เบิกล่วงหน้า]") ? "advance" : "deduction");
+        const empAdjustments = (deductionsMap.get(emp.id) || []).map(d => ({ ...d, type: adjType(d) }));
+        const bonusTotal = r2(empAdjustments.filter(d => d.type === 'bonus').reduce((s, d) => s + (d.is_percentage ? 0 : parseFloat(d.amount || 0)), 0));
+        const totalAllowances = r2(monthlyAllowance + (isDiligenceEarned ? diligenceAllowance : 0) + bonusTotal);
 
-        // Statutory Deductions
+        const grossEarnings = r2(totalSalary + totalOTPay + totalAllowances);
+
         let ssoDeduct = 0;
-        if (rates.social_security_enrolled) {
-            // Social security: 5% of base earnings capped at 15,000 THB (max 750 THB)
-            const ssoBase = Math.min(Math.max(grossEarnings, 0), 15000);
-            ssoDeduct = Math.round(ssoBase * 0.05);
+        if (ssoEnabled && rates.social_security_enrolled) {
+            ssoDeduct = Math.min(Math.round(Math.max(grossEarnings, 0) * ssoPct / 100), ssoCap);
         }
-
         const taxPct = Number(rates.withholding_tax_pct || 0);
-        const taxDeduct = taxPct > 0 ? (grossEarnings * (taxPct / 100)) : 0;
+        const taxDeduct = r2(taxPct > 0 ? grossEarnings * (taxPct / 100) : 0);
 
-        // Custom Deductions from table
-        const empDeductions = deductionsMap.get(emp.id) || [];
-        let customDeduct = 0;
-        empDeductions.forEach(d => {
-            if (d.is_percentage) {
-                customDeduct += (grossEarnings) * (parseFloat(d.amount) / 100);
-            } else {
-                customDeduct += parseFloat(d.amount);
-            }
+        const adjustments = empAdjustments.map(d => {
+            const amount = d.is_percentage ? grossEarnings * (parseFloat(d.amount || 0) / 100) : parseFloat(d.amount || 0);
+            return { id: d.id, type: d.type || 'deduction', reason: d.reason || '', is_percentage: !!d.is_percentage, raw: Number(d.amount), amount: r2(amount) };
         });
+        const customDeduct = r2(adjustments.filter(a => a.type !== 'bonus').reduce((s, a) => s + a.amount, 0));
 
-        awayDeduct = Math.round(awayDeduct * 100) / 100;
-        const totalDeduct = ssoDeduct + taxDeduct + customDeduct + awayDeduct;
-        const netSalary = Math.max(0, grossEarnings - totalDeduct);
+        awayDeduct = r2(awayDeduct);
+        const totalDeduct = r2(ssoDeduct + taxDeduct + customDeduct + awayDeduct);
+        const netSalary = r2(Math.max(0, grossEarnings - totalDeduct));
 
         return {
             emp,
@@ -634,6 +420,7 @@ export const calculatePayroll = (employees, logs, transactions, shifts, payrollC
             monthlyAllowance,
             diligenceAllowance,
             isDiligenceEarned,
+            bonusTotal,
             totalAllowances,
             ssoDeduct,
             taxDeduct,
@@ -647,6 +434,7 @@ export const calculatePayroll = (employees, logs, transactions, shifts, payrollC
             absentCount,
             incompleteCount,
             offDayWorkCount,
+            adjustments,
             dailyDetails: dailyDetails.sort((a, b) => a.date.localeCompare(b.date))
         };
     });
@@ -715,9 +503,9 @@ export const simulateStaffPayroll = (emp, assumptions = {}) => {
     const wageType = rates.wage_type || (emp?.employment_status === 'Fulltime' && emp?.base_salary > 0 ? 'monthly' : (rates.morning || rates.evening || rates.mid ? 'daily' : 'hourly'));
     const baseSalary = Number(emp?.base_salary || rates.base_salary || 0);
     const standardShiftRate = Number(rates.morning || rates.daily_rate || 350);
-    const doubleRate = Number(rates.double || rates.double_shift_rate || 800);
+    const doubleRate = Number(rates.double || rates.double_shift_rate || assumptions.doubleShiftRate || 700);
     const hourlyRate = Number(rates.hourly_rate || 50);
-    const otRate = Number(rates.ot_rate || (hourlyRate * 1.5));
+    const otRate = Number(assumptions.otRate ?? 50); // one shop-wide OT rate
     
     const regularShifts = Number(assumptions.regularShifts ?? assumptions.morningShifts ?? 20);
     const doubleShifts = Number(assumptions.doubleShifts ?? 2);
@@ -747,7 +535,7 @@ export const simulateStaffPayroll = (emp, assumptions = {}) => {
     const gross = basePay + otPay + totalAllowances;
     
     let sso = 0;
-    if (rates.social_security_enrolled) {
+    if (assumptions.ssoEnabled && rates.social_security_enrolled) {
         const ssoBase = Math.min(Math.max(gross, 0), 15000);
         sso = Math.round(ssoBase * 0.05);
     }

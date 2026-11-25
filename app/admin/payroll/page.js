@@ -1,16 +1,53 @@
 "use client";
+/* Brand v2 · payroll. Cream surface, plum header, one charcoal primary (พิมพ์สลิปทั้งหมด).
+ * Thai labels, money in DM Mono with 2 decimals, no icons. Works as a list on phone and desktop.
+ * Hallmark · pre-emit critique: P5 H5 E5 S5 R5 V5 */
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../../lib/supabaseClient';
 import { calculatePayroll } from '../../../utils/payroll';
 import { format, startOfMonth, endOfMonth, addDays } from 'date-fns';
 import { th } from 'date-fns/locale';
-import { 
-    FileText, Printer, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, 
-    Search, Filter, Plus, Download, Copy, Check, AlertTriangle, Sparkles, 
-    Shield, DollarSign, Users, CreditCard, Building2, Trash2, X, Calculator, HelpCircle
-} from 'lucide-react';
 import * as XLSX from 'xlsx';
+
+const baht = (n) => `฿${Number(n || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const hrs = (n) => (n > 0 ? Number(n).toFixed(1) : '-');
+const awayFmt = (m) => `${Math.floor(m / 60) > 0 ? `${Math.floor(m / 60)} ชม. ` : ''}${m % 60} น.`;
+const WAGE_TH = { monthly: 'รายเดือน', daily: 'รายกะ', hourly: 'รายชั่วโมง' };
+const ADJ_TH = { deduction: 'หักเงิน', advance: 'เบิกล่วงหน้า', bonus: 'โบนัส' };
+
+// Day status code from utils/payroll.js → Thai label + tone
+const statusInfo = (status) => {
+    const s = String(status || '');
+    const late = s.match(/^LATE \(\+(\d+)M\)/);
+    if (late) return { label: `สาย ${late[1]} น.`, tone: 'warn' };
+    const map = {
+        'NORMAL': ['ปกติ', 'ok'],
+        'IN PROGRESS': ['กำลังทำงาน', 'mute'],
+        'MISSED CHECK-OUT': ['ลืมลงเวลาออก · จ่ายถึงเลิกกะ', 'warn'],
+        'MISSED CHECK-IN': ['ลืมลงเวลาเข้า · ไม่จ่าย', 'warn'],
+        'ABSENT': ['ขาดงาน', 'warn'],
+        'SCHEDULED': ['ยังไม่ถึงวัน', 'mute'],
+        'PENDING': ['วันนี้', 'mute'],
+        'EXEMPT': ['ยกเว้น', 'mute'],
+        'OFF': ['หยุด', 'mute'],
+        'OFF-DAY WORK': ['มาทำวันหยุด', 'info'],
+        'MISSED CHECK-OUT (OFF-DAY)': ['วันหยุด · ลืมลงเวลาออก', 'warn'],
+        'MISSED CHECK-IN (OFF-DAY)': ['วันหยุด · ลืมลงเวลาเข้า', 'warn'],
+        'UNSCHEDULED WORK': ['มาโดยไม่มีกะ', 'info'],
+        'MISSED CHECK-OUT (UNSCHEDULED)': ['ไม่มีกะ · ลืมลงเวลาออก', 'warn'],
+        'MISSED CHECK-IN (UNSCHEDULED)': ['ไม่มีกะ · ลืมลงเวลาเข้า', 'warn'],
+    };
+    const [label, tone] = map[s] || [s, 'mute'];
+    return { label, tone };
+};
+const toneCls = {
+    ok: 'border-rule text-subtle',
+    warn: 'bg-plum text-cream border-plum',
+    info: 'border-plum text-plum',
+    mute: 'border-rule text-neutral',
+};
+const isException = (d) => ['warn', 'info'].includes(statusInfo(d.status).tone);
 
 export default function PayrollDashboard() {
     const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
@@ -21,17 +58,16 @@ export default function PayrollDashboard() {
     const [searchQuery, setSearchQuery] = useState('');
     const [wageFilter, setWageFilter] = useState('ALL'); // 'ALL' | 'monthly' | 'daily' | 'hourly'
     const [copiedBankId, setCopiedBankId] = useState(null);
+    const [toast, setToast] = useState(null);
 
-    // Modal state for adding custom deduction/adjustment
     const [showAdjustmentModal, setShowAdjustmentModal] = useState(false);
-    const [adjustmentForm, setAdjustmentForm] = useState({
-        empId: '',
-        amount: '',
-        isPercent: false,
-        reason: '',
-        type: 'deduction' // 'deduction' | 'bonus' | 'advance'
-    });
+    const [adjustmentForm, setAdjustmentForm] = useState({ empId: '', amount: '', isPercent: false, reason: '', type: 'deduction' });
     const [isSavingAdjustment, setIsSavingAdjustment] = useState(false);
+
+    const showToast = (message, type = 'success') => {
+        setToast({ message, type });
+        setTimeout(() => setToast(null), 4000);
+    };
 
     const toggleExpand = (empId) => {
         setExpandedEmpId(expandedEmpId === empId ? null : empId);
@@ -54,154 +90,101 @@ export default function PayrollDashboard() {
             supabase.from('employees').select('*').order('id'),
             supabase.from('shifts').select('*').order('start_time'),
             supabase.from('roster_transactions').select('*').gte('date', startStr).lte('date', endStr),
-            supabase.from('attendance_logs').select('*').gte('timestamp', startDate.toISOString()).lte('timestamp', addDays(endDate, 2).toISOString()),
+            // From the day before: a night shift on the last day of the previous month ends after midnight
+            supabase.from('attendance_logs').select('*').gte('timestamp', addDays(startDate, -1).toISOString()).lte('timestamp', addDays(endDate, 2).toISOString()).order('timestamp'),
             supabase.from('employee_schedules').select('*'),
             supabase.from('payroll_deductions').select('*').eq('month', selectedMonth),
             supabase.from('payroll_config').select('*')
         ]);
 
-        const payrollConfig = { hourly_rate: 50, ot_rate: 75 };
-        configRes.data?.forEach(c => {
-            payrollConfig[c.key] = Number(c.value);
-        });
+        const payrollConfig = { hourly_rate: 50, ot_rate: 50 };
+        configRes.data?.forEach(c => { payrollConfig[c.key] = Number(c.value); });
 
         if (empRes.data && transRes.data && logRes.data) {
-            const data = calculatePayroll(
-                empRes.data, 
-                logRes.data, 
-                transRes.data, 
-                shiftRes.data || [], 
-                payrollConfig,
-                deductRes.data || [], 
-                selectedMonth,
-                schedRes.data || []
-            );
-            setPayrollData(data);
+            setPayrollData(calculatePayroll(empRes.data, logRes.data, transRes.data, shiftRes.data || [], payrollConfig, deductRes.data || [], selectedMonth, schedRes.data || []));
         }
         setLoading(false);
     }
 
-    const prevMonth = () => {
-        const [year, month] = selectedMonth.split('-');
-        const date = new Date(year, month - 2);
-        setSelectedMonth(format(date, 'yyyy-MM'));
+    const shiftMonth = (delta) => {
+        const [year, month] = selectedMonth.split('-').map(Number);
+        setSelectedMonth(format(new Date(year, month - 1 + delta), 'yyyy-MM'));
     };
 
-    const nextMonth = () => {
-        const [year, month] = selectedMonth.split('-');
-        const date = new Date(year, month);
-        setSelectedMonth(format(date, 'yyyy-MM'));
-    };
-
-    // Summary calculations
     const summary = useMemo(() => {
-        const activeWorking = payrollData.filter(d => d.workDays > 0 || d.totalSalary > 0);
-        const totalNetSalary = payrollData.reduce((sum, item) => sum + item.netSalary, 0);
-        const totalBaseSalary = payrollData.reduce((sum, item) => sum + item.totalSalary, 0);
-        const totalOTPay = payrollData.reduce((sum, item) => sum + item.totalOTPay, 0);
-        const totalAllowances = payrollData.reduce((sum, item) => sum + (item.totalAllowances || 0), 0);
-        const totalDeductions = payrollData.reduce((sum, item) => sum + (item.totalDeduct || 0), 0);
-        const totalSsoDeduct = payrollData.reduce((sum, item) => sum + (item.ssoDeduct || 0), 0);
-        const totalTaxDeduct = payrollData.reduce((sum, item) => sum + (item.taxDeduct || 0), 0);
-
-        const totalMissedPunches = payrollData.reduce((sum, item) => sum + (item.incompleteCount || 0), 0);
-        const totalOffDayWorks = payrollData.reduce((sum, item) => sum + (item.offDayWorkCount || 0), 0);
-        const totalLate = payrollData.reduce((sum, item) => sum + (item.lateCount || 0), 0);
-        const totalAbsent = payrollData.reduce((sum, item) => sum + (item.absentCount || 0), 0);
-
+        const sum = (f) => payrollData.reduce((s, item) => s + (f(item) || 0), 0);
         return {
-            workingStaffCount: activeWorking.length,
-            totalNetSalary,
-            totalBaseSalary,
-            totalOTPay,
-            totalAllowances,
-            totalDeductions,
-            totalSsoDeduct,
-            totalTaxDeduct,
-            totalMissedPunches,
-            totalOffDayWorks,
-            totalLate,
-            totalAbsent
+            totalNetSalary: sum(i => i.netSalary),
+            totalBaseSalary: sum(i => i.totalSalary),
+            totalOTPay: sum(i => i.totalOTPay),
+            totalAllowances: sum(i => i.totalAllowances),
+            totalDeductions: sum(i => i.totalDeduct),
+            totalMissedPunches: sum(i => i.incompleteCount),
+            totalOffDayWorks: sum(i => i.offDayWorkCount),
+            totalLate: sum(i => i.lateCount),
+            totalAbsent: sum(i => i.absentCount),
         };
     }, [payrollData]);
 
-    // Filtered payroll data for display
-    const filteredPayrollData = useMemo(() => {
-        return payrollData.filter(item => {
-            // Search query
-            if (searchQuery.trim()) {
-                const q = searchQuery.toLowerCase();
-                const name = (item.emp.name || '').toLowerCase();
-                const nickname = (item.emp.nickname || '').toLowerCase();
-                const position = (item.emp.position || '').toLowerCase();
-                const bank = (item.emp.bank_account || '').toLowerCase();
-                if (!name.includes(q) && !nickname.includes(q) && !position.includes(q) && !bank.includes(q)) {
-                    return false;
-                }
-            }
+    const filteredPayrollData = useMemo(() => payrollData.filter(item => {
+        if (searchQuery.trim()) {
+            const q = searchQuery.toLowerCase();
+            const hay = [item.emp.name, item.emp.nickname, item.emp.position, item.emp.bank_account].map(v => (v || '').toLowerCase());
+            if (!hay.some(v => v.includes(q))) return false;
+        }
+        return wageFilter === 'ALL' || item.wageType === wageFilter;
+    }), [payrollData, searchQuery, wageFilter]);
 
-            // Wage type filter
-            if (wageFilter !== 'ALL') {
-                if (item.wageType !== wageFilter) return false;
-            }
-
-            return true;
-        });
-    }, [payrollData, searchQuery, wageFilter]);
-
-    // Handle adding custom adjustment/deduction
     const handleSaveAdjustment = async (e) => {
         e.preventDefault();
         if (!adjustmentForm.empId || !adjustmentForm.amount) {
-            return alert("กรุณาเลือกพนักงานและระบุจำนวนเงิน");
+            showToast('เลือกพนักงานและใส่จำนวนเงินก่อน', 'error');
+            return;
         }
-
         setIsSavingAdjustment(true);
+        const type = adjustmentForm.type || 'deduction';
+        const reason = adjustmentForm.reason.trim() || ADJ_TH[type];
+        const row = {
+            employee_id: adjustmentForm.empId,
+            month: selectedMonth,
+            amount: Number(adjustmentForm.amount),
+            is_percentage: type === 'deduction' && !!adjustmentForm.isPercent,
+            reason,
+        };
         try {
-            const { error } = await supabase.from('payroll_deductions').insert({
-                employee_id: adjustmentForm.empId,
-                month: selectedMonth,
-                amount: Number(adjustmentForm.amount),
-                is_percentage: !!adjustmentForm.isPercent,
-                reason: adjustmentForm.reason || 'รายการปรับยอดเงินเดือน',
-                type: adjustmentForm.type || 'deduction'
-            });
-
+            let { error } = await supabase.from('payroll_deductions').insert({ ...row, type });
+            // Column `type` not added yet (migration 20261125_payroll_deductions_type.sql): keep the type in the reason
+            if (error && (error.code === '42703' || error.code === 'PGRST204' || /type/.test(error.message || ''))) {
+                const prefix = type === 'bonus' ? '[โบนัส] ' : type === 'advance' ? '[เบิกล่วงหน้า] ' : '';
+                ({ error } = await supabase.from('payroll_deductions').insert({ ...row, reason: prefix + reason }));
+            }
             if (error) throw error;
-
-            alert("บันทึกรายการปรับยอดสำเร็จ!");
+            showToast(`บันทึก${ADJ_TH[type]}แล้ว`);
             setShowAdjustmentModal(false);
             setAdjustmentForm({ empId: '', amount: '', isPercent: false, reason: '', type: 'deduction' });
             fetchData();
         } catch (err) {
-            alert("Error: " + err.message);
+            showToast('บันทึกไม่สำเร็จ: ' + (err.message || err), 'error');
         } finally {
             setIsSavingAdjustment(false);
         }
     };
 
-    // Handle deleting a deduction
-    const handleDeleteDeduction = async (deductId) => {
-        if (!confirm("คุณต้องการลบรายการปรับยอดนี้หรือไม่?")) return;
-        try {
-            const { error } = await supabase.from('payroll_deductions').delete().eq('id', deductId);
-            if (error) throw error;
-            fetchData();
-        } catch (err) {
-            alert("Error: " + err.message);
-        }
+    const handleDeleteDeduction = async (adj) => {
+        if (!confirm(`ลบรายการ "${adj.reason || ADJ_TH[adj.type]}" ${baht(adj.amount)} ?`)) return;
+        const { error } = await supabase.from('payroll_deductions').delete().eq('id', adj.id);
+        if (error) showToast('ลบไม่สำเร็จ: ' + error.message, 'error');
+        else { showToast('ลบรายการแล้ว'); fetchData(); }
     };
 
-    // Handle Export detailed excel
     const handleExportExcel = () => {
-        if (!filteredPayrollData.length) return alert("ไม่มีข้อมูลสำหรับการ Export");
-
+        if (!filteredPayrollData.length) { showToast('ไม่มีข้อมูลให้ส่งออก', 'error'); return; }
         const masterSummaryRows = filteredPayrollData.map(item => ({
             "รหัสพนักงาน": item.emp.id,
             "ชื่อ - นามสกุล": item.emp.name,
             "ชื่อเล่น": item.emp.nickname || "-",
             "ตำแหน่ง": item.emp.position || "-",
-            "ประเภทค่าจ้าง": item.wageType === 'monthly' ? 'รายเดือน' : (item.wageType === 'daily' ? 'รายกะ' : 'รายชั่วโมง'),
+            "ประเภทค่าจ้าง": WAGE_TH[item.wageType] || item.wageType,
             "วันทำงาน (วัน)": item.workDays,
             "ชม. ปกติ": Number(item.totalRegularHours.toFixed(1)),
             "ชม. OT": Number(item.totalOTHours.toFixed(1)),
@@ -209,674 +192,333 @@ export default function PayrollDashboard() {
             "ค่าล่วงเวลา OT (บาท)": item.totalOTPay,
             "ค่าตำแหน่ง/เบี้ยเลี้ยง (บาท)": item.monthlyAllowance || 0,
             "เบี้ยขยัน (บาท)": item.isDiligenceEarned ? item.diligenceAllowance : 0,
+            "โบนัส (บาท)": item.bonusTotal || 0,
             "สวัสดิการรวม (บาท)": item.totalAllowances || 0,
             "หักประกันสังคม (บาท)": item.ssoDeduct || 0,
             "หักภาษี ณ ที่จ่าย (บาท)": item.taxDeduct || 0,
-            "รายการหักอื่นๆ (บาท)": item.customDeduct || 0,
-            "ออกระหว่างวัน (นาที)": item.totalAwayMins || 0,
+            "หัก/เบิกล่วงหน้า (บาท)": item.customDeduct || 0,
+            "ออกระหว่างวันที่หัก (นาที)": item.totalAwayMins || 0,
             "หักเวลาออกระหว่างวัน (บาท)": item.awayDeduct || 0,
             "ยอดหักรวม (บาท)": item.totalDeduct,
-            "ยอดจ่ายสุทธิ (Net THB)": item.netSalary,
+            "ยอดจ่ายสุทธิ (บาท)": item.netSalary,
             "ธนาคาร": item.emp.bank_name || "-",
             "เลขบัญชี": item.emp.bank_account || "-",
             "มาสาย (ครั้ง)": item.lateCount || 0,
             "ขาดงาน (ครั้ง)": item.absentCount || 0,
-            "ไม่ลงเวลาออก (ครั้ง)": item.incompleteCount || 0,
-            "ทำงานวันหยุด (วัน)": item.offDayWorkCount || 0
+            "ลืมลงเวลา (ครั้ง)": item.incompleteCount || 0,
+            "ทำวันหยุด (วัน)": item.offDayWorkCount || 0
         }));
-
         const detailedDailyRows = [];
-        filteredPayrollData.forEach(item => {
-            item.dailyDetails.forEach(day => {
-                detailedDailyRows.push({
-                    "วันที่": day.date,
-                    "พนักงาน": item.emp.name,
-                    "ชื่อเล่น": item.emp.nickname || "-",
-                    "กะงาน": day.shift,
-                    "เวลาตามตาราง": day.scheduled_in !== '-' ? `${day.scheduled_in} - ${day.scheduled_out}` : '-',
-                    "เวลาเข้าจริง": day.in,
-                    "เวลาออกจริง": day.out,
-                    "ชม. ปกติ": day.regular_hours > 0 ? Number(day.regular_hours.toFixed(1)) : 0,
-                    "ชม. OT": day.ot_hours > 0 ? Number(day.ot_hours.toFixed(1)) : 0,
-                    "ค่าแรงประจำวัน (บาท)": day.wage || 0,
-                    "ค่า OT (บาท)": day.ot || 0,
-                    "รวมค่าจ้างวันนั้น (บาท)": (day.wage || 0) + (day.ot || 0),
-                    "สถานะการลงเวลา": day.status
-                });
-            });
-        });
-
+        filteredPayrollData.forEach(item => item.dailyDetails.forEach(day => detailedDailyRows.push({
+            "วันที่": day.date,
+            "พนักงาน": item.emp.name,
+            "ชื่อเล่น": item.emp.nickname || "-",
+            "กะงาน": day.shift,
+            "เวลาตามตาราง": day.scheduled_in !== '-' ? `${day.scheduled_in} - ${day.scheduled_out}` : '-',
+            "เวลาเข้าจริง": day.in,
+            "เวลาออกจริง": day.out,
+            "ออกระหว่างวันที่หัก (นาที)": day.away_mins || 0,
+            "ชม. ปกติ": day.regular_hours > 0 ? Number(day.regular_hours.toFixed(1)) : 0,
+            "ชม. OT": day.ot_hours > 0 ? Number(day.ot_hours.toFixed(1)) : 0,
+            "ค่าแรงประจำวัน (บาท)": day.wage || 0,
+            "ค่า OT (บาท)": day.ot || 0,
+            "รวมค่าจ้างวันนั้น (บาท)": (day.wage || 0) + (day.ot || 0),
+            "สถานะ": statusInfo(day.status).label
+        })));
         const wb = XLSX.utils.book_new();
-        const wsMaster = XLSX.utils.json_to_sheet(masterSummaryRows);
-        const wsDaily = XLSX.utils.json_to_sheet(detailedDailyRows);
-
-        XLSX.utils.book_append_sheet(wb, wsMaster, "Payroll_Master_Summary");
-        XLSX.utils.book_append_sheet(wb, wsDaily, "Attendance_Daily_Breakdown");
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(masterSummaryRows), "สรุปเงินเดือน");
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(detailedDailyRows), "รายวัน");
         XLSX.writeFile(wb, `InTheHaus_Payroll_${selectedMonth}.xlsx`);
     };
 
-    // Copy bank transfer info to clipboard
     const handleCopyBankInfo = (emp, netSalary) => {
-        const text = `${emp.bank_name || 'BANK'} ${emp.bank_account || ''} | ${emp.nickname || emp.name} | ฿${netSalary.toLocaleString('th-TH', { minimumFractionDigits: 2 })}`;
-        navigator.clipboard.writeText(text);
+        navigator.clipboard.writeText(`${emp.bank_name || 'BANK'} ${emp.bank_account || ''} | ${emp.nickname || emp.name} | ${baht(netSalary)}`);
         setCopiedBankId(emp.id);
         setTimeout(() => setCopiedBankId(null), 2000);
     };
 
-    const getStatusBadgeStyle = (status) => {
-        const s = (status || '').toUpperCase();
-        if (s.includes('OFF-DAY WORK')) return 'bg-rams-ink text-rams-panel border-rams-ink font-bold';
-        if (s.includes('UNSCHEDULED WORK')) return 'bg-rams-orange/15 text-rams-orange border-rams-orange/30 font-bold';
-        if (s.includes('MISSED') || s.includes('INCOMPLETE') || s.includes('ABSENT')) return 'bg-rams-red/15 text-rams-red border-rams-red/30 font-bold';
-        if (s.includes('LATE')) return 'bg-rams-amber/15 text-rams-amber border-rams-amber/30 font-bold';
-        if (s === 'OFF') return 'bg-rams-bg text-rams-ink-muted border-rams-rule-light';
-        return 'bg-rams-green/10 text-rams-green border-rams-green/30 font-bold';
-    };
-
     const filterDailyList = (list) => {
-        if (dailyFilter === 'EXCEPTIONS') {
-            return list.filter(d => {
-                const s = (d.status || '').toUpperCase();
-                return s.includes('MISSED') || s.includes('OFF-DAY') || s.includes('UNSCHEDULED') || s.includes('LATE') || s.includes('ABSENT') || s.includes('INCOMPLETE');
-            });
-        }
-        if (dailyFilter === 'WORK') {
-            return list.filter(d => d.shift !== 'OFF' || d.status.includes('WORK'));
-        }
-        if (dailyFilter === 'OFF') {
-            return list.filter(d => d.shift === 'OFF' || d.status === 'OFF');
-        }
+        if (dailyFilter === 'EXCEPTIONS') return list.filter(isException);
+        if (dailyFilter === 'WORK') return list.filter(d => (d.wage + d.ot) > 0 || d.in !== '-');
+        if (dailyFilter === 'OFF') return list.filter(d => d.shift === 'OFF');
         return list;
     };
 
+    const [y, m] = selectedMonth.split('-').map(Number);
+    const monthLabel = `${format(new Date(y, m - 1), 'LLLL', { locale: th })} ${y + 543}`;
+    const flagsOf = (item) => [
+        item.incompleteCount > 0 && `ลืมลงเวลา ${item.incompleteCount}`,
+        item.absentCount > 0 && `ขาด ${item.absentCount}`,
+        item.lateCount > 0 && `สาย ${item.lateCount}`,
+        item.offDayWorkCount > 0 && `ทำวันหยุด ${item.offDayWorkCount}`,
+    ].filter(Boolean);
+
+    const input = 'w-full min-h-12 px-4 bg-cream border border-charcoal text-base text-charcoal placeholder:text-neutral outline-none focus-visible:border-plum';
+
     return (
-        <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6 text-rams-ink font-sans min-h-screen bg-rams-bg selection:bg-rams-ink/10">
-            
-            {/* Top Navigation Breadcrumb */}
-            <div className="flex justify-between items-center">
-                <a href="/admin" className="text-xs font-mono font-bold text-rams-ink-muted hover:text-rams-ink flex items-center gap-1.5 w-fit transition-colors uppercase tracking-wider">
-                    <ChevronLeft size={14} /> กลับสู่หน้าแดชบอร์ดหลัก (Admin Portal)
-                </a>
-                <div className="flex items-center gap-2">
-                    <a 
-                        href="/admin" 
-                        onClick={(e) => { e.preventDefault(); window.location.href = '/admin'; }}
-                        className="text-[10px] font-mono font-bold text-rams-orange uppercase tracking-wider hover:underline"
-                    >
-                        ⚙️ จัดการเรทใน Staff Directory
-                    </a>
-                </div>
-            </div>
-
-            {/* Header Title & Report Buttons */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-rams-panel p-5 rounded-sm border border-rams-rule shadow-none">
-                <div>
-                    <div className="flex items-center gap-2.5">
-                        <DollarSign size={20} className="text-rams-orange" />
-                        <h1 className="text-lg font-mono font-bold tracking-wider text-rams-ink uppercase">
-                            ระบบประมวลผลเงินเดือน (Payroll & Attendance Engine)
-                        </h1>
-                    </div>
-                    <p className="text-[10px] font-mono uppercase tracking-widest text-rams-ink-muted mt-1.5">
-                        คำนวณอัตโนมัติตามโมเดลค่าจ้าง (รายเดือน / รายกะ / ราย ชม.), บันทึกเวลาเข้า-ออกจริง, OT, เบี้ยขยัน, และประกันสังคม
-                    </p>
-                </div>
-                
-                <div className="flex flex-wrap gap-2">
-                    <button
-                        onClick={() => setShowAdjustmentModal(true)}
-                        className="flex items-center gap-1.5 px-3.5 py-2 bg-rams-bg hover:bg-rams-ink-muted/10 text-rams-ink rounded-sm border border-rams-rule-light text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer"
-                    >
-                        <Plus size={13} className="text-rams-orange" />
-                        <span>ปรับยอด/หักเงิน</span>
-                    </button>
-                    <button
-                        onClick={handleExportExcel}
-                        className="flex items-center gap-1.5 px-3.5 py-2 bg-rams-bg hover:bg-rams-ink-muted/10 text-rams-ink rounded-sm border border-rams-rule-light text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer"
-                    >
-                        <Download size={13} />
-                        <span>Excel</span>
-                    </button>
-                    <a 
-                        href={`/admin/payroll/report?month=${selectedMonth}&type=master`} 
-                        target="_blank"
-                        className="flex items-center gap-1.5 px-3.5 py-2 bg-rams-bg hover:bg-rams-ink-muted/10 text-rams-ink rounded-sm border border-rams-rule-light text-xs font-mono font-bold uppercase tracking-wider transition-all"
-                    >
-                        <FileText size={13} className="text-rams-ink-muted" /> 
-                        <span>Master Report</span>
-                    </a>
-                    <a 
-                        href={`/admin/payroll/report?month=${selectedMonth}&type=individual`} 
-                        target="_blank"
-                        className="flex items-center gap-1.5 px-4 py-2 bg-rams-orange hover:bg-rams-orange-active text-rams-panel rounded-sm border border-rams-rule text-xs font-mono font-bold uppercase tracking-wider shadow-[0_2px_0_0_var(--color-rams-rule)] active:translate-y-[1px] active:shadow-none transition-all"
-                    >
-                        <Printer size={13} /> 
-                        <span>พิมพ์สลิป (Payslips)</span>
-                    </a>
-                </div>
-            </div>
-
-            {/* Metrics Overview Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3.5">
-                {/* Metric 1: Net Payout */}
-                <div className="bg-rams-panel p-5 rounded-sm border border-rams-rule shadow-none flex flex-col justify-between">
-                    <p className="text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1">
-                        ยอดจ่ายเงินเดือนสุทธิรวม (Net Payout)
-                    </p>
-                    <h3 className="text-2xl font-mono font-black text-rams-green tracking-tight">
-                        ฿{summary.totalNetSalary.toLocaleString('th-TH', { minimumFractionDigits: 2 })}
-                    </h3>
-                    <div className="mt-2 pt-2 border-t border-rams-rule-light flex justify-between text-[10px] font-mono text-rams-ink-muted">
-                        <span>ฐาน + OT: ฿{(summary.totalBaseSalary + summary.totalOTPay).toLocaleString()}</span>
-                        <span>สวัสดิการ: +฿{summary.totalAllowances.toLocaleString()}</span>
-                    </div>
-                </div>
-
-                {/* Metric 2: Month Selector */}
-                <div className="bg-rams-panel p-4 rounded-sm border border-rams-rule-light flex flex-col justify-center items-center shadow-none">
-                    <p className="text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-2">
-                        รอบประจำเดือน (Payroll Period)
-                    </p>
-                    <div className="flex items-center gap-3">
-                        <button 
-                            onClick={prevMonth} 
-                            className="w-8 h-8 bg-rams-bg border border-rams-rule-light hover:border-rams-rule text-rams-ink flex items-center justify-center rounded-sm transition-all cursor-pointer"
-                        >
-                            <ChevronLeft size={16}/>
-                        </button>
-                        <span className="text-sm font-mono font-bold w-32 text-center uppercase tracking-wider text-rams-ink">
-                            {format(new Date(selectedMonth + '-01'), 'MMMM yyyy', { locale: th })}
-                        </span>
-                        <button 
-                            onClick={nextMonth} 
-                            className="w-8 h-8 bg-rams-bg border border-rams-rule-light hover:border-rams-rule text-rams-ink flex items-center justify-center rounded-sm transition-all cursor-pointer"
-                        >
-                            <ChevronRight size={16}/>
-                        </button>
-                    </div>
-                </div>
-
-                {/* Metric 3: Deductions Breakdown */}
-                <div className="bg-rams-panel p-5 rounded-sm border border-rams-rule-light shadow-none flex flex-col justify-between">
-                    <p className="text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1">
-                        ยอดหักรวม (Statutory & Adjustments)
-                    </p>
-                    <h3 className="text-2xl font-mono font-black text-rams-red tracking-tight">
-                        -฿{summary.totalDeductions.toLocaleString('th-TH', { minimumFractionDigits: 2 })}
-                    </h3>
-                    <div className="mt-2 pt-2 border-t border-rams-rule-light flex justify-between text-[10px] font-mono text-rams-ink-muted">
-                        <span>ประกันสังคม: ฿{summary.totalSsoDeduct.toLocaleString()}</span>
-                        <span>ภาษี/อื่นๆ: ฿{(summary.totalTaxDeduct + (summary.totalDeductions - summary.totalSsoDeduct - summary.totalTaxDeduct)).toLocaleString()}</span>
-                    </div>
-                </div>
-
-                {/* Metric 4: Audit & Exceptions */}
-                <div className="bg-rams-panel p-5 rounded-sm border border-rams-rule-light shadow-none flex flex-col justify-between">
-                    <p className="text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1">
-                        พนักงานปฏิบัติงาน & ความผิดปกติ
-                    </p>
-                    <div className="flex items-baseline gap-2">
-                        <h3 className="text-2xl font-mono font-black text-rams-ink tracking-tight">
-                            {summary.workingStaffCount} <span className="text-xs font-normal text-rams-ink-muted font-mono">คน</span>
-                        </h3>
-                    </div>
-                    <div className="mt-2 pt-2 border-t border-rams-rule-light flex items-center gap-1.5 flex-wrap">
-                        {summary.totalMissedPunches > 0 && (
-                            <span className="px-1.5 py-0.2 rounded-xs text-[9px] font-mono font-bold bg-rams-red/10 text-rams-red border border-rams-red/30">
-                                MISSED:{summary.totalMissedPunches}
-                            </span>
-                        )}
-                        {summary.totalOffDayWorks > 0 && (
-                            <span className="px-1.5 py-0.2 rounded-xs text-[9px] font-mono font-bold bg-rams-orange/10 text-rams-orange border border-rams-orange/30">
-                                OFF-DAY:{summary.totalOffDayWorks}
-                            </span>
-                        )}
-                        {summary.totalLate > 0 && (
-                            <span className="px-1.5 py-0.2 rounded-xs text-[9px] font-mono font-bold bg-rams-amber/10 text-rams-amber border border-rams-amber/30">
-                                LATE:{summary.totalLate}
-                            </span>
-                        )}
-                        {!summary.totalMissedPunches && !summary.totalOffDayWorks && !summary.totalLate && (
-                            <span className="text-[10px] font-mono text-rams-green font-bold">✓ การลงเวลาปกติ</span>
-                        )}
-                    </div>
-                </div>
-            </div>
-
-            {/* Filter & Search Bar */}
-            <div className="bg-rams-panel p-3.5 rounded-sm border border-rams-rule-light flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-                <div className="relative flex-1 max-w-md">
-                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-rams-ink-muted" />
-                    <input 
-                        type="text"
-                        placeholder="ค้นหาชื่อพนักงาน, ตำแหน่ง, บัญชีธนาคาร..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-9 pr-3 py-1.5 rounded-sm border border-rams-rule-light focus:border-rams-rule outline-none bg-rams-bg text-rams-ink font-sans text-xs transition-all"
-                    />
-                </div>
-
-                <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-mono uppercase text-rams-ink-muted font-bold">โมเดลค่าจ้าง:</span>
-                    <div className="flex bg-rams-bg border border-rams-rule-light rounded-sm p-0.5 text-[10px] font-mono font-bold uppercase tracking-wider">
-                        {[
-                            { id: 'ALL', label: 'ทั้งหมด' },
-                            { id: 'monthly', label: 'รายเดือน' },
-                            { id: 'daily', label: 'รายกะ' },
-                            { id: 'hourly', label: 'ราย ชม.' }
-                        ].map(type => (
-                            <button
-                                key={type.id}
-                                onClick={() => setWageFilter(type.id)}
-                                className={`px-2.5 py-1 rounded-xs transition-all cursor-pointer ${wageFilter === type.id ? 'bg-rams-ink text-rams-panel font-bold' : 'text-rams-ink-muted hover:text-rams-ink'}`}
-                            >
-                                {type.label}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            </div>
-
-            {/* Payroll Table */}
-            <div className="bg-rams-panel border border-rams-rule rounded-sm overflow-hidden shadow-none">
-                <div className="overflow-x-auto">
-                    {loading ? (
-                        <div className="p-12 text-center font-mono text-xs text-rams-ink-muted uppercase tracking-wider animate-pulse">
-                            กำลังคำนวณและประมวลผลข้อมูลเงินเดือน...
-                        </div>
-                    ) : filteredPayrollData.length === 0 ? (
-                        <div className="p-12 text-center font-mono text-xs text-rams-ink-muted uppercase tracking-wider">
-                            ไม่พบข้อมูลเงินเดือนที่ตรงกับเงื่อนไขการค้นหา
-                        </div>
-                    ) : (
-                        <table className="w-full text-xs text-left">
-                            <thead className="bg-rams-bg/60 text-rams-ink-muted border-b border-rams-rule-light font-mono text-[9px] uppercase tracking-widest">
-                                <tr>
-                                    <th className="px-5 py-3.5">พนักงาน / โมเดลค่าจ้าง</th>
-                                    <th className="px-4 py-3.5 text-center">วัน / ชม.</th>
-                                    <th className="px-4 py-3.5 text-right">ค่าแรงฐาน</th>
-                                    <th className="px-4 py-3.5 text-right">ค่า OT</th>
-                                    <th className="px-4 py-3.5 text-right text-rams-green">สวัสดิการ</th>
-                                    <th className="px-4 py-3.5 text-right text-rams-red">ยอดหัก</th>
-                                    <th className="px-5 py-3.5 text-right">ยอดจ่ายสุทธิ</th>
-                                    <th className="px-4 py-3.5 text-center">Audit Status</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-rams-rule-light font-mono">
-                                {filteredPayrollData.map(item => {
-                                    const isExpanded = expandedEmpId === item.emp.id;
-                                    const wageType = item.wageType;
-
-                                    return (
-                                        <React.Fragment key={item.emp.id}>
-                                            <tr 
-                                                className={`hover:bg-rams-bg/40 cursor-pointer transition-colors text-rams-ink ${isExpanded ? 'bg-rams-bg/30 font-semibold' : ''}`}
-                                                onClick={() => toggleExpand(item.emp.id)}
-                                            >
-                                                {/* Employee Info */}
-                                                <td className="px-5 py-3.5 font-sans">
-                                                    <div className="flex items-center gap-3">
-                                                        <span className="text-rams-ink-muted">
-                                                            {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                                                        </span>
-                                                        <div className="w-8 h-8 rounded-sm bg-rams-ink text-rams-panel flex items-center justify-center font-mono font-bold text-xs shrink-0">
-                                                            {item.emp.nickname ? item.emp.nickname.charAt(0).toUpperCase() : item.emp.name.charAt(0).toUpperCase()}
-                                                        </div>
-                                                        <div>
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="font-bold text-rams-ink">{item.emp.name}</span>
-                                                                {item.emp.nickname && (
-                                                                    <span className="px-1.5 py-0.2 rounded-xs bg-rams-bg border border-rams-rule-light text-rams-ink font-mono text-[9px] font-bold">
-                                                                        {item.emp.nickname}
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                            <div className="flex items-center gap-1.5 text-[10px] font-mono text-rams-ink-muted mt-0.5">
-                                                                <span>{item.emp.position || "Staff"}</span>
-                                                                <span>·</span>
-                                                                <span className="text-rams-orange font-bold uppercase text-[9px]">
-                                                                    {wageType === 'monthly' ? 'รายเดือน' : (wageType === 'daily' ? 'รายกะ' : 'ราย ชม.')}
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </td>
-
-                                                {/* Days & Hours */}
-                                                <td className="px-4 py-3.5 text-center">
-                                                    <div className="font-bold text-rams-ink">{item.workDays} วัน</div>
-                                                    <div className="text-[10px] text-rams-ink-muted">
-                                                        {item.totalRegularHours.toFixed(1)}h / <span className="text-rams-orange font-bold">{item.totalOTHours.toFixed(1)}h OT</span>
-                                                    </div>
-                                                </td>
-
-                                                {/* Base Wage */}
-                                                <td className="px-4 py-3.5 text-right font-bold text-rams-ink">
-                                                    ฿{item.totalSalary.toLocaleString('th-TH', { minimumFractionDigits: 2 })}
-                                                </td>
-
-                                                {/* OT Pay */}
-                                                <td className="px-4 py-3.5 text-right font-bold text-rams-orange">
-                                                    {item.totalOTPay > 0 ? `฿${item.totalOTPay.toLocaleString('th-TH', { minimumFractionDigits: 2 })}` : '-'}
-                                                </td>
-
-                                                {/* Allowances (+Diligence) */}
-                                                <td className="px-4 py-3.5 text-right font-bold text-rams-green">
-                                                    {item.totalAllowances > 0 ? `+฿${item.totalAllowances.toLocaleString('th-TH', { minimumFractionDigits: 2 })}` : '-'}
-                                                </td>
-
-                                                {/* Deductions */}
-                                                <td className="px-4 py-3.5 text-right font-bold text-rams-red">
-                                                    {item.totalDeduct > 0 ? `-฿${item.totalDeduct.toLocaleString('th-TH', { minimumFractionDigits: 2 })}` : '-'}
-                                                </td>
-
-                                                {/* Net Salary */}
-                                                <td className="px-5 py-3.5 text-right font-black text-rams-green text-sm">
-                                                    ฿{item.netSalary.toLocaleString('th-TH', { minimumFractionDigits: 2 })}
-                                                </td>
-
-                                                {/* Audit Badges */}
-                                                <td className="px-4 py-3.5 text-center">
-                                                    <div className="flex flex-wrap items-center justify-center gap-1">
-                                                        {item.incompleteCount > 0 && (
-                                                            <span className="px-1.5 py-0.2 rounded-xs text-[9px] font-bold border uppercase bg-rams-red/10 text-rams-red border-rams-red/30">
-                                                                MISSED:{item.incompleteCount}
-                                                            </span>
-                                                        )}
-                                                        {item.offDayWorkCount > 0 && (
-                                                            <span className="px-1.5 py-0.2 rounded-xs text-[9px] font-bold border uppercase bg-rams-orange/10 text-rams-orange border-rams-orange/30">
-                                                                OFF-DAY:{item.offDayWorkCount}
-                                                            </span>
-                                                        )}
-                                                        {item.lateCount > 0 && (
-                                                            <span className="px-1.5 py-0.2 rounded-xs text-[9px] font-bold border uppercase bg-rams-amber/10 text-rams-amber border-rams-amber/30">
-                                                                LATE:{item.lateCount}
-                                                            </span>
-                                                        )}
-                                                        {item.absentCount > 0 && (
-                                                            <span className="px-1.5 py-0.2 rounded-xs text-[9px] font-bold border uppercase bg-rams-red/10 text-rams-red border-rams-red/30">
-                                                                ABSENT:{item.absentCount}
-                                                            </span>
-                                                        )}
-                                                        {!item.incompleteCount && !item.offDayWorkCount && !item.lateCount && !item.absentCount && (
-                                                            <span className="text-rams-green text-[10px] font-bold">OK</span>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                            </tr>
-
-                                            {/* Expanded Detailed Breakdown */}
-                                            {isExpanded && (
-                                                <tr>
-                                                    <td colSpan={8} className="p-4 sm:p-5 bg-rams-bg/30 border-t border-b border-rams-rule-light font-sans">
-                                                        <div className="bg-rams-panel border border-rams-rule-light rounded-sm p-4.5 space-y-4 shadow-none">
-                                                            
-                                                            {/* Detailed Calculation Formula Box */}
-                                                            <div className="bg-rams-bg p-4 rounded-sm border border-rams-rule-light space-y-2">
-                                                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                                                                    <div className="flex items-center gap-2 font-mono text-xs font-bold text-rams-ink uppercase tracking-wider">
-                                                                        <Calculator size={14} className="text-rams-orange" />
-                                                                        <span>โครงสร้างการคำนวณค่าตอบแทน: {item.emp.name} ({wageType.toUpperCase()})</span>
-                                                                    </div>
-                                                                    
-                                                                    {/* Bank Copy Button */}
-                                                                    {item.emp.bank_account && (
-                                                                        <button
-                                                                            onClick={(e) => {
-                                                                                e.stopPropagation();
-                                                                                handleCopyBankInfo(item.emp, item.netSalary);
-                                                                            }}
-                                                                            className="flex items-center gap-1.5 px-3 py-1 bg-rams-panel border border-rams-rule-light hover:border-rams-rule rounded-sm font-mono text-[10px] font-bold text-rams-ink uppercase transition-all cursor-pointer"
-                                                                        >
-                                                                            {copiedBankId === item.emp.id ? <Check size={12} className="text-rams-green" /> : <Copy size={12} />}
-                                                                            <span>{copiedBankId === item.emp.id ? 'คัดลอกข้อมูลโอนเงินแล้ว!' : `คัดลอกบัญชี ${item.emp.bank_name || ''} ${item.emp.bank_account}`}</span>
-                                                                        </button>
-                                                                    )}
-                                                                </div>
-
-                                                                {/* Transparent Calculation Breakdown */}
-                                                                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2 pt-2 border-t border-rams-rule-light font-mono text-[11px]">
-                                                                    <div className="bg-rams-panel p-2 rounded-xs border border-rams-rule-light">
-                                                                        <span className="text-[9px] text-rams-ink-muted uppercase block">1. ค่าแรงฐาน:</span>
-                                                                        <span className="font-bold text-rams-ink">฿{item.totalSalary.toLocaleString()}</span>
-                                                                    </div>
-                                                                    <div className="bg-rams-panel p-2 rounded-xs border border-rams-rule-light">
-                                                                        <span className="text-[9px] text-rams-ink-muted uppercase block">2. ค่า OT ({item.totalOTHours.toFixed(1)}h):</span>
-                                                                        <span className="font-bold text-rams-orange">฿{item.totalOTPay.toLocaleString()}</span>
-                                                                    </div>
-                                                                    <div className="bg-rams-panel p-2 rounded-xs border border-rams-rule-light">
-                                                                        <span className="text-[9px] text-rams-ink-muted uppercase block">3. ค่าตำแหน่ง:</span>
-                                                                        <span className="font-bold text-rams-green">฿{(item.monthlyAllowance || 0).toLocaleString()}</span>
-                                                                    </div>
-                                                                    <div className="bg-rams-panel p-2 rounded-xs border border-rams-rule-light">
-                                                                        <span className="text-[9px] text-rams-ink-muted uppercase block">4. เบี้ยขยัน:</span>
-                                                                        <span className="font-bold text-rams-green">{item.isDiligenceEarned ? `฿${item.diligenceAllowance.toLocaleString()}` : '฿0 (ไม่ผ่าน)'}</span>
-                                                                    </div>
-                                                                    <div className="bg-rams-panel p-2 rounded-xs border border-rams-rule-light">
-                                                                        <span className="text-[9px] text-rams-ink-muted uppercase block">5. ประกันสังคม:</span>
-                                                                        <span className="font-bold text-rams-red">{item.ssoDeduct > 0 ? `-฿${item.ssoDeduct.toLocaleString()}` : '฿0'}</span>
-                                                                    </div>
-                                                                    <div className="bg-rams-panel p-2 rounded-xs border border-rams-rule-light">
-                                                                        <span className="text-[9px] text-rams-ink-muted uppercase block">6. ภาษี/หักอื่นๆ:</span>
-                                                                        <span className="font-bold text-rams-red">{(item.taxDeduct + item.customDeduct) > 0 ? `-฿${(item.taxDeduct + item.customDeduct).toLocaleString()}` : '฿0'}</span>
-                                                                    </div>
-                                                                    {item.totalAwayMins > 0 && (
-                                                                        <div className="bg-rams-panel p-2 rounded-xs border border-rams-rule-light">
-                                                                            <span className="text-[9px] text-rams-ink-muted uppercase block">7. ออกระหว่างวัน {((m) => `${Math.floor(m / 60) > 0 ? `${Math.floor(m / 60)} ชม. ` : ''}${m % 60} น.`)(item.totalAwayMins)}:</span>
-                                                                            <span className="font-bold text-rams-red">{item.awayDeduct > 0 ? `-฿${item.awayDeduct.toLocaleString()}` : 'หักจากชั่วโมงแล้ว'}</span>
-                                                                        </div>
-                                                                    )}
-                                                                    <div className="bg-rams-ink text-rams-panel p-2 rounded-xs border border-rams-ink">
-                                                                        <span className="text-[9px] text-rams-panel/70 uppercase block">= ยอดสุทธิ:</span>
-                                                                        <span className="font-black text-xs text-rams-green">฿{item.netSalary.toLocaleString()}</span>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-
-                                                            {/* Daily Log Header & Filters */}
-                                                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pt-2">
-                                                                <h4 className="font-mono font-bold text-rams-ink text-xs uppercase tracking-wider">
-                                                                    สถิติการเข้างานและค่าจ้างรายวัน (Daily Logs Breakdown)
-                                                                </h4>
-                                                                
-                                                                <div className="flex flex-wrap items-center gap-2">
-                                                                    <div className="flex items-center gap-1 font-mono text-[9px] uppercase tracking-wider bg-rams-bg p-0.5 border border-rams-rule-light rounded-sm">
-                                                                        <button 
-                                                                            onClick={(e) => { e.stopPropagation(); setDailyFilter('ALL'); }}
-                                                                            className={`px-2.5 py-1 rounded-xs transition-all cursor-pointer ${dailyFilter === 'ALL' ? 'bg-rams-ink text-rams-panel font-bold' : 'text-rams-ink-muted hover:text-rams-ink'}`}
-                                                                        >
-                                                                            ALL ({item.dailyDetails.length})
-                                                                        </button>
-                                                                        <button 
-                                                                            onClick={(e) => { e.stopPropagation(); setDailyFilter('EXCEPTIONS'); }}
-                                                                            className={`px-2.5 py-1 rounded-xs transition-all cursor-pointer ${dailyFilter === 'EXCEPTIONS' ? 'bg-rams-red text-rams-panel font-bold' : 'text-rams-red hover:bg-rams-red/10'}`}
-                                                                        >
-                                                                            EXCEPTIONS
-                                                                        </button>
-                                                                        <button 
-                                                                            onClick={(e) => { e.stopPropagation(); setDailyFilter('WORK'); }}
-                                                                            className={`px-2.5 py-1 rounded-xs transition-all cursor-pointer ${dailyFilter === 'WORK' ? 'bg-rams-ink text-rams-panel font-bold' : 'text-rams-ink-muted hover:text-rams-ink'}`}
-                                                                        >
-                                                                            WORK DAYS
-                                                                        </button>
-                                                                        <button 
-                                                                            onClick={(e) => { e.stopPropagation(); setDailyFilter('OFF'); }}
-                                                                            className={`px-2.5 py-1 rounded-xs transition-all cursor-pointer ${dailyFilter === 'OFF' ? 'bg-rams-ink text-rams-panel font-bold' : 'text-rams-ink-muted hover:text-rams-ink'}`}
-                                                                        >
-                                                                            OFF DAYS
-                                                                        </button>
-                                                                    </div>
-
-                                                                    <a
-                                                                        href={`/admin/payroll/report?month=${selectedMonth}&type=individual&emp_id=${item.emp.id}`}
-                                                                        target="_blank"
-                                                                        onClick={(e) => e.stopPropagation()}
-                                                                        className="flex items-center gap-1.5 px-3 py-1 bg-rams-bg hover:bg-rams-panel text-rams-ink border border-rams-rule-light hover:border-rams-rule rounded-sm font-mono text-[9px] font-bold uppercase tracking-wider transition-all"
-                                                                    >
-                                                                        <Printer size={11} /> 
-                                                                        <span>พิมพ์สลิปคนนี้</span>
-                                                                    </a>
-                                                                </div>
-                                                            </div>
-
-                                                            {/* Daily Log Table */}
-                                                            <div className="max-h-72 overflow-y-auto border border-rams-rule-light rounded-sm custom-scrollbar">
-                                                                <table className="w-full text-[11px] text-left">
-                                                                    <thead className="bg-rams-bg/80 text-rams-ink-muted border-b border-rams-rule-light uppercase text-[9px] font-mono font-bold tracking-widest sticky top-0">
-                                                                        <tr>
-                                                                            <th className="px-3 py-2">วันที่</th>
-                                                                            <th className="px-3 py-2">กะงาน</th>
-                                                                            <th className="px-3 py-2">เวลาตามตาราง</th>
-                                                                            <th className="px-3 py-2">เวลาเข้า-ออกจริง</th>
-                                                                            <th className="px-3 py-2">สถานะ</th>
-                                                                            <th className="px-3 py-2 text-center">ชม.ปกติ</th>
-                                                                            <th className="px-3 py-2 text-center">OT (ชม.)</th>
-                                                                            <th className="px-3 py-2 text-right">ค่าแรง</th>
-                                                                            <th className="px-3 py-2 text-right">ค่า OT</th>
-                                                                            <th className="px-3 py-2 text-right">รวม</th>
-                                                                        </tr>
-                                                                    </thead>
-                                                                    <tbody className="divide-y divide-rams-rule-light font-mono">
-                                                                        {filterDailyList(item.dailyDetails).map((day, idx) => {
-                                                                            const isOffNormal = day.shift === 'OFF' && day.status === 'OFF';
-                                                                            const isOffWorked = day.status.includes('OFF-DAY');
-                                                                            const isMissed = day.status.includes('MISSED');
-
-                                                                            return (
-                                                                                <tr key={idx} className={`${isOffNormal ? 'text-rams-ink-muted bg-rams-bg/10' : 'text-rams-ink hover:bg-rams-bg/40'} ${isOffWorked ? 'bg-rams-ink/5' : ''}`}>
-                                                                                    <td className="px-3 py-2 font-bold">{format(new Date(day.date), 'dd MMM yyyy', { locale: th })}</td>
-                                                                                    <td className="px-3 py-2 font-bold">{day.shift}</td>
-                                                                                    <td className={`px-3 py-2 ${isOffNormal ? 'text-rams-ink-muted' : 'text-rams-ink font-bold'}`}>
-                                                                                        {day.scheduled_in !== '-' ? `${day.scheduled_in} - ${day.scheduled_out}` : '-'}
-                                                                                    </td>
-                                                                                    <td className={`px-3 py-2 font-bold ${isOffNormal ? 'text-rams-ink-muted' : isMissed ? 'text-rams-red' : 'text-rams-ink'}`}>
-                                                                                        {day.in !== '-' || day.out !== '-' ? `${day.in} - ${day.out}` : '-'}
-                                                                                    </td>
-                                                                                    <td className="px-3 py-2">
-                                                                                        <span className={`px-1.5 py-0.2 rounded-xs text-[9px] font-mono border uppercase tracking-wider ${getStatusBadgeStyle(day.status)}`}>
-                                                                                            {day.status}
-                                                                                        </span>
-                                                                                    </td>
-                                                                                    <td className="px-3 py-2 text-center">
-                                                                                        {day.regular_hours > 0 ? day.regular_hours.toFixed(1) : '-'}
-                                                                                        {day.away_mins > 0 && <span className="block text-[10px] text-rams-red">ออก {((m) => `${Math.floor(m / 60) > 0 ? `${Math.floor(m / 60)} ชม. ` : ''}${m % 60} น.`)(day.away_mins)}</span>}
-                                                                                    </td>
-                                                                                    <td className="px-3 py-2 text-center text-rams-orange font-bold">{day.ot_hours > 0 ? day.ot_hours.toFixed(1) : '-'}</td>
-                                                                                    <td className="px-3 py-2 text-right">{day.wage > 0 ? day.wage.toLocaleString('th-TH', { minimumFractionDigits: 2 }) : '-'}</td>
-                                                                                    <td className="px-3 py-2 text-right text-rams-orange">{day.ot > 0 ? day.ot.toLocaleString('th-TH', { minimumFractionDigits: 2 }) : '-'}</td>
-                                                                                    <td className="px-3 py-2 text-right font-bold">
-                                                                                        {(day.wage + day.ot) > 0 ? (day.wage + day.ot).toLocaleString('th-TH', { minimumFractionDigits: 2 }) : '-'}
-                                                                                    </td>
-                                                                                </tr>
-                                                                            );
-                                                                        })}
-                                                                    </tbody>
-                                                                </table>
-                                                            </div>
-
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            )}
-                                        </React.Fragment>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    )}
-                </div>
-            </div>
-
-            {/* Modal: Add Deduction / Bonus Adjustment */}
-            {showAdjustmentModal && (
-                <div className="fixed inset-0 bg-rams-ink/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-                    <div className="bg-rams-panel border border-rams-rule rounded-sm w-full max-w-md p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
-                        <div className="flex justify-between items-center border-b border-rams-rule-light pb-3">
-                            <h3 className="font-mono font-bold text-sm text-rams-ink uppercase tracking-wider flex items-center gap-2">
-                                <Plus size={16} className="text-rams-orange" />
-                                เพิ่มรายการปรับยอด / หักเงินเดือน
-                            </h3>
-                            <button onClick={() => setShowAdjustmentModal(false)} className="text-rams-ink-muted hover:text-rams-ink cursor-pointer">
-                                <X size={16} />
-                            </button>
-                        </div>
-
-                        <form onSubmit={handleSaveAdjustment} className="space-y-4 text-xs">
-                            <div>
-                                <label className="block text-[10px] font-mono font-bold text-rams-ink-muted mb-1 uppercase">พนักงาน *</label>
-                                <select 
-                                    value={adjustmentForm.empId} 
-                                    onChange={(e) => setAdjustmentForm({ ...adjustmentForm, empId: e.target.value })}
-                                    required
-                                    className="w-full p-2 bg-rams-bg border border-rams-rule-light rounded-sm text-rams-ink font-sans text-xs outline-none cursor-pointer"
-                                >
-                                    <option value="">-- เลือกพนักงาน --</option>
-                                    {payrollData.map(d => (
-                                        <option key={d.emp.id} value={d.emp.id}>
-                                            {d.emp.name} {d.emp.nickname ? `(${d.emp.nickname})` : ''} - {d.emp.position}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="block text-[10px] font-mono font-bold text-rams-ink-muted mb-1 uppercase">ประเภทรายการ</label>
-                                    <select 
-                                        value={adjustmentForm.type} 
-                                        onChange={(e) => setAdjustmentForm({ ...adjustmentForm, type: e.target.value })}
-                                        className="w-full p-2 bg-rams-bg border border-rams-rule-light rounded-sm text-rams-ink font-sans text-xs outline-none cursor-pointer"
-                                    >
-                                        <option value="deduction">หักเงิน (Deduction)</option>
-                                        <option value="advance">เบิกล่วงหน้า (Advance)</option>
-                                        <option value="bonus">เงินเพิ่มพิเศษ (Bonus)</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-mono font-bold text-rams-ink-muted mb-1 uppercase">จำนวนเงิน (บาท) *</label>
-                                    <input 
-                                        type="number"
-                                        placeholder="เช่น 500"
-                                        required
-                                        value={adjustmentForm.amount}
-                                        onChange={(e) => setAdjustmentForm({ ...adjustmentForm, amount: e.target.value })}
-                                        className="w-full p-2 bg-rams-bg border border-rams-rule-light rounded-sm text-rams-ink font-mono text-xs outline-none"
-                                    />
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-[10px] font-mono font-bold text-rams-ink-muted mb-1 uppercase">เหตุผล / รายละเอียดบันทึก</label>
-                                <input 
-                                    type="text"
-                                    placeholder="เช่น หักค่าของเสียหาย, เบิกล่วงหน้า, โบนัสผลงาน"
-                                    value={adjustmentForm.reason}
-                                    onChange={(e) => setAdjustmentForm({ ...adjustmentForm, reason: e.target.value })}
-                                    className="w-full p-2 bg-rams-bg border border-rams-rule-light rounded-sm text-rams-ink font-sans text-xs outline-none"
-                                />
-                            </div>
-
-                            <div className="pt-2 border-t border-rams-rule-light flex justify-end gap-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setShowAdjustmentModal(false)}
-                                    className="px-4 py-2 bg-rams-bg text-rams-ink rounded-sm font-mono text-xs uppercase cursor-pointer"
-                                >
-                                    ยกเลิก
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={isSavingAdjustment}
-                                    className="px-5 py-2 bg-rams-orange hover:bg-rams-orange-active text-rams-panel font-mono text-xs font-bold uppercase rounded-sm border border-rams-rule shadow-[0_2px_0_0_var(--color-rams-rule)] active:translate-y-[1px] transition-all cursor-pointer"
-                                >
-                                    {isSavingAdjustment ? 'กำลังบันทึก...' : 'บันทึกรายการ'}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
+        <div className="brand-v2 min-h-screen">
+            {toast && (
+                <div role="status" className={`fixed top-4 right-4 z-[60] max-w-sm flex items-start gap-3 px-4 py-3 border text-base ${toast.type === 'error' ? 'bg-error text-cream border-error' : 'bg-charcoal text-cream border-charcoal'}`}>
+                    <span className="flex-1">{toast.message}</span>
+                    <button type="button" onClick={() => setToast(null)} className="text-sm font-semibold underline underline-offset-4 shrink-0">ปิด</button>
                 </div>
             )}
 
+            <header className="w-full bg-plum text-cream border-b border-plum-3">
+                <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-stretch">
+                    <a href="/admin" className="min-h-14 pr-4 flex items-center text-base text-on-plum-2 hover:text-cream transition-colors duration-150 border-r border-plum-3">← แดชบอร์ด</a>
+                    <div className="flex-1 px-4 py-3 min-w-0">
+                        <h1 className="font-head text-2xl">เงินเดือน</h1>
+                        <p className="text-sm text-on-plum-2">คิดจากตารางงานและเวลาเข้า-ออกจริง</p>
+                    </div>
+                    <div className="hidden sm:flex items-center pl-4 border-l border-plum-3">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src="/logo-inbaan-wordmark-cream-96.png" alt="ในบ้าน" width={73} height={40} className="h-10 w-auto" />
+                    </div>
+                </div>
+            </header>
+
+            <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 flex flex-col gap-4">
+                {/* Month */}
+                <section className="border border-charcoal bg-cream grid grid-cols-[auto_1fr_auto] items-stretch">
+                    <button type="button" onClick={() => shiftMonth(-1)} className="min-h-14 px-4 text-base font-semibold text-charcoal hover:bg-paper-2 border-r border-rule transition-colors duration-150">← <span className="hidden sm:inline">เดือนก่อน</span></button>
+                    <h2 className="self-center text-center text-xl font-semibold text-charcoal px-2">{monthLabel}</h2>
+                    <button type="button" onClick={() => shiftMonth(1)} className="min-h-14 px-4 text-base font-semibold text-charcoal hover:bg-paper-2 border-l border-rule transition-colors duration-150"><span className="hidden sm:inline">เดือนถัดไป</span> →</button>
+                </section>
+
+                {/* Summary */}
+                <section className="grid grid-cols-2 md:grid-cols-4 gap-px bg-rule border border-rule [&>div]:bg-cream">
+                    <div className="px-4 py-3 col-span-2 md:col-span-1">
+                        <p className="text-sm text-neutral">ยอดโอนรวม</p>
+                        <p className="font-num text-3xl text-charcoal">{loading ? '…' : baht(summary.totalNetSalary)}</p>
+                    </div>
+                    <div className="px-4 py-3">
+                        <p className="text-sm text-neutral">ค่าแรง + OT</p>
+                        <p className="font-num text-xl text-charcoal">{baht(summary.totalBaseSalary + summary.totalOTPay)}</p>
+                    </div>
+                    <div className="px-4 py-3">
+                        <p className="text-sm text-neutral">หักรวม</p>
+                        <p className="font-num text-xl text-charcoal">{summary.totalDeductions > 0 ? `−${baht(summary.totalDeductions)}` : baht(0)}</p>
+                    </div>
+                    <div className="px-4 py-3 col-span-2 md:col-span-1">
+                        <p className="text-sm text-neutral">ต้องตรวจ</p>
+                        <p className="text-base text-charcoal">
+                            ลืมลงเวลา <span className={`font-num ${summary.totalMissedPunches ? 'text-plum font-semibold' : ''}`}>{summary.totalMissedPunches}</span>
+                            {' · '}ขาด <span className={`font-num ${summary.totalAbsent ? 'text-plum font-semibold' : ''}`}>{summary.totalAbsent}</span>
+                            {' · '}สาย <span className="font-num">{summary.totalLate}</span>
+                        </p>
+                    </div>
+                </section>
+
+                {/* Actions */}
+                <section className="flex flex-col lg:flex-row gap-2">
+                    <div className="flex-1 grid grid-cols-3 gap-px bg-rule border border-rule">
+                        <button type="button" onClick={() => setShowAdjustmentModal(true)} className="min-h-12 px-3 bg-cream hover:bg-paper-2 text-base font-semibold text-charcoal transition-colors duration-150">เพิ่ม/หักเงิน</button>
+                        <button type="button" onClick={handleExportExcel} className="min-h-12 px-3 bg-cream hover:bg-paper-2 text-base font-semibold text-charcoal transition-colors duration-150">Excel</button>
+                        <a href={`/admin/payroll/report?month=${selectedMonth}&type=master`} target="_blank" className="min-h-12 px-3 bg-cream hover:bg-paper-2 text-base font-semibold text-charcoal flex items-center justify-center transition-colors duration-150">สรุปทั้งร้าน</a>
+                    </div>
+                    <a href={`/admin/payroll/report?month=${selectedMonth}&type=individual`} target="_blank" className="min-h-12 px-6 bg-charcoal hover:bg-charcoal-2 text-cream text-base font-semibold flex items-center justify-center transition-colors duration-150 lg:min-w-[200px]">
+                        พิมพ์สลิปทั้งหมด
+                    </a>
+                </section>
+
+                {/* Filters */}
+                <section className="flex flex-col md:flex-row md:items-end justify-between gap-3">
+                    <div>
+                        <p className="text-sm font-semibold text-neutral mb-1">ประเภทค่าจ้าง</p>
+                        <div className="grid grid-cols-4 gap-px bg-rule border border-rule">
+                            {[['ALL', 'ทั้งหมด'], ['monthly', 'รายเดือน'], ['daily', 'รายกะ'], ['hourly', 'รายชม.']].map(([id, label]) => (
+                                <button key={id} type="button" onClick={() => setWageFilter(id)} aria-pressed={wageFilter === id}
+                                    className={`min-h-12 px-3 text-base transition-colors duration-150 ${wageFilter === id ? 'bg-charcoal text-cream font-semibold' : 'bg-cream text-charcoal hover:bg-paper-2'}`}>
+                                    {label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="md:w-72">
+                        <label htmlFor="payroll-search" className="block text-sm font-semibold text-neutral mb-1">ค้นหา</label>
+                        <input id="payroll-search" type="search" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="ชื่อ ตำแหน่ง หรือเลขบัญชี" className={input} />
+                    </div>
+                </section>
+
+                {/* Staff list */}
+                <section className="border border-charcoal bg-cream">
+                    {loading ? (
+                        <p className="p-12 text-center text-base text-neutral">กำลังคำนวณเงินเดือน…</p>
+                    ) : filteredPayrollData.length === 0 ? (
+                        <p className="p-12 text-center text-base text-neutral">ไม่พบพนักงานตามที่กรอง</p>
+                    ) : (
+                        <ul className="divide-y divide-rule">
+                            {filteredPayrollData.map(item => {
+                                const open = expandedEmpId === item.emp.id;
+                                const flags = flagsOf(item);
+                                return (
+                                    <li key={item.emp.id}>
+                                        <button type="button" onClick={() => toggleExpand(item.emp.id)} aria-expanded={open}
+                                            className={`w-full text-left px-4 py-3 grid grid-cols-[1fr_auto] md:grid-cols-[minmax(0,2fr)_minmax(0,1.4fr)_auto] gap-x-4 gap-y-1 items-center transition-colors duration-150 ${open ? 'bg-paper-2' : 'hover:bg-paper-2'}`}>
+                                            <span className="min-w-0">
+                                                <span className="block text-base font-semibold text-charcoal truncate">{item.emp.nickname || item.emp.name}</span>
+                                                <span className="block text-sm text-neutral truncate">{item.emp.position || '-'} · {WAGE_TH[item.wageType] || item.wageType}</span>
+                                            </span>
+                                            <span className="row-start-2 col-span-2 md:row-start-auto md:col-span-1 text-sm text-subtle">
+                                                <span className="font-num">{item.workDays}</span> วัน · <span className="font-num">{item.totalRegularHours.toFixed(1)}</span> ชม.
+                                                {item.totalOTHours > 0 && <> · OT <span className="font-num">{item.totalOTHours.toFixed(1)}</span> ชม.</>}
+                                                {flags.length > 0 && <span className="block text-plum font-semibold">{flags.join(' · ')}</span>}
+                                            </span>
+                                            <span className="text-right">
+                                                <span className="block font-num text-xl text-charcoal">{baht(item.netSalary)}</span>
+                                                <span className="block text-sm text-plum">{open ? 'ซ่อน' : 'ดูรายละเอียด'}</span>
+                                            </span>
+                                        </button>
+
+                                        {open && (
+                                            <div className="px-4 pb-4 bg-paper-2 flex flex-col gap-4">
+                                                {/* Breakdown */}
+                                                <div className="grid md:grid-cols-2 gap-4">
+                                                    <dl className="border border-rule bg-cream text-base">
+                                                        {[
+                                                            ['ค่าแรง', baht(item.totalSalary)],
+                                                            [`OT (${item.totalOTHours.toFixed(1)} ชม.)`, baht(item.totalOTPay)],
+                                                            item.monthlyAllowance > 0 && ['ค่าตำแหน่ง / เบี้ยเลี้ยง', `+${baht(item.monthlyAllowance)}`],
+                                                            item.diligenceAllowance > 0 && ['เบี้ยขยัน', item.isDiligenceEarned ? `+${baht(item.diligenceAllowance)}` : 'ไม่ได้ (มีสาย/ขาด/ลืมลงเวลา)'],
+                                                            item.bonusTotal > 0 && ['โบนัส', `+${baht(item.bonusTotal)}`],
+                                                            item.ssoDeduct > 0 && ['ประกันสังคม', `−${baht(item.ssoDeduct)}`],
+                                                            item.taxDeduct > 0 && ['ภาษี ณ ที่จ่าย', `−${baht(item.taxDeduct)}`],
+                                                            item.totalAwayMins > 0 && [`ออกระหว่างวัน ${awayFmt(item.totalAwayMins)}`, item.awayDeduct > 0 ? `−${baht(item.awayDeduct)}` : 'หักจากชั่วโมงแล้ว'],
+                                                        ].filter(Boolean).map(([k, v]) => (
+                                                            <div key={k} className="px-4 py-2 border-b border-rule flex justify-between gap-3">
+                                                                <dt className="text-subtle">{k}</dt><dd className="font-num text-charcoal text-right">{v}</dd>
+                                                            </div>
+                                                        ))}
+                                                        {item.adjustments?.filter(a => a.type !== 'bonus').map(a => (
+                                                            <div key={a.id} className="px-4 py-2 border-b border-rule flex justify-between items-center gap-3">
+                                                                <dt className="text-subtle min-w-0 truncate">{ADJ_TH[a.type]} · {(a.reason || '').replace(/^\[(โบนัส|เบิกล่วงหน้า)\]\s*/, '')}</dt>
+                                                                <dd className="flex items-center gap-2 shrink-0"><span className="font-num text-charcoal">−{baht(a.amount)}</span>
+                                                                    <button type="button" onClick={() => handleDeleteDeduction(a)} className="min-h-10 px-2 text-sm text-error underline underline-offset-4">ลบ</button></dd>
+                                                            </div>
+                                                        ))}
+                                                        {item.adjustments?.filter(a => a.type === 'bonus').map(a => (
+                                                            <div key={a.id} className="px-4 py-2 border-b border-rule flex justify-between items-center gap-3">
+                                                                <dt className="text-subtle min-w-0 truncate">โบนัส · {(a.reason || '').replace(/^\[โบนัส\]\s*/, '')}</dt>
+                                                                <dd className="flex items-center gap-2 shrink-0"><span className="font-num text-charcoal">+{baht(a.amount)}</span>
+                                                                    <button type="button" onClick={() => handleDeleteDeduction(a)} className="min-h-10 px-2 text-sm text-error underline underline-offset-4">ลบ</button></dd>
+                                                            </div>
+                                                        ))}
+                                                        <div className="px-4 py-3 bg-charcoal text-cream flex justify-between gap-3">
+                                                            <dt className="font-semibold">ยอดโอนสุทธิ</dt><dd className="font-num text-2xl">{baht(item.netSalary)}</dd>
+                                                        </div>
+                                                    </dl>
+                                                    <div className="flex flex-col gap-2">
+                                                        {item.emp.bank_account ? (
+                                                            <button type="button" onClick={() => handleCopyBankInfo(item.emp, item.netSalary)} className="min-h-12 px-4 border border-charcoal bg-cream hover:bg-paper-2 text-left text-base text-charcoal transition-colors duration-150">
+                                                                {copiedBankId === item.emp.id ? 'คัดลอกข้อมูลโอนแล้ว' : <>คัดลอกข้อมูลโอน · {item.emp.bank_name || ''} <span className="font-num">{item.emp.bank_account}</span></>}
+                                                            </button>
+                                                        ) : <p className="border border-rule bg-cream px-4 py-3 text-base text-neutral">ยังไม่มีเลขบัญชี (เพิ่มได้ในรายชื่อพนักงาน)</p>}
+                                                        <a href={`/admin/payroll/report?month=${selectedMonth}&type=individual&emp_id=${item.emp.id}`} target="_blank" className="min-h-12 px-4 border border-charcoal bg-cream hover:bg-paper-2 text-base text-charcoal flex items-center transition-colors duration-150">พิมพ์สลิปคนนี้</a>
+                                                        <button type="button" onClick={() => { setAdjustmentForm(f => ({ ...f, empId: String(item.emp.id) })); setShowAdjustmentModal(true); }} className="min-h-12 px-4 border border-charcoal bg-cream hover:bg-paper-2 text-left text-base text-charcoal transition-colors duration-150">เพิ่ม/หักเงินคนนี้</button>
+                                                    </div>
+                                                </div>
+
+                                                {/* Daily */}
+                                                <div className="border border-rule bg-cream">
+                                                    <div className="px-4 py-3 border-b border-rule flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                                        <h3 className="text-base font-semibold text-charcoal">รายวัน</h3>
+                                                        <div className="grid grid-cols-4 gap-px bg-rule border border-rule">
+                                                            {[['ALL', 'ทั้งหมด'], ['EXCEPTIONS', 'ต้องตรวจ'], ['WORK', 'วันทำงาน'], ['OFF', 'วันหยุด']].map(([id, label]) => (
+                                                                <button key={id} type="button" onClick={() => setDailyFilter(id)} aria-pressed={dailyFilter === id}
+                                                                    className={`min-h-10 px-3 text-sm transition-colors duration-150 ${dailyFilter === id ? 'bg-charcoal text-cream font-semibold' : 'bg-cream text-charcoal hover:bg-paper-2'}`}>{label}</button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                    <div className="overflow-x-auto">
+                                                        <table className="w-full text-left min-w-[720px]">
+                                                            <thead className="border-b border-rule text-sm text-neutral">
+                                                                <tr>
+                                                                    <th className="px-4 py-2 font-semibold">วันที่</th>
+                                                                    <th className="px-3 py-2 font-semibold">กะ</th>
+                                                                    <th className="px-3 py-2 font-semibold">เข้า–ออกจริง</th>
+                                                                    <th className="px-3 py-2 font-semibold">สถานะ</th>
+                                                                    <th className="px-3 py-2 font-semibold text-right">ชม.</th>
+                                                                    <th className="px-3 py-2 font-semibold text-right">OT</th>
+                                                                    <th className="px-4 py-2 font-semibold text-right">รวม</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody className="divide-y divide-rule text-sm">
+                                                                {filterDailyList(item.dailyDetails).map((day, idx) => {
+                                                                    const st = statusInfo(day.status);
+                                                                    const total = (day.wage || 0) + (day.ot || 0);
+                                                                    return (
+                                                                        <tr key={idx}>
+                                                                            <td className="px-4 py-2 whitespace-nowrap">{format(new Date(`${day.date}T12:00:00`), 'EEE d MMM', { locale: th })}</td>
+                                                                            <td className="px-3 py-2 text-subtle">{day.shift === 'OFF' ? 'หยุด' : day.shift === 'UNSCHEDULED' ? 'ไม่มีกะ' : (day.shift || '').replace(/\s+\)/g, ')').replace(/(\d{2}:\d{2})-(\d{2}:\d{2})/g, '$1–$2').replace(/[\p{Extended_Pictographic}️]/gu, '').replace(/\s+\)/g, ')').trim()}</td>
+                                                                            <td className="px-3 py-2 font-num whitespace-nowrap">{day.in === '-' && day.out === '-' ? '-' : `${day.in === '-' ? '?' : day.in}–${day.out === '-' ? '?' : day.out}`}
+                                                                                {day.away_mins > 0 && <span className="block font-thai text-plum">ออก {awayFmt(day.away_mins)}</span>}
+                                                                            </td>
+                                                                            <td className="px-3 py-2"><span className={`inline-block px-1.5 py-0.5 border text-xs ${toneCls[st.tone]}`}>{st.label}</span></td>
+                                                                            <td className="px-3 py-2 font-num text-right">{hrs(day.regular_hours)}</td>
+                                                                            <td className="px-3 py-2 font-num text-right">{hrs(day.ot_hours)}</td>
+                                                                            <td className="px-4 py-2 font-num text-right">{total > 0 ? baht(total) : '-'}</td>
+                                                                        </tr>
+                                                                    );
+                                                                })}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                    )}
+                </section>
+            </main>
+
+            {/* Add adjustment */}
+            {showAdjustmentModal && (
+                <div className="brand-v2 !bg-charcoal/50 fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="adj-title">
+                    <form onSubmit={handleSaveAdjustment} className="bg-cream border border-charcoal w-full max-w-md">
+                        <div className="bg-plum text-cream flex items-stretch">
+                            <div className="flex-1 px-4 py-3">
+                                <h3 id="adj-title" className="font-head text-2xl">เพิ่ม/หักเงิน</h3>
+                                <p className="text-sm text-on-plum-2">{monthLabel}</p>
+                            </div>
+                            <button type="button" onClick={() => setShowAdjustmentModal(false)} className="min-w-16 px-4 border-l border-plum-3 text-base font-semibold hover:bg-plum-2 transition-colors duration-150">ปิด</button>
+                        </div>
+                        <div className="p-4 flex flex-col gap-3">
+                            <div className="grid grid-cols-3 gap-px bg-rule border border-charcoal" role="radiogroup" aria-label="ประเภท">
+                                {Object.entries(ADJ_TH).map(([id, label]) => (
+                                    <button key={id} type="button" role="radio" aria-checked={adjustmentForm.type === id} onClick={() => setAdjustmentForm(f => ({ ...f, type: id, isPercent: id === 'deduction' ? f.isPercent : false }))}
+                                        className={`min-h-12 text-base transition-colors duration-150 ${adjustmentForm.type === id ? 'bg-charcoal text-cream font-semibold' : 'bg-cream text-charcoal hover:bg-paper-2'}`}>{label}</button>
+                                ))}
+                            </div>
+                            <label className="text-sm font-semibold text-neutral">พนักงาน
+                                <select required value={adjustmentForm.empId} onChange={e => setAdjustmentForm(f => ({ ...f, empId: e.target.value }))} className={`${input} mt-1`}>
+                                    <option value="">เลือกพนักงาน</option>
+                                    {payrollData.map(d => <option key={d.emp.id} value={d.emp.id}>{d.emp.nickname || d.emp.name} · {d.emp.position || '-'}</option>)}
+                                </select>
+                            </label>
+                            <label className="text-sm font-semibold text-neutral">จำนวน{adjustmentForm.isPercent ? ' (%)' : ' (บาท)'}
+                                <input required type="number" min="0" step="0.01" inputMode="decimal" value={adjustmentForm.amount} onChange={e => setAdjustmentForm(f => ({ ...f, amount: e.target.value }))} placeholder="เช่น 500" className={`${input} mt-1 font-num`} />
+                            </label>
+                            {adjustmentForm.type === 'deduction' && (
+                                <label className="flex items-center gap-3 min-h-12 text-base text-charcoal cursor-pointer">
+                                    <input type="checkbox" checked={adjustmentForm.isPercent} onChange={e => setAdjustmentForm(f => ({ ...f, isPercent: e.target.checked }))} className="w-5 h-5 accent-charcoal" />
+                                    คิดเป็น % ของรายได้รวม
+                                </label>
+                            )}
+                            <label className="text-sm font-semibold text-neutral">เหตุผล
+                                <input type="text" value={adjustmentForm.reason} onChange={e => setAdjustmentForm(f => ({ ...f, reason: e.target.value }))} placeholder="เช่น ของเสียหาย, เบิกกลางเดือน, โบนัสยอดขาย" className={`${input} mt-1`} />
+                            </label>
+                        </div>
+                        <div className="px-4 pb-4 grid grid-cols-2 gap-3">
+                            <button type="button" onClick={() => setShowAdjustmentModal(false)} className="min-h-12 border border-charcoal text-base text-charcoal hover:bg-paper-2 transition-colors duration-150">ยกเลิก</button>
+                            <button type="submit" disabled={isSavingAdjustment} className="min-h-12 bg-charcoal hover:bg-charcoal-2 text-cream text-base font-semibold transition-colors duration-150 disabled:opacity-50">{isSavingAdjustment ? 'กำลังบันทึก…' : 'บันทึก'}</button>
+                        </div>
+                    </form>
+                </div>
+            )}
         </div>
     );
 }

@@ -269,9 +269,9 @@ export default function AdminDashboard() {
                 }
             });
         }
-        const publishedTransactions = data.transactions?.filter(t => t.status === 'PUBLISHED') || [];
+        // No draft stage (owner, 2026-11-25): every roster row counts
         return calculatePayroll(
-            data.employees, data.logs, publishedTransactions, data.shifts,
+            data.employees, data.logs, data.transactions || [], data.shifts,
             data.payrollConfig, data.deductions, selectedMonth,
             flatSchedules
         );

@@ -1114,7 +1114,7 @@ export default function AdminRosterPage() {
                 return {
                     ...t,
                     date: newDate,
-                    status: 'DRAFT', // Always copy as draft
+                    status: 'PUBLISHED', // no draft stage: copied shifts are live
                 };
             });
 

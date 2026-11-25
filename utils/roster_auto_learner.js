@@ -314,7 +314,7 @@ export async function autoGenerateWeeklyRoster({
                     custom_start_time: null,
                     custom_end_time: null,
                     is_off: true,
-                    status: 'DRAFT',
+                    status: 'PUBLISHED',
                     note: `LEAVE:${leave.leave_type.toUpperCase()}`
                 });
 
@@ -342,7 +342,7 @@ export async function autoGenerateWeeklyRoster({
                     custom_start_time: habit.is_off ? null : (habit.custom_start_time || null),
                     custom_end_time: habit.is_off ? null : (habit.custom_end_time || null),
                     is_off: !!habit.is_off,
-                    status: 'DRAFT'
+                    status: 'PUBLISHED'
                 });
             }
         });
@@ -424,7 +424,7 @@ export async function autoGenerateWeeklyRoster({
         custom_start_time: t.custom_start_time,
         custom_end_time: t.custom_end_time,
         is_off: t.is_off,
-        status: 'DRAFT',
+        status: 'PUBLISHED', // no draft stage (owner, 2026-11-25): roster changes are live
         updated_at: new Date().toISOString()
     }));
 
