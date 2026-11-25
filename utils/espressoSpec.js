@@ -5,7 +5,7 @@
 export const ESPRESSO_SPEC = {
     dose: { label: 'ผงกาแฟ', unit: 'g', min: 18, max: 20 },
     yield: { label: 'น้ำกาแฟ', unit: 'ml', min: 35, max: 40 },
-    firstDrop: { label: 'หยดแรก', unit: 'วิ', min: 5, max: 8 },
+    firstDrop: { label: 'หยดแรก', unit: 'วิ', min: 3.5, max: 5.5 },
     totalTime: { label: 'เวลาสกัด', unit: 'วิ', min: 25, max: 30 },
 };
 
@@ -51,4 +51,19 @@ export function bangkokDayStartISO(now = new Date()) {
     const bkk = new Date(now.getTime() + 7 * 3600_000);
     const y = bkk.getUTCFullYear(), m = bkk.getUTCMonth(), d = bkk.getUTCDate();
     return new Date(Date.UTC(y, m, d) - 7 * 3600_000).toISOString();
+}
+
+/**
+ * Status of a stored value against the current standard (for reports, so
+ * older shots are judged by today's numbers). Falls back to the stored status
+ * when there is no value.
+ */
+export function judge(key, value, stored) {
+    const n = Number(value);
+    if (!(n > 0)) return stored || 'NOT_SPECIFIED';
+    const s = ESPRESSO_SPEC[key];
+    const timed = key === 'firstDrop' || key === 'totalTime';
+    if (n < s.min) return timed ? 'FAST' : 'LOW';
+    if (n > s.max) return timed ? 'SLOW' : 'HIGH';
+    return 'OK';
 }

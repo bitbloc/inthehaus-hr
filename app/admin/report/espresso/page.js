@@ -7,7 +7,7 @@
 import { useState, useEffect, useMemo, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { supabase } from "../../../../lib/supabaseClient";
-import { ESPRESSO_SPEC, STATUS_TH, isOff, specText, num, shotVerdict } from "../../../../utils/espressoSpec";
+import { ESPRESSO_SPEC, STATUS_TH, isOff, specText, num, shotVerdict, judge } from "../../../../utils/espressoSpec";
 
 const MONTHS_TH = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
 const DAYS_TH = ["อา.", "จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส."];
@@ -100,10 +100,17 @@ function EspressoReport() {
         () =>
             rows.map((r) => {
                 const at = new Date(r.created_at).getTime();
+                const j = {
+                    dose_status: judge("dose", r.dose, r.dose_status),
+                    yield_status: judge("yield", r.yield, r.yield_status),
+                    first_drop_status: judge("firstDrop", r.first_drop, r.first_drop_status),
+                    total_time_status: judge("totalTime", r.total_time, r.total_time_status),
+                };
                 return {
                     ...r,
+                    ...j,
                     when: bkk(r.created_at),
-                    verdict: shotVerdict({ dose: r.dose_status, yieldStatus: r.yield_status, firstDrop: r.first_drop_status, totalTime: r.total_time_status }),
+                    verdict: shotVerdict({ dose: j.dose_status, yieldStatus: j.yield_status, firstDrop: j.first_drop_status, totalTime: j.total_time_status }),
                     photos: photos.filter((p) => Math.abs(p.at - at) <= 5 * 60_000).map((p) => p.url),
                 };
             }),
