@@ -1,0 +1,12 @@
+SOV_monomon (sov-monomon-thai-latin.woff2)
+Copyright (C) June 2017, Worawut Thanawatanawanich. All rights reserved.
+
+Licence stated in the font's own name table:
+"This font is free software; you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation; either version 2 of the License, or (at your option) any later version."
+https://www.gnu.org/licenses/gpl.html
+
+The file served here is a modified version (subset to Thai + basic Latin, hinting
+removed, converted to WOFF2 with fontTools). It is distributed under the same licence.
+Unmodified original: SOV_monomon-hinted.ttf, Version 1.00 (f0nt.com / SOV fonts).

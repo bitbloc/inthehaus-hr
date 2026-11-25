@@ -1,8 +1,8 @@
 'use client';
+/* Brand v2 · NFC / QR location fallback. Text only. Hallmark · pre-emit critique: P5 H5 E5 S5 R5 V5 */
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { QrCode, X, Camera, AlertCircle, Wifi } from 'lucide-react';
 import liff from '@line/liff';
 
 export default function QRScannerModal({ isOpen, onClose, onScanSuccess, onNfcSuccess }) {
@@ -109,88 +109,82 @@ export default function QRScannerModal({ isOpen, onClose, onScanSuccess, onNfcSu
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-rams-ink/60 backdrop-blur-[2px] z-50 flex items-center justify-center p-4"
+        transition={{ duration: 0.16 }}
+        className="brand-v2 !bg-charcoal/50 fixed inset-0 z-50 flex items-center justify-center p-4"
       >
         <motion.div
-          initial={{ scale: 0.96, opacity: 0 }}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="qr-modal-title"
+          initial={{ scale: 0.98, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0.96, opacity: 0 }}
-          className="bg-rams-panel border-2 border-rams-rule w-full max-w-sm rounded-sm p-6 shadow-[0_4px_0_0_var(--color-rams-rule)] text-rams-ink space-y-5 relative"
+          exit={{ scale: 0.98, opacity: 0 }}
+          transition={{ duration: 0.16, ease: 'easeOut' }}
+          className="bg-cream text-charcoal border border-charcoal w-full max-w-sm"
         >
-          {/* Close button */}
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 w-8 h-8 bg-rams-bg border border-rams-rule-light hover:border-rams-rule rounded-sm flex items-center justify-center text-rams-ink-muted hover:text-rams-ink transition cursor-pointer"
-          >
-            <X className="w-4 h-4" />
-          </button>
-
-          {/* Header */}
-          <div className="text-center space-y-1.5 pt-1">
-            <div className="w-12 h-12 bg-rams-orange text-rams-panel rounded-sm flex items-center justify-center mx-auto border border-rams-rule shadow-[0_2px_0_0_var(--color-rams-rule)]">
-              <QrCode className="w-6 h-6" />
+          <div className="bg-plum text-cream flex items-stretch">
+            <div className="flex-1 px-4 py-3">
+              <h3 id="qr-modal-title" className="font-head text-2xl">ยืนยันพิกัดร้าน</h3>
+              <p className="font-num text-xs tracking-[0.12em] text-on-plum-2">NFC · QR</p>
             </div>
-            <h3 className="text-base font-mono font-bold text-rams-ink uppercase tracking-wide pt-1">
-              ยืนยันพิกัดร้าน (NFC หรือ QR)
-            </h3>
-            <p className="text-xs text-rams-ink-muted leading-relaxed">
-              ใช้ในกรณีสัญญาณ GPS ในอาคารคลาดเคลื่อน แตะแผ่น NFC ที่บาร์หรือสแกน QR จากจอ POS
-            </p>
+            <button
+              type="button"
+              onClick={onClose}
+              className="min-w-16 px-4 border-l border-plum-3 text-base font-semibold hover:bg-plum-2 transition-colors duration-150"
+            >
+              ปิด
+            </button>
           </div>
 
-          {/* Action Buttons */}
-          <div className="space-y-2.5">
+          <div className="p-4 flex flex-col gap-3">
+            <p className="text-base text-subtle">
+              ใช้เมื่อ GPS ในร้านคลาดเคลื่อน แตะแผ่น NFC ที่บาร์ หรือสแกน QR จากจอ POS
+            </p>
+
             <button
               type="button"
               onClick={tryLiffScan}
-              className="w-full bg-rams-orange hover:bg-rams-orange-active text-rams-panel font-mono font-bold py-3 rounded-sm border border-rams-rule flex items-center justify-center gap-2 text-xs shadow-[0_2px_0_0_var(--color-rams-rule)] active:translate-y-[1px] active:shadow-none transition cursor-pointer"
+              className="w-full min-h-14 bg-charcoal hover:bg-charcoal-2 text-cream text-lg font-semibold transition-colors duration-150"
             >
-              <Camera className="w-4 h-4" />
-              <span>{scanning ? 'กำลังเปิดกล้อง...' : 'สแกน QR ผ่านกล้อง LINE'}</span>
+              {scanning ? 'กำลังเปิดกล้อง…' : 'สแกน QR ด้วยกล้อง LINE'}
             </button>
 
             <button
               type="button"
               onClick={startWebNfcScan}
-              className="w-full bg-rams-bg hover:bg-rams-panel text-rams-ink font-mono font-bold py-2.5 rounded-sm border border-rams-rule flex items-center justify-center gap-2 text-xs active:translate-y-[1px] transition cursor-pointer"
+              className="w-full min-h-12 bg-plum hover:bg-plum-2 text-cream text-base font-semibold transition-colors duration-150"
             >
-              <Wifi className="w-4 h-4 rotate-90 text-rams-orange" />
-              <span>{nfcScanning ? 'นำหลังเครื่องแตะแผ่น NFC...' : 'แตะอ่านแผ่น NFC (Android Web NFC)'}</span>
+              {nfcScanning ? 'นำหลังเครื่องแตะแผ่น NFC…' : 'แตะอ่านแผ่น NFC (Android)'}
             </button>
 
-            <div className="relative flex py-1.5 items-center">
-              <div className="flex-grow border-t border-rams-rule-light"></div>
-              <span className="flex-shrink mx-3 text-[10px] font-mono text-rams-ink-muted font-bold uppercase">
-                หรือกรอกรหัส Token บนจอร้าน
-              </span>
-              <div className="flex-grow border-t border-rams-rule-light"></div>
-            </div>
-
-            {/* Manual Token Form */}
-            <form onSubmit={handleManualSubmit} className="space-y-2">
+            <form onSubmit={handleManualSubmit} className="border-t border-rule pt-3 flex flex-col gap-2">
+              <label htmlFor="qr-manual-token" className="text-sm font-semibold text-neutral">
+                หรือกรอกรหัส Token จากจอร้าน
+              </label>
               <input
+                id="qr-manual-token"
                 type="text"
-                placeholder="เช่น ITH_XXXX หรือ NFC_BAR_..."
+                placeholder="ITH_XXXX หรือ NFC_BAR_..."
                 value={manualCode}
                 onChange={(e) => setManualCode(e.target.value)}
-                className="w-full bg-rams-bg border border-rams-rule-light focus:border-rams-rule rounded-sm px-4 py-2.5 text-xs text-center font-mono font-bold text-rams-ink placeholder-rams-ink-muted/60 uppercase outline-none transition"
+                autoCapitalize="characters"
+                className="w-full min-h-12 bg-cream border border-charcoal px-4 text-base text-center font-num text-charcoal placeholder:text-neutral uppercase outline-none focus-visible:border-plum"
               />
               <button
                 type="submit"
                 disabled={!manualCode.trim()}
-                className="w-full bg-rams-ink hover:bg-neutral-800 disabled:opacity-40 text-rams-panel font-mono font-bold py-2.5 rounded-sm border border-rams-rule text-xs transition cursor-pointer"
+                className="w-full min-h-12 bg-cream hover:bg-paper-2 border border-charcoal disabled:border-rule disabled:text-neutral text-charcoal text-base font-semibold transition-colors duration-150"
               >
-                ยืนยันรหัสพิกัดร้าน
+                ยืนยันรหัส
               </button>
             </form>
-          </div>
 
-          {errorMsg && (
-            <div className="text-[11px] font-mono text-rams-ink bg-rams-amber/15 border border-rams-amber p-2.5 rounded-sm flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0 text-rams-orange mt-0.5" />
-              <span>{errorMsg}</span>
-            </div>
-          )}
+            {errorMsg && (
+              <p role="status" className="border border-plum bg-paper-2 px-4 py-3 text-base text-charcoal">
+                {errorMsg}
+              </p>
+            )}
+          </div>
         </motion.div>
       </motion.div>
     </AnimatePresence>

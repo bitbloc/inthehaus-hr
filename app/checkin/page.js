@@ -1,7 +1,6 @@
-/* Hallmark · route: custom (bespoke) · structure: modular control grid · idea: "tactile push button & physical LED indicators"
- * paper: oklch(96% 0.006 80) · accent: oklch(62% 0.16 45) · display: Geist Mono · body: Geist Sans
- * axes: light / geometric-sans / warm · gates: all-pass · studied: no · pre-emit critique: P5 H5 E5 S5 R5 V5
- */
+/* Brand v2 (Thai Twist Modern) · cream surface, plum header, one charcoal primary.
+ * Type: SOV_monomon headings, IBM Plex Sans Thai body, DM Mono numbers. No icons or emoji.
+ * Hallmark · pre-emit critique: P5 H5 E5 S5 R5 V5 */
 "use client";
 import { useEffect, useState, useRef } from "react";
 import liff from "@line/liff";
@@ -11,7 +10,7 @@ import { resizeImage } from "../../utils/imageResizer";
 import Link from "next/link";
 import { format, isSameDay, startOfWeek, addDays } from "date-fns";
 import { th } from "date-fns/locale";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, MotionConfig } from "framer-motion";
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import NavigationDock from "../_components/NavigationDock";
@@ -23,96 +22,6 @@ function cn(...inputs) {
 import WeatherCard from "./components/WeatherCard";
 import QRScannerModal from "./components/QRScannerModal";
 import { sfx } from "../../utils/soundEffects";
-
-// --- Clean Technical SVG Icons (Dieter Rams Precision Icons) ---
-const SunIcon = ({ className = "w-5 h-5 stroke-current" }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <circle cx="12" cy="12" r="4" />
-    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
-  </svg>
-);
-
-const MoonIcon = ({ className = "w-5 h-5 stroke-current" }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
-  </svg>
-);
-
-const ClockIcon = ({ className = "w-5 h-5 stroke-current" }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <circle cx="12" cy="12" r="10" />
-    <polyline points="12 6 12 12 16 14" />
-  </svg>
-);
-
-const RegisterIcon = ({ className = "w-5 h-5 stroke-current" }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
-    <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
-  </svg>
-);
-
-const CameraIcon = ({ className = "w-10 h-10 stroke-current text-rams-ink mb-2" }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
-    <circle cx="12" cy="13" r="3" />
-  </svg>
-);
-
-const ConsoleIcon = ({ className = "w-5 h-5 stroke-current" }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <rect x="2" y="3" width="20" height="14" rx="1" />
-    <line x1="8" y1="21" x2="16" y2="21" />
-    <line x1="12" y1="17" x2="12" y2="21" />
-  </svg>
-);
-
-const RosterIcon = ({ className = "w-5 h-5 stroke-current" }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <rect x="3" y="4" width="18" height="18" rx="1" />
-    <line x1="16" y1="2" x2="16" y2="6" />
-    <line x1="8" y1="2" x2="8" y2="6" />
-    <line x1="3" y1="10" x2="21" y2="10" />
-  </svg>
-);
-
-const CoffeeIcon = ({ className = "w-5 h-5 stroke-current" }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M18 8h1a4 4 0 0 1 0 8h-1" />
-    <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z" />
-    <line x1="6" y1="1" x2="6" y2="4" />
-    <line x1="10" y1="1" x2="10" y2="4" />
-    <line x1="14" y1="1" x2="14" y2="4" />
-  </svg>
-);
-
-const AuditIcon = ({ className = "w-5 h-5 stroke-current" }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
-    <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
-    <line x1="12" y1="22.08" x2="12" y2="12" />
-  </svg>
-);
-
-const PinIcon = ({ className = "w-4 h-4 stroke-current" }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <line x1="12" y1="17" x2="12" y2="22" />
-    <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z" />
-  </svg>
-);
-
-const MegaphoneIcon = ({ className = "w-4 h-4 stroke-current" }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="m3 11 18-5v12L3 14v-3z" />
-    <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" />
-  </svg>
-);
-
-const CheckIcon = ({ className = "w-4 h-4 stroke-current" }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <polyline points="20 6 9 17 4 12" />
-  </svg>
-);
 
 export default function CheckIn() {
   // --- State ---
@@ -151,6 +60,7 @@ export default function CheckIn() {
   const [punchFeedback, setPunchFeedback] = useState(null);
   const [showPunchModal, setShowPunchModal] = useState(false);
   const [selectedMood, setSelectedMood] = useState(null);
+  const [waterSipped, setWaterSipped] = useState(false);
 
   // Dev Mode State (Disabled for plain security)
   const [devMode, setDevMode] = useState(false);
@@ -970,6 +880,7 @@ export default function CheckIn() {
         employee: json.employee || employeeData
       });
       setSelectedMood(null);
+      setWaterSipped(false);
       setShowPunchModal(true);
 
       fetchRecents();
@@ -1068,824 +979,551 @@ export default function CheckIn() {
 
   const isOwner = Boolean(employeeData && ((employeeData.position || '').toLowerCase().includes('owner') || (employeeData.position || '').toLowerCase().includes('ceo')));
 
-  // Dynamic Button Colors and Logic
-  const isLate = !isOwner && shiftContext?.isLate && lastAction !== 'check_in';
-  let mainButtonConfig = { 
-    label: 'Check In', 
-    icon: <SunIcon className="w-7 h-7 stroke-current mb-1" />, 
-    sub: 'Start your day', 
-    color: "bg-rams-orange text-rams-panel border border-rams-rule active:bg-rams-orange-active shadow-[0_3px_0_0_var(--color-rams-rule)]" 
+  // --- Brand v2 display helpers (text only, no icons / emoji) ---
+  const plain = (s) => String(s ?? '').replace(/[\p{Extended_Pictographic}️‍]/gu, '').replace(/\s{2,}/g, ' ').trim();
+  const isReady = status.includes('Ready') || status.includes('พร้อม');
+  const STATUS_TH = {
+    'Checking...': 'กำลังตรวจสอบพิกัด…',
+    'LIFF Error': 'เชื่อมต่อ LINE ไม่สำเร็จ',
+    'GPS Not Supported': 'เครื่องนี้ไม่รองรับ GPS',
+    'New User': 'ยังไม่ได้ลงทะเบียน',
+    'Pending Approval': 'รอแอดมินอนุมัติ',
   };
+  const LEAVE_TH = { sick: 'ลาป่วย', business: 'ลากิจ' };
+  const leaveLabel = (type) => LEAVE_TH[type] || 'ลาพักร้อน';
+  const MOODS = [
+    { emoji: '🔥', label: 'ฟิต', note: 'มีพลังพร้อมลุย' },
+    { emoji: '😊', label: 'ดี', note: 'อารมณ์ดี สดชื่น' },
+    { emoji: '😐', label: 'เฉย', note: 'ปกติ เรื่อย ๆ' },
+    { emoji: '😴', label: 'ง่วง', note: 'เหนื่อยหน่อย พักผ่อนนะ' },
+    { emoji: '🤒', label: 'ป่วย', note: 'ดูแลสุขภาพด้วยนะ' },
+  ];
+  const moodLabel = (m) => MOODS.find((x) => x.emoji === m)?.label || '';
+  const tap = { whileTap: { scale: 0.98 }, transition: { duration: 0.12, ease: 'easeOut' } };
+  const fadeIn = { initial: { opacity: 0, y: 4 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.16, ease: 'easeOut' } };
 
+  // Main action: one charcoal primary per screen, Thai first
+  const isLate = !isOwner && shiftContext?.isLate && lastAction !== 'check_in';
+  let mainButtonConfig = { label: 'เข้างาน', en: 'CHECK IN', sub: 'ถ่ายรูปยืนยันตัวตน', tone: 'primary' };
   if (lastAction === 'register') {
-    mainButtonConfig = { 
-      label: 'Register', 
-      icon: <RegisterIcon className="w-7 h-7 stroke-current mb-1" />, 
-      sub: 'Request Access', 
-      color: "bg-rams-orange text-rams-panel border border-rams-rule active:bg-rams-orange-active shadow-[0_3px_0_0_var(--color-rams-rule)]" 
-    };
+    mainButtonConfig = { label: 'ลงทะเบียน', en: 'REGISTER', sub: 'ขอสิทธิ์ใช้งาน', tone: 'primary' };
   } else if (lastAction === 'pending') {
-    mainButtonConfig = { 
-      label: 'Pending', 
-      icon: <ClockIcon className="w-7 h-7 stroke-current mb-1" />, 
-      sub: 'Waiting Admin', 
-      color: "bg-rams-amber text-rams-ink border border-rams-rule shadow-[0_3px_0_0_var(--color-rams-rule)]" 
-    };
+    mainButtonConfig = { label: 'รออนุมัติ', en: 'PENDING', sub: 'แอดมินกำลังตรวจสอบ', tone: 'waiting' };
   } else if (lastAction === 'check_in') {
-    mainButtonConfig = { 
-      label: 'Check Out', 
-      icon: <MoonIcon className="w-7 h-7 stroke-current mb-1" />, 
-      sub: 'Good rest!', 
-      color: "bg-rams-ink text-rams-panel border border-rams-rule shadow-[0_3px_0_0_var(--color-rams-rule)]" 
-    };
+    mainButtonConfig = { label: 'ออกงาน', en: 'CHECK OUT', sub: 'พักผ่อนให้เต็มที่', tone: 'primary' };
   } else if (isLate) {
-    mainButtonConfig = { 
-      label: 'Check In', 
-      icon: <ClockIcon className="w-7 h-7 stroke-current mb-1" />, 
-      sub: 'Start your day (Late)', 
-      color: "bg-rams-red text-rams-panel border border-rams-rule active:bg-rams-red/90 shadow-[0_3px_0_0_var(--color-rams-rule)]" 
-    };
+    mainButtonConfig = { label: 'เข้างาน', en: 'CHECK IN · LATE', sub: 'เลยเวลาเข้ากะแล้ว', tone: 'primary' };
   }
+  const mainButtonClass = mainButtonConfig.tone === 'waiting'
+    ? 'bg-paper-2 text-subtle border border-charcoal'
+    : 'bg-charcoal text-cream hover:bg-charcoal-2 border border-charcoal';
 
-  const displayStatus = isOwner 
-    ? (status.includes('Ready') || status.includes('พร้อม') ? '👑 OWNER · พร้อมใช้งาน (HQ)' : '👑 OWNER · ยกเว้นการลงเวลา (EXEMPT)') 
-    : status;
+  const displayStatus = isOwner
+    ? (isReady ? 'เจ้าของร้าน · อยู่ในพื้นที่ร้าน' : 'เจ้าของร้าน · ไม่ต้องลงเวลา')
+    : plain(STATUS_TH[status] || status);
+
+  const sectionLabel = 'text-sm font-semibold text-neutral';
+  const card = 'w-full bg-cream border border-rule';
 
   return (
-    <div className="min-h-screen bg-rams-bg text-rams-ink font-sans flex flex-col items-center relative overflow-x-clip font-feature-settings-['ss01'] pb-32">
+    <MotionConfig reducedMotion="user">
+    <div className="brand-v2 min-h-screen flex flex-col items-center relative overflow-x-clip pb-36">
 
-      {/* 1. Header (Dieter Rams Utilitarian Solid Bar) */}
-      <motion.div
-        className="w-full px-6 py-4 flex justify-between items-center z-20 sticky top-0 bg-rams-panel border-b border-rams-rule-light relative"
-        initial={{ y: -10, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-      >
-        <div className="flex items-center gap-1.5 z-10">
-          <span className="w-2 h-2 rounded-full bg-rams-green animate-pulse"></span>
-          <span className="text-[10px] font-mono font-bold text-rams-ink uppercase tracking-wider">
-            HAUS OPS
-          </span>
-        </div>
-
-        {/* Center: Logo */}
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center z-10 pointer-events-none">
-           <img src="/logo.png" alt="In The Haus" className="h-9 object-contain grayscale brightness-90 contrast-125" />
-        </div>
-
-        <div className="flex items-center gap-3 z-10">
-          <Link href="https://forms.gle/3LdW9zdjdTCpfpTe8" target="_blank" className="text-[10px] font-mono font-bold text-rams-ink-muted hover:text-rams-ink border border-rams-rule-light bg-rams-bg px-2.5 py-1.5 transition-colors mr-1 rounded-sm">
-            คำขอเบิกเงินล่วงหน้า
-          </Link>
-          {profile ? (
-            <div className="flex items-center gap-3">
-              <div className="flex flex-col items-end">
-                <span className="text-xs font-mono font-bold text-rams-ink">{profile.displayName}</span>
-                <span
+      {/* 1. Header: plum bar, two cells */}
+      <header className="w-full sticky top-0 z-20 bg-plum text-cream border-b border-plum-3">
+        <div className="mx-auto max-w-sm px-4 flex items-stretch">
+          <div className="flex-1 px-4 py-3 flex flex-col justify-center min-w-0">
+            <span className="font-head text-2xl">ในบ้าน</span>
+            <span className="font-num text-xs tracking-[0.12em] text-on-plum-2">HAUS OPS</span>
+          </div>
+          <div className="border-l border-plum-3 px-4 py-3 flex items-center gap-3 min-w-0">
+            {profile ? (
+              <>
+                <button
+                  type="button"
                   onClick={() => {
                     navigator.clipboard.writeText(profile.userId);
-                    alert("Copied User ID");
+                    alert("คัดลอก User ID แล้ว");
                   }}
-                  className={cn(
-                    "text-[10px] font-mono cursor-pointer transition-colors",
-                    isOwner ? "text-rams-amber font-extrabold" : "text-rams-ink-muted hover:text-rams-orange"
-                  )}
+                  className="min-h-12 flex flex-col items-end justify-center min-w-0 text-right group"
+                  title="แตะเพื่อคัดลอก User ID"
                 >
-                  {isOwner ? `👑 ${employeeData?.position || 'Owner'}` : (employeeData?.position || (lastAction === 'pending' ? 'Pending' : 'Staff'))}
-                </span>
-              </div>
-              {profile.pictureUrl ? (
+                  <span className="text-base font-semibold truncate max-w-[9rem]">{profile.displayName}</span>
+                  <span className="text-sm text-on-plum-2 group-hover:text-cream truncate max-w-[9rem]">
+                    {isOwner ? 'เจ้าของร้าน' : (employeeData?.position || (lastAction === 'pending' ? 'รออนุมัติ' : 'พนักงาน'))}
+                  </span>
+                </button>
                 <div className="relative w-10 h-10 shrink-0">
-                  <img 
-                    src={profile.pictureUrl} 
-                    alt={profile.displayName || ""}
-                    referrerPolicy="no-referrer"
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none';
-                      const fallback = e.currentTarget.parentElement?.querySelector('.avatar-header-fallback');
-                      if (fallback) fallback.classList.remove('hidden');
-                    }}
-                    className="w-10 h-10 rounded-sm object-cover border border-rams-rule-light" 
-                  />
-                  <div className="avatar-header-fallback hidden w-10 h-10 rounded-sm bg-rams-panel flex items-center justify-center text-xs font-mono font-extrabold text-rams-ink border border-rams-rule-light absolute inset-0">
+                  {profile.pictureUrl && (
+                    <img
+                      src={profile.pictureUrl}
+                      alt=""
+                      referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                        const fallback = e.currentTarget.parentElement?.querySelector('.avatar-header-fallback');
+                        if (fallback) fallback.classList.remove('hidden');
+                      }}
+                      className="w-10 h-10 object-cover border border-plum-3"
+                    />
+                  )}
+                  <div className={cn("avatar-header-fallback w-10 h-10 bg-plum-2 flex items-center justify-center font-num text-sm border border-plum-3 absolute inset-0", profile.pictureUrl && "hidden")}>
                     {(profile.displayName || "U").slice(0, 2).toUpperCase()}
                   </div>
                 </div>
-              ) : (
-                <div className="w-10 h-10 rounded-sm bg-rams-panel flex items-center justify-center text-xs font-mono font-extrabold text-rams-ink border border-rams-rule-light">
-                  {(profile.displayName || "U").slice(0, 2).toUpperCase()}
-                </div>
-              )}
-            </div>
-          ) : (
-            <button 
-              onClick={handleLineLogin} 
-              className="px-3.5 py-1.5 bg-[#06C755] hover:bg-[#05b34c] text-white rounded-sm text-xs font-mono font-bold border border-rams-rule active:translate-y-[1px] tactile-btn-sm shadow-sm transition-[transform,background-color]"
-            >
-              LINE Login
-            </button>
-          )}
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={handleLineLogin}
+                className="min-h-12 px-4 bg-plum-2 hover:bg-plum-3 text-cream border border-plum-3 text-base font-semibold transition-colors duration-150"
+              >
+                เข้าสู่ระบบ LINE
+              </button>
+            )}
+          </div>
         </div>
-      </motion.div>
+      </header>
 
-      {/* 2. Contextual Info (Next Shift - Rams Panel) */}
-      <AnimatePresence>
-        {shiftContext && (
-          <motion.div
-            initial={{ opacity: 0, y: 5 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mt-4 w-full max-w-sm px-6 z-10"
-          >
-            <div className="flex items-center justify-between px-4 py-3 bg-rams-panel border border-rams-rule-light rounded-sm shadow-none">
-              <div className="flex items-center gap-3">
-                <div className={cn("w-9 h-9 rounded-sm border border-rams-rule-light flex items-center justify-center text-sm bg-rams-bg")}>
-                  {isLate ? <ClockIcon className="w-5 h-5 text-rams-red" /> : <SunIcon className="w-5 h-5 text-rams-orange" />}
-                </div>
-                <div>
-                  <h4 className="text-[10px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest leading-tight">
-                    {isLate ? "Running Late" : "Current Shift"}
-                  </h4>
-                  <p className="text-sm font-mono font-bold text-rams-ink">
-                    {shiftContext.start.slice(0, 5)} - {shiftContext.end.slice(0, 5)}
-                  </p>
-                </div>
+      <main className="w-full max-w-sm px-4 flex flex-col gap-4 mt-4 z-10">
+
+        {/* 2. Today's shift */}
+        <AnimatePresence>
+          {shiftContext && (
+            <motion.section {...fadeIn} className={cn(card, "flex items-stretch")}>
+              <div className="flex-1 px-4 py-3">
+                <p className={sectionLabel}>กะวันนี้</p>
+                <p className="font-num text-xl text-charcoal">
+                  {shiftContext.start.slice(0, 5)}–{shiftContext.end.slice(0, 5)}
+                </p>
               </div>
               {isLate && (
-                <span className="px-2 py-0.5 bg-rams-red text-rams-panel text-[10px] font-mono font-bold rounded-sm border border-rams-rule-light">LATE</span>
+                <div className="bg-plum text-cream px-4 flex flex-col justify-center items-center">
+                  <span className="text-base font-semibold">สาย</span>
+                  <span className="font-num text-xs text-on-plum-2">LATE</span>
+                </div>
               )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            </motion.section>
+          )}
+        </AnimatePresence>
 
-      {/* 3. Hero Clock & Main Action */}
-      <div className="flex-1 flex flex-col items-center justify-start w-full z-10 mt-4">
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="text-center mb-5 w-full max-w-sm px-6"
-        >
-          {/* Stark Digital Flip/LCD Style Bezel (Dieter Rams Braun Clock) */}
-          <div className="border-2 border-rams-rule bg-rams-panel p-5 rounded-sm text-center shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] w-full mb-3">
-            <h2 className="text-[4.5rem] md:text-[5.5rem] leading-none font-mono font-bold text-rams-ink tracking-tight select-none">
+        {/* 3. Clock + status */}
+        <section className={card}>
+          <div className="px-4 pt-5 pb-4 text-center">
+            <p className="font-num text-[4.5rem] leading-none text-charcoal tabular-nums select-none">
               {currentTime ? format(currentTime, "HH:mm") : "--:--"}
-            </h2>
-            <p className="text-[11px] font-mono font-bold text-rams-ink-muted mt-2 tracking-widest uppercase">
-              {currentTime ? format(currentTime, "EEEEที่ d MMMM yyyy", { locale: th }) : "Loading..."}
+            </p>
+            <p className="text-base text-subtle mt-3">
+              {currentTime ? format(currentTime, "EEEEที่ d MMMM yyyy", { locale: th }) : "กำลังโหลด…"}
             </p>
           </div>
-
-          <motion.div
-            className={cn(
-              "inline-flex items-center gap-2 px-3.5 py-1.5 rounded-sm text-[11px] font-mono font-bold tracking-wider uppercase border border-rams-rule-light bg-rams-panel",
-              isOwner ? "border-rams-amber/40 text-rams-ink bg-rams-amber/10" : ""
-            )}
-          >
-            <span className={cn(
-              "w-2 h-2 rounded-full border border-rams-rule-light shrink-0", 
-              isOwner ? 'bg-rams-amber animate-pulse' : (status.includes('Ready') || status.includes('พร้อม') ? 'bg-rams-green animate-pulse' : 'bg-rams-red')
-            )}></span>
-            {displayStatus}
-          </motion.div>
-          
-          {/* Gamification: Early Bird Badge */}
+          <div className="border-t border-rule px-4 py-3 flex items-baseline justify-between gap-3">
+            <span className={cn(sectionLabel, "shrink-0")}>สถานะ</span>
+            <span className={cn("text-base text-right", isReady || isOwner ? "text-charcoal font-semibold" : "text-plum font-semibold")}>
+              {displayStatus}
+            </span>
+          </div>
           {!isOwner && lastAction !== 'check_in' && shiftContext && !isLate && (
-            <div className="mt-3 flex justify-center">
-              <motion.div
-                initial={{ opacity: 0, y: 5 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="px-3.5 py-1 bg-rams-orange/10 text-rams-orange border border-rams-rule-light rounded-sm text-[11px] font-mono font-bold flex items-center gap-1.5"
-              >
-                <span>🔥</span>
-                <span>มาเช้าจัง เยี่ยมไปเลย!</span>
-              </motion.div>
-            </div>
+            <p className="border-t border-rule px-4 py-3 text-base text-plum">มาก่อนเวลา เยี่ยมไปเลย</p>
           )}
-        </motion.div>
+        </section>
 
-        {/* Main Check-In Action Button */}
+        {/* Main action */}
         {!status.includes('Checking') && (
-          <>
-            {isOwner ? (
-              /* Executive Command Hub for Owner */
-              <div className="w-full max-w-sm px-6 mb-6 z-30 space-y-3.5">
-                {/* Executive Status Card */}
-                <motion.div
-                  initial={{ opacity: 0, y: 5 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="bg-rams-panel border-2 border-rams-rule p-4 rounded-sm shadow-[0_2px_0_0_var(--color-rams-rule)] relative overflow-hidden"
-                >
-                  <div className="flex items-center justify-between mb-2.5">
-                    <span className="px-2 py-0.5 bg-rams-amber/15 text-rams-ink border border-rams-amber/40 rounded-sm text-[10px] font-mono font-bold tracking-wider uppercase flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-rams-amber"></span>
-                      <span>OWNER · MANAGEMENT</span>
-                    </span>
-                    <span className="text-[10px] font-mono font-bold text-rams-green bg-rams-green/10 border border-rams-green/30 px-2 py-0.5 rounded-sm">
-                      EXEMPT ✓
-                    </span>
-                  </div>
-
-                  <h3 className="text-sm font-mono font-bold text-rams-ink mb-1">
-                    สวัสดีครับคุณ {employeeData?.nickname || employeeData?.name}
-                  </h3>
-                  <p className="text-[11px] font-sans text-rams-ink-muted leading-relaxed">
-                    ตำแหน่งของคุณได้รับการยกเว้นการลงเวลาเข้า-ออกงานและไม่ถูกนับขาดงาน สามารถเข้าใช้งานเมนูบริหารจัดการร้านได้ทันที
+          isOwner ? (
+            /* Owner hub */
+            <section className="flex flex-col gap-4">
+              <motion.div {...fadeIn} className={card}>
+                <div className="px-4 py-4">
+                  <h2 className="font-head text-2xl text-charcoal">สวัสดีครับคุณ {employeeData?.nickname || employeeData?.name}</h2>
+                  <p className="text-base text-subtle mt-2">
+                    ตำแหน่งนี้ไม่ต้องลงเวลาเข้า-ออก และไม่ถูกนับขาดงาน เข้าเมนูบริหารร้านได้ทันที
                   </p>
-
-                  <div className="mt-3 pt-3 border-t border-rams-rule-light grid grid-cols-2 divide-x divide-rams-rule-light text-center">
-                    <div className="pr-2">
-                      <span className="text-[10px] font-mono font-bold text-rams-ink-muted uppercase block">สิทธิ์การใช้งาน</span>
-                      <span className="text-xs font-mono font-bold text-rams-ink mt-0.5 block">ผู้บริหารระดับสูง</span>
-                    </div>
-                    <div className="pl-2">
-                      <span className="text-[10px] font-mono font-bold text-rams-ink-muted uppercase block">การลงเวลา</span>
-                      <span className="text-xs font-mono font-bold text-rams-green mt-0.5 block">ทางเลือก (Optional)</span>
-                    </div>
-                  </div>
-                </motion.div>
-
-                {/* Executive Quick Portals Grid */}
-                <div className="grid grid-cols-2 gap-2">
-                  <Link
-                    href="/admin"
-                    className="p-3 bg-rams-panel hover:bg-rams-bg border border-rams-rule rounded-sm flex flex-col justify-between transition-[transform,background-color,border-color,color] duration-150 ease-out active:translate-y-[1px] shadow-sm tactile-btn-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rams-ink group"
-                  >
-                    <div className="text-rams-ink group-hover:text-rams-orange transition-colors mb-2">
-                      <ConsoleIcon className="w-5 h-5 stroke-current" />
-                    </div>
-                    <div>
-                      <div className="text-xs font-mono font-bold text-rams-ink group-hover:text-rams-orange transition-colors">
-                        Admin Console
-                      </div>
-                      <div className="text-[10px] font-mono text-rams-ink-muted mt-0.5">
-                        ระบบ HR & หลังบ้าน
-                      </div>
-                    </div>
-                  </Link>
-
-                  <Link
-                    href="/shifts"
-                    className="p-3 bg-rams-panel hover:bg-rams-bg border border-rams-rule rounded-sm flex flex-col justify-between transition-[transform,background-color,border-color,color] duration-150 ease-out active:translate-y-[1px] shadow-sm tactile-btn-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rams-ink group"
-                  >
-                    <div className="text-rams-ink group-hover:text-rams-orange transition-colors mb-2">
-                      <RosterIcon className="w-5 h-5 stroke-current" />
-                    </div>
-                    <div>
-                      <div className="text-xs font-mono font-bold text-rams-ink group-hover:text-rams-orange transition-colors">
-                        Master Roster
-                      </div>
-                      <div className="text-[10px] font-mono text-rams-ink-muted mt-0.5">
-                        ตารางกะ & เวรทีมงาน
-                      </div>
-                    </div>
-                  </Link>
-
-                  <Link
-                    href="/admin/report/espresso"
-                    className="p-3 bg-rams-panel hover:bg-rams-bg border border-rams-rule rounded-sm flex flex-col justify-between transition-[transform,background-color,border-color,color] duration-150 ease-out active:translate-y-[1px] shadow-sm tactile-btn-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rams-ink group"
-                  >
-                    <div className="text-rams-ink group-hover:text-rams-orange transition-colors mb-2">
-                      <CoffeeIcon className="w-5 h-5 stroke-current" />
-                    </div>
-                    <div>
-                      <div className="text-xs font-mono font-bold text-rams-ink group-hover:text-rams-orange transition-colors">
-                        Espresso Report
-                      </div>
-                      <div className="text-[10px] font-mono text-rams-ink-muted mt-0.5">
-                        รายงานบาร์ & สกัดช็อต
-                      </div>
-                    </div>
-                  </Link>
-
-                  <Link
-                    href="/stock/audit"
-                    className="p-3 bg-rams-panel hover:bg-rams-bg border border-rams-rule rounded-sm flex flex-col justify-between transition-[transform,background-color,border-color,color] duration-150 ease-out active:translate-y-[1px] shadow-sm tactile-btn-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rams-ink group"
-                  >
-                    <div className="text-rams-ink group-hover:text-rams-orange transition-colors mb-2">
-                      <AuditIcon className="w-5 h-5 stroke-current" />
-                    </div>
-                    <div>
-                      <div className="text-xs font-mono font-bold text-rams-ink group-hover:text-rams-orange transition-colors">
-                        Stock Audit
-                      </div>
-                      <div className="text-[10px] font-mono text-rams-ink-muted mt-0.5">
-                        เช็คสต็อกวัตถุดิบ
-                      </div>
-                    </div>
-                  </Link>
                 </div>
-
-                {/* Optional Voluntary Punch Accordion */}
-                <div className="pt-1">
-                  <button
-                    onClick={() => setShowOptionalPunch(!showOptionalPunch)}
-                    className="w-full py-2 px-3 bg-rams-panel hover:bg-rams-bg border border-rams-rule-light rounded-sm flex items-center justify-between text-[11px] font-mono font-bold text-rams-ink-muted hover:text-rams-ink transition-[transform,background-color,color] duration-150 ease-out active:translate-y-[1px] tactile-btn-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rams-ink"
-                  >
-                    <span className="flex items-center gap-1.5">
-                      <CameraIcon className="w-3.5 h-3.5 stroke-current" />
-                      <span>บันทึกเวลาประวัติ (ทางเลือก)</span>
-                    </span>
-                    <span>{showOptionalPunch ? '▲ ซ่อน' : '▼ เปิด'}</span>
-                  </button>
-
-                  <AnimatePresence>
-                    {showOptionalPunch && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        transition={{ duration: 0.15, ease: "easeOut" }}
-                        className="pt-2 space-y-2 overflow-hidden"
-                      >
-                        <motion.button
-                          whileHover={{ scale: 1.01 }}
-                          whileTap={{ scale: 0.985, y: 1 }}
-                          transition={{ type: "spring", stiffness: 400, damping: 25 }}
-                          onClick={handleStartCheckIn}
-                          disabled={isSubmitting}
-                          className="w-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rams-ink"
-                        >
-                          <div className={cn(
-                            "w-full py-3.5 rounded-sm flex items-center justify-center gap-2 border border-rams-rule text-center select-none cursor-pointer transition-shadow",
-                            mainButtonConfig.color
-                          )}>
-                            <span className="scale-90">{mainButtonConfig.icon}</span>
-                            <span className="text-xs font-mono font-bold uppercase tracking-wider">
-                              {isSubmitting ? "Processing..." : `${mainButtonConfig.label} (ทางเลือก)`}
-                            </span>
-                          </div>
-                        </motion.button>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              </div>
-            ) : (
-              /* Standard Staff Check-in / Check-out Button with Smooth Motion */
-              <div className="w-full max-w-sm px-6 mb-6 z-30 space-y-2.5">
-                {verifiedNfc && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="flex items-center justify-between px-3.5 py-2 bg-rams-green/10 border border-rams-green rounded-sm text-xs font-mono font-bold text-rams-green"
-                  >
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-rams-green animate-pulse" />
-                      <span>NFC STATION VERIFIED: {verifiedNfc.nfcStation}</span>
-                    </span>
-                    <span className="text-[10px] uppercase">READY ✓</span>
-                  </motion.div>
-                )}
-                {verifiedQrToken && !verifiedNfc && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="flex items-center justify-between px-3.5 py-2 bg-rams-green/10 border border-rams-green rounded-sm text-xs font-mono font-bold text-rams-green"
-                  >
-                    <span>POS QR TOKEN VERIFIED</span>
-                    <span className="text-[10px] uppercase">READY ✓</span>
-                  </motion.div>
-                )}
-                <motion.button
-                  whileHover={{ scale: 1.012 }}
-                  whileTap={{ scale: 0.98, y: 1.5 }}
-                  transition={{ type: "spring", stiffness: 420, damping: 26 }}
-                  onClick={handleStartCheckIn}
-                  disabled={isSubmitting}
-                  className="w-full disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rams-ink group"
-                >
-                  <div className={cn(
-                    "w-full py-5 rounded-sm flex flex-col items-center justify-center border-2 border-rams-rule text-center select-none cursor-pointer transition-all duration-150",
-                    mainButtonConfig.color
-                  )}>
-                    <motion.span
-                      animate={{ y: [0, -2, 0] }}
-                      transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
-                      className="mb-1"
-                    >
-                      {mainButtonConfig.icon}
-                    </motion.span>
-                    <span className="text-xl font-mono font-bold uppercase tracking-wider">
-                      {isSubmitting ? "Processing..." : mainButtonConfig.label}
-                    </span>
-                    <span className="text-[11px] font-mono opacity-85 mt-1 font-bold uppercase tracking-widest">
-                      {verifiedNfc ? `NFC: ${verifiedNfc.nfcStation} · กดเพื่อถ่ายรูปลงเวลา` : mainButtonConfig.sub}
-                    </span>
+                <div className="grid grid-cols-2 border-t border-rule divide-x divide-rule">
+                  <div className="px-4 py-3">
+                    <p className={sectionLabel}>สิทธิ์</p>
+                    <p className="text-base font-semibold">ผู้บริหาร</p>
                   </div>
-                </motion.button>
+                  <div className="px-4 py-3">
+                    <p className={sectionLabel}>การลงเวลา</p>
+                    <p className="text-base font-semibold">ไม่บังคับ</p>
+                  </div>
+                </div>
+              </motion.div>
 
-                {/* Hardware Fallback Trigger (NFC or QR) when GPS is indoor-drifting */}
-                <motion.button
+              <nav aria-label="เมนูเจ้าของร้าน" className="grid grid-cols-2 gap-px bg-rule border border-rule">
+                {[
+                  { href: '/admin', th: 'หลังบ้าน HR', en: 'ADMIN' },
+                  { href: '/shifts', th: 'ตารางกะทีม', en: 'ROSTER' },
+                  { href: '/admin/report/espresso', th: 'รายงานบาร์', en: 'ESPRESSO' },
+                  { href: '/stock/audit', th: 'เช็คสต็อก', en: 'STOCK' },
+                ].map((l) => (
+                  <Link
+                    key={l.href}
+                    href={l.href}
+                    className="bg-cream hover:bg-paper-2 min-h-[72px] px-4 py-3 flex flex-col justify-between transition-colors duration-150"
+                  >
+                    <span className="text-base font-semibold text-charcoal">{l.th}</span>
+                    <span className="font-num text-xs text-neutral tracking-[0.08em]">{l.en}</span>
+                  </Link>
+                ))}
+              </nav>
+
+              <div className={card}>
+                <button
                   type="button"
-                  whileHover={{ y: -1 }}
-                  whileTap={{ scale: 0.985 }}
-                  transition={{ duration: 0.12 }}
-                  onClick={() => setShowQRScanner(true)}
-                  className="w-full py-2.5 px-3 bg-rams-panel hover:bg-rams-bg border border-rams-rule-light hover:border-rams-rule rounded-sm flex items-center justify-between text-xs font-mono font-bold text-rams-ink-muted hover:text-rams-ink transition cursor-pointer"
+                  onClick={() => setShowOptionalPunch(!showOptionalPunch)}
+                  aria-expanded={showOptionalPunch}
+                  className="w-full min-h-12 px-4 flex items-center justify-between text-base text-charcoal hover:bg-paper-2 transition-colors duration-150"
                 >
-                  <span className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-rams-orange" />
-                    <span>GPS ในร้านคลาดเคลื่อน? ยืนยันด้วยแผ่น NFC หรือ QR</span>
-                  </span>
-                  <span className="text-[10px] font-mono uppercase text-rams-orange font-bold">OPEN →</span>
-                </motion.button>
+                  <span>ลงเวลาไว้ดูย้อนหลัง (ไม่บังคับ)</span>
+                  <span className="text-sm text-neutral">{showOptionalPunch ? 'ซ่อน' : 'เปิด'}</span>
+                </button>
+                <AnimatePresence initial={false}>
+                  {showOptionalPunch && (
+                    <motion.div {...fadeIn} exit={{ opacity: 0 }} className="border-t border-rule p-4">
+                      <motion.button
+                        type="button"
+                        {...tap}
+                        onClick={handleStartCheckIn}
+                        disabled={isSubmitting}
+                        className={cn("w-full min-h-14 text-lg font-semibold disabled:opacity-50 transition-colors duration-150", mainButtonClass)}
+                      >
+                        {isSubmitting ? "กำลังบันทึก…" : mainButtonConfig.label}
+                      </motion.button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
-            )}
-          </>
+            </section>
+          ) : (
+            /* Staff check-in / check-out */
+            <section className="flex flex-col gap-2">
+              {(verifiedNfc || verifiedQrToken) && (
+                <motion.div {...fadeIn} className={cn(card, "px-4 py-3 flex items-center justify-between gap-3")}>
+                  <span className="text-base text-charcoal">
+                    {verifiedNfc ? <>ยืนยันพิกัดด้วย NFC <span className="font-num">{verifiedNfc.nfcStation}</span></> : 'ยืนยันพิกัดด้วย QR จากจอ POS'}
+                  </span>
+                  <span className="text-sm font-semibold text-plum shrink-0">พร้อม</span>
+                </motion.div>
+              )}
+
+              <motion.button
+                type="button"
+                {...tap}
+                onClick={handleStartCheckIn}
+                disabled={isSubmitting}
+                className={cn("w-full min-h-[88px] px-4 py-4 flex flex-col items-center justify-center text-center select-none disabled:opacity-50 transition-colors duration-150", mainButtonClass)}
+              >
+                <span className="text-2xl font-semibold">
+                  {isSubmitting ? "กำลังบันทึก…" : mainButtonConfig.label}
+                </span>
+                <span className="text-base opacity-80 mt-1">
+                  {verifiedNfc ? 'แตะเพื่อถ่ายรูปลงเวลา' : mainButtonConfig.sub}
+                </span>
+                <span className="font-num text-xs tracking-[0.14em] opacity-70 mt-1">{mainButtonConfig.en}</span>
+              </motion.button>
+
+              <button
+                type="button"
+                onClick={() => setShowQRScanner(true)}
+                className="w-full min-h-12 px-4 py-3 bg-cream hover:bg-paper-2 border border-charcoal flex items-center justify-between gap-3 text-left transition-colors duration-150"
+              >
+                <span className="text-base text-charcoal">GPS ในร้านคลาดเคลื่อน? ยืนยันด้วย NFC หรือ QR</span>
+                <span className="text-sm font-semibold text-plum shrink-0">เปิด</span>
+              </button>
+            </section>
+          )
         )}
 
-        {/* Daily Bulletin & Dashboard */}
+        {/* Bulletin & dashboard */}
         {(() => {
           const allAnnouncements = announcements.length > 0 ? announcements : (activeAnnouncement ? [activeAnnouncement] : []);
           const fixedAnnouncements = allAnnouncements.filter(a => a.expires_at === null);
           const temporaryAnnouncements = allAnnouncements.filter(a => a.expires_at !== null && !dismissedIds.includes(a.id));
 
           return (
-            <div className="w-full max-w-sm px-6 mb-6 z-30 flex flex-col gap-4">
-              {/* Fixed Announcements */}
-              <AnimatePresence>
-                {fixedAnnouncements.map((a) => (
-                  <motion.div
-                    key={`fixed-${a.id}`}
-                    initial={{ opacity: 0, y: 5 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="w-full bg-rams-panel border border-rams-rule-light p-4 shadow-none flex items-start gap-3.5 rounded-sm"
-                  >
-                    <PinIcon className="w-4 h-4 stroke-current text-rams-ink shrink-0 mt-0.5" />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 mb-1.5">
-                        <span className="text-[9px] font-mono font-extrabold text-rams-ink border border-rams-rule-light bg-rams-bg px-2 py-0.5 rounded-sm uppercase tracking-widest">Pinned</span>
-                        {a.priority > 1 && (
-                          <span className="text-[9px] font-mono font-extrabold text-rams-panel border border-rams-rule-light bg-rams-red px-2 py-0.5 rounded-sm uppercase tracking-widest animate-pulse">Urgent</span>
-                        )}
-                      </div>
-                      <p className="text-xs font-semibold text-rams-ink leading-relaxed break-words">{a.message}</p>
-                    </div>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
+            <>
+              {/* Pinned announcements */}
+              {fixedAnnouncements.map((a) => (
+                <motion.article key={`fixed-${a.id}`} {...fadeIn} className={card}>
+                  {a.priority > 1 && (
+                    <div className="bg-plum text-cream px-4 py-2 text-sm font-semibold">ประกาศสำคัญ</div>
+                  )}
+                  <div className="px-4 py-3">
+                    <p className={sectionLabel}>ปักหมุด</p>
+                    <p className="text-base text-charcoal break-words mt-1">{a.message}</p>
+                  </div>
+                </motion.article>
+              ))}
 
-              {/* Temporary Announcements */}
+              {/* Temporary announcements */}
               <AnimatePresence>
                 {temporaryAnnouncements.map((a) => {
                   let expLabel = '';
                   if (a.expires_at) {
-                     const diffMs = new Date(a.expires_at) - new Date();
-                     if (diffMs > 0) {
-                       const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
-                       const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-                       if (diffHrs > 0) {
-                         expLabel = `หมดเวลาใน ${diffHrs} ชม.`;
-                       } else {
-                         expLabel = `หมดเวลาใน ${diffMins} นาที`;
-                       }
-                     } else {
-                       expLabel = 'หมดเวลาแล้ว';
-                     }
+                    const diffMs = new Date(a.expires_at) - new Date();
+                    if (diffMs > 0) {
+                      const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
+                      const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                      expLabel = diffHrs > 0 ? `หมดเวลาใน ${diffHrs} ชม.` : `หมดเวลาใน ${diffMins} นาที`;
+                    } else {
+                      expLabel = 'หมดเวลาแล้ว';
+                    }
                   }
                   const isUrgent = a.priority > 1;
 
                   return (
-                    <motion.div
+                    <motion.article
                       key={`temp-${a.id}`}
-                      initial={{ opacity: 0, scale: 0.98 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.98, height: 0, marginBottom: 0, padding: 0 }}
-                      className="w-full bg-rams-panel border border-rams-rule-light p-4 shadow-none flex items-start gap-3.5 rounded-sm transition-[transform,opacity] duration-150 ease-out relative"
+                      {...fadeIn}
+                      exit={{ opacity: 0, transition: { duration: 0.12 } }}
+                      className={card}
                     >
-                      <MegaphoneIcon className={cn("w-4 h-4 stroke-current shrink-0 mt-0.5", isUrgent ? "text-rams-red" : "text-rams-orange")} />
-                      <div className="flex-1 min-w-0 pr-6">
-                        <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
-                          <span className={`text-[10px] font-mono font-extrabold border border-rams-rule-light ${isUrgent ? 'bg-rams-red/10 text-rams-red' : 'bg-rams-orange/10 text-rams-orange'} px-2 py-0.5 rounded-sm uppercase tracking-widest`}>
-                            {isUrgent ? 'Important' : 'News'}
-                          </span>
-                          {expLabel && (
-                            <span className="text-[10px] font-mono font-bold text-rams-ink-muted flex items-center gap-1">
-                              <ClockIcon className="w-3 h-3 stroke-current" />
-                              {expLabel}
-                            </span>
-                          )}
+                      {isUrgent && (
+                        <div className="bg-plum text-cream px-4 py-2 text-sm font-semibold">ประกาศสำคัญ</div>
+                      )}
+                      <div className="px-4 py-3">
+                        <div className="flex items-baseline justify-between gap-3">
+                          <p className={sectionLabel}>ข่าวจากร้าน</p>
+                          {expLabel && <p className="text-sm text-neutral">{expLabel}</p>}
                         </div>
-                        <p className="text-xs font-semibold text-rams-ink leading-relaxed break-words">{a.message}</p>
-                        <button
-                          onClick={() => handleDismissAnnouncement(a.id)}
-                          className="mt-2 py-1 px-3 bg-rams-bg hover:bg-rams-panel active:translate-y-[1px] text-[11px] font-mono font-extrabold text-rams-ink border border-rams-rule-light rounded-sm transition-[background-color,transform] duration-150 ease-out tactile-btn-sm"
-                        >
-                          รับทราบ
-                        </button>
+                        <p className="text-base text-charcoal break-words mt-1">{a.message}</p>
                       </div>
-                      <button 
+                      <button
+                        type="button"
                         onClick={() => handleDismissAnnouncement(a.id)}
-                        className="absolute top-3 right-3 w-8 h-8 rounded-sm flex items-center justify-center text-rams-ink-muted hover:text-rams-ink hover:bg-rams-bg border border-rams-rule-light transition-colors duration-150 text-sm font-bold active:translate-y-[1px]"
-                        aria-label="Dismiss announcement"
+                        className="w-full min-h-12 border-t border-rule text-base font-semibold text-plum hover:bg-paper-2 transition-colors duration-150"
                       >
-                        ✕
+                        รับทราบ
                       </button>
-                    </motion.div>
+                    </motion.article>
                   );
                 })}
               </AnimatePresence>
 
-              {/* Approved Leaves & My Pending Requests */}
+              {/* Leaves */}
               {(approvedLeaves.length > 0 || myPendingLeaves.length > 0) && (
-                <div className="w-full bg-rams-panel border border-rams-rule-light p-4 shadow-none flex flex-col gap-3 rounded-sm">
-                  <div className="flex items-center justify-between pb-2 border-b border-rams-rule-light">
-                    <span className="text-[10px] font-mono font-extrabold text-rams-ink-muted uppercase tracking-widest">ข้อมูลการลาหยุด</span>
-                    <span className="text-[10px] font-mono font-bold text-rams-ink-muted">{format(currentTime || new Date(), "dd MMMM yyyy", { locale: th })}</span>
+                <section className={card}>
+                  <div className="px-4 py-3 border-b border-rule flex items-baseline justify-between gap-3">
+                    <h3 className="text-base font-semibold text-charcoal">การลาหยุด</h3>
+                    <span className="text-sm text-neutral">{format(currentTime || new Date(), "d MMMM yyyy", { locale: th })}</span>
                   </div>
 
-                  {/* Approved Leaves List (Sleek Avatar Cards) */}
-                  <div className="flex flex-col gap-2">
-                    <p className="text-[10px] font-mono font-bold text-rams-ink-muted uppercase tracking-wider mb-1">รายชื่อลางานล่าสุด</p>
-                    {approvedLeaves.length > 0 ? (
-                      <div className="flex flex-col gap-1.5">
-                        {approvedLeaves.map((l) => {
-                          const empName = l.employees?.nickname || l.employees?.name?.split(' ')[0] || 'Staff';
-                          const typeLabel = l.leave_type === 'sick' ? 'ลาป่วย 😷' : l.leave_type === 'business' ? 'ลากิจ 💼' : 'พักร้อน 🏖️';
-                          const badgeColor = l.leave_type === 'sick' 
-                            ? 'bg-rams-red/10 text-rams-red' 
-                            : l.leave_type === 'business' 
-                              ? 'bg-rams-amber/10 text-rams-amber' 
-                              : 'bg-rams-orange/10 text-rams-orange';
-                          
-                          const isTodayLeave = l.leave_date === format(new Date(), 'yyyy-MM-dd');
-                          const dateObj = new Date(l.leave_date);
-                          const dateStrFormatted = format(dateObj, 'd MMM', { locale: th });
-
-                          return (
-                            <div key={l.id} className="flex items-center justify-between py-2 px-2.5 bg-rams-bg rounded-sm border border-rams-rule-light">
-                              <div className="flex items-center gap-2.5 min-w-0">
-                                {/* Employee Avatar with Fallback */}
-                                <div className="relative w-8 h-8 shrink-0">
-                                  {l.employees?.photo_url ? (
-                                    <>
-                                      <img 
-                                        src={l.employees.photo_url} 
-                                        alt={empName} 
-                                        referrerPolicy="no-referrer"
-                                        onError={(e) => {
-                                          e.currentTarget.style.display = 'none';
-                                          const fallback = e.currentTarget.parentElement?.querySelector('.avatar-fallback');
-                                          if (fallback) fallback.classList.remove('hidden');
-                                        }}
-                                        className="w-8 h-8 rounded-sm object-cover border border-rams-rule-light shadow-none" 
-                                      />
-                                      <div className="avatar-fallback hidden w-8 h-8 rounded-sm bg-rams-panel flex items-center justify-center text-[10px] font-mono font-extrabold text-rams-ink border border-rams-rule-light absolute inset-0">
-                                        {empName.slice(0, 2).toUpperCase()}
-                                      </div>
-                                    </>
-                                  ) : (
-                                    <div className="w-8 h-8 rounded-sm bg-rams-panel flex items-center justify-center text-[10px] font-mono font-extrabold text-rams-ink border border-rams-rule-light">
-                                      {empName.slice(0, 2).toUpperCase()}
-                                    </div>
-                                  )}
-                                </div>
-                                <div className="flex flex-col min-w-0 ml-1">
-                                  <span className="text-xs font-bold text-rams-ink truncate leading-tight mb-0.5">{empName}</span>
-                                  <span className="text-[10px] font-mono text-rams-ink-muted truncate leading-none">{l.reason || 'ทำธุระส่วนตัว'}</span>
+                  {approvedLeaves.length > 0 ? (
+                    <ul className="divide-y divide-rule">
+                      {approvedLeaves.map((l) => {
+                        const empName = l.employees?.nickname || l.employees?.name?.split(' ')[0] || 'พนักงาน';
+                        const isTodayLeave = l.leave_date === format(new Date(), 'yyyy-MM-dd');
+                        return (
+                          <li key={l.id} className="px-4 py-3 flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="relative w-10 h-10 shrink-0">
+                                {l.employees?.photo_url && (
+                                  <img
+                                    src={l.employees.photo_url}
+                                    alt=""
+                                    referrerPolicy="no-referrer"
+                                    onError={(e) => {
+                                      e.currentTarget.style.display = 'none';
+                                      const fallback = e.currentTarget.parentElement?.querySelector('.avatar-fallback');
+                                      if (fallback) fallback.classList.remove('hidden');
+                                    }}
+                                    className="w-10 h-10 object-cover border border-rule"
+                                  />
+                                )}
+                                <div className={cn("avatar-fallback w-10 h-10 bg-paper-2 flex items-center justify-center font-num text-sm border border-rule absolute inset-0", l.employees?.photo_url && "hidden")}>
+                                  {empName.slice(0, 2).toUpperCase()}
                                 </div>
                               </div>
-
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                <span className={`text-[10px] font-mono font-extrabold px-2 py-0.5 rounded-sm border border-rams-rule-light ${badgeColor}`}>
-                                  {typeLabel}
-                                </span>
-                                <span className={cn(
-                                  "text-[10px] font-mono font-extrabold px-1.5 py-0.5 rounded-sm border border-rams-rule-light",
-                                  isTodayLeave 
-                                    ? "bg-rams-red text-rams-panel animate-pulse" 
-                                    : "bg-rams-panel text-rams-ink-muted"
-                                )}>
-                                  {isTodayLeave ? 'วันนี้' : dateStrFormatted}
-                                </span>
+                              <div className="min-w-0">
+                                <p className="text-base font-semibold text-charcoal truncate">{empName}</p>
+                                <p className="text-sm text-neutral truncate">{leaveLabel(l.leave_type)} · {l.reason || 'ธุระส่วนตัว'}</p>
                               </div>
                             </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <span className="text-rams-ink-muted font-mono font-bold italic text-[11px] block mt-0.5">ช่วงนี้ไม่มีคนลาหยุด ☀️</span>
-                    )}
-                  </div>
+                            {isTodayLeave ? (
+                              <span className="shrink-0 bg-plum text-cream px-2 py-1 text-sm font-semibold">วันนี้</span>
+                            ) : (
+                              <span className="shrink-0 text-sm text-subtle">{format(new Date(l.leave_date), 'd MMM', { locale: th })}</span>
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : (
+                    <p className="px-4 py-3 text-base text-neutral">ช่วงนี้ไม่มีใครลาหยุด</p>
+                  )}
 
-                  {/* My Pending Leaves */}
                   {myPendingLeaves.length > 0 && (
-                    <div className="flex items-start gap-2.5 min-w-0 pt-2 border-t border-rams-rule-light">
-                      <span className="text-sm shrink-0">⏳</span>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[10px] font-mono font-bold text-rams-ink-muted uppercase tracking-wider">คำขอลาของคุณที่ค้างอยู่</p>
-                        <div className="flex flex-col gap-1 mt-1">
-                          {myPendingLeaves.slice(0, 2).map((l, idx) => {
-                            const dateFormatted = format(new Date(l.leave_date), 'dd/MM');
-                            const typeLabel = l.leave_type === 'sick' ? 'ลาป่วย' : l.leave_type === 'business' ? 'ลากิจ' : 'ลาพักร้อน';
-                            return (
-                              <div key={idx} className="flex items-center gap-1.5 text-[10px] font-mono font-bold text-rams-orange">
-                                <span className="w-1.5 h-1.5 rounded-full bg-rams-orange animate-pulse shrink-0"></span>
-                                <span>{typeLabel} วันที่ {dateFormatted} (รออนุมัติ)</span>
-                              </div>
-                            );
-                          })}
-                          {myPendingLeaves.length > 2 && (
-                            <span className="text-[10px] font-mono font-bold text-rams-ink-muted pl-3">และรายการอื่นอีก {myPendingLeaves.length - 2} รายการ</span>
-                          )}
-                        </div>
-                      </div>
+                    <div className="px-4 py-3 border-t border-rule">
+                      <p className={sectionLabel}>คำขอลาของคุณที่รออนุมัติ</p>
+                      <ul className="mt-1">
+                        {myPendingLeaves.slice(0, 2).map((l, idx) => (
+                          <li key={idx} className="text-base text-plum">
+                            {leaveLabel(l.leave_type)} วันที่ <span className="font-num">{format(new Date(l.leave_date), 'dd/MM')}</span>
+                          </li>
+                        ))}
+                      </ul>
+                      {myPendingLeaves.length > 2 && (
+                        <p className="text-sm text-neutral mt-1">และอีก {myPendingLeaves.length - 2} รายการ</p>
+                      )}
                     </div>
                   )}
-                </div>
+                </section>
               )}
 
-              {/* Weekly Schedule Row */}
+              {/* Weekly schedule */}
               {weeklySchedule.length > 0 && (
-                <div className="w-full bg-rams-panel border border-rams-rule-light p-4 shadow-none flex flex-col gap-2.5 rounded-sm">
-                  <span className="text-[10px] font-mono font-extrabold text-rams-ink-muted uppercase tracking-widest pb-1 border-b border-rams-rule-light">ตารางงานสัปดาห์นี้</span>
-                  <div className="grid grid-cols-7 gap-1">
+                <section className={card}>
+                  <div className="px-4 py-3 border-b border-rule">
+                    <h3 className="text-base font-semibold text-charcoal">ตารางงานสัปดาห์นี้</h3>
+                  </div>
+                  <div className="grid grid-cols-7 gap-px bg-rule">
                     {weeklySchedule.map((day, idx) => {
                       const dayInitialsMap = { Mon: 'จ', Tue: 'อ', Wed: 'พ', Thu: 'พฤ', Fri: 'ศ', Sat: 'ส', Sun: 'อา' };
                       const thaiInitial = dayInitialsMap[day.dayName] || day.dayName;
-
-                      let timeDisplay = '';
-                      let statusBg = 'bg-rams-bg border-rams-rule-light text-rams-ink-muted';
-                      
-                      if (day.isLeave) {
-                        timeDisplay = 'ลา';
-                        statusBg = 'bg-rams-red/10 border-rams-red/30 text-rams-red';
-                      } else if (day.isOff) {
-                        timeDisplay = 'หยุด';
-                        statusBg = 'bg-rams-bg border-rams-rule-light text-rams-ink-muted/55';
-                      } else {
-                        timeDisplay = day.shiftTime ? day.shiftTime.split('-')[0] : 'งาน';
-                        statusBg = 'bg-rams-orange/10 border-rams-orange/30 text-rams-orange';
-                      }
-
+                      const timeDisplay = day.isLeave ? 'ลา' : day.isOff ? 'หยุด' : (day.shiftTime ? day.shiftTime.split('-')[0] : 'งาน');
                       const isSelected = selectedDaySchedule?.dateStr === day.dateStr;
 
                       return (
-                        <div 
+                        <button
+                          type="button"
                           key={idx}
                           onClick={() => setSelectedDaySchedule(day)}
+                          aria-pressed={isSelected}
                           className={cn(
-                            "relative flex flex-col items-center p-1 rounded-sm border text-center transition-[background-color,border-color,transform] duration-150 min-w-0 cursor-pointer active:translate-y-[1px] select-none z-10 overflow-hidden",
-                            day.isToday 
-                              ? "bg-rams-ink border-rams-rule text-rams-panel shadow-none" 
-                              : isSelected
-                                ? "border-rams-rule text-rams-ink shadow-none bg-rams-bg"
-                                : cn("border-rams-rule-light", statusBg.split(" ").filter(c => !c.startsWith("border-")).join(" "))
+                            "min-h-[76px] min-w-0 py-2 flex flex-col items-center justify-between text-center select-none transition-colors duration-150",
+                            day.isToday ? "bg-charcoal text-cream" : "bg-cream text-charcoal hover:bg-paper-2",
+                            isSelected && "ring-2 ring-inset ring-plum"
                           )}
                         >
-                          {isSelected && !day.isToday && (
-                            <motion.div
-                              layoutId="activeScheduleDayBubble"
-                              className="absolute inset-0 bg-rams-bg border border-rams-rule rounded-sm -z-10"
-                              transition={{ duration: 0.15, ease: "easeOut" }}
-                            />
-                          )}
-                          <span className={cn("text-[10px] font-mono font-bold", day.isToday ? "text-rams-panel/75" : "text-rams-ink-muted")}>
-                            {thaiInitial}
-                          </span>
-                          <span className="text-xs font-mono font-black tracking-tight mt-0.5">
-                            {day.dateNum}
-                          </span>
+                          <span className={cn("text-sm", day.isToday ? "text-cream" : "text-neutral")}>{thaiInitial}</span>
+                          <span className="font-num text-base">{day.dateNum}</span>
                           <span className={cn(
-                            "text-[9px] font-mono font-extrabold mt-1 px-1 py-0.5 rounded-sm text-center tracking-tighter whitespace-nowrap border border-rams-rule-light", 
-                            day.isToday 
-                              ? (day.isLeave ? "bg-rams-red text-rams-panel border-rams-rule" : day.isOff ? "bg-rams-bg text-rams-ink-muted" : "bg-rams-orange text-rams-panel border-rams-rule")
-                              : (day.isLeave ? "bg-rams-red/10 text-rams-red" : day.isOff ? "bg-rams-bg text-rams-ink-muted/55" : "bg-rams-orange/10 text-rams-orange")
+                            "text-[13px] !leading-5 whitespace-nowrap",
+                            !day.isLeave && !day.isOff && day.shiftTime && "font-num text-xs",
+                            day.isToday ? "text-cream" : day.isLeave ? "text-plum font-semibold" : day.isOff ? "text-neutral" : "text-charcoal"
                           )}>
                             {timeDisplay}
                           </span>
-                        </div>
+                        </button>
                       );
                     })}
                   </div>
 
-                  {/* Selected Day Shift Detail */}
                   {selectedDaySchedule && (
-                    <motion.div 
+                    <motion.div
                       key={selectedDaySchedule.dateStr}
-                      initial={{ opacity: 0, y: 5 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="mt-2 p-3 bg-rams-bg border border-rams-rule-light rounded-sm flex items-center justify-between"
+                      {...fadeIn}
+                      className="px-4 py-3 border-t border-rule flex items-center justify-between gap-3"
                     >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className={cn(
-                          "w-10 h-10 rounded-sm flex items-center justify-center text-lg border border-rams-rule-light shrink-0 bg-rams-panel",
-                          selectedDaySchedule.isLeave 
-                            ? "bg-rams-red/10 text-rams-red border-rams-red/30" 
-                            : selectedDaySchedule.isOff 
-                              ? "bg-rams-panel text-rams-ink-muted/50 border-rams-rule-light" 
-                              : "bg-rams-orange/10 text-rams-orange border-rams-orange/30"
-                        )}>
-                          {selectedDaySchedule.isLeave 
-                            ? (selectedDaySchedule.leaveType === 'sick' ? '🤢' : selectedDaySchedule.leaveType === 'business' ? '💼' : '🏖️') 
-                            : selectedDaySchedule.isOff 
-                              ? '😴' 
-                              : (((selectedDaySchedule.shiftName || '').includes('ค่ำ') || (selectedDaySchedule.shiftName || '').includes('เย็น') || (selectedDaySchedule.shiftTime || '').startsWith('18') || (selectedDaySchedule.shiftTime || '').startsWith('17') || (selectedDaySchedule.shiftTime || '').startsWith('16')) ? '🌙' : '☀️')}
-                        </div>
-                        <div className="min-w-0">
-                          <h5 className="text-[10px] font-mono font-extrabold text-rams-ink-muted uppercase tracking-widest leading-none mb-1.5 truncate">
-                            {format(selectedDaySchedule.date, 'EEEE d MMMM yyyy', { locale: th })} {selectedDaySchedule.isToday && '(วันนี้)'}
-                          </h5>
-                          <p className="text-xs font-mono font-bold text-rams-ink leading-none truncate">
-                            {selectedDaySchedule.isLeave 
-                              ? `ลางาน (${selectedDaySchedule.leaveType === 'sick' ? 'ลาป่วย 😷' : selectedDaySchedule.leaveType === 'business' ? 'ลากิจ 💼' : 'พักร้อน 🏖️'})` 
-                              : selectedDaySchedule.isOff 
-                                ? 'วันหยุด (OFF)' 
-                                : selectedDaySchedule.shiftName || 'กะงาน'}
-                          </p>
-                        </div>
+                      <div className="min-w-0">
+                        <p className="text-sm text-neutral">
+                          {format(selectedDaySchedule.date, 'EEEE d MMMM', { locale: th })}{selectedDaySchedule.isToday && ' · วันนี้'}
+                        </p>
+                        <p className="text-base font-semibold text-charcoal">
+                          {selectedDaySchedule.isLeave
+                            ? leaveLabel(selectedDaySchedule.leaveType)
+                            : selectedDaySchedule.isOff
+                              ? 'วันหยุด'
+                              : selectedDaySchedule.shiftName || 'กะงาน'}
+                        </p>
                       </div>
-                      
                       {!selectedDaySchedule.isOff && !selectedDaySchedule.isLeave && selectedDaySchedule.shiftTime && (
-                        <div className="text-right shrink-0 ml-3">
-                          <span className="text-[11px] font-mono font-bold text-rams-ink bg-rams-panel border border-rams-rule-light px-2.5 py-1 rounded-sm whitespace-nowrap">
-                            {selectedDaySchedule.shiftTime}
-                          </span>
-                        </div>
+                        <span className="font-num text-base text-charcoal shrink-0">{selectedDaySchedule.shiftTime}</span>
                       )}
                     </motion.div>
                   )}
-                </div>
+                </section>
               )}
-            </div>
+            </>
           );
         })()}
 
-      </div>
+        {/* Links */}
+        <Link
+          href="https://forms.gle/3LdW9zdjdTCpfpTe8"
+          target="_blank"
+          className="w-full min-h-12 px-4 py-3 bg-cream hover:bg-paper-2 border border-charcoal flex items-center justify-between gap-3 transition-colors duration-150"
+        >
+          <span className="text-base text-charcoal">ขอเบิกเงินล่วงหน้า</span>
+          <span className="font-num text-xs text-neutral tracking-[0.08em] shrink-0">GOOGLE FORM</span>
+        </Link>
 
-      {/* 4. Weather & Recent Activity (Dieter Rams Clean Panels) */}
-      <div className="w-full max-w-sm px-6 z-10 mb-8 space-y-4">
+        {/* 4. Weather */}
         <AnimatePresence>
           {userPosition && (
             <WeatherCard
               latitude={userPosition.lat}
               longitude={userPosition.lon}
-              locationName={status.includes('Ready') ? 'In The Haus' : 'Remote'}
+              locationName={isReady ? 'In The Haus' : 'นอกร้าน'}
             />
           )}
         </AnimatePresence>
 
-        <div>
-          <h3 className="text-[11px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-3 pl-1">
-            Recent Activity · กิจกรรมล่าสุด
-          </h3>
-          <div className="flex flex-col gap-2">
-          <AnimatePresence>
-            {recentCheckins.slice(0, 3).map((log, i) => {
-              const namePart = log.employees?.nickname || log.employees?.name?.split(' ')[0] || 'Staff';
-              return (
-                <motion.div
-                  key={log.id}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  className="flex items-center justify-between p-3 bg-rams-panel border border-rams-rule-light rounded-sm shadow-none"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="relative w-10 h-10 shrink-0">
-                      <img 
-                        src={log.employees?.photo_url || log.photo_url} 
-                        alt=""
-                        referrerPolicy="no-referrer"
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                          const fallback = e.currentTarget.parentElement?.querySelector('.avatar-fallback');
-                          if (fallback) fallback.classList.remove('hidden');
-                        }}
-                        className="w-10 h-10 rounded-sm object-cover bg-rams-panel border border-rams-rule-light" 
-                      />
-                      <div className="avatar-fallback hidden w-10 h-10 rounded-sm bg-rams-bg flex items-center justify-center text-xs font-mono font-extrabold text-rams-ink border border-rams-rule-light absolute inset-0">
-                        {namePart.slice(0, 2).toUpperCase()}
+        {/* Recent activity */}
+        {recentCheckins.length > 0 && (
+          <section className={card}>
+            <div className="px-4 py-3 border-b border-rule flex items-baseline justify-between gap-3">
+              <h3 className="text-base font-semibold text-charcoal">กิจกรรมล่าสุด</h3>
+              <span className="font-num text-xs text-neutral tracking-[0.08em]">RECENT</span>
+            </div>
+            <ul className="divide-y divide-rule">
+              <AnimatePresence initial={false}>
+                {recentCheckins.slice(0, 3).map((log) => {
+                  const namePart = log.employees?.nickname || log.employees?.name?.split(' ')[0] || 'พนักงาน';
+                  const photo = log.employees?.photo_url || log.photo_url;
+                  const mood = moodLabel(log.mood_status);
+                  return (
+                    <motion.li key={log.id} {...fadeIn} className="px-4 py-3 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="relative w-10 h-10 shrink-0">
+                          {photo && (
+                            <img
+                              src={photo}
+                              alt=""
+                              referrerPolicy="no-referrer"
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                                const fallback = e.currentTarget.parentElement?.querySelector('.avatar-fallback');
+                                if (fallback) fallback.classList.remove('hidden');
+                              }}
+                              className="w-10 h-10 object-cover border border-rule"
+                            />
+                          )}
+                          <div className={cn("avatar-fallback w-10 h-10 bg-paper-2 flex items-center justify-center font-num text-sm border border-rule absolute inset-0", photo && "hidden")}>
+                            {namePart.slice(0, 2).toUpperCase()}
+                          </div>
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-base font-semibold text-charcoal truncate">{namePart}</p>
+                          <p className="text-sm text-neutral truncate">
+                            {log.action_type === 'check_in'
+                              ? 'เข้างาน'
+                              : (new Date(log.timestamp).getHours() < 6 ? 'ออกงาน (กะเมื่อวาน)' : 'ออกงาน')}
+                            {mood && ` · ${mood}`}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold text-rams-ink truncate">{namePart}</p>
-                      <p className="text-[10px] font-mono text-rams-ink-muted truncate">
-                        {log.action_type === 'check_in' 
-                          ? 'Checked In' 
-                          : (new Date(log.timestamp).getHours() < 6 ? 'Checked Out (กะเมื่อวาน 🌙)' : 'Checked Out')}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-end shrink-0 ml-3">
-                    <span className="text-xs font-mono font-bold text-rams-ink">{format(new Date(log.timestamp), "HH:mm")}</span>
-                    <span className="text-sm font-emoji">{log.mood_status || ''}</span>
-                  </div>
-                </motion.div>
-              );
-            })}
-          </AnimatePresence>
-          </div>
-        </div>
-      </div>
+                      <span className="font-num text-base text-charcoal shrink-0">{format(new Date(log.timestamp), "HH:mm")}</span>
+                    </motion.li>
+                  );
+                })}
+              </AnimatePresence>
+            </ul>
+          </section>
+        )}
+      </main>
 
-      {/* Brand Footer */}
-      <footer className="w-full text-center py-6 mt-4 text-[10px] font-mono tracking-[0.2em] text-rams-ink-muted uppercase select-none z-10">
+      <footer className="w-full text-center py-6 mt-4 font-num text-xs tracking-[0.16em] text-neutral select-none">
         ONHAUS SYSTEM © {new Date().getFullYear()}
       </footer>
 
-      {/* 5. Navigation Dock (The "Haus" Dock) */}
+      {/* 5. Navigation dock */}
       <NavigationDock />
 
-      {/* Hardware QR & NFC Scanner Modal */}
+      {/* NFC / QR scanner */}
       <QRScannerModal
         isOpen={showQRScanner}
         onClose={() => setShowQRScanner(false)}
@@ -1900,224 +1538,178 @@ export default function CheckIn() {
         }}
       />
 
-      {/* Camera & Punch Feedback (Modals in Dieter Rams Style) */}
       <AnimatePresence>
+        {/* Camera */}
         {showCamera && (
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-rams-bg flex flex-col items-center justify-center p-6"
+            transition={{ duration: 0.16 }}
+            className="brand-v2 fixed inset-0 z-50 flex flex-col"
           >
-            <div className="absolute top-0 w-full p-6 flex justify-between items-center border-b border-rams-rule-light bg-rams-panel">
-              <h3 className="text-lg font-mono font-bold text-rams-ink uppercase tracking-wider">Verify Location</h3>
-              <button 
-                onClick={() => setShowCamera(false)} 
-                className="w-10 h-10 bg-rams-bg border border-rams-rule-light rounded-sm flex items-center justify-center font-bold active:translate-y-[1px] tactile-btn-sm"
-                aria-label="Close camera"
+            <div className="bg-plum text-cream border-b border-plum-3 flex items-stretch">
+              <h3 className="flex-1 px-4 py-3 font-head text-2xl self-center">ถ่ายรูปยืนยัน</h3>
+              <button
+                type="button"
+                onClick={() => setShowCamera(false)}
+                className="min-w-16 min-h-14 px-4 border-l border-plum-3 text-base font-semibold hover:bg-plum-2 transition-colors duration-150"
               >
-                ✕
+                ปิด
               </button>
             </div>
 
-            <div
-              onClick={() => fileInputRef.current?.click()}
-              className="relative w-full max-w-sm aspect-square bg-rams-panel rounded-sm border-2 border-dashed border-rams-rule hover:border-rams-orange flex flex-col items-center justify-center overflow-hidden active:translate-y-[2px] transition-[transform,border-color] duration-150 cursor-pointer"
-            >
-              {isUploading
-                ? <div className="animate-spin w-12 h-12 border-4 border-rams-rule-light border-t-rams-orange rounded-full"></div>
-                : <>
-                  <CameraIcon className="w-14 h-14 stroke-current text-rams-ink mb-3" />
-                  <span className="text-xs font-mono font-bold text-rams-ink-muted uppercase tracking-widest">Tap to Take Photo</span>
-                </>
-              }
+            <div className="flex-1 flex flex-col items-center justify-center p-4">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+                className="w-full max-w-sm aspect-square bg-paper-2 hover:bg-paper-3 border border-charcoal flex flex-col items-center justify-center gap-2 transition-colors duration-150"
+              >
+                <span className="text-xl font-semibold text-charcoal">
+                  {isUploading ? 'กำลังอัปโหลด…' : 'แตะเพื่อถ่ายรูป'}
+                </span>
+                <span className="font-num text-xs text-neutral tracking-[0.12em]">{isUploading ? 'UPLOADING' : 'TAP TO TAKE PHOTO'}</span>
+              </button>
+              <p className="mt-6 text-base text-subtle text-center max-w-xs">ถ่ายรูปตัวเองให้ชัด ภายในพื้นที่ร้าน</p>
+              <input type="file" accept="image/*" capture="user" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
             </div>
-
-            <p className="mt-8 text-rams-ink-muted text-center text-xs font-mono font-bold uppercase tracking-wider leading-relaxed max-w-xs">Please take a clear photo of yourself within the shop area.</p>
-            <input type="file" accept="image/*" capture="user" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
           </motion.div>
         )}
 
-        {/* Punch Confirmation & Attendance Status Modal */}
+        {/* Punch confirmation */}
         {showPunchModal && punchFeedback && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 select-none">
+          <div className="brand-v2 !bg-transparent fixed inset-0 z-50 flex items-center justify-center p-4 select-none">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+              transition={{ duration: 0.16 }}
+              className="absolute inset-0 bg-charcoal/50"
               onClick={() => {
                 setShowPunchModal(false);
                 setPunchFeedback(null);
               }}
             />
             <motion.div
-              initial={{ scale: 0.95, opacity: 0, y: 10 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.95, opacity: 0, y: 10 }}
-              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-              className="w-full max-w-sm bg-rams-panel border-2 border-rams-rule rounded-sm p-5 shadow-2xl relative overflow-hidden z-10 space-y-3.5 max-h-[90vh] overflow-y-auto custom-scrollbar"
+              role="dialog"
+              aria-modal="true"
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.16, ease: 'easeOut' }}
+              className="w-full max-w-sm bg-cream border border-charcoal relative z-10 max-h-[90vh] overflow-y-auto custom-scrollbar"
             >
-              {/* Rams Decorative Status Top Bar */}
-              <div className={cn(
-                "h-1.5 w-full absolute top-0 inset-x-0",
-                punchFeedback.action === 'check_in' 
-                  ? (punchFeedback.isLate ? "bg-rams-amber" : "bg-rams-green")
-                  : "bg-rams-ink"
-              )} />
-
-              {/* Status Header */}
-              <div className="text-center pt-1">
-                <div className={cn(
-                  "w-12 h-12 rounded-sm mx-auto flex items-center justify-center mb-2 border shadow-sm",
-                  punchFeedback.action === 'check_in'
-                    ? (punchFeedback.isLate ? "bg-rams-amber/10 border-rams-amber/30 text-rams-amber" : "bg-rams-green/10 border-rams-green/30 text-rams-green")
-                    : "bg-rams-ink text-rams-panel border-rams-rule"
-                )}>
-                  {punchFeedback.action === 'check_in' 
-                    ? (punchFeedback.isLate ? <ClockIcon className="w-7 h-7 stroke-current" /> : <SunIcon className="w-7 h-7 stroke-current" />) 
-                    : <MoonIcon className="w-7 h-7 stroke-current" />}
-                </div>
-
-                <span className="text-[10px] font-mono font-bold tracking-widest text-rams-ink-muted uppercase block">
+              <div className="bg-plum text-cream px-4 py-4">
+                <p className="font-num text-xs tracking-[0.14em] text-on-plum-2">
                   {punchFeedback.action === 'check_in' ? 'CHECK-IN CONFIRMED' : 'CHECK-OUT CONFIRMED'}
-                </span>
-
-                <h3 className="text-base font-mono font-extrabold text-rams-ink mt-0.5">
-                  {punchFeedback.action === 'check_in' ? 'ลงเวลาเข้างานสำเร็จ!' : 'ลงเวลาออกงานสำเร็จ!'}
+                </p>
+                <h3 className="font-head text-2xl mt-1">
+                  {punchFeedback.action === 'check_in' ? 'ลงเวลาเข้างานแล้ว' : 'ลงเวลาออกงานแล้ว'}
                 </h3>
               </div>
 
-              {/* Attendance Status Badge Card */}
-              <div className="p-3 bg-rams-bg rounded-sm border border-rams-rule-light space-y-2">
-                <div className="flex items-center justify-between pb-1.5 border-b border-rams-rule-light">
-                  <span className="text-[10px] font-mono font-bold text-rams-ink-muted uppercase">สถานะการลงเวลา</span>
-                  <span className={cn(
-                    "px-2 py-0.5 rounded-sm text-[10px] font-mono font-bold tracking-wide border",
-                    punchFeedback.action === 'check_in'
-                      ? (punchFeedback.statusCategory === 'LATE'
-                          ? "bg-rams-red/10 text-rams-red border-rams-red/30 animate-pulse"
-                          : punchFeedback.statusCategory === 'OFF_DAY'
-                            ? "bg-rams-ink/10 text-rams-ink border-rams-rule-light"
-                            : "bg-rams-green/10 text-rams-green border-rams-green/30")
-                      : "bg-rams-panel text-rams-ink border-rams-rule-light"
-                  )}>
-                    {punchFeedback.statusLabel || (punchFeedback.action === 'check_in' ? 'ตรงเวลา (ปกติ ✓)' : 'ออกงานเรียบร้อย ✓')}
-                  </span>
+              <div className="px-4 py-3 border-b border-rule flex items-center justify-between gap-3">
+                <span className={sectionLabel}>สถานะ</span>
+                <span className={cn(
+                  "px-2 py-1 text-sm font-semibold text-right",
+                  punchFeedback.action === 'check_in' && punchFeedback.statusCategory === 'LATE'
+                    ? "bg-plum text-cream"
+                    : "border border-charcoal text-charcoal"
+                )}>
+                  {plain(punchFeedback.statusLabel) || (punchFeedback.action === 'check_in' ? 'ตรงเวลา' : 'ออกงานเรียบร้อย')}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 divide-x divide-rule border-b border-rule">
+                <div className="px-4 py-3">
+                  <p className={sectionLabel}>เวลาบันทึก</p>
+                  <p className="font-num text-2xl text-charcoal mt-1">
+                    {punchFeedback.timeFormatted || format(new Date(), 'HH:mm')}
+                  </p>
                 </div>
-
-                {/* Details Grid */}
-                <div className="grid grid-cols-2 divide-x divide-rams-rule-light text-center">
-                  <div className="pr-2">
-                    <span className="text-[10px] font-mono text-rams-ink-muted block">เวลาบันทึก</span>
-                    <span className="text-xs font-mono font-bold text-rams-ink mt-0.5 block">
-                      {punchFeedback.timeFormatted ? `${punchFeedback.timeFormatted} น.` : format(new Date(), 'HH:mm น.')}
-                    </span>
-                  </div>
-
-                  <div className="pl-2">
-                    <span className="text-[10px] font-mono text-rams-ink-muted block">
-                      {punchFeedback.action === 'check_in' ? 'กะการทำงาน' : 'รวมเวลาทำงาน'}
-                    </span>
-                    <span className="text-xs font-mono font-bold text-rams-ink mt-0.5 block truncate">
-                      {punchFeedback.action === 'check_in'
-                        ? (punchFeedback.shiftInfo?.startTime ? `${punchFeedback.shiftInfo.startTime} - ${punchFeedback.shiftInfo.endTime || ''}` : (punchFeedback.shiftInfo?.name || 'กะประจำ'))
-                        : (punchFeedback.duration ? `${punchFeedback.duration.hours} ชม. ${punchFeedback.duration.minutes} น.` : 'เสร็จสิ้น')}
-                    </span>
-                  </div>
+                <div className="px-4 py-3 min-w-0">
+                  <p className={sectionLabel}>{punchFeedback.action === 'check_in' ? 'กะการทำงาน' : 'รวมเวลาทำงาน'}</p>
+                  <p className={cn("text-charcoal mt-1 truncate", punchFeedback.action === 'check_in' ? (punchFeedback.shiftInfo?.startTime ? "font-num text-lg" : "text-base font-semibold") : "font-num text-2xl")}>
+                    {punchFeedback.action === 'check_in'
+                      ? (punchFeedback.shiftInfo?.startTime ? `${punchFeedback.shiftInfo.startTime}–${punchFeedback.shiftInfo.endTime || ''}` : (punchFeedback.shiftInfo?.name || 'กะประจำ'))
+                      : (punchFeedback.duration ? `${punchFeedback.duration.hours}:${String(punchFeedback.duration.minutes).padStart(2, '0')}` : 'เสร็จสิ้น')}
+                  </p>
+                  {punchFeedback.action !== 'check_in' && punchFeedback.duration && (
+                    <p className="text-sm text-neutral">ชั่วโมง:นาที</p>
+                  )}
                 </div>
               </div>
 
-              {/* Special Check-in Cold Water Toast OR Check-out Wrap Up Card */}
               {punchFeedback.action === 'check_in' ? (
-                <div className="p-3 bg-sky-500/10 border border-sky-400/40 rounded-sm flex items-center justify-between">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <span className="text-2xl select-none animate-bounce">🧊</span>
-                    <div className="min-w-0">
-                      <p className="text-[11px] font-mono font-bold text-sky-800 leading-tight">
-                        รับน้ำเย็นเจี๊ยบจากยูซุสักแก้ว!
-                      </p>
-                      <p className="text-[10px] font-sans text-sky-700/80 mt-0.5">
-                        เติมความสดชื่นก่อนเริ่มกะงานนะ 🐾
-                      </p>
-                    </div>
+                <div className="px-4 py-3 border-b border-rule flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-base font-semibold text-charcoal">รับน้ำเย็นจากยูซุสักแก้ว</p>
+                    <p className="text-sm text-neutral">
+                      {waterSipped ? 'ชื่นใจ เติมพลังเต็มแล้ว ลุยเลย' : 'เติมความสดชื่นก่อนเริ่มกะ'}
+                    </p>
                   </div>
                   <button
+                    type="button"
                     onClick={() => {
                       sfx.playWaterDrop();
                       sfx.triggerHaptic([20, 40]);
-                      alert("💧 ชื่นใจ! ยูซุเติมพลังให้ 100% แล้ว ลุยเลยทาส!");
+                      setWaterSipped(true);
                     }}
-                    className="shrink-0 px-2.5 py-1 bg-white hover:bg-sky-50 active:translate-y-[1px] text-[10px] font-mono font-extrabold text-sky-700 border border-sky-300 rounded-sm transition-[transform,background-color] tactile-btn-sm"
+                    disabled={waterSipped}
+                    className="shrink-0 min-h-12 px-4 bg-plum hover:bg-plum-2 disabled:bg-paper-2 disabled:text-neutral text-cream text-base font-semibold transition-colors duration-150"
                   >
-                    จิบเลย 💧
+                    {waterSipped ? 'จิบแล้ว' : 'จิบเลย'}
                   </button>
                 </div>
               ) : (
-                <div className="p-3 bg-rams-bg border border-rams-rule-light rounded-sm">
-                  <p className="text-xs font-bold text-rams-ink">
-                    &ldquo;ทำได้ดีมาก! ขอบคุณสำหรับความทุ่มเทในวันนี้นะครับ 🐾&rdquo;
-                  </p>
-                  <p className="text-[10px] font-mono text-rams-orange mt-1">
-                    💡 Yuzu says: พักผ่อนเยอะๆ ดื่มน้ำอุ่นๆ แล้วเจอกันกะหน้านะ!
-                  </p>
+                <div className="px-4 py-3 border-b border-rule">
+                  <p className="text-base font-semibold text-charcoal">ทำได้ดีมาก ขอบคุณสำหรับวันนี้นะครับ</p>
+                  <p className="text-sm text-plum mt-1">ยูซุฝากบอก: พักผ่อนเยอะ ๆ แล้วเจอกันกะหน้า</p>
                 </div>
               )}
 
-              {/* Mood Selector Section */}
-              <div className="space-y-1.5 pt-0.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-mono font-bold text-rams-ink-muted uppercase">
-                    {selectedMood ? 'บันทึกอารมณ์แล้ว:' : 'รู้สึกอย่างไรตอนนี้?'}
-                  </span>
+              <div className="px-4 py-3">
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className={sectionLabel}>{selectedMood ? 'บันทึกความรู้สึกแล้ว' : 'ตอนนี้รู้สึกอย่างไร'}</span>
                   {selectedMood && (
-                    <span className="text-[10px] font-mono font-bold text-rams-orange truncate ml-2">
-                      {selectedMood === '🔥' && 'มีพลังพร้อมลุย!'}
-                      {selectedMood === '😊' && 'อารมณ์ดี สดชื่น!'}
-                      {selectedMood === '😐' && 'ปกติ เรื่อยๆ'}
-                      {selectedMood === '😴' && 'เหนื่อยหน่อย พักผ่อนนะ'}
-                      {selectedMood === '🤒' && 'ไม่ค่อยสบาย ดูแลสุขภาพด้วยนะ'}
-                    </span>
+                    <span className="text-sm text-plum truncate">{MOODS.find((m) => m.emoji === selectedMood)?.note}</span>
                   )}
                 </div>
-
-                <div className="grid grid-cols-5 gap-1.5">
-                  {[
-                    { emoji: '🔥', label: 'ฟิต' },
-                    { emoji: '😊', label: 'ดี' },
-                    { emoji: '😐', label: 'เฉย' },
-                    { emoji: '😴', label: 'ง่วง' },
-                    { emoji: '🤒', label: 'ป่วย' }
-                  ].map((m) => (
+                <div className="grid grid-cols-5 gap-px bg-rule border border-rule mt-2">
+                  {MOODS.map((m) => (
                     <button
+                      type="button"
                       key={m.emoji}
                       onClick={() => handleMoodSelect(m.emoji)}
+                      aria-pressed={selectedMood === m.emoji}
                       className={cn(
-                        "py-2 rounded-sm border flex flex-col items-center justify-center transition-[transform,background-color,border-color] duration-150 active:translate-y-[1px] tactile-btn-sm cursor-pointer",
-                        selectedMood === m.emoji
-                          ? "bg-rams-orange text-white border-rams-rule shadow-sm"
-                          : "bg-rams-bg hover:bg-rams-panel border-rams-rule-light text-rams-ink"
+                        "min-h-12 text-base transition-colors duration-150",
+                        selectedMood === m.emoji ? "bg-plum text-cream font-semibold" : "bg-cream text-charcoal hover:bg-paper-2"
                       )}
                     >
-                      <span className="text-lg font-emoji mb-0.5">{m.emoji}</span>
-                      <span className="text-[10px] font-mono font-bold opacity-85">{m.label}</span>
+                      {m.label}
                     </button>
                   ))}
                 </div>
               </div>
 
-              {/* Close · Acknowledge Button */}
-              <button
-                onClick={() => {
-                  setShowPunchModal(false);
-                  setPunchFeedback(null);
-                }}
-                className="w-full py-3 bg-rams-ink hover:bg-neutral-800 text-rams-panel rounded-sm text-xs font-mono font-bold border border-rams-rule transition-[transform,background-color] duration-150 active:translate-y-[1px] tactile-btn shadow-sm cursor-pointer"
-              >
-                ตกลง · เรียบร้อย ✓
-              </button>
+              <div className="px-4 pb-4">
+                <motion.button
+                  type="button"
+                  {...tap}
+                  onClick={() => {
+                    setShowPunchModal(false);
+                    setPunchFeedback(null);
+                  }}
+                  className="w-full min-h-14 bg-charcoal hover:bg-charcoal-2 text-cream text-lg font-semibold transition-colors duration-150"
+                >
+                  ตกลง
+                </motion.button>
+              </div>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
     </div>
+    </MotionConfig>
   );
 }

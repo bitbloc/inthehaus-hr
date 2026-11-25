@@ -1,5 +1,64 @@
 @import "tailwindcss";
 
+/* Brand v2 fonts (source of truth: inthehaus-booking/.agents/AGENTS.md §3).
+   Self-hosted woff2, swap. A face only downloads when a page uses it, so
+   pages still on the old Rams theme load nothing new. */
+@font-face { font-family: 'SOV_monomon'; src: url('/fonts/sov-monomon-thai-latin.woff2') format('woff2'); font-weight: 100 900; font-style: normal; font-display: swap; unicode-range: U+0020-007E, U+00A0, U+00B7, U+0E01-0E5B, U+2013-2014, U+2018-201D, U+2026, U+25CC; }
+@font-face { font-family: 'IBM Plex Sans Thai'; src: url('/fonts/ibm-plex-sans-thai-400-thai.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; unicode-range: U+0E01-0E5B, U+200C-200D, U+25CC; }
+@font-face { font-family: 'IBM Plex Sans Thai'; src: url('/fonts/ibm-plex-sans-thai-400-latin.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2190-2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'IBM Plex Sans Thai'; src: url('/fonts/ibm-plex-sans-thai-500-thai.woff2') format('woff2'); font-weight: 500; font-style: normal; font-display: swap; unicode-range: U+0E01-0E5B, U+200C-200D, U+25CC; }
+@font-face { font-family: 'IBM Plex Sans Thai'; src: url('/fonts/ibm-plex-sans-thai-500-latin.woff2') format('woff2'); font-weight: 500; font-style: normal; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2190-2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'IBM Plex Sans Thai'; src: url('/fonts/ibm-plex-sans-thai-600-thai.woff2') format('woff2'); font-weight: 600; font-style: normal; font-display: swap; unicode-range: U+0E01-0E5B, U+200C-200D, U+25CC; }
+@font-face { font-family: 'IBM Plex Sans Thai'; src: url('/fonts/ibm-plex-sans-thai-600-latin.woff2') format('woff2'); font-weight: 600; font-style: normal; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2190-2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'IBM Plex Sans Thai'; src: url('/fonts/ibm-plex-sans-thai-700-thai.woff2') format('woff2'); font-weight: 700 900; font-style: normal; font-display: swap; unicode-range: U+0E01-0E5B, U+200C-200D, U+25CC; }
+@font-face { font-family: 'IBM Plex Sans Thai'; src: url('/fonts/ibm-plex-sans-thai-700-latin.woff2') format('woff2'); font-weight: 700 900; font-style: normal; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2190-2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'DM Mono'; src: url('/fonts/dm-mono-400-latin.woff2') format('woff2'); font-weight: 100 400; font-style: normal; font-display: swap; unicode-range: U+0000-00FF, U+2000-206F, U+2190-2193, U+2212; }
+@font-face { font-family: 'DM Mono'; src: url('/fonts/dm-mono-500-latin.woff2') format('woff2'); font-weight: 500 900; font-style: normal; font-display: swap; unicode-range: U+0000-00FF, U+2000-206F, U+2190-2193, U+2212; }
+
+/* Brand v2 tokens. Utilities: bg-plum, text-charcoal, bg-cream, border-rule,
+   text-neutral, text-subtle, text-error, font-thai, font-num, font-head.
+   ("subtle" = brand --muted #524A4E; the name "muted" is taken here.) */
+@theme {
+  --color-plum: oklch(25.18% 0.1001 348.33);        /* #41032A */
+  --color-plum-2: oklch(33.03% 0.0965 348.04);      /* #571C3E */
+  --color-plum-3: oklch(41.92% 0.0851 347.97);      /* #6E3855 */
+  --color-on-plum-2: oklch(79.98% 0.0348 349.28);   /* #D0B5C1 */
+  --color-charcoal: oklch(21.78% 0 0);              /* #1A1A1A */
+  --color-charcoal-2: oklch(26.96% 0.0069 345.80);  /* #292527 */
+  --color-charcoal-3: oklch(33.10% 0.0078 351.28);  /* #393436 */
+  --color-cream: oklch(96.20% 0.0115 84.58);        /* #F6F2EA */
+  --color-paper-2: oklch(92.60% 0.0095 352.37);     /* #ECE4E7 */
+  --color-paper-3: oklch(89.47% 0.0128 345.51);     /* #E3D9DE */
+  --color-rule: oklch(85.05% 0.0113 348.48);        /* #D4CBCF */
+  --color-neutral: oklch(48.01% 0.0120 345.78);     /* #635B5F */
+  --color-subtle: oklch(41.84% 0.0124 345.90);      /* #524A4E */
+  --color-error: oklch(50.03% 0.1821 29.51);        /* #B42318 */
+
+  --font-thai: 'IBM Plex Sans Thai', system-ui, sans-serif;
+  --font-num: 'DM Mono', 'IBM Plex Sans Thai', ui-monospace, monospace;
+  --font-head: 'SOV_monomon', 'IBM Plex Sans Thai', sans-serif;
+}
+
+/* Scope for screens already on Brand v2 */
+.brand-v2 {
+  background: var(--color-cream);
+  color: var(--color-charcoal);
+  font-family: var(--font-thai);
+  line-height: 1.55;
+  /* Tailwind's text-* sizes carry their own tighter line-heights (1.25-1.43);
+     Thai tone marks and lower vowels need 1.5-1.6 (AGENTS.md §4). */
+  --text-xs--line-height: 1.5;
+  --text-sm--line-height: 1.6;
+  --text-base--line-height: 1.6;
+  --text-lg--line-height: 1.55;
+  --text-xl--line-height: 1.5;
+  --text-2xl--line-height: 1.5;
+}
+.brand-v2 :focus-visible {
+  outline: 2px solid var(--color-plum);
+  outline-offset: 2px;
+}
+
 :root {
   --background: oklch(96% 0.006 80);
   --foreground: oklch(20% 0.003 80);
