@@ -32,6 +32,9 @@ export default function AdminRosterPage() {
     const [editingCell, setEditingCell] = useState(null); // { employee, date, slots: [] }
     const [saving, setSaving] = useState(false);
     const [customPresets, setCustomPresets] = useState([]);
+    const [hiddenPresetIds, setHiddenPresetIds] = useState([]); // standard presets the owner removed (this browser)
+    const [managePresets, setManagePresets] = useState(false);
+    const [quickPick, setQuickPick] = useState(null); // { emp, date, top, left }
     const [presetModal, setPresetModal] = useState(null); // { start, end } or null
 
     // Smart Auto-Generate Roster State
@@ -65,6 +68,8 @@ export default function AdminRosterPage() {
             if (saved) {
                 setCustomPresets(JSON.parse(saved));
             }
+            const hidden = localStorage.getItem('roster_hidden_presets');
+            if (hidden) setHiddenPresetIds(JSON.parse(hidden));
         } catch (e) {
             console.error(e);
         }
@@ -127,11 +132,30 @@ export default function AdminRosterPage() {
         return deduplicated;
     }, [customPresets]);
 
+    // Presets offered as choices. Hidden ones still label existing shifts in the grid.
+    const visiblePresets = useMemo(() => allPresets.filter(p => !hiddenPresetIds.includes(p.id)), [allPresets, hiddenPresetIds]);
+
+    // One-tap remove: custom presets are deleted, standard ones hidden. "คืนค่ากะมาตรฐาน" brings all back.
+    const removePreset = (preset) => {
+        if (preset.isCustom) {
+            const next = (customPresets || []).filter(cp => cp.id !== preset.id && `custom_${(cp.start || '').slice(0, 5)}-${(cp.end || '').slice(0, 5)}` !== preset.id);
+            setCustomPresets(next);
+            try { localStorage.setItem('roster_custom_presets', JSON.stringify(next)); } catch (e) { console.error(e); }
+        } else {
+            const next = [...new Set([...hiddenPresetIds, preset.id])];
+            setHiddenPresetIds(next);
+            try { localStorage.setItem('roster_hidden_presets', JSON.stringify(next)); } catch (e) { console.error(e); }
+        }
+        showToast(`ลบกะ "${plainText(preset.name)}" ${(preset.start || '').slice(0, 5)}–${(preset.end || '').slice(0, 5)} แล้ว`, 'success');
+    };
+
     const resetToDefaultPresets = () => {
         if (confirm('คุณต้องการรีเซ็ต Preset กะทั้งหมดกลับเป็นค่าเริ่มต้นมาตรฐานของร้าน (ตามเวลาเปิดร้านใหม่ 11:00-21:30 ครัวปิด 20:45) ใช่หรือไม่? รายการซ้ำซ้อนจะถูกลบทั้งหมด')) {
             setCustomPresets([]);
+            setHiddenPresetIds([]);
             try {
                 localStorage.removeItem('roster_custom_presets');
+                localStorage.removeItem('roster_hidden_presets');
             } catch (e) {
                 console.error(e);
             }
@@ -235,6 +259,15 @@ export default function AdminRosterPage() {
     useEffect(() => {
         fetchData();
     }, [currentDate]);
+
+    useEffect(() => {
+        if (!quickPick) return;
+        // Close when the page or table scrolls (menu is fixed-positioned), but not when the menu's own list scrolls
+        const close = (e) => { if (e?.target?.closest?.('[role="menu"]')) return; setQuickPick(null); };
+        window.addEventListener('scroll', close, true);
+        window.addEventListener('resize', close);
+        return () => { window.removeEventListener('scroll', close, true); window.removeEventListener('resize', close); };
+    }, [quickPick]);
 
     // Realtime Sync on Roster, Leaves, and Attendance
     useRealtimeSync(['roster_transactions', 'leave_requests', 'attendance_logs'], () => {
@@ -800,6 +833,20 @@ export default function AdminRosterPage() {
         });
     };
 
+    // Map a preset to a DB shift id (explicit shiftId, or same name + times)
+    const resolvePresetShiftId = (preset) => {
+        if (preset.shiftId) return String(preset.shiftId);
+        const norm = (v) => plainText(v).replace(/[\s\(\)\:\-0-9\.]/g, '').toLowerCase();
+        const normPre = norm(preset.name);
+        const matched = shifts.find(s => {
+            const sameTime = (s.start_time || '').slice(0, 5) === (preset.start || '').slice(0, 5) &&
+                (s.end_time || '').slice(0, 5) === (preset.end || '').slice(0, 5);
+            const normS = norm(s.name);
+            return sameTime && (normPre === normS || normPre.includes(normS) || normS.includes(normPre));
+        });
+        return matched ? String(matched.id) : '';
+    };
+
     const applyPreset = (index, preset) => {
         setEditingCell(prev => {
             if (!prev) return prev;
@@ -864,6 +911,47 @@ export default function AdminRosterPage() {
         });
     };
 
+    const postSaveCell = async (empId, dateStr, transactions) => {
+        const res = await fetch('/api/roster/bulk', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'SAVE_CELL', employee_id: empId, date: dateStr, transactions })
+        });
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.message || 'Save failed');
+        }
+    };
+
+    // Quick pick from an empty cell: save one MAIN slot (preset) or OFF (preset = null)
+    const quickSave = async (emp, date, preset) => {
+        setQuickPick(null);
+        const dateStr = format(date, 'yyyy-MM-dd');
+        const shiftId = preset ? resolvePresetShiftId(preset) : '';
+        const slot = preset
+            ? { shift_id: shiftId ? parseInt(shiftId) : null, custom_start_time: (preset.start || '').slice(0, 5), custom_end_time: (preset.end || '').slice(0, 5), is_off: false }
+            : { shift_id: null, custom_start_time: null, custom_end_time: null, is_off: true };
+        setSaving(true);
+        try {
+            await postSaveCell(emp.id, dateStr, [{ employee_id: emp.id, date: dateStr, slot_type: 'MAIN', status: 'PUBLISHED', ...slot }]);
+            await fetchData();
+            const what = preset ? `${plainText(preset.name)} ${slot.custom_start_time}–${slot.custom_end_time}` : 'หยุด';
+            showToast(`${emp.nickname || emp.name} · ${format(date, 'd MMM', { locale: th })}: ${what}`, 'success');
+        } catch (e) {
+            showToast(e.message || 'บันทึกไม่สำเร็จ', 'error');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const openQuickPick = (emp, date, el) => {
+        const r = el.getBoundingClientRect();
+        const W = 288, H = Math.min(window.innerHeight * 0.6, 480);
+        const left = Math.max(8, Math.min(r.left, window.innerWidth - W - 8));
+        const top = r.bottom + 4 + H > window.innerHeight ? Math.max(8, r.top - H - 4) : r.bottom + 4;
+        setQuickPick({ emp, date, top, left });
+    };
+
     const saveCell = async () => {
         if (!editingCell) return;
         setSaving(true);
@@ -889,21 +977,7 @@ export default function AdminRosterPage() {
         });
 
         try {
-            const res = await fetch('/api/roster/bulk', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    action: 'SAVE_CELL', 
-                    employee_id: empId,
-                    date: dateStr,
-                    transactions: payload 
-                })
-            });
-
-            if (!res.ok) {
-                const errData = await res.json().catch(() => ({}));
-                throw new Error(errData.message || 'Save failed');
-            }
+            await postSaveCell(empId, dateStr, payload);
             
             await fetchData();
             setEditingCell(null);
@@ -1657,10 +1731,13 @@ export default function AdminRosterPage() {
                                                         <td key={i} className={`p-1.5 border-l border-rule align-top ${empSuspended ? 'bg-paper-2' : ''}`}>
                                                             <button
                                                                 type="button"
-                                                                onClick={() => openCellModal(emp, date)}
+                                                                onClick={(e) => (slots.length === 0 && empLeaves.length === 0 && !attendanceStatus)
+                                                                    ? openQuickPick(emp, date, e.currentTarget)
+                                                                    : openCellModal(emp, date)}
+                                                                aria-haspopup={slots.length === 0 && empLeaves.length === 0 && !attendanceStatus ? 'menu' : 'dialog'}
                                                                 aria-label={`แก้กะ ${emp.nickname || emp.name} ${daysTitle[i]} ${format(date, 'dd/MM')}`}
                                                                 className={`group w-full min-h-[76px] p-1.5 flex flex-col gap-1 text-left transition-colors duration-150 border ${
- hasDiscrepancy ? 'border-plum bg-plum/5 hover:bg-plum/10' : 'border-transparent hover:border-charcoal hover:bg-paper-2'
+ hasDiscrepancy ? 'border-transparent bg-plum/5 hover:bg-plum/10' : 'border-transparent hover:border-charcoal hover:bg-paper-2'
  }`}
                                                             >
                                                                 {slots.length === 0 && empLeaves.length === 0 && !attendanceStatus && (
@@ -2158,7 +2235,7 @@ export default function AdminRosterPage() {
                                                 <>
                                                     {PRESET_GROUPS.map(group => {
                                                         const seen = new Set();
-                                                        const groupPresets = allPresets.filter(group.match).filter(p => {
+                                                        const groupPresets = visiblePresets.filter(group.match).filter(p => {
                                                             const k = `${normName(p.name)}|${(p.start || '').slice(0, 5)}|${(p.end || '').slice(0, 5)}`;
                                                             if (seen.has(k)) return false;
                                                             seen.add(k);
@@ -2172,6 +2249,17 @@ export default function AdminRosterPage() {
                                                                     {groupPresets.map((preset, pIdx) => {
                                                                         const sel = selectedPreset === preset;
                                                                         return (
+                                                                            managePresets ? (
+                                                                                <div key={preset.id || pIdx} className="min-h-14 pl-3 bg-cream flex items-stretch">
+                                                                                    <span className="flex-1 py-2 flex flex-col justify-center min-w-0">
+                                                                                        <span className="font-num text-base text-charcoal">{(preset.start || '').slice(0, 5)}–{(preset.end || '').slice(0, 5)}</span>
+                                                                                        <span className="text-sm text-subtle truncate">{plainText(preset.name)}</span>
+                                                                                    </span>
+                                                                                    <button type="button" onClick={() => removePreset(preset)} aria-label={`ลบกะ ${plainText(preset.name)}`} className="px-3 border-l border-rule text-base text-error hover:bg-paper-2 transition-colors duration-150">
+                                                                                        ลบ
+                                                                                    </button>
+                                                                                </div>
+                                                                            ) : (
                                                                             <button
                                                                                 key={preset.id || pIdx}
                                                                                 type="button"
@@ -2182,6 +2270,7 @@ export default function AdminRosterPage() {
                                                                                 <span className="font-num text-base">{(preset.start || '').slice(0, 5)}–{(preset.end || '').slice(0, 5)}</span>
                                                                                 <span className={`text-sm ${sel ? 'text-cream' : 'text-subtle'}`}>{plainText(preset.name)}</span>
                                                                             </button>
+                                                                            )
                                                                         );
                                                                     })}
                                                                     {groupPresets.length % 2 === 1 && <span className="bg-cream" aria-hidden="true" />}
@@ -2241,7 +2330,10 @@ export default function AdminRosterPage() {
                                                         <button type="button" onClick={() => openPresetModal(startClean || '10:00', endClean || '18:00')} className="min-h-10 text-plum underline underline-offset-4">
                                                             เพิ่มกะมาตรฐานใหม่
                                                         </button>
-                                                        <button type="button" onClick={resetToDefaultPresets} className="min-h-10 text-neutral underline underline-offset-4" title="คืนค่ากะมาตรฐานตามเวลาเปิดร้าน">
+                                                        <button type="button" onClick={() => setManagePresets(v => !v)} aria-pressed={managePresets} className={`min-h-10 underline underline-offset-4 ${managePresets ? 'text-charcoal font-semibold' : 'text-plum'}`}>
+                                                            {managePresets ? 'เสร็จ (กลับไปเลือกกะ)' : 'ลบกะที่ไม่ใช้'}
+                                                        </button>
+                                                        <button type="button" onClick={resetToDefaultPresets} className="min-h-10 text-neutral underline underline-offset-4" title="คืนค่ากะมาตรฐานตามเวลาเปิดร้าน (เอากะที่ลบกลับมาด้วย)">
                                                             คืนค่ากะมาตรฐาน
                                                         </button>
                                                     </div>
@@ -2267,6 +2359,58 @@ export default function AdminRosterPage() {
                         </div>
                     </div>
                 </div>
+                );
+            })()}
+
+            {/* Quick pick: dropdown from an empty cell's "+ เพิ่มกะ" */}
+            {quickPick && (() => {
+                const groups = [
+                    { key: 'floor', title: 'หน้าร้าน และบาร์', match: p => p.category === 'floor' },
+                    { key: 'kitchen', title: 'ครัว', match: p => p.category === 'kitchen' },
+                    { key: 'roles', title: 'บทบาทพิเศษ และพาร์ตไทม์', match: p => p.category === 'management' || p.category === 'parttime' },
+                    { key: 'custom', title: 'กะที่สร้างเอง', match: p => p.category === 'custom' || p.isCustom },
+                ];
+                const { emp, date } = quickPick;
+                const itemCls = 'w-full min-h-12 px-4 py-2 text-left flex items-baseline justify-between gap-3 hover:bg-paper-2 focus-visible:bg-paper-2 transition-colors duration-150';
+                const firstKey = groups.find(g => visiblePresets.some(g.match))?.key;
+                return (
+                    <>
+                        <div className="fixed inset-0 z-40" onClick={() => setQuickPick(null)} aria-hidden="true" />
+                        <div
+                            role="menu"
+                            aria-label={`เลือกกะ ${emp.nickname || emp.name} ${format(date, 'dd/MM')}`}
+                            className="brand-v2 fixed z-50 w-72 max-h-[60vh] overflow-y-auto custom-scrollbar border border-charcoal"
+                            style={{ top: quickPick.top, left: quickPick.left }}
+                            onKeyDown={e => { if (e.key === 'Escape') setQuickPick(null); }}
+                        >
+                            <div className="px-4 py-2 border-b border-rule bg-paper-2">
+                                <p className="text-base font-semibold text-charcoal">{emp.nickname || emp.name}</p>
+                                <p className="text-sm text-neutral">{format(date, 'EEEEที่ d MMM', { locale: th })}</p>
+                            </div>
+                            {groups.map(g => {
+                                const list = visiblePresets.filter(g.match);
+                                if (list.length === 0) return null;
+                                return (
+                                    <div key={g.key} className="border-b border-rule">
+                                        <p className="px-4 pt-2 text-xs font-semibold text-neutral">{g.title}</p>
+                                        {list.map((p, i) => (
+                                            <button key={p.id || i} type="button" role="menuitem" autoFocus={g.key === firstKey && i === 0} disabled={saving} onClick={() => quickSave(emp, date, p)} className={itemCls}>
+                                                <span className="font-num text-base text-charcoal shrink-0">{(p.start || '').slice(0, 5)}–{(p.end || '').slice(0, 5)}</span>
+                                                <span className="text-sm text-subtle text-right">{plainText(p.name)}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                );
+                            })}
+                            <button type="button" role="menuitem" disabled={saving} onClick={() => quickSave(emp, date, null)} className={`${itemCls} border-b border-rule`}>
+                                <span className="text-base text-charcoal">หยุด</span>
+                            </button>
+                            <button type="button" role="menuitem" onClick={() => { setQuickPick(null); openCellModal(emp, date); }} className={itemCls}>
+                                <span className="text-base text-plum font-semibold">ปรับละเอียด…</span>
+                                <span className="text-sm text-neutral">กะแยก · เวลาเอง</span>
+                            </button>
+                        </div>
+                    </>
                 );
             })()}
 
