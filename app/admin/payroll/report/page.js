@@ -358,6 +358,7 @@ function PayrollPDFReportContent() {
                                                 </td>
                                                 <td className={`py-1.5 px-2 text-right ${isOff ? 'text-neutral-400' : 'text-neutral-700'}`}>
                                                     {d.regular_hours > 0 ? Number(d.regular_hours).toFixed(1) : '-'}
+                                                    {d.away_mins > 0 && <span className="block text-[9px] text-rams-red">ออก {((m) => `${Math.floor(m / 60) > 0 ? `${Math.floor(m / 60)} ชม. ` : ''}${m % 60} น.`)(d.away_mins)}</span>}
                                                 </td>
                                                 <td className={`py-1.5 px-2 text-right ${isOff ? 'text-neutral-400' : 'text-rams-orange font-medium'}`}>
                                                     {d.ot_hours > 0 ? Number(d.ot_hours).toFixed(1) : '-'}
@@ -409,6 +410,12 @@ function PayrollPDFReportContent() {
                                         <div className="flex justify-between">
                                             <span className="font-medium text-neutral-600">Tax & Other Deductions / ภาษี & รายการหักอื่นๆ</span>
                                             <span className="font-mono font-bold text-rams-red">-฿{(item.taxDeduct + item.customDeduct).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</span>
+                                        </div>
+                                    )}
+                                    {item.totalAwayMins > 0 && (
+                                        <div className="flex justify-between">
+                                            <span className="font-medium text-neutral-600">Time Away / ออกระหว่างวัน ({((m) => `${Math.floor(m / 60) > 0 ? `${Math.floor(m / 60)} ชม. ` : ''}${m % 60} น.`)(item.totalAwayMins)})</span>
+                                            <span className="font-mono font-bold text-rams-red">{item.awayDeduct > 0 ? `-฿${item.awayDeduct.toLocaleString('th-TH', { minimumFractionDigits: 2 })}` : 'หักจากชั่วโมงแล้ว'}</span>
                                         </div>
                                     )}
                                     <div className="flex justify-between border-t border-neutral-200 pt-1">

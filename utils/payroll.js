@@ -81,6 +81,30 @@ function findDayPunches(empLogs, targetDateStr) {
 }
 
 /**
+ * Minutes an employee was checked out in the middle of a work day:
+ * every check_out → next check_in pair strictly between the day's first
+ * check-in and last check-out (staff check out when they step out on an errand).
+ */
+export function awayMinutesBetween(empLogs, checkIn, checkOut) {
+    if (!checkIn || !checkOut) return 0;
+    const inner = [...(empLogs || [])]
+        .map(l => ({ type: l.action_type, t: new Date(l.timestamp) }))
+        .filter(l => l.t > checkIn && l.t < checkOut)
+        .sort((a, b) => a.t - b.t);
+    let away = 0;
+    let outAt = null;
+    inner.forEach(l => {
+        if (l.type === 'check_out') {
+            if (!outAt) outAt = l.t;
+        } else if (l.type === 'check_in' && outAt) {
+            away += Math.max(0, differenceInMinutes(l.t, outAt));
+            outAt = null;
+        }
+    });
+    return away;
+}
+
+/**
  * Calculates payroll, OT, and attendance stats for all employees using roster_transactions.
  */
 export const calculatePayroll = (employees, logs, transactions, shifts, payrollConfig, deductions, selectedMonth, weeklySchedules = []) => {
@@ -120,6 +144,8 @@ export const calculatePayroll = (employees, logs, transactions, shifts, payrollC
         let offDayWorkCount = 0;
         
         let totalRegularHours = 0;
+        let totalAwayMins = 0;   // mid-day errands (checked out, then back in)
+        let awayDeduct = 0;      // baht, for per-shift / monthly staff whose pay does not scale with hours
 
         const dailyDetails = [];
         const empLogs = logsMap.get(emp.id) || [];
@@ -215,7 +241,8 @@ export const calculatePayroll = (employees, logs, transactions, shifts, payrollC
                             if (lateMins > 15) lateCount++; // Grace period of 15 minutes
                         }
 
-                        actualMins = differenceInMinutes(checkOut, checkIn);
+                        const awayMins = awayMinutesBetween(empLogs, checkIn, checkOut);
+                        actualMins = Math.max(0, differenceInMinutes(checkOut, checkIn) - awayMins);
                         
                         // Strict Roster-bound calculation: Regular time capped at scheduled end time
                         // Overtime (OT) = any time worked past the scheduled Roster end time
@@ -225,6 +252,11 @@ export const calculatePayroll = (employees, logs, transactions, shifts, payrollC
                             otMins = actualMins - scheduledMins;
                         } else {
                             otMins = 0;
+                        }
+
+                        // Time away mid-day comes out of OT first: OT can't exceed real minutes worked beyond the schedule
+                        if (awayMins > 0) {
+                            otMins = Math.max(0, Math.min(otMins, actualMins - Math.min(actualMins, scheduledMins)));
                         }
 
                         // Overtime Policy: OT must be at least 1 hour (>= 60 minutes) to be counted
@@ -261,6 +293,12 @@ export const calculatePayroll = (employees, logs, transactions, shifts, payrollC
 
                         dailyOT = oHours * otRate;
 
+                        // Hourly pay already shrinks with fewer minutes; fixed-pay staff get an explicit deduction
+                        totalAwayMins += awayMins;
+                        if (awayMins > 0 && wageType !== 'hourly') {
+                            awayDeduct += (awayMins / 60) * hourlyRate;
+                        }
+
                         totalRegularHours += rHours;
                         totalOTHours += oHours;
                         totalSalary += dailyWage;
@@ -281,6 +319,7 @@ export const calculatePayroll = (employees, logs, transactions, shifts, payrollC
                             ot: dailyOT,
                             ot_hours: oHours,
                             regular_hours: rHours,
+                            away_mins: awayMins,
                             status: lateMins > 0 ? `LATE (+${lateMins}M)` : 'NORMAL'
                         });
 
@@ -374,7 +413,9 @@ export const calculatePayroll = (employees, logs, transactions, shifts, payrollC
                 const { checkIn, checkOut } = findDayPunches(empLogs, dateStr);
 
                 if (checkIn && checkOut) {
-                    const actualMins = differenceInMinutes(checkOut, checkIn);
+                    const awayMins = awayMinutesBetween(empLogs, checkIn, checkOut);
+                    const actualMins = Math.max(0, differenceInMinutes(checkOut, checkIn) - awayMins);
+                    totalAwayMins += awayMins;
                     if (actualMins > 0) {
                         const maxRegularMins = 8 * 60;
                         const regularMins = Math.min(actualMins, maxRegularMins);
@@ -470,7 +511,9 @@ export const calculatePayroll = (employees, logs, transactions, shifts, payrollC
                 const { checkIn, checkOut } = findDayPunches(empLogs, dateStr);
 
                 if (checkIn && checkOut) {
-                    const actualMins = differenceInMinutes(checkOut, checkIn);
+                    const awayMins = awayMinutesBetween(empLogs, checkIn, checkOut);
+                    const actualMins = Math.max(0, differenceInMinutes(checkOut, checkIn) - awayMins);
+                    totalAwayMins += awayMins;
                     if (actualMins > 0) {
                         const maxRegularMins = 8 * 60;
                         const regularMins = Math.min(actualMins, maxRegularMins);
@@ -576,7 +619,8 @@ export const calculatePayroll = (employees, logs, transactions, shifts, payrollC
             }
         });
 
-        const totalDeduct = ssoDeduct + taxDeduct + customDeduct;
+        awayDeduct = Math.round(awayDeduct * 100) / 100;
+        const totalDeduct = ssoDeduct + taxDeduct + customDeduct + awayDeduct;
         const netSalary = Math.max(0, grossEarnings - totalDeduct);
 
         return {
@@ -594,6 +638,8 @@ export const calculatePayroll = (employees, logs, transactions, shifts, payrollC
             ssoDeduct,
             taxDeduct,
             customDeduct,
+            awayDeduct,
+            totalAwayMins,
             totalDeduct,
             grossEarnings,
             netSalary,

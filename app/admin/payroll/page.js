@@ -213,6 +213,8 @@ export default function PayrollDashboard() {
             "หักประกันสังคม (บาท)": item.ssoDeduct || 0,
             "หักภาษี ณ ที่จ่าย (บาท)": item.taxDeduct || 0,
             "รายการหักอื่นๆ (บาท)": item.customDeduct || 0,
+            "ออกระหว่างวัน (นาที)": item.totalAwayMins || 0,
+            "หักเวลาออกระหว่างวัน (บาท)": item.awayDeduct || 0,
             "ยอดหักรวม (บาท)": item.totalDeduct,
             "ยอดจ่ายสุทธิ (Net THB)": item.netSalary,
             "ธนาคาร": item.emp.bank_name || "-",
@@ -658,6 +660,12 @@ export default function PayrollDashboard() {
                                                                         <span className="text-[9px] text-rams-ink-muted uppercase block">6. ภาษี/หักอื่นๆ:</span>
                                                                         <span className="font-bold text-rams-red">{(item.taxDeduct + item.customDeduct) > 0 ? `-฿${(item.taxDeduct + item.customDeduct).toLocaleString()}` : '฿0'}</span>
                                                                     </div>
+                                                                    {item.totalAwayMins > 0 && (
+                                                                        <div className="bg-rams-panel p-2 rounded-xs border border-rams-rule-light">
+                                                                            <span className="text-[9px] text-rams-ink-muted uppercase block">7. ออกระหว่างวัน {((m) => `${Math.floor(m / 60) > 0 ? `${Math.floor(m / 60)} ชม. ` : ''}${m % 60} น.`)(item.totalAwayMins)}:</span>
+                                                                            <span className="font-bold text-rams-red">{item.awayDeduct > 0 ? `-฿${item.awayDeduct.toLocaleString()}` : 'หักจากชั่วโมงแล้ว'}</span>
+                                                                        </div>
+                                                                    )}
                                                                     <div className="bg-rams-ink text-rams-panel p-2 rounded-xs border border-rams-ink">
                                                                         <span className="text-[9px] text-rams-panel/70 uppercase block">= ยอดสุทธิ:</span>
                                                                         <span className="font-black text-xs text-rams-green">฿{item.netSalary.toLocaleString()}</span>
@@ -749,7 +757,10 @@ export default function PayrollDashboard() {
                                                                                             {day.status}
                                                                                         </span>
                                                                                     </td>
-                                                                                    <td className="px-3 py-2 text-center">{day.regular_hours > 0 ? day.regular_hours.toFixed(1) : '-'}</td>
+                                                                                    <td className="px-3 py-2 text-center">
+                                                                                        {day.regular_hours > 0 ? day.regular_hours.toFixed(1) : '-'}
+                                                                                        {day.away_mins > 0 && <span className="block text-[10px] text-rams-red">ออก {((m) => `${Math.floor(m / 60) > 0 ? `${Math.floor(m / 60)} ชม. ` : ''}${m % 60} น.`)(day.away_mins)}</span>}
+                                                                                    </td>
                                                                                     <td className="px-3 py-2 text-center text-rams-orange font-bold">{day.ot_hours > 0 ? day.ot_hours.toFixed(1) : '-'}</td>
                                                                                     <td className="px-3 py-2 text-right">{day.wage > 0 ? day.wage.toLocaleString('th-TH', { minimumFractionDigits: 2 }) : '-'}</td>
                                                                                     <td className="px-3 py-2 text-right text-rams-orange">{day.ot > 0 ? day.ot.toLocaleString('th-TH', { minimumFractionDigits: 2 }) : '-'}</td>
