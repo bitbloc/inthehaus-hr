@@ -9,45 +9,14 @@ import { calculatePayroll } from '../../../utils/payroll';
 import { format, startOfMonth, endOfMonth, addDays } from 'date-fns';
 import { th } from 'date-fns/locale';
 import * as XLSX from 'xlsx';
+import { baht, hrs, awayFmt, WAGE_TH, ADJ_TH, adjReason, shiftText, statusInfo, isException, flagsOf } from '../../../utils/payrollLabels';
 
-const baht = (n) => `฿${Number(n || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const hrs = (n) => (n > 0 ? Number(n).toFixed(1) : '-');
-const awayFmt = (m) => `${Math.floor(m / 60) > 0 ? `${Math.floor(m / 60)} ชม. ` : ''}${m % 60} น.`;
-const WAGE_TH = { monthly: 'รายเดือน', daily: 'รายกะ', hourly: 'รายชั่วโมง' };
-const ADJ_TH = { deduction: 'หักเงิน', advance: 'เบิกล่วงหน้า', bonus: 'โบนัส' };
-
-// Day status code from utils/payroll.js → Thai label + tone
-const statusInfo = (status) => {
-    const s = String(status || '');
-    const late = s.match(/^LATE \(\+(\d+)M\)/);
-    if (late) return { label: `สาย ${late[1]} น.`, tone: 'warn' };
-    const map = {
-        'NORMAL': ['ปกติ', 'ok'],
-        'IN PROGRESS': ['กำลังทำงาน', 'mute'],
-        'MISSED CHECK-OUT': ['ลืมลงเวลาออก · จ่ายถึงเลิกกะ', 'warn'],
-        'MISSED CHECK-IN': ['ลืมลงเวลาเข้า · ไม่จ่าย', 'warn'],
-        'ABSENT': ['ขาดงาน', 'warn'],
-        'SCHEDULED': ['ยังไม่ถึงวัน', 'mute'],
-        'PENDING': ['วันนี้', 'mute'],
-        'EXEMPT': ['ยกเว้น', 'mute'],
-        'OFF': ['หยุด', 'mute'],
-        'OFF-DAY WORK': ['มาทำวันหยุด', 'info'],
-        'MISSED CHECK-OUT (OFF-DAY)': ['วันหยุด · ลืมลงเวลาออก', 'warn'],
-        'MISSED CHECK-IN (OFF-DAY)': ['วันหยุด · ลืมลงเวลาเข้า', 'warn'],
-        'UNSCHEDULED WORK': ['มาโดยไม่มีกะ', 'info'],
-        'MISSED CHECK-OUT (UNSCHEDULED)': ['ไม่มีกะ · ลืมลงเวลาออก', 'warn'],
-        'MISSED CHECK-IN (UNSCHEDULED)': ['ไม่มีกะ · ลืมลงเวลาเข้า', 'warn'],
-    };
-    const [label, tone] = map[s] || [s, 'mute'];
-    return { label, tone };
-};
 const toneCls = {
     ok: 'border-rule text-subtle',
     warn: 'bg-plum text-cream border-plum',
     info: 'border-plum text-plum',
     mute: 'border-rule text-neutral',
 };
-const isException = (d) => ['warn', 'info'].includes(statusInfo(d.status).tone);
 
 export default function PayrollDashboard() {
     const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
@@ -246,12 +215,6 @@ export default function PayrollDashboard() {
 
     const [y, m] = selectedMonth.split('-').map(Number);
     const monthLabel = `${format(new Date(y, m - 1), 'LLLL', { locale: th })} ${y + 543}`;
-    const flagsOf = (item) => [
-        item.incompleteCount > 0 && `ลืมลงเวลา ${item.incompleteCount}`,
-        item.absentCount > 0 && `ขาด ${item.absentCount}`,
-        item.lateCount > 0 && `สาย ${item.lateCount}`,
-        item.offDayWorkCount > 0 && `ทำวันหยุด ${item.offDayWorkCount}`,
-    ].filter(Boolean);
 
     const input = 'w-full min-h-12 px-4 bg-cream border border-charcoal text-base text-charcoal placeholder:text-neutral outline-none focus-visible:border-plum';
 
@@ -392,14 +355,14 @@ export default function PayrollDashboard() {
                                                         ))}
                                                         {item.adjustments?.filter(a => a.type !== 'bonus').map(a => (
                                                             <div key={a.id} className="px-4 py-2 border-b border-rule flex justify-between items-center gap-3">
-                                                                <dt className="text-subtle min-w-0 truncate">{ADJ_TH[a.type]} · {(a.reason || '').replace(/^\[(โบนัส|เบิกล่วงหน้า)\]\s*/, '')}</dt>
+                                                                <dt className="text-subtle min-w-0 truncate">{ADJ_TH[a.type]} · {adjReason(a)}</dt>
                                                                 <dd className="flex items-center gap-2 shrink-0"><span className="font-num text-charcoal">−{baht(a.amount)}</span>
                                                                     <button type="button" onClick={() => handleDeleteDeduction(a)} className="min-h-10 px-2 text-sm text-error underline underline-offset-4">ลบ</button></dd>
                                                             </div>
                                                         ))}
                                                         {item.adjustments?.filter(a => a.type === 'bonus').map(a => (
                                                             <div key={a.id} className="px-4 py-2 border-b border-rule flex justify-between items-center gap-3">
-                                                                <dt className="text-subtle min-w-0 truncate">โบนัส · {(a.reason || '').replace(/^\[โบนัส\]\s*/, '')}</dt>
+                                                                <dt className="text-subtle min-w-0 truncate">โบนัส · {adjReason(a)}</dt>
                                                                 <dd className="flex items-center gap-2 shrink-0"><span className="font-num text-charcoal">+{baht(a.amount)}</span>
                                                                     <button type="button" onClick={() => handleDeleteDeduction(a)} className="min-h-10 px-2 text-sm text-error underline underline-offset-4">ลบ</button></dd>
                                                             </div>
@@ -450,7 +413,7 @@ export default function PayrollDashboard() {
                                                                     return (
                                                                         <tr key={idx}>
                                                                             <td className="px-4 py-2 whitespace-nowrap">{format(new Date(`${day.date}T12:00:00`), 'EEE d MMM', { locale: th })}</td>
-                                                                            <td className="px-3 py-2 text-subtle">{day.shift === 'OFF' ? 'หยุด' : day.shift === 'UNSCHEDULED' ? 'ไม่มีกะ' : (day.shift || '').replace(/\s+\)/g, ')').replace(/(\d{2}:\d{2})-(\d{2}:\d{2})/g, '$1–$2').replace(/[\p{Extended_Pictographic}️]/gu, '').replace(/\s+\)/g, ')').trim()}</td>
+                                                                            <td className="px-3 py-2 text-subtle">{shiftText(day.shift)}</td>
                                                                             <td className="px-3 py-2 font-num whitespace-nowrap">{day.in === '-' && day.out === '-' ? '-' : `${day.in === '-' ? '?' : day.in}–${day.out === '-' ? '?' : day.out}`}
                                                                                 {day.away_mins > 0 && <span className="block font-thai text-plum">ออก {awayFmt(day.away_mins)}</span>}
                                                                             </td>

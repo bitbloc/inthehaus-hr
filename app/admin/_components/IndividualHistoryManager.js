@@ -1,15 +1,12 @@
 "use client";
+import { initialOf } from "../../../utils/initial";
 
 import React, { useState, useMemo } from "react";
 import { 
     format, parseISO, differenceInMinutes, subDays, addDays, isValid 
 } from "date-fns";
 import { th } from "date-fns/locale";
-import { 
-    Calendar, Clock, AlertTriangle, CheckCircle2, User, ChevronLeft, ChevronRight,
-    Search, Filter, Download, Plus, Trash2, Camera, Smile, ArrowUpDown, RefreshCw,
-    Maximize2, X, MapPin, Smartphone, ShieldCheck, FileSpreadsheet, Eye, LogIn, LogOut
-} from "lucide-react";
+import { Search, Filter } from 'lucide-react';
 import * as XLSX from "xlsx";
 import { Badge } from "./ui/Badge";
 import { Card } from "./ui/Card";
@@ -19,7 +16,7 @@ import { formatDate, formatTime } from "../../../utils/format";
 function StaffAvatar({ employee, className = "w-11 h-11", textClassName = "text-base" }) {
     const [imgError, setImgError] = useState(false);
     const photoUrl = employee?.photo_url;
-    const initialChar = (employee?.nickname || employee?.name || "E").charAt(0).toUpperCase();
+    const initialChar = initialOf(employee?.nickname, employee?.name);
 
     return (
         <div className="relative shrink-0 select-none">
@@ -29,15 +26,15 @@ function StaffAvatar({ employee, className = "w-11 h-11", textClassName = "text-
                     alt={employee?.name || ""}
                     onError={() => setImgError(true)}
                     referrerPolicy="no-referrer"
-                    className={`${className} rounded-sm object-cover border border-rams-rule-light bg-rams-bg`}
+                    className={`${className} object-cover border border-rule bg-cream`}
                 />
             ) : (
-                <div className={`${className} rounded-sm bg-rams-ink text-rams-panel font-mono font-black ${textClassName} flex items-center justify-center border border-rams-rule uppercase`}>
+                <div className={`${className} bg-charcoal text-cream font-num font-semibold ${textClassName} flex items-center justify-center border border-charcoal`}>
                     {initialChar}
                 </div>
             )}
             {employee?.is_active !== false && (
-                <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-rams-green border-2 border-rams-panel" />
+                <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-charcoal border-2 border-cream" />
             )}
         </div>
     );
@@ -191,7 +188,7 @@ export default function IndividualHistoryManager({
             if (firstCheckIn) {
                 const checkInDate = new Date(firstCheckIn.timestamp);
                 if (isOffDay) {
-                    statusBadge = { label: "ทำงานวันหยุด (Off Day)", color: "purple" };
+                    statusBadge = { label: "ทำงานวันหยุด", color: "purple" };
                 } else if (scheduledShift?.start_time) {
                     const [sh, sm] = scheduledShift.start_time.split(":");
                     const shiftStart = new Date(checkInDate);
@@ -203,13 +200,13 @@ export default function IndividualHistoryManager({
                         lateMinutes = diff;
                         statusBadge = { label: `สาย +${diff} นาที`, color: "amber" };
                     } else {
-                        statusBadge = { label: "ตรงเวลา (On Time)", color: "emerald" };
+                        statusBadge = { label: "ตรงเวลา", color: "emerald" };
                     }
                 } else {
                     statusBadge = { label: "เข้างานปกติ", color: "emerald" };
                 }
             } else if (logsOnDate.some(l => l.action_type === "absent")) {
-                statusBadge = { label: "ขาดงาน (Absent)", color: "rose" };
+                statusBadge = { label: "ขาดงาน", color: "rose" };
             }
 
             // Check if there was an approved leave on this date
@@ -332,7 +329,7 @@ export default function IndividualHistoryManager({
                 "วันในสัปดาห์": format(item.dateObj, "EEEE", { locale: th }),
                 "ชื่อพนักงาน": currentEmployee.name,
                 "ชื่อเล่น": currentEmployee.nickname || "-",
-                "กะงานที่กำหนด": item.scheduledShift ? `${item.scheduledShift.name} (${item.scheduledShift.start_time} - ${item.scheduledShift.end_time})` : (item.isOffDay ? "วันหยุด (OFF)" : "-"),
+                "กะงานที่กำหนด": item.scheduledShift ? `${item.scheduledShift.name} (${item.scheduledShift.start_time} - ${item.scheduledShift.end_time})` : (item.isOffDay ? "วันหยุด" : "-"),
                 "เวลาเข้างาน": item.firstCheckIn ? formatTime(item.firstCheckIn.timestamp) : "-",
                 "เวลาออกงาน": item.lastCheckOut ? formatTime(item.lastCheckOut.timestamp) : "-",
                 "ชั่วโมงทำงานจริง": item.durationText,
@@ -370,16 +367,16 @@ export default function IndividualHistoryManager({
         return (
             <div className="space-y-6">
                 {/* Header Banner */}
-                <div className="bg-rams-panel p-6 rounded-sm border border-rams-rule-light shadow-none">
+                <div className="bg-cream p-6 border border-rule">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div>
                             <div className="flex items-center gap-2">
-                                <span className="w-2.5 h-2.5 rounded-full bg-rams-orange animate-pulse"></span>
-                                <h2 className="text-base font-mono font-bold uppercase tracking-wider text-rams-ink">
-                                    INDIVIDUAL HISTORY · ประวัติการเข้างานรายบุคคล
+                                <span className="w-2.5 h-2.5 bg-plum"></span>
+                                <h2 className="text-base font-semibold text-charcoal">
+                                    ประวัติการเข้างานรายคน
                                 </h2>
                             </div>
-                            <p className="text-xs font-mono text-rams-ink-muted uppercase tracking-widest mt-1">
+                            <p className="text-xs text-neutral mt-1">
                                 เลือกพนักงานเพื่อเรียกดูสถิติการลงเวลา บันทึกการเข้า-ออกงาน และตรวจสอบภาพถ่ายยืนยันตัวตน
                             </p>
                         </div>
@@ -388,7 +385,7 @@ export default function IndividualHistoryManager({
                                 type="month"
                                 value={selectedMonth}
                                 onChange={e => setSelectedMonth(e.target.value)}
-                                className="bg-rams-bg border border-rams-rule px-3 py-1.5 rounded-sm font-mono text-xs font-bold text-rams-ink outline-none cursor-pointer"
+                                className="bg-cream border border-charcoal px-3 py-1.5 font-num text-xs font-semibold text-charcoal outline-none cursor-pointer"
                             />
                         </div>
                     </div>
@@ -396,12 +393,11 @@ export default function IndividualHistoryManager({
 
                 {/* Staff Selection Grid */}
                 <Card className="p-6">
-                    <div className="flex items-center justify-between mb-4 pb-2 border-b border-rams-rule-light">
-                        <span className="font-mono text-xs font-bold uppercase tracking-wider text-rams-ink flex items-center gap-2">
-                            <User className="w-4 h-4 text-rams-orange" />
-                            เลือกพนักงานเพื่อดูประวัติ ({activeEmployees.length} คน)
+                    <div className="flex items-center justify-between mb-4 pb-2 border-b border-rule">
+                        <span className="text-xs font-semibold text-charcoal flex items-center gap-2">
+                                                        เลือกพนักงานเพื่อดูประวัติ ({activeEmployees.length} คน)
                         </span>
-                        <span className="text-[10px] font-mono text-rams-ink-muted">
+                        <span className="text-xs text-neutral">
                             คลิกที่การ์ดพนักงานเพื่อเปิดประวัติทันที
                         </span>
                     </div>
@@ -411,19 +407,18 @@ export default function IndividualHistoryManager({
                             <button
                                 key={emp.id}
                                 onClick={() => setSelectedEmpId(String(emp.id))}
-                                className="flex items-center gap-3 p-3 text-left bg-rams-bg hover:bg-rams-panel rounded-sm border border-rams-rule-light hover:border-rams-orange transition-all duration-150 group cursor-pointer"
+                                className="flex items-center gap-3 p-3 text-left bg-cream hover:bg-cream border border-rule hover:border-plum transition-colors duration-150 duration-150 group cursor-pointer"
                             >
                                 <StaffAvatar employee={emp} className="w-10 h-10" />
                                 <div className="min-w-0 flex-1">
-                                    <div className="font-mono font-bold text-xs text-rams-ink group-hover:text-rams-orange truncate">
+                                    <div className="font-num font-semibold text-xs text-charcoal group-hover:text-plum truncate">
                                         {emp.nickname ? `${emp.nickname} · ${emp.name}` : emp.name}
                                     </div>
-                                    <div className="text-[10px] font-mono text-rams-ink-muted truncate mt-0.5">
+                                    <div className="text-xs font-num text-neutral truncate mt-0.5">
                                         {emp.position || "Staff"} · {emp.employment_status || "Fulltime"}
                                     </div>
                                 </div>
-                                <ChevronRight className="w-4 h-4 text-rams-ink-muted group-hover:text-rams-orange group-hover:translate-x-0.5 transition-transform shrink-0" />
-                            </button>
+                                                            </button>
                         ))}
                     </div>
                 </Card>
@@ -437,14 +432,14 @@ export default function IndividualHistoryManager({
     return (
         <div className="space-y-6">
             {/* 1. TOP CONTROL & STAFF PROFILE BAR */}
-            <div className="bg-rams-panel p-5 rounded-sm border border-rams-rule-light shadow-none">
+            <div className="bg-cream p-5 border border-rule">
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                     {/* Staff Profile & Navigation */}
                     <div className="flex items-center gap-3">
                         <StaffAvatar employee={currentEmployee} className="w-14 h-14" textClassName="text-xl" />
                         <div>
                             <div className="flex items-center gap-2 flex-wrap">
-                                <h2 className="text-base font-mono font-bold text-rams-ink">
+                                <h2 className="text-base font-num font-semibold text-charcoal">
                                     {currentEmployee?.nickname ? `${currentEmployee.nickname} (${currentEmployee.name})` : currentEmployee?.name}
                                 </h2>
                                 <Badge color="blue">
@@ -454,7 +449,7 @@ export default function IndividualHistoryManager({
                                     {currentEmployee?.employment_status || "Fulltime"}
                                 </Badge>
                             </div>
-                            <div className="flex items-center gap-4 text-[10px] font-mono text-rams-ink-muted mt-1 flex-wrap">
+                            <div className="flex items-center gap-4 text-xs font-num text-neutral mt-1 flex-wrap">
                                 <span>รหัส: #{currentEmployee?.id}</span>
                                 {currentEmployee?.phone && <span>โทร: {currentEmployee.phone}</span>}
                                 <span>กะประจำ: {currentEmployee?.shift_rates?.wage_type === 'monthly' ? 'เงินเดือน' : 'รายวัน/ชั่วโมง'}</span>
@@ -465,18 +460,16 @@ export default function IndividualHistoryManager({
                     {/* Controls: Prev/Next, Staff Dropdown, Month Picker, Export */}
                     <div className="flex items-center gap-2 flex-wrap">
                         {/* Prev / Next Stepper */}
-                        <div className="flex items-center border border-rams-rule-light rounded-sm bg-rams-bg overflow-hidden">
+                        <div className="flex items-center border border-rule bg-cream overflow-hidden">
                             <button
                                 onClick={handlePrevStaff}
                                 title="พนักงานคนก่อนหน้า"
-                                className="p-2 hover:bg-rams-panel text-rams-ink transition-colors cursor-pointer border-r border-rams-rule-light"
-                            >
-                                <ChevronLeft className="w-4 h-4" />
-                            </button>
+                                className="hover:bg-cream text-charcoal transition-colors cursor-pointer border-r border-rule min-h-11 px-3 text-sm font-semibold underline-offset-4 hover:underline"
+                            >← ก่อนหน้า</button>
                             <select
                                 value={selectedEmpId}
                                 onChange={e => setSelectedEmpId(e.target.value)}
-                                className="p-2 font-mono text-xs font-bold text-rams-ink bg-transparent outline-none cursor-pointer max-w-[160px]"
+                                className="p-2 font-num text-xs font-semibold text-charcoal bg-transparent outline-none cursor-pointer max-w-[160px]"
                             >
                                 {activeEmployees.map(e => (
                                     <option key={e.id} value={e.id}>
@@ -487,10 +480,8 @@ export default function IndividualHistoryManager({
                             <button
                                 onClick={handleNextStaff}
                                 title="พนักงานคนถัดไป"
-                                className="p-2 hover:bg-rams-panel text-rams-ink transition-colors cursor-pointer border-l border-rams-rule-light"
-                            >
-                                <ChevronRight className="w-4 h-4" />
-                            </button>
+                                className="hover:bg-cream text-charcoal transition-colors cursor-pointer border-l border-rule min-h-11 px-3 text-sm font-semibold underline-offset-4 hover:underline"
+                            >ถัดไป →</button>
                         </div>
 
                         {/* Month Selector */}
@@ -498,18 +489,17 @@ export default function IndividualHistoryManager({
                             type="month"
                             value={selectedMonth}
                             onChange={e => setSelectedMonth(e.target.value)}
-                            className="bg-rams-bg border border-rams-rule px-3 py-2 rounded-sm font-mono text-xs font-bold text-rams-ink outline-none cursor-pointer"
+                            className="bg-cream border border-charcoal px-3 py-2 font-num text-xs font-semibold text-charcoal outline-none cursor-pointer"
                         />
 
                         {/* Export Button */}
                         <button
                             onClick={handleExportExcel}
                             disabled={isExporting}
-                            className="flex items-center gap-1.5 px-3 py-2 bg-rams-panel hover:bg-rams-bg text-rams-ink border border-rams-rule-light rounded-sm font-mono text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer"
+                            className="flex items-center gap-1.5 px-3 py-2 bg-cream hover:bg-cream text-charcoal border border-rule font-num text-xs font-semibold transition-colors cursor-pointer"
                             title="ดาวน์โหลด Excel"
                         >
-                            <Download className="w-3.5 h-3.5 text-rams-orange" />
-                            <span className="hidden sm:inline">Excel</span>
+                                                        <span className="hidden sm:inline">Excel</span>
                         </button>
 
                         {/* Manual Punch Button */}
@@ -520,10 +510,9 @@ export default function IndividualHistoryManager({
                                 }
                                 if (setShowManualModal) setShowManualModal(true);
                             }}
-                            className="flex items-center gap-1.5 px-3 py-2 bg-rams-orange hover:bg-rams-orange-active text-rams-panel rounded-sm font-mono text-xs font-bold uppercase tracking-wider tactile-btn cursor-pointer"
+                            className="flex items-center gap-1.5 px-3 py-2 bg-plum hover:bg-plum-2 text-cream font-num text-xs font-semibold tactile-btn cursor-pointer"
                         >
-                            <Plus className="w-3.5 h-3.5" />
-                            <span className="hidden sm:inline">ลงเวลาย้อนหลัง</span>
+                                                        <span className="hidden sm:inline">ลงเวลาย้อนหลัง</span>
                         </button>
                     </div>
                 </div>
@@ -532,96 +521,92 @@ export default function IndividualHistoryManager({
             {/* 2. SUMMARY METRIC CARDS (4 Columns) */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 {/* Work Days */}
-                <Card className="p-4 border border-rams-rule-light bg-rams-panel">
-                    <div className="flex items-center justify-between text-rams-ink-muted mb-2">
-                        <span className="font-mono text-[10px] font-bold uppercase tracking-wider">วันทำงานจริง</span>
-                        <Calendar className="w-4 h-4 text-rams-orange" />
-                    </div>
+                <Card className="p-4 border border-rule bg-cream">
+                    <div className="flex items-center justify-between text-neutral mb-2">
+                        <span className="text-xs font-semibold">วันทำงานจริง</span>
+                                            </div>
                     <div className="flex items-baseline gap-2">
-                        <span className="text-2xl font-mono font-black text-rams-ink">
+                        <span className="text-2xl font-num font-semibold text-charcoal">
                             {summaryMetrics.totalWorkDays}
                         </span>
-                        <span className="text-xs font-mono text-rams-ink-muted">วัน</span>
+                        <span className="text-xs text-neutral">วัน</span>
                     </div>
-                    <div className="text-[10px] font-mono text-rams-ink-muted mt-1">
+                    <div className="text-xs text-neutral mt-1">
                         รวม {summaryMetrics.totalHours} ชม. (เฉลี่ย {summaryMetrics.avgHoursPerDay} ชม./วัน)
                     </div>
                 </Card>
 
                 {/* On-Time Rate */}
-                <Card className="p-4 border border-rams-rule-light bg-rams-panel">
-                    <div className="flex items-center justify-between text-rams-ink-muted mb-2">
-                        <span className="font-mono text-[10px] font-bold uppercase tracking-wider">อัตราตรงเวลา</span>
-                        <Clock className="w-4 h-4 text-rams-green" />
-                    </div>
+                <Card className="p-4 border border-rule bg-cream">
+                    <div className="flex items-center justify-between text-neutral mb-2">
+                        <span className="text-xs font-semibold">อัตราตรงเวลา</span>
+                                            </div>
                     <div className="flex items-baseline gap-2">
-                        <span className={`text-2xl font-mono font-black ${summaryMetrics.lateCount > 0 ? "text-rams-amber" : "text-rams-green"}`}>
+                        <span className={`text-2xl font-num font-semibold ${summaryMetrics.lateCount > 0 ? "text-plum" : "text-charcoal"}`}>
                             {summaryMetrics.onTimeRate}%
                         </span>
                     </div>
-                    <div className="text-[10px] font-mono text-rams-ink-muted mt-1">
-                        {summaryMetrics.lateCount > 0 ? `เข้าสาย ${summaryMetrics.lateCount} ครั้ง` : "เข้างานตรงเวลา 100% ✨"}
+                    <div className="text-xs text-neutral mt-1">
+                        {summaryMetrics.lateCount > 0 ? `เข้าสาย ${summaryMetrics.lateCount} ครั้ง` : "เข้างานตรงเวลา 100% "}
                     </div>
                 </Card>
 
                 {/* Off-Day & Special Shifts */}
-                <Card className="p-4 border border-rams-rule-light bg-rams-panel">
-                    <div className="flex items-center justify-between text-rams-ink-muted mb-2">
-                        <span className="font-mono text-[10px] font-bold uppercase tracking-wider">งานนอกกะ / วันหยุด</span>
-                        <CheckCircle2 className="w-4 h-4 text-rams-orange" />
-                    </div>
+                <Card className="p-4 border border-rule bg-cream">
+                    <div className="flex items-center justify-between text-neutral mb-2">
+                        <span className="text-xs font-semibold">งานนอกกะ / วันหยุด</span>
+                                            </div>
                     <div className="flex items-baseline gap-2">
-                        <span className="text-2xl font-mono font-black text-rams-ink">
+                        <span className="text-2xl font-num font-semibold text-charcoal">
                             {summaryMetrics.offDayWorkCount}
                         </span>
-                        <span className="text-xs font-mono text-rams-ink-muted">กะ</span>
+                        <span className="text-xs text-neutral">กะ</span>
                     </div>
-                    <div className="text-[10px] font-mono text-rams-ink-muted mt-1">
-                        {summaryMetrics.missingCheckoutCount > 0 ? `⚠️ ลืมสแกนออก ${summaryMetrics.missingCheckoutCount} วัน` : "สแกนครบทุกกะงาน"}
+                    <div className="text-xs text-neutral mt-1">
+                        {summaryMetrics.missingCheckoutCount > 0 ? `ลืมสแกนออก ${summaryMetrics.missingCheckoutCount} วัน` : "สแกนครบทุกกะงาน"}
                     </div>
                 </Card>
 
                 {/* Approved Leaves & Absences */}
-                <Card className="p-4 border border-rams-rule-light bg-rams-panel">
-                    <div className="flex items-center justify-between text-rams-ink-muted mb-2">
-                        <span className="font-mono text-[10px] font-bold uppercase tracking-wider">การลา / ขาดงาน</span>
-                        <AlertTriangle className="w-4 h-4 text-rams-red" />
-                    </div>
+                <Card className="p-4 border border-rule bg-cream">
+                    <div className="flex items-center justify-between text-neutral mb-2">
+                        <span className="text-xs font-semibold">การลา / ขาดงาน</span>
+                                            </div>
                     <div className="flex items-baseline gap-2">
-                        <span className={`text-2xl font-mono font-black ${summaryMetrics.approvedLeaves > 0 ? "text-rams-orange" : "text-rams-ink"}`}>
+                        <span className={`text-2xl font-num font-semibold ${summaryMetrics.approvedLeaves > 0 ? "text-plum" : "text-charcoal"}`}>
                             {summaryMetrics.approvedLeaves}
                         </span>
-                        <span className="text-xs font-mono text-rams-ink-muted">วันลา</span>
+                        <span className="text-xs text-neutral">วันลา</span>
                     </div>
-                    <div className="text-[10px] font-mono text-rams-ink-muted mt-1">
+                    <div className="text-xs text-neutral mt-1">
                         {individualStats.absent > 0 ? `ขาดงาน ${individualStats.absent} วัน` : "ไม่มีประวัติขาดงาน"}
                     </div>
                 </Card>
             </div>
 
             {/* 3. TOOLBAR: VIEW TOGGLE & STATUS FILTERS */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-rams-panel p-3 rounded-sm border border-rams-rule-light">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-cream p-3 border border-rule">
                 {/* View Tabs */}
-                <div className="flex items-center gap-1 bg-rams-bg p-1 rounded-sm border border-rams-rule-light">
+                <div className="flex items-center gap-1 bg-cream p-1 border border-rule">
                     <button
                         onClick={() => setViewMode("shifts")}
-                        className={`px-3 py-1.5 font-mono text-xs font-bold uppercase tracking-wider rounded-xs transition-colors cursor-pointer ${
-                            viewMode === "shifts"
-                                ? "bg-rams-panel text-rams-ink shadow-sm border border-rams-rule-light"
-                                : "text-rams-ink-muted hover:text-rams-ink"
-                        }`}
+                        className={`px-3 py-1.5 font-num text-xs font-semibold transition-colors cursor-pointer ${
+ viewMode === "shifts"
+ ? "bg-cream text-charcoal border border-rule"
+ : "text-neutral hover:text-charcoal"
+ }`}
                     >
-                        กะงานรายวัน (Daily Shifts)
+                        กะงานรายวัน
                     </button>
                     <button
                         onClick={() => setViewMode("raw")}
-                        className={`px-3 py-1.5 font-mono text-xs font-bold uppercase tracking-wider rounded-xs transition-colors cursor-pointer ${
-                            viewMode === "raw"
-                                ? "bg-rams-panel text-rams-ink shadow-sm border border-rams-rule-light"
-                                : "text-rams-ink-muted hover:text-rams-ink"
-                        }`}
+                        className={`px-3 py-1.5 font-num text-xs font-semibold transition-colors cursor-pointer ${
+ viewMode === "raw"
+ ? "bg-cream text-charcoal border border-rule"
+ : "text-neutral hover:text-charcoal"
+ }`}
                     >
-                        ประวัติสแกนทั้งหมด (Timeline)
+                        ประวัติสแกนทั้งหมด
                     </button>
                 </div>
 
@@ -629,7 +614,7 @@ export default function IndividualHistoryManager({
                 <div className="flex items-center gap-2 flex-wrap">
                     {/* Status Filter Chips (only on shifts view) */}
                     {viewMode === "shifts" && (
-                        <div className="flex items-center gap-1 text-[10px] font-mono overflow-x-auto pb-1 sm:pb-0">
+                        <div className="flex items-center gap-1 text-xs overflow-x-auto pb-1 sm:pb-0">
                             {[
                                 { id: "ALL", label: "ทั้งหมด" },
                                 { id: "ON_TIME", label: "ตรงเวลา" },
@@ -640,11 +625,11 @@ export default function IndividualHistoryManager({
                                 <button
                                     key={filter.id}
                                     onClick={() => setStatusFilter(filter.id)}
-                                    className={`px-2.5 py-1 rounded-xs uppercase tracking-wider font-bold transition-colors cursor-pointer border ${
-                                        statusFilter === filter.id
-                                            ? "bg-rams-orange text-rams-panel border-rams-orange"
-                                            : "bg-rams-bg text-rams-ink-muted border-rams-rule-light hover:text-rams-ink"
-                                    }`}
+                                    className={`px-2.5 py-1 font-semibold transition-colors cursor-pointer border ${
+ statusFilter === filter.id
+ ? "bg-plum text-cream border-plum"
+ : "bg-cream text-neutral border-rule hover:text-charcoal"
+ }`}
                                 >
                                     {filter.label}
                                 </button>
@@ -654,13 +639,12 @@ export default function IndividualHistoryManager({
 
                     {/* Search Input */}
                     <div className="relative flex-1 sm:w-44">
-                        <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-rams-ink-muted" />
-                        <input
+                                                <input
                             type="text"
                             placeholder="ค้นหาวันที่ / บันทึก..."
                             value={searchQuery}
                             onChange={e => setSearchQuery(e.target.value)}
-                            className="w-full bg-rams-bg border border-rams-rule-light rounded-xs pl-8 pr-3 py-1 font-mono text-xs text-rams-ink outline-none focus:border-rams-orange"
+                            className="w-full bg-cream border border-rule pl-8 pr-3 py-1 font-num text-xs text-charcoal outline-none focus:border-plum"
                         />
                     </div>
                 </div>
@@ -668,25 +652,25 @@ export default function IndividualHistoryManager({
 
             {/* 4. MAIN CONTENT AREA: VIEW MODE 1 - PAIRED DAILY SHIFTS */}
             {viewMode === "shifts" && (
-                <Card className="p-0 overflow-hidden border border-rams-rule-light">
+                <Card className="p-0 overflow-hidden border border-rule">
                     <div className="overflow-x-auto">
                         <table className="w-full text-left text-xs border-collapse">
                             <thead>
-                                <tr className="bg-rams-bg border-b border-rams-rule-light font-mono font-bold text-[10px] text-rams-ink-muted uppercase tracking-wider">
-                                    <th className="py-3 px-4">วันที่ (Date)</th>
-                                    <th className="py-3 px-4">กะที่กำหนด (Schedule)</th>
-                                    <th className="py-3 px-4">เข้างาน (In)</th>
-                                    <th className="py-3 px-4">ออกงาน (Out)</th>
-                                    <th className="py-3 px-4">ชั่วโมงทำงาน (Duration)</th>
-                                    <th className="py-3 px-4">สถานะ (Status)</th>
-                                    <th className="py-3 px-4">ความรู้สึก / บันทึก (Mood & Notes)</th>
+                                <tr className="bg-cream border-b border-rule font-num font-semibold text-xs text-neutral">
+                                    <th className="py-3 px-4">วันที่</th>
+                                    <th className="py-3 px-4">กะที่กำหนด</th>
+                                    <th className="py-3 px-4">เข้างาน</th>
+                                    <th className="py-3 px-4">ออกงาน</th>
+                                    <th className="py-3 px-4">ชั่วโมงทำงาน</th>
+                                    <th className="py-3 px-4">สถานะ</th>
+                                    <th className="py-3 px-4">ความรู้สึก / บันทึก</th>
                                     <th className="py-3 px-4 text-right">จัดการ</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-rams-rule-light font-mono">
+                            <tbody className="divide-y divide-rule font-num">
                                 {filteredShifts.length === 0 ? (
                                     <tr>
-                                        <td colSpan={8} className="py-12 text-center text-rams-ink-muted font-mono text-xs">
+                                        <td colSpan={8} className="py-12 text-center text-neutral text-xs">
                                             ไม่พบข้อมูลการเข้างานตามเงื่อนไขที่เลือก
                                         </td>
                                     </tr>
@@ -699,11 +683,11 @@ export default function IndividualHistoryManager({
                                         } = dayItem;
 
                                         return (
-                                            <tr key={dateStr} className="hover:bg-rams-bg/60 transition-colors">
+                                            <tr key={dateStr} className="hover:bg-paper-2 transition-colors">
                                                 {/* Date & Day */}
-                                                <td className="py-3 px-4 font-bold text-rams-ink whitespace-nowrap">
+                                                <td className="py-3 px-4 font-semibold text-charcoal whitespace-nowrap">
                                                     <div>{formatDate(dateObj)}</div>
-                                                    <div className="text-[10px] text-rams-ink-muted font-normal">
+                                                    <div className="text-xs text-neutral font-normal">
                                                         {format(dateObj, "EEEE", { locale: th })}
                                                     </div>
                                                 </td>
@@ -712,18 +696,18 @@ export default function IndividualHistoryManager({
                                                 <td className="py-3 px-4 whitespace-nowrap">
                                                     {scheduledShift ? (
                                                         <div className="flex items-center gap-1.5">
-                                                            <span className="w-2 h-2 rounded-full bg-rams-orange" />
-                                                            <span className="font-bold text-rams-ink">
+                                                            <span className="w-2 h-2 bg-plum" />
+                                                            <span className="font-semibold text-charcoal">
                                                                 {scheduledShift.name}
                                                             </span>
-                                                            <span className="text-[10px] text-rams-ink-muted">
+                                                            <span className="text-xs text-neutral">
                                                                 ({scheduledShift.start_time} - {scheduledShift.end_time})
                                                             </span>
                                                         </div>
                                                     ) : isOffDay ? (
-                                                        <Badge color="purple">วันหยุด (OFF)</Badge>
+                                                        <Badge color="purple">วันหยุด</Badge>
                                                     ) : (
-                                                        <span className="text-rams-ink-muted">-</span>
+                                                        <span className="text-neutral">-</span>
                                                     )}
                                                 </td>
 
@@ -740,28 +724,26 @@ export default function IndividualHistoryManager({
                                                                     <img
                                                                         src={firstCheckIn.photo_url}
                                                                         alt="Check In"
-                                                                        className="w-7 h-7 rounded-sm object-cover border border-rams-rule-light group-hover/pic:border-rams-orange"
+                                                                        className="w-7 h-7 object-cover border border-rule group-hover/pic:border-plum"
                                                                     />
-                                                                    <Eye className="w-3 h-3 absolute inset-0 m-auto text-white opacity-0 group-hover/pic:opacity-100 transition-opacity drop-shadow" />
-                                                                </button>
+                                                                                                                                    </button>
                                                             ) : (
-                                                                <span className="w-7 h-7 rounded-sm bg-rams-bg border border-rams-rule-light flex items-center justify-center text-rams-ink-muted">
-                                                                    <LogIn className="w-3.5 h-3.5" />
-                                                                </span>
+                                                                <span className="w-7 h-7 bg-cream border border-rule flex items-center justify-center text-neutral">
+                                                                                                                                    </span>
                                                             )}
                                                             <div>
-                                                                <span className="font-bold text-rams-ink">
+                                                                <span className="font-semibold text-charcoal">
                                                                     {formatTime(firstCheckIn.timestamp)}
                                                                 </span>
                                                                 {firstCheckIn.verification_method && (
-                                                                    <div className="text-[9px] text-rams-ink-muted">
+                                                                    <div className="text-xs text-neutral">
                                                                         {firstCheckIn.verification_method}
                                                                     </div>
                                                                 )}
                                                             </div>
                                                         </div>
                                                     ) : (
-                                                        <span className="text-rams-ink-muted">-</span>
+                                                        <span className="text-neutral">-</span>
                                                     )}
                                                 </td>
 
@@ -778,38 +760,36 @@ export default function IndividualHistoryManager({
                                                                     <img
                                                                         src={lastCheckOut.photo_url}
                                                                         alt="Check Out"
-                                                                        className="w-7 h-7 rounded-sm object-cover border border-rams-rule-light group-hover/pic:border-rams-orange"
+                                                                        className="w-7 h-7 object-cover border border-rule group-hover/pic:border-plum"
                                                                     />
-                                                                    <Eye className="w-3 h-3 absolute inset-0 m-auto text-white opacity-0 group-hover/pic:opacity-100 transition-opacity drop-shadow" />
-                                                                </button>
+                                                                                                                                    </button>
                                                             ) : (
-                                                                <span className="w-7 h-7 rounded-sm bg-rams-bg border border-rams-rule-light flex items-center justify-center text-rams-ink-muted">
-                                                                    <LogOut className="w-3.5 h-3.5" />
-                                                                </span>
+                                                                <span className="w-7 h-7 bg-cream border border-rule flex items-center justify-center text-neutral">
+                                                                                                                                    </span>
                                                             )}
                                                             <div>
-                                                                <span className="font-bold text-rams-ink">
+                                                                <span className="font-semibold text-charcoal">
                                                                     {formatTime(lastCheckOut.timestamp)}
                                                                 </span>
                                                                 {new Date(lastCheckOut.timestamp).getHours() < 6 && (
-                                                                    <span className="text-[9px] text-rams-orange block">
-                                                                        🌙 กะข้ามคืน
+                                                                    <span className="text-xs text-plum block">
+                                                                        กะข้ามคืน
                                                                     </span>
                                                                 )}
                                                             </div>
                                                         </div>
                                                     ) : isMissingCheckout ? (
-                                                        <span className="text-[10px] text-rams-amber font-bold bg-rams-amber/10 px-2 py-0.5 rounded-xs">
-                                                            ⚠️ ยังไม่สแกนออก
+                                                        <span className="text-xs text-plum font-semibold bg-plum/10 px-2 py-0.5">
+                                                            ยังไม่สแกนออก
                                                         </span>
                                                     ) : (
-                                                        <span className="text-rams-ink-muted">-</span>
+                                                        <span className="text-neutral">-</span>
                                                     )}
                                                 </td>
 
                                                 {/* Work Duration */}
                                                 <td className="py-3 px-4 whitespace-nowrap">
-                                                    <span className="font-bold text-rams-ink">
+                                                    <span className="font-semibold text-charcoal">
                                                         {durationText}
                                                     </span>
                                                 </td>
@@ -822,20 +802,20 @@ export default function IndividualHistoryManager({
                                                 </td>
 
                                                 {/* Mood & Notes */}
-                                                <td className="py-3 px-4 max-w-[200px] truncate text-rams-ink-muted text-[11px]">
+                                                <td className="py-3 px-4 max-w-[200px] truncate text-neutral text-xs">
                                                     {firstCheckIn?.mood_status || firstCheckIn?.mood_note ? (
                                                         <div className="flex items-center gap-1.5 truncate">
                                                             {firstCheckIn.mood_status && (
                                                                 <span className="text-xs">{firstCheckIn.mood_status}</span>
                                                             )}
                                                             {firstCheckIn.mood_note && (
-                                                                <span className="truncate text-rams-ink font-sans">
+                                                                <span className="truncate text-charcoal">
                                                                     {firstCheckIn.mood_note}
                                                                 </span>
                                                             )}
                                                         </div>
                                                     ) : (
-                                                        <span className="text-rams-ink-muted/50">-</span>
+                                                        <span className="text-neutral/50">-</span>
                                                     )}
                                                 </td>
 
@@ -846,17 +826,13 @@ export default function IndividualHistoryManager({
                                                             <button
                                                                 onClick={() => handleToggleLogAction && handleToggleLogAction(firstCheckIn)}
                                                                 title="สลับสถานะ เข้า/ออก"
-                                                                className="p-1 text-rams-ink-muted hover:text-rams-orange hover:bg-rams-bg rounded-xs transition-colors cursor-pointer"
-                                                            >
-                                                                <ArrowUpDown className="w-3.5 h-3.5" />
-                                                            </button>
+                                                                className="text-neutral hover:text-plum hover:bg-cream transition-colors cursor-pointer min-h-11 px-3 text-sm font-semibold underline-offset-4 hover:underline"
+                                                            >สลับ</button>
                                                             <button
                                                                 onClick={() => handleDeleteLog && handleDeleteLog(firstCheckIn.id)}
                                                                 title="ลบรายการสแกนนี้"
-                                                                className="p-1 text-rams-ink-muted hover:text-rams-red hover:bg-rams-bg rounded-xs transition-colors cursor-pointer"
-                                                            >
-                                                                <Trash2 className="w-3.5 h-3.5" />
-                                                            </button>
+                                                                className="hover:bg-cream transition-colors cursor-pointer min-h-11 px-3 text-sm font-semibold underline-offset-4 hover:underline text-error"
+                                                            >ลบ</button>
                                                         </div>
                                                     )}
                                                 </td>
@@ -872,24 +848,24 @@ export default function IndividualHistoryManager({
 
             {/* 4. MAIN CONTENT AREA: VIEW MODE 2 - RAW LOG TIMELINE */}
             {viewMode === "raw" && (
-                <Card className="p-0 overflow-hidden border border-rams-rule-light">
+                <Card className="p-0 overflow-hidden border border-rule">
                     <div className="overflow-x-auto">
                         <table className="w-full text-left text-xs border-collapse">
                             <thead>
-                                <tr className="bg-rams-bg border-b border-rams-rule-light font-mono font-bold text-[10px] text-rams-ink-muted uppercase tracking-wider">
-                                    <th className="py-3 px-4">วันและเวลา (Timestamp)</th>
-                                    <th className="py-3 px-4">การกระทำ (Action)</th>
-                                    <th className="py-3 px-4">สถานะกะ (Shift Status)</th>
-                                    <th className="py-3 px-4">ภาพถ่าย (Photo)</th>
-                                    <th className="py-3 px-4">วิธีระบุตัวตน (Method)</th>
+                                <tr className="bg-cream border-b border-rule font-num font-semibold text-xs text-neutral">
+                                    <th className="py-3 px-4">วันและเวลา</th>
+                                    <th className="py-3 px-4">การกระทำ</th>
+                                    <th className="py-3 px-4">สถานะกะ</th>
+                                    <th className="py-3 px-4">ภาพถ่าย</th>
+                                    <th className="py-3 px-4">วิธีระบุตัวตน</th>
                                     <th className="py-3 px-4">อารมณ์ / หมายเหตุ</th>
                                     <th className="py-3 px-4 text-right">จัดการ</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-rams-rule-light font-mono">
+                            <tbody className="divide-y divide-rule font-num">
                                 {filteredRawLogs.length === 0 ? (
                                     <tr>
-                                        <td colSpan={7} className="py-12 text-center text-rams-ink-muted font-mono text-xs">
+                                        <td colSpan={7} className="py-12 text-center text-neutral text-xs">
                                             ไม่พบประวัติการสแกนในเดือนนี้
                                         </td>
                                     </tr>
@@ -899,9 +875,9 @@ export default function IndividualHistoryManager({
                                         const isCheckIn = log.action_type === "check_in";
 
                                         return (
-                                            <tr key={log.id} className="hover:bg-rams-bg/60 transition-colors">
+                                            <tr key={log.id} className="hover:bg-paper-2 transition-colors">
                                                 {/* Timestamp */}
-                                                <td className="py-3 px-4 font-bold text-rams-ink whitespace-nowrap">
+                                                <td className="py-3 px-4 font-semibold text-charcoal whitespace-nowrap">
                                                     {formatDate(log.timestamp)} {formatTime(log.timestamp)}
                                                 </td>
 
@@ -924,40 +900,39 @@ export default function IndividualHistoryManager({
                                                     {log.photo_url ? (
                                                         <button
                                                             onClick={() => setSelectedPhoto(log)}
-                                                            className="flex items-center gap-1.5 text-rams-orange hover:underline cursor-pointer"
+                                                            className="flex items-center gap-1.5 text-plum hover:underline cursor-pointer"
                                                         >
                                                             <img
                                                                 src={log.photo_url}
                                                                 alt=""
-                                                                className="w-6 h-6 rounded-sm object-cover border border-rams-rule-light"
+                                                                className="w-6 h-6 object-cover border border-rule"
                                                             />
-                                                            <span className="text-[10px]">ดูรูป</span>
+                                                            <span className="text-xs">ดูรูป</span>
                                                         </button>
                                                     ) : (
-                                                        <span className="text-rams-ink-muted/50 text-[10px]">-</span>
+                                                        <span className="text-neutral/50 text-xs">-</span>
                                                     )}
                                                 </td>
 
                                                 {/* Verification Method */}
-                                                <td className="py-3 px-4 whitespace-nowrap text-rams-ink-muted text-[10px]">
+                                                <td className="py-3 px-4 whitespace-nowrap text-neutral text-xs">
                                                     <div className="flex items-center gap-1">
-                                                        <MapPin className="w-3 h-3 text-rams-ink-muted" />
-                                                        <span>{log.verification_method || "GPS"}</span>
+                                                                                                                <span>{log.verification_method || "GPS"}</span>
                                                         {log.accuracy_meters && (
-                                                            <span className="text-[9px]">({Math.round(log.accuracy_meters)}m)</span>
+                                                            <span className="text-xs">({Math.round(log.accuracy_meters)}m)</span>
                                                         )}
                                                     </div>
                                                 </td>
 
                                                 {/* Mood / Note */}
-                                                <td className="py-3 px-4 max-w-[200px] truncate text-rams-ink-muted text-[11px]">
+                                                <td className="py-3 px-4 max-w-[200px] truncate text-neutral text-xs">
                                                     {log.mood_status || log.mood_note ? (
                                                         <div className="truncate">
-                                                            <span className="font-bold text-rams-ink mr-1">{log.mood_status}</span>
-                                                            <span className="text-rams-ink-muted">{log.mood_note}</span>
+                                                            <span className="font-semibold text-charcoal mr-1">{log.mood_status}</span>
+                                                            <span className="text-neutral">{log.mood_note}</span>
                                                         </div>
                                                     ) : (
-                                                        <span className="text-rams-ink-muted/50">-</span>
+                                                        <span className="text-neutral/50">-</span>
                                                     )}
                                                 </td>
 
@@ -967,17 +942,13 @@ export default function IndividualHistoryManager({
                                                         <button
                                                             onClick={() => handleToggleLogAction && handleToggleLogAction(log)}
                                                             title="สลับสถานะ"
-                                                            className="p-1 text-rams-ink-muted hover:text-rams-orange hover:bg-rams-bg rounded-xs transition-colors cursor-pointer"
-                                                        >
-                                                            <ArrowUpDown className="w-3.5 h-3.5" />
-                                                        </button>
+                                                            className="text-neutral hover:text-plum hover:bg-cream transition-colors cursor-pointer min-h-11 px-3 text-sm font-semibold underline-offset-4 hover:underline"
+                                                        >สลับ</button>
                                                         <button
                                                             onClick={() => handleDeleteLog && handleDeleteLog(log.id)}
                                                             title="ลบ"
-                                                            className="p-1 text-rams-ink-muted hover:text-rams-red hover:bg-rams-bg rounded-xs transition-colors cursor-pointer"
-                                                        >
-                                                            <Trash2 className="w-3.5 h-3.5" />
-                                                        </button>
+                                                            className="hover:bg-cream transition-colors cursor-pointer min-h-11 px-3 text-sm font-semibold underline-offset-4 hover:underline text-error"
+                                                        >ลบ</button>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -993,54 +964,51 @@ export default function IndividualHistoryManager({
             {/* 5. PHOTO LIGHTBOX MODAL */}
             {selectedPhoto && (
                 <div 
-                    className="fixed inset-0 z-50 bg-rams-ink/70 backdrop-blur-xs flex items-center justify-center p-4"
+                    className="fixed inset-0 z-50 bg-charcoal/70 flex items-center justify-center p-4"
                     onClick={() => setSelectedPhoto(null)}
                 >
                     <div 
-                        className="bg-rams-panel border border-rams-rule rounded-sm max-w-md w-full overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150"
+                        className="bg-cream border border-charcoal max-w-md w-full overflow-hidden"
                         onClick={e => e.stopPropagation()}
                     >
-                        <div className="p-3 border-b border-rams-rule-light flex items-center justify-between bg-rams-bg">
+                        <div className="p-3 border-b border-rule flex items-center justify-between bg-cream">
                             <div className="flex items-center gap-2">
-                                <Camera className="w-4 h-4 text-rams-orange" />
-                                <span className="font-mono text-xs font-bold uppercase tracking-wider text-rams-ink">
+                                                                <span className="text-xs font-semibold text-charcoal">
                                     หลักฐานการสแกน · {selectedPhoto.action_type === 'check_in' ? 'เข้างาน' : 'ออกงาน'}
                                 </span>
                             </div>
                             <button
                                 onClick={() => setSelectedPhoto(null)}
-                                className="p-1 text-rams-ink-muted hover:text-rams-ink cursor-pointer"
-                            >
-                                <X className="w-4 h-4" />
-                            </button>
+                                className="text-neutral hover:text-charcoal cursor-pointer min-h-11 px-3 text-sm font-semibold underline-offset-4 hover:underline"
+                            >ปิด</button>
                         </div>
 
-                        <div className="p-4 bg-rams-bg flex items-center justify-center">
+                        <div className="p-4 bg-cream flex items-center justify-center">
                             <img
                                 src={selectedPhoto.photo_url}
                                 alt="Attendance Proof"
-                                className="max-h-[360px] w-auto rounded-sm object-contain border border-rams-rule-light shadow-sm"
+                                className="max-h-[360px] w-auto object-contain border border-rule"
                             />
                         </div>
 
-                        <div className="p-4 space-y-2 font-mono text-xs border-t border-rams-rule-light">
+                        <div className="p-4 space-y-2 font-num text-xs border-t border-rule">
                             <div className="flex justify-between">
-                                <span className="text-rams-ink-muted">เวลาสแกน:</span>
-                                <span className="font-bold text-rams-ink">
+                                <span className="text-neutral">เวลาสแกน:</span>
+                                <span className="font-semibold text-charcoal">
                                     {formatDate(selectedPhoto.timestamp)} {formatTime(selectedPhoto.timestamp)}
                                 </span>
                             </div>
                             <div className="flex justify-between">
-                                <span className="text-rams-ink-muted">วิธีระบุตัวตน:</span>
-                                <span className="font-bold text-rams-ink">
+                                <span className="text-neutral">วิธีระบุตัวตน:</span>
+                                <span className="font-semibold text-charcoal">
                                     {selectedPhoto.verification_method || "GPS"}
                                     {selectedPhoto.accuracy_meters && ` (รัศมี ${Math.round(selectedPhoto.accuracy_meters)} ม.)`}
                                 </span>
                             </div>
                             {selectedPhoto.mood_status && (
                                 <div className="flex justify-between">
-                                    <span className="text-rams-ink-muted">อารมณ์ / หมายเหตุ:</span>
-                                    <span className="text-rams-ink font-sans">
+                                    <span className="text-neutral">อารมณ์ / หมายเหตุ:</span>
+                                    <span className="text-charcoal">
                                         {selectedPhoto.mood_status} {selectedPhoto.mood_note ? `- ${selectedPhoto.mood_note}` : ''}
                                     </span>
                                 </div>

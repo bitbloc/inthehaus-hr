@@ -2787,10 +2787,8 @@ export default function AdminRosterPage() {
                             <button
                                 type="button"
                                 onClick={() => setAdjustingEmpModal(null)}
-                                className="text-neutral hover:text-charcoal font-num text-sm"
-                            >
-                                
-                            </button>
+                                className="text-neutral hover:text-charcoal font-num text-sm min-h-11 px-3 text-sm font-semibold"
+                            >ปิด</button>
                         </div>
 
                         <div className="p-6 space-y-5 overflow-y-auto custom-scrollbar bg-cream flex-1">
@@ -2984,10 +2982,8 @@ export default function AdminRosterPage() {
                             <button
                                 type="button"
                                 onClick={() => setShowAutoGenModal(false)}
-                                className="w-7 h-7 flex items-center justify-center border border-rule hover:border-charcoal bg-cream text-charcoal font-num text-xs transition-colors duration-150 cursor-pointer"
-                            >
-                                
-                            </button>
+                                className="flex items-center justify-center border border-rule hover:border-charcoal bg-cream text-charcoal font-num text-xs transition-colors duration-150 cursor-pointer min-h-11 px-3 text-sm font-semibold"
+                            >ปิด</button>
                         </div>
 
                         {/* Body */}
@@ -3104,10 +3100,8 @@ export default function AdminRosterPage() {
                             <button
                                 type="button"
                                 onClick={() => setLearnedHabitsModal(null)}
-                                className="w-7 h-7 flex items-center justify-center border border-rule hover:border-charcoal bg-cream text-charcoal font-num text-xs transition-colors duration-150 cursor-pointer"
-                            >
-                                
-                            </button>
+                                className="flex items-center justify-center border border-rule hover:border-charcoal bg-cream text-charcoal font-num text-xs transition-colors duration-150 cursor-pointer min-h-11 px-3 text-sm font-semibold"
+                            >ปิด</button>
                         </div>
 
                         <div className="p-6 max-h-[65vh] overflow-y-auto custom-scrollbar">

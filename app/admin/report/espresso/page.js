@@ -1,278 +1,337 @@
 "use client";
+/* Brand v2 · monthly espresso test-shot report (A4 print / Save as PDF).
+ * Reads the structured rows in espresso_logs (written by the LINE webhook),
+ * not the chat text, so every number and status matches the LINE card.
+ * Photos still come from yuzu_chat_history (image notes within 5 minutes). */
 
-import { useState, useEffect, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useState, useEffect, useMemo, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { supabase } from "../../../../lib/supabaseClient";
-import { format, startOfMonth, endOfMonth, parseISO } from "date-fns";
-import { th } from "date-fns/locale";
+import { ESPRESSO_SPEC, STATUS_TH, isOff, specText, num, shotVerdict } from "../../../../utils/espressoSpec";
 
-function EspressoPDFReportContent() {
-    const searchParams = useSearchParams();
-    const dateParam = searchParams.get('date');
-    const [reports, setReports] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [employees, setEmployees] = useState([]);
+const MONTHS_TH = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
+const DAYS_TH = ["อา.", "จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส."];
 
-    const reportDate = dateParam || format(new Date(), 'yyyy-MM-dd');
-
-    useEffect(() => {
-        const fetchData = async () => {
-            // Fetch employees for mapping
-            const { data: empData } = await supabase.from('employees').select('id, name, nickname, line_bot_id, line_user_id');
-            if (empData) setEmployees(empData);
-
-            // Fetch chat history for the ENTIRE MONTH of the selected date
-            const dateObj = new Date(reportDate);
-            const start = startOfMonth(dateObj).toISOString();
-            const end = endOfMonth(dateObj).toISOString();
-
-            const { data: chatData, error } = await supabase
-                .from('yuzu_chat_history')
-                .select('id, created_at, user_id, role, content, message_type')
-                .gte('created_at', start)
-                .lte('created_at', end)
-                .order('created_at', { ascending: true });
-
-            if (!error && chatData) {
-                // Filter messages
-                const rawReports = chatData.filter(m => m.message_type === 'espresso_report');
-                const photos = chatData.filter(m => m.message_type === 'image_description' && m.content.includes('[ภาพประกอบช็อตกาแฟ]'));
-                const analyses = chatData.filter(m => m.role === 'model' && m.content.includes('[Espresso Analysis]'));
-
-                // Match reports with photos and analyses
-                const matchedReports = rawReports.map(report => {
-                    const reportTime = new Date(report.created_at);
-
-                    // Find photos within 5 minutes of report from the same user
-                    const matchingPhotos = photos.filter(p => {
-                        const pTime = new Date(p.created_at);
-                        const diffMin = Math.abs(pTime - reportTime) / 60000;
-                        return p.user_id === report.user_id && diffMin <= 5;
-                    });
-
-                    const photoUrls = matchingPhotos.map(p => {
-                        const match = p.content.match(/\[ภาพประกอบช็อตกาแฟ\] (https?:\/\/[^\s]+)/);
-                        return match ? match[1] : null;
-                    }).filter(Boolean);
-
-                    // Find analysis within 2 minutes after report
-                    const analysis = analyses.find(a => {
-                        const aTime = new Date(a.created_at);
-                        const diffMin = (aTime - reportTime) / 60000;
-                        return diffMin >= 0 && diffMin <= 2;
-                    });
-
-                    const recommendation = analysis 
-                        ? analysis.content.replace('[Espresso Analysis]', '').trim() 
-                        : 'ไม่มีบทวิเคราะห์ช็อตกาแฟ';
-
-                    return {
-                        id: report.id,
-                        timestamp: report.created_at,
-                        userId: report.user_id,
-                        rawText: report.content,
-                        photos: photoUrls,
-                        recommendation
-                    };
-                });
-
-                setReports(matchedReports);
-            }
-            setLoading(false);
-        };
-        fetchData();
-    }, [reportDate]);
-
-    const getEmployeeDisplay = (userId) => {
-        const emp = employees.find(e => 
-            String(e.id) === String(userId) || 
-            (userId && e.line_bot_id && e.line_bot_id.toLowerCase() === String(userId).toLowerCase()) ||
-            (userId && e.line_user_id && e.line_user_id.toLowerCase() === String(userId).toLowerCase())
-        );
-        return emp ? (emp.nickname || emp.name) : "บาริสต้า (ไม่ทราบชื่อ)";
+/** Bangkok wall-clock parts of an ISO timestamp. */
+function bkk(iso) {
+    const d = new Date(new Date(iso).getTime() + 7 * 3600_000);
+    return {
+        key: d.toISOString().slice(0, 10),
+        day: d.getUTCDate(),
+        dow: d.getUTCDay(),
+        time: `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`,
     };
+}
+/** UTC bounds of a Bangkok calendar month "yyyy-MM". */
+function monthBounds(month) {
+    const [y, m] = month.split("-").map(Number);
+    return {
+        start: new Date(Date.UTC(y, m - 1, 1) - 7 * 3600_000).toISOString(),
+        end: new Date(Date.UTC(y, m, 1) - 7 * 3600_000).toISOString(),
+    };
+}
+const thisMonth = () => bkk(new Date().toISOString()).key.slice(0, 7);
+const monthLabel = (month) => {
+    const [y, m] = month.split("-").map(Number);
+    return `${MONTHS_TH[m - 1]} ${y + 543}`;
+};
+const avg = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
+const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0);
 
-    if (loading) return <div className="p-20 text-center font-bold font-mono tracking-widest text-slate-400">GENERATING ESPRESSO REPORT...</div>;
-
-    // Group reports by date
-    const reportsByDay = reports.reduce((groups, report) => {
-        const dateStr = format(new Date(report.timestamp), 'yyyy-MM-dd');
-        if (!groups[dateStr]) groups[dateStr] = [];
-        groups[dateStr].push(report);
-        return groups;
-    }, {});
-
-    // Sort dates in descending order (newest first)
-    const sortedDates = Object.keys(reportsByDay).sort((a, b) => new Date(b) - new Date(a));
-
-    const totalImages = reports.reduce((sum, r) => sum + r.photos.length, 0);
-    const selectedMonthName = format(new Date(reportDate), 'MMMM yyyy', { locale: th });
-
+/** A measured value cell: plum bold when outside the standard. */
+function Val({ value, status, unit }) {
+    const v = status === "NOT_SPECIFIED" || !(Number(value) > 0) ? null : num(value);
+    if (!v) return <span className="text-neutral">-</span>;
+    const off = isOff(status);
     return (
-        <div className="min-h-screen bg-[#fafaf9] text-neutral-900 p-8 md:p-16 font-mono selection:bg-neutral-900 selection:text-white">
-            {/* Header / Brand Area */}
-            <div className="flex justify-between items-center border-b-2 border-neutral-900 pb-8 mb-12">
-                <div className="flex items-center gap-4">
-                    <img src="/logo.png" className="h-12 w-auto object-contain" alt="In The Haus Logo" onError={(e) => e.target.style.display = 'none'} />
-                    <div>
-                        <h1 className="text-xl font-bold tracking-widest leading-none mb-1">IN THE HAUS</h1>
-                        <p className="text-[9px] font-bold tracking-[0.2em] uppercase text-neutral-500">Espresso Calibration Report (Monthly)</p>
-                    </div>
-                </div>
-                <div className="text-right">
-                    <div className="text-xl font-bold tracking-tight text-neutral-800 uppercase">{selectedMonthName}</div>
-                    <div className="text-[8px] font-bold tracking-widest uppercase text-neutral-400 mt-1">Generated: {format(new Date(), 'dd/MM/yyyy HH:mm')}</div>
-                </div>
-            </div>
+        <span className={off ? "text-plum font-semibold" : "text-charcoal"}>
+            <span className="font-num">{v}</span>
+            {unit && <span className="text-neutral"> {unit}</span>}
+            {off && <span className="block text-sm">{STATUS_TH[status]}</span>}
+        </span>
+    );
+}
 
-            {/* Aggregated Stats (Dieter Rams Bento style cards) */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-                <div className="border border-neutral-300 bg-white p-6 rounded-2xl flex flex-col justify-between">
-                    <p className="text-[9px] font-bold tracking-[0.2em] uppercase text-neutral-400 mb-2">Selected Month</p>
-                    <p className="text-2xl font-bold tracking-tight capitalize text-neutral-900">{format(new Date(reportDate), 'LLLL yyyy', { locale: th })}</p>
-                </div>
-                <div className="border border-neutral-300 bg-white p-6 rounded-2xl flex flex-col justify-between">
-                    <p className="text-[9px] font-bold tracking-[0.2em] uppercase text-neutral-400 mb-2">Total Extractions Logged</p>
-                    <p className="text-3xl font-bold tracking-tight text-neutral-900">{reports.length} <span className="text-xs font-normal text-neutral-400">Shots</span></p>
-                </div>
-                <div className="border border-neutral-300 bg-white p-6 rounded-2xl flex flex-col justify-between">
-                    <p className="text-[9px] font-bold tracking-[0.2em] uppercase text-neutral-400 mb-2">Total Calibration Images</p>
-                    <p className="text-3xl font-bold tracking-tight text-neutral-900">{totalImages} <span className="text-xs font-normal text-neutral-400">Files</span></p>
-                </div>
-            </div>
-
-            {/* Monthly Logs List (Grouped by Date) */}
-            {sortedDates.length === 0 ? (
-                <div className="py-20 text-center border border-neutral-300 border-dashed rounded-2xl bg-white">
-                    <p className="text-neutral-300 font-bold uppercase tracking-widest mb-1">No Extractions Logged</p>
-                    <p className="text-neutral-400 text-xs">ไม่พบข้อมูลการสกัดกาแฟในเดือนนี้</p>
-                </div>
-            ) : (
-                <div className="space-y-16">
-                    {sortedDates.map((dateStr) => {
-                        const dayLogs = reportsByDay[dateStr];
-                        const dateFormatted = format(new Date(dateStr), 'EEEEที่ d MMMM yyyy', { locale: th });
-                        
-                        return (
-                            <div key={dateStr} className="border border-neutral-200 bg-white rounded-3xl p-6 md:p-8 space-y-6">
-                                {/* Date Heading Banner */}
-                                <div className="border-b border-neutral-200 pb-4 flex justify-between items-baseline flex-wrap gap-2">
-                                    <h3 className="text-sm font-bold uppercase tracking-wider text-neutral-800">
-                                        📅 {dateFormatted}
-                                    </h3>
-                                    <span className="text-[9px] font-bold tracking-widest text-neutral-400 uppercase">
-                                        {dayLogs.length} LOGS
-                                    </span>
-                                </div>
-
-                                {/* Shot Lists of the Day */}
-                                <div className="divide-y divide-neutral-100">
-                                    {dayLogs.map((report, idx) => (
-                                        <div key={report.id} className="py-6 first:pt-0 last:pb-0 space-y-4">
-                                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                                                <div className="flex items-center gap-3">
-                                                    <span className="bg-neutral-900 text-white font-bold px-2 py-0.5 text-[9px] tracking-widest rounded-md">
-                                                        SHOT #{idx + 1}
-                                                    </span>
-                                                    <span className="font-mono text-[10px] font-bold text-neutral-400">
-                                                        {format(new Date(report.timestamp), 'HH:mm น.')}
-                                                    </span>
-                                                </div>
-                                                <div className="text-[10px] font-bold uppercase tracking-widest text-neutral-600">
-                                                    บาริสต้า: {getEmployeeDisplay(report.userId)}
-                                                </div>
-                                            </div>
-
-                                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                                                {/* Left Column: Raw parameters and photos */}
-                                                <div className="lg:col-span-7 space-y-4">
-                                                    <div className="bg-[#fafaf9] p-4 border border-neutral-200 rounded-xl">
-                                                        <h4 className="text-[9px] font-bold tracking-widest uppercase text-neutral-400 mb-2">บันทึกพารามิเตอร์ (Raw Log)</h4>
-                                                        <p className="text-xs leading-relaxed whitespace-pre-wrap font-semibold text-neutral-800">{report.rawText}</p>
-                                                    </div>
-
-                                                    {report.photos.length > 0 && (
-                                                        <div className="space-y-2">
-                                                            <h4 className="text-[9px] font-bold tracking-widest uppercase text-neutral-400">ภาพประกอบการชง (Calibration Photos)</h4>
-                                                            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                                                                {report.photos.map((url, i) => (
-                                                                    <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="aspect-square bg-[#fafaf9] border border-neutral-200 overflow-hidden block hover:opacity-85 transition-all relative rounded-lg">
-                                                                        <img src={url} alt={`Calibration Supporting ${i + 1}`} className="w-full h-full object-cover" />
-                                                                    </a>
-                                                                ))}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                {/* Right Column: AI Analysis */}
-                                                <div className="lg:col-span-5">
-                                                    <div className="border border-neutral-200 p-5 bg-[#fafaf9] h-full flex flex-col justify-between rounded-xl">
-                                                        <div>
-                                                            <h4 className="text-[9px] font-bold tracking-widest uppercase text-neutral-400 mb-2">บทวิเคราะห์จาก Yuzu AI</h4>
-                                                            <p className="text-xs leading-relaxed text-neutral-800 italic whitespace-pre-wrap">
-                                                                &ldquo;{report.recommendation}&rdquo;
-                                                            </p>
-                                                        </div>
-                                                        <div className="text-[8px] font-bold text-neutral-400 mt-4 uppercase tracking-widest">
-                                                            Yuzu AI Assistant 🍊
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-            )}
-
-            {/* Footer Copyright */}
-            <div className="mt-20 pt-8 border-t border-neutral-200">
-                <div className="flex justify-between items-end flex-wrap gap-4">
-                    <div className="max-w-sm">
-                        <p className="text-[9px] font-bold tracking-[0.2em] uppercase mb-2 text-neutral-400">Verification & Archives</p>
-                        <p className="text-[9px] leading-relaxed text-neutral-400">
-                            This document is an aggregated monthly calibration report processed by Yuzu AI for In The Haus. 
-                            Extraction data and feedback are analyzed using Gemini 3.6 Flash.
-                        </p>
-                    </div>
-                    <div className="text-right">
-                        <p className="text-[10px] font-bold italic tracking-widest uppercase text-neutral-700">YUZU x IN THE HAUS</p>
-                        <p className="text-[9px] font-bold text-neutral-400 mt-1">ONHAUS SYSTEM © {new Date().getFullYear()} All Rights Reserved</p>
-                    </div>
-                </div>
-            </div>
-
-            <style jsx global>{`
-                @media print {
-                    .no-print { display: none !important; }
-                    body { 
-                        padding: 0 !important; 
-                        margin: 0 !important;
-                        background: white !important;
-                        -webkit-print-color-adjust: exact !important;
-                        print-color-adjust: exact !important;
-                    }
-                }
-            `}</style>
-
-            <button 
-                onClick={() => window.print()}
-                className="fixed bottom-8 right-8 no-print bg-neutral-900 border border-neutral-900 text-white px-8 py-4 rounded-xl font-bold text-xs tracking-widest uppercase hover:bg-white hover:text-neutral-900 transition-all cursor-pointer shadow-md z-50"
-            >
-                Print to PDF
-            </button>
+function Stat({ label, value, sub }) {
+    return (
+        <div className="bg-cream p-4">
+            <p className="text-sm text-neutral">{label}</p>
+            <p className="font-num text-2xl text-charcoal mt-1">{value}</p>
+            {sub && <p className="text-sm text-neutral mt-0.5">{sub}</p>}
         </div>
     );
 }
 
-export default function EspressoPDFReport() {
+function EspressoReport() {
+    const params = useSearchParams();
+    const router = useRouter();
+    // ?month=yyyy-MM, or the older ?date=yyyy-MM-dd links from the Yuzu page
+    const month = params.get("month") || (params.get("date") || "").slice(0, 7) || thisMonth();
+
+    const [rows, setRows] = useState([]);
+    const [photos, setPhotos] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
+
+    useEffect(() => {
+        let alive = true;
+        (async () => {
+            setLoading(true);
+            setError("");
+            const { start, end } = monthBounds(month);
+            const [logs, pics] = await Promise.all([
+                supabase.from("espresso_logs").select("*").gte("created_at", start).lt("created_at", end).order("created_at", { ascending: true }),
+                supabase.from("yuzu_chat_history").select("created_at, user_id, content").eq("message_type", "image_description").like("content", "%[ภาพประกอบช็อตกาแฟ]%").gte("created_at", start).lt("created_at", end),
+            ]);
+            if (!alive) return;
+            if (logs.error) setError("โหลดข้อมูลไม่สำเร็จ: " + logs.error.message);
+            setRows(logs.data || []);
+            setPhotos(
+                (pics.data || [])
+                    .map((p) => ({ at: new Date(p.created_at).getTime(), url: (p.content.match(/\[ภาพประกอบช็อตกาแฟ\]\s*(https?:\/\/\S+)/) || [])[1] }))
+                    .filter((p) => p.url)
+            );
+            setLoading(false);
+        })();
+        return () => { alive = false; };
+    }, [month]);
+
+    const shots = useMemo(
+        () =>
+            rows.map((r) => {
+                const at = new Date(r.created_at).getTime();
+                return {
+                    ...r,
+                    when: bkk(r.created_at),
+                    verdict: shotVerdict({ dose: r.dose_status, yieldStatus: r.yield_status, firstDrop: r.first_drop_status, totalTime: r.total_time_status }),
+                    photos: photos.filter((p) => Math.abs(p.at - at) <= 5 * 60_000).map((p) => p.url),
+                };
+            }),
+        [rows, photos]
+    );
+
+    const summary = useMemo(() => {
+        const timed = shots.filter((s) => s.total_time_status && s.total_time_status !== "NOT_SPECIFIED");
+        const inTime = timed.filter((s) => s.total_time_status === "OK").length;
+        const fast = timed.filter((s) => s.total_time_status === "FAST").length;
+        const slow = timed.filter((s) => s.total_time_status === "SLOW").length;
+        const judged = shots.filter((s) => s.is_grind_correct !== null && s.is_grind_correct !== undefined);
+        const right = judged.filter((s) => s.is_grind_correct === true).length;
+        const vals = (k) => shots.map((s) => Number(s[k])).filter((n) => n > 0);
+        const byBarista = Object.entries(
+            shots.reduce((m, s) => {
+                const k = s.operator_name || "ไม่ทราบชื่อ";
+                m[k] = m[k] || { n: 0, ok: 0 };
+                m[k].n++;
+                if (s.total_time_status === "OK") m[k].ok++;
+                return m;
+            }, {})
+        ).sort((a, b) => b[1].n - a[1].n);
+        return {
+            n: shots.length, timed: timed.length, inTime, fast, slow, judged: judged.length, right,
+            avgDose: avg(vals("dose")), avgYield: avg(vals("yield")), avgTime: avg(vals("total_time")), avgDrop: avg(vals("first_drop")),
+            byBarista,
+        };
+    }, [shots]);
+
+    const setMonth = (m) => m && router.replace(`/admin/report/espresso?month=${m}`);
+
     return (
-        <Suspense fallback={<div className="p-20 text-center font-bold tracking-widest text-slate-400 uppercase font-mono">Loading Espresso Report Engine...</div>}>
-            <EspressoPDFReportContent />
+        <div className="brand-v2 min-h-screen print-root">
+            <style jsx global>{`
+                @page { size: A4 portrait; margin: 12mm; }
+                .doc { max-width: 210mm; }
+                @media print {
+                    .no-print { display: none !important; }
+                    html, body, .print-root { background: #fff !important; }
+                    .doc { max-width: none; border: none !important; padding: 0 !important; margin: 0 !important; background: #fff !important; }
+                    .doc .bg-cream { background: #fff !important; }
+                    .avoid-break, tr { break-inside: avoid; page-break-inside: avoid; }
+                    .print-break-before { break-before: page; page-break-before: always; }
+                    thead { display: table-header-group; }
+                    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                }
+            `}</style>
+
+            <header className="no-print sticky top-0 z-40 bg-plum text-cream border-b border-plum-3">
+                <div className="max-w-5xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row sm:items-stretch">
+                    <div className="flex items-stretch flex-1 min-w-0">
+                        <a href="/admin" className="min-h-14 pr-4 flex items-center text-base text-on-plum-2 hover:text-cream transition-colors duration-150 border-r border-plum-3">← หลังบ้าน</a>
+                        <div className="flex-1 px-4 py-3 min-w-0">
+                            <h2 className="font-head text-2xl">รายงานเอสเปรสโซ</h2>
+                            <p className="text-sm text-on-plum-2">{monthLabel(month)} · {summary.n} ช็อต</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2 pb-3 sm:pb-0 sm:pl-4 sm:border-l border-plum-3">
+                        <label className="flex items-center">
+                            <span className="sr-only">เดือน</span>
+                            <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="min-h-12 px-3 bg-plum-2 border border-plum-3 font-num text-base text-cream [color-scheme:dark]" />
+                        </label>
+                        <button type="button" onClick={() => window.print()} className="min-h-12 px-5 bg-charcoal hover:bg-charcoal-2 text-cream text-base font-semibold whitespace-nowrap transition-colors duration-150">
+                            พิมพ์ / บันทึก PDF
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <main className="px-4 sm:px-6 py-8">
+                <article className="doc bg-cream border border-rule mx-auto p-6 sm:p-10">
+                    {/* Document head */}
+                    <div className="flex items-start justify-between gap-6 border-b-2 border-charcoal pb-5">
+                        <div>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src="/logo-inbaan-wordmark-charcoal-96.png" alt="ในบ้าน" width={73} height={40} className="h-10 w-auto" />
+                            <h1 className="font-head text-3xl leading-normal text-charcoal mt-3">รายงานช็อตทดสอบเอสเปรสโซ</h1>
+                            <p className="text-base text-neutral">ประจำเดือน {monthLabel(month)}</p>
+                        </div>
+                        <div className="text-right text-sm text-neutral shrink-0">
+                            <p>พิมพ์เมื่อ</p>
+                            <p className="font-num text-charcoal">{new Date().toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Bangkok" })}</p>
+                        </div>
+                    </div>
+
+                    {loading ? (
+                        <p className="py-16 text-center text-base text-neutral">กำลังโหลดข้อมูล…</p>
+                    ) : error ? (
+                        <p className="py-16 text-center text-base text-error">{error}</p>
+                    ) : summary.n === 0 ? (
+                        <p className="py-16 text-center text-base text-neutral">เดือนนี้ยังไม่มีช็อตทดสอบ</p>
+                    ) : (
+                        <>
+                            {/* Summary */}
+                            <section className="avoid-break mt-6">
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-rule border border-rule">
+                                    <Stat label="ช็อตทั้งหมด" value={summary.n} sub={`${new Set(shots.map((s) => s.when.key)).size} วัน`} />
+                                    <Stat label="ผ่านเกณฑ์เวลา" value={`${pct(summary.inTime, summary.timed)}%`} sub={`${summary.inTime} จาก ${summary.timed} ช็อต`} />
+                                    <Stat label="เร็วไป · ช้าไป" value={`${summary.fast} · ${summary.slow}`} sub="ช็อต" />
+                                    <Stat label="ตัดสินใจเรื่องบดถูก" value={summary.judged ? `${pct(summary.right, summary.judged)}%` : "-"} sub={summary.judged ? `${summary.right} จาก ${summary.judged} ครั้ง` : "ยังไม่มีข้อมูล"} />
+                                </div>
+
+                                <table className="w-full mt-5 text-base border-collapse">
+                                    <thead>
+                                        <tr className="border-b border-charcoal text-sm text-neutral text-left">
+                                            <th className="py-2 pr-3 font-semibold">ค่าเฉลี่ยเดือนนี้</th>
+                                            <th className="py-2 px-3 font-semibold text-right">เฉลี่ย</th>
+                                            <th className="py-2 pl-3 font-semibold text-right">เกณฑ์ร้าน</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {[["dose", summary.avgDose], ["yield", summary.avgYield], ["firstDrop", summary.avgDrop], ["totalTime", summary.avgTime]].map(([k, v]) => {
+                                            const s = ESPRESSO_SPEC[k];
+                                            const off = v !== null && (v < s.min || v > s.max);
+                                            return (
+                                                <tr key={k} className="border-b border-rule">
+                                                    <td className="py-2 pr-3 text-charcoal">{s.label}</td>
+                                                    <td className={`py-2 px-3 text-right font-num ${off ? "text-plum font-semibold" : "text-charcoal"}`}>{v === null ? "-" : `${num(v)} ${s.unit}`}</td>
+                                                    <td className="py-2 pl-3 text-right font-num text-neutral">{specText(k)}</td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+
+                                <div className="mt-5">
+                                    <p className="text-sm text-neutral">รายคน (ช็อตที่ผ่านเกณฑ์เวลา / ทั้งหมด)</p>
+                                    <div className="mt-1 flex flex-wrap gap-x-6 gap-y-1 text-base text-charcoal">
+                                        {summary.byBarista.map(([name, v]) => (
+                                            <span key={name}>{name} <span className="font-num">{v.ok}/{v.n}</span></span>
+                                        ))}
+                                    </div>
+                                </div>
+                            </section>
+
+                            {/* Shot table */}
+                            <section className="mt-8">
+                                <h2 className="text-lg font-semibold text-charcoal border-b border-charcoal pb-2">ทุกช็อตในเดือน</h2>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full min-w-[640px] text-base border-collapse">
+                                        <thead>
+                                            <tr className="border-b border-charcoal text-sm text-neutral text-left">
+                                                <th className="py-2 pr-2 font-semibold">วันที่</th>
+                                                <th className="py-2 px-2 font-semibold">บาริสต้า</th>
+                                                <th className="py-2 px-2 font-semibold text-right">ผงกาแฟ</th>
+                                                <th className="py-2 px-2 font-semibold text-right">น้ำกาแฟ</th>
+                                                <th className="py-2 px-2 font-semibold text-right">หยดแรก</th>
+                                                <th className="py-2 px-2 font-semibold text-right">เวลาสกัด</th>
+                                                <th className="py-2 pl-2 font-semibold">ผล</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {shots.map((s) => (
+                                                <tr key={s.id} className="border-b border-rule align-top">
+                                                    <td className="py-2 pr-2 whitespace-nowrap">
+                                                        <span className="text-charcoal">{DAYS_TH[s.when.dow]} <span className="font-num">{s.when.day}</span></span>
+                                                        <span className="block text-sm text-neutral font-num">{s.when.time}</span>
+                                                    </td>
+                                                    <td className="py-2 px-2 text-charcoal">{s.operator_name || "-"}</td>
+                                                    <td className="py-2 px-2 text-right"><Val value={s.dose} status={s.dose_status} unit="g" /></td>
+                                                    <td className="py-2 px-2 text-right"><Val value={s.yield} status={s.yield_status} unit="ml" /></td>
+                                                    <td className="py-2 px-2 text-right"><Val value={s.first_drop} status={s.first_drop_status} unit="วิ" /></td>
+                                                    <td className="py-2 px-2 text-right"><Val value={s.total_time} status={s.total_time_status} unit="วิ" /></td>
+                                                    <td className={`py-2 pl-2 ${s.verdict.off ? "text-plum font-semibold" : "text-charcoal"}`}>{s.verdict.text}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </section>
+
+                            {/* Notes per shot */}
+                            <section className="print-break-before mt-10">
+                                <h2 className="text-lg font-semibold text-charcoal border-b border-charcoal pb-2">บันทึกและคำแนะนำรายช็อต</h2>
+                                <div className="divide-y divide-rule">
+                                    {shots.map((s) => (
+                                        <div key={s.id} className="avoid-break py-4">
+                                            <div className="flex items-baseline justify-between gap-3">
+                                                <p className="text-base font-semibold text-charcoal">
+                                                    {DAYS_TH[s.when.dow]} <span className="font-num">{s.when.day}</span> · <span className="font-num">{s.when.time}</span> · {s.operator_name || "-"}
+                                                </p>
+                                                <p className={`text-sm shrink-0 ${s.verdict.off ? "text-plum font-semibold" : "text-neutral"}`}>{s.verdict.text}</p>
+                                            </div>
+                                            <div className="mt-2 grid sm:grid-cols-2 gap-x-6 gap-y-2 text-base">
+                                                {s.grind_adjustment && (
+                                                    <p><span className="text-sm text-neutral block">การปรับบด</span>
+                                                        <span className={s.is_grind_correct === false ? "text-plum" : "text-charcoal"}>{s.grind_adjustment}{s.is_grind_correct === true ? " · ปรับถูกทาง" : s.is_grind_correct === false ? " · ควรปรับอีกทาง" : ""}</span>
+                                                    </p>
+                                                )}
+                                                {s.taste_profile && (
+                                                    <p><span className="text-sm text-neutral block">รสชาติที่น่าจะได้</span><span className="text-charcoal">{s.taste_profile}</span></p>
+                                                )}
+                                            </div>
+                                            {s.recommendation && (
+                                                <p className="mt-2 bg-paper-2 px-3 py-2 text-base text-charcoal"><span className="text-sm text-neutral block">ยูซุแนะนำ</span>{s.recommendation}</p>
+                                            )}
+                                            {s.photos.length > 0 && (
+                                                <div className="mt-2 flex gap-2">
+                                                    {s.photos.slice(0, 4).map((url) => (
+                                                        <a key={url} href={url} target="_blank" rel="noopener noreferrer" className="block w-20 h-20 border border-rule overflow-hidden">
+                                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                            <img src={url} alt={`รูปช็อตของ${s.operator_name || "บาริสต้า"}`} className="w-full h-full object-cover" />
+                                                        </a>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </section>
+                        </>
+                    )}
+
+                    <footer className="mt-10 pt-4 border-t border-rule flex justify-between gap-4 text-sm text-neutral">
+                        <span>ข้อมูลจากรายงานช็อตในกลุ่ม LINE อ่านค่าโดยยูซุ</span>
+                        <span className="shrink-0">ในบ้าน นครพนม</span>
+                    </footer>
+                </article>
+            </main>
+        </div>
+    );
+}
+
+export default function EspressoReportPage() {
+    return (
+        <Suspense fallback={<div className="brand-v2 min-h-screen p-16 text-center text-base text-neutral">กำลังโหลด…</div>}>
+            <EspressoReport />
         </Suspense>
     );
 }

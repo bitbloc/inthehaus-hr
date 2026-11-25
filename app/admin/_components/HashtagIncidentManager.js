@@ -20,24 +20,24 @@ function formatMonthLabel(monthStr) {
 function getTagBadgeStyle(tag) {
     const t = tag.toLowerCase();
     if (t.includes('staffinsight')) {
-        return "bg-amber-500/15 text-amber-800 border-amber-300/80 dark:text-amber-300";
+        return "bg-paper-2 text-plum border-plum dark:text-plum";
     }
     if (t.includes('hardwareissue') || t.includes('foodsafetyrisk') || t.includes('supplyshortage')) {
-        return "bg-rose-500/15 text-rose-800 border-rose-300/80 dark:text-rose-300";
+        return "bg-paper-2 text-error border-error dark:text-error";
     }
     if (t.includes('sopfail')) {
         return "bg-purple-500/15 text-purple-800 border-purple-300/80 dark:text-purple-300";
     }
     if (t.includes('hygienealert') || t.includes('storagerisk') || t.includes('coldchainbreak')) {
-        return "bg-orange-500/15 text-orange-800 border-orange-300/80 dark:text-orange-300";
+        return "bg-paper-2 text-plum border-plum dark:text-plum";
     }
     if (t.includes('storagesuccess')) {
-        return "bg-emerald-500/15 text-emerald-800 border-emerald-300/80 dark:text-emerald-300";
+        return "bg-paper-2 text-plum border-plum dark:text-plum";
     }
     if (t.includes('servicestandard') || t.includes('salespitch') || t.includes('marketingidea')) {
-        return "bg-sky-500/15 text-sky-800 border-sky-300/80 dark:text-sky-300";
+        return "bg-paper-2 text-plum border-plum dark:text-plum";
     }
-    return "bg-rams-bg text-rams-ink border-rams-rule-light";
+    return "bg-cream text-charcoal border-rule";
 }
 
 export default function HashtagIncidentManager() {
@@ -151,28 +151,26 @@ export default function HashtagIncidentManager() {
     return (
         <div className="space-y-6">
             {/* 1. Header Banner & Filter Bar */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-rams-ink p-6 rounded-sm text-rams-panel border border-rams-rule gap-4">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-charcoal p-6 text-cream border border-charcoal gap-4">
                 <div className="space-y-1">
-                    <h3 className="text-base font-mono font-bold uppercase tracking-widest text-rams-panel flex items-center gap-2">
-                        <Icons.Audit size={20} className="text-rams-orange" />
-                        Hashtag & Incident Analytics // บันทึกเหตุการณ์ร้าน
+                    <h3 className="text-base font-semibold text-cream flex items-center gap-2">
+                                                บันทึกเหตุการณ์ร้าน
                     </h3>
-                    <p className="text-rams-panel/60 text-xs font-mono uppercase mt-1">
+                    <p className="text-cream/60 text-xs mt-1">
                         สืบค้น ติดตามปัญหา และสรุปสถิติแฮชแท็กของน้องยูซุรายเดือน
                     </p>
                 </div>
 
                 {/* Month Picker & Refresh */}
                 <div className="flex items-center gap-2 w-full md:w-auto">
-                    <div className="flex items-center gap-2 bg-rams-panel text-rams-ink px-3 py-1.5 rounded-sm border border-rams-rule flex-1 md:flex-initial">
-                        <Icons.Calendar size={14} className="text-rams-ink-muted shrink-0" />
-                        <select
+                    <div className="flex items-center gap-2 bg-cream text-charcoal px-3 py-1.5 border border-charcoal flex-1 md:flex-initial">
+                                                <select
                             value={selectedMonth}
                             onChange={(e) => handleMonthChange(e.target.value)}
-                            className="bg-transparent text-xs font-mono font-bold uppercase outline-none cursor-pointer pr-2 w-full"
+                            className="bg-transparent text-xs font-num font-semibold outline-none cursor-pointer pr-2 w-full"
                         >
                             {availableMonths.map((m) => (
-                                <option key={m} value={m} className="bg-rams-panel text-rams-ink">
+                                <option key={m} value={m} className="bg-cream text-charcoal">
                                     {formatMonthLabel(m)} ({m})
                                 </option>
                             ))}
@@ -182,24 +180,22 @@ export default function HashtagIncidentManager() {
                     <button
                         onClick={() => fetchHashtagsData()}
                         disabled={loading}
-                        className="p-2 bg-rams-panel hover:bg-rams-bg text-rams-ink border border-rams-rule rounded-sm transition-all active:scale-95 disabled:opacity-50"
+                        className="bg-cream hover:bg-cream text-charcoal border border-charcoal transition-colors duration-150  disabled:opacity-50 min-h-11 px-3 text-sm font-semibold underline-offset-4 hover:underline"
                         title="รีเฟรชข้อมูล"
-                    >
-                        <Icons.Refresh size={14} className={loading ? "animate-spin" : ""} />
-                    </button>
+                    >รีเฟรช</button>
                 </div>
             </div>
 
             {/* 2. Hashtag Filter Pills */}
             <Card className="p-4 space-y-3">
                 <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-mono font-extrabold text-rams-ink-muted uppercase tracking-widest">
-                        Hashtag Categories // หมวดหมู่เรื่องราวในเดือนนี้ ({hashtags.length} แท็ก)
+                    <span className="text-xs font-semibold text-neutral">
+                        หมวดเรื่องเดือนนี้ ({hashtags.length} แท็ก)
                     </span>
                     {selectedTag !== "ALL" && (
                         <button
                             onClick={() => handleTagClick("ALL")}
-                            className="text-[10px] font-mono font-bold text-rams-orange hover:underline cursor-pointer"
+                            className="text-xs font-semibold text-plum hover:underline cursor-pointer"
                         >
                             แสดงทุกแฮชแท็ก
                         </button>
@@ -210,11 +206,11 @@ export default function HashtagIncidentManager() {
                     {/* ALL button */}
                     <button
                         onClick={() => handleTagClick("ALL")}
-                        className={`px-3 py-1.5 rounded-sm text-xs font-mono font-bold border transition-all cursor-pointer ${
-                            selectedTag === "ALL"
-                                ? "bg-rams-ink text-rams-panel border-rams-rule shadow-sm"
-                                : "bg-rams-bg hover:bg-rams-panel border-rams-rule-light text-rams-ink"
-                        }`}
+                        className={`px-3 py-1.5 text-xs font-num font-semibold border transition-colors duration-150 cursor-pointer ${
+ selectedTag === "ALL"
+ ? "bg-charcoal text-cream border-charcoal "
+ : "bg-cream hover:bg-cream border-rule text-charcoal"
+ }`}
                     >
                         # ทั้งหมด ({records.length})
                     </button>
@@ -227,14 +223,14 @@ export default function HashtagIncidentManager() {
                             <button
                                 key={h.tag}
                                 onClick={() => handleTagClick(h.tag)}
-                                className={`px-2.5 py-1.5 rounded-sm text-xs font-mono font-bold border transition-all flex items-center gap-1.5 cursor-pointer ${
+                                className={`px-2.5 py-1.5  text-xs font-num font-semibold border transition-colors duration-150 flex items-center gap-1.5 cursor-pointer ${
                                     isSelected
-                                        ? "bg-rams-orange text-rams-panel border-rams-rule shadow-sm"
+                                        ? "bg-plum text-cream border-charcoal "
                                         : `${badgeStyle} hover:opacity-90`
                                 }`}
                             >
                                 <span>{h.tag}</span>
-                                <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${isSelected ? "bg-white/30 text-white" : "bg-rams-ink/10 text-rams-ink"}`}>
+                                <span className={`text-xs px-1.5 py-0.2 ${isSelected ? "bg-cream/30 text-cream" : "bg-charcoal/10 text-charcoal"}`}>
                                     {h.count}
                                 </span>
                             </button>
@@ -246,17 +242,16 @@ export default function HashtagIncidentManager() {
             {/* 3. Search & AI Summary Trigger Bar */}
             <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
                 {/* Search Bar */}
-                <div className="flex items-center gap-2 bg-rams-panel border border-rams-rule-light rounded-sm px-3 py-2 flex-1 max-w-md">
-                    <Icons.Search size={14} className="text-rams-ink-muted shrink-0" />
-                    <input
+                <div className="flex items-center gap-2 bg-cream border border-rule px-3 py-2 flex-1 max-w-md">
+                                        <input
                         type="text"
                         placeholder="ค้นหาข้อความ หรือชื่อพนักงาน..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="bg-transparent border-none outline-none text-xs font-mono text-rams-ink w-full placeholder:text-rams-ink-muted"
+                        className="bg-transparent border-none outline-none text-xs font-num text-charcoal w-full placeholder:text-neutral"
                     />
                     {searchQuery && (
-                        <button onClick={() => setSearchQuery("")} className="text-xs text-rams-ink-muted hover:text-rams-ink">✕</button>
+                        <button onClick={() => setSearchQuery("")} className="text-xs text-neutral hover:text-charcoal min-h-11 px-3 text-sm font-semibold underline-offset-4 hover:underline">ล้าง</button>
                     )}
                 </div>
 
@@ -264,17 +259,15 @@ export default function HashtagIncidentManager() {
                 <button
                     onClick={handleGenerateAiSummary}
                     disabled={summaryLoading || filteredRecords.length === 0}
-                    className="py-2.5 px-4 bg-rams-panel hover:bg-rams-bg border-2 border-rams-rule rounded-sm font-mono font-bold text-xs text-rams-ink transition-all active:translate-y-[1px] tactile-btn flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer shadow-sm"
+                    className="py-2.5 px-4 bg-cream hover:bg-cream border-2 border-charcoal font-num font-semibold text-xs text-charcoal transition-colors duration-150 tactile-btn flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
                 >
                     {summaryLoading ? (
                         <>
-                            <span className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-rams-orange border-t-transparent" />
                             <span>AI กำลังวิเคราะห์...</span>
                         </>
                     ) : (
                         <>
-                            <Icons.Yuzu size={15} className="text-rams-orange" />
-                            <span>🤖 วิเคราะห์ & สรุปประเด็นด้วย AI</span>
+                                                        <span>วิเคราะห์ & สรุปประเด็นด้วย AI</span>
                         </>
                     )}
                 </button>
@@ -282,23 +275,23 @@ export default function HashtagIncidentManager() {
 
             {/* 4. AI Executive Summary Presentation Card */}
             {summaryError && (
-                <div className="p-4 bg-rose-50 border border-rose-200 text-rose-800 text-xs font-mono rounded-sm">
-                    ⚠️ {summaryError}
+                <div className="p-4 bg-paper-2 border border-error text-error text-xs font-num">
+                    {summaryError}
                 </div>
             )}
 
             {aiSummary && (
-                <Card className="border-2 border-rams-orange bg-rams-panel p-5 relative overflow-hidden space-y-4 shadow-md">
-                    <div className="h-1 w-full bg-rams-orange absolute top-0 inset-x-0" />
+                <Card className="border-2 border-plum bg-cream p-5 relative overflow-hidden space-y-4">
+                    <div className="h-1 w-full bg-plum absolute top-0 inset-x-0" />
 
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-rams-rule-light pb-3">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-rule pb-3">
                         <div className="flex items-center gap-2">
-                            <span className="text-lg">🤖</span>
+                            <span className="text-lg"></span>
                             <div>
-                                <h4 className="text-sm font-mono font-extrabold text-rams-ink">
-                                    AI Executive Briefing // บทสรุป {selectedTag === 'ALL' ? 'ภาพรวม' : selectedTag}
+                                <h4 className="text-sm font-semibold text-charcoal">
+                                    สรุปจาก AI · {selectedTag === 'ALL' ? 'ภาพรวม' : selectedTag}
                                 </h4>
-                                <span className="text-[10px] font-mono text-rams-ink-muted">
+                                <span className="text-xs text-neutral">
                                     ประจำเดือน {formatMonthLabel(selectedMonth)} · จากข้อมูลจริง {filteredRecords.length} รายการ
                                 </span>
                             </div>
@@ -306,26 +299,26 @@ export default function HashtagIncidentManager() {
 
                         <div className="flex items-center gap-2 self-end sm:self-auto">
                             {aiSummary.severityLevel && (
-                                <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-sm border ${
-                                    aiSummary.severityLevel === 'HIGH' ? 'bg-red-500/15 text-red-700 border-red-300' :
-                                    aiSummary.severityLevel === 'MEDIUM' ? 'bg-amber-500/15 text-amber-700 border-amber-300' :
-                                    'bg-green-500/15 text-green-700 border-green-300'
-                                }`}>
+                                <span className={`text-xs font-num font-semibold px-2 py-0.5 border ${
+ aiSummary.severityLevel === 'HIGH' ? 'bg-paper-2 text-error border-error' :
+ aiSummary.severityLevel === 'MEDIUM' ? 'bg-paper-2 text-plum border-plum' :
+ 'bg-paper-2 text-plum border-plum'
+ }`}>
                                     SEVERITY: {aiSummary.severityLevel}
                                 </span>
                             )}
                             <button
                                 onClick={handleCopySummary}
-                                className="px-2.5 py-1 bg-rams-bg hover:bg-rams-panel border border-rams-rule-light rounded-sm text-[10px] font-mono font-bold text-rams-ink transition-colors flex items-center gap-1 tactile-btn-sm"
+                                className="px-2.5 py-1 bg-cream hover:bg-cream border border-rule text-xs font-semibold text-charcoal transition-colors flex items-center gap-1 tactile-btn-sm"
                             >
-                                {copied ? "✓ คัดลอกแล้ว" : "คัดลอกสรุป"}
+                                {copied ? "คัดลอกแล้ว" : "คัดลอกสรุป"}
                             </button>
                         </div>
                     </div>
 
                     {/* Executive Summary Paragraph */}
-                    <div className="p-3.5 bg-rams-bg border border-rams-rule-light rounded-sm">
-                        <p className="text-xs font-sans text-rams-ink leading-relaxed">
+                    <div className="p-3.5 bg-cream border border-rule">
+                        <p className="text-xs text-charcoal leading-relaxed">
                             {aiSummary.executiveSummary}
                         </p>
                     </div>
@@ -335,13 +328,13 @@ export default function HashtagIncidentManager() {
                         {/* Key Incidents */}
                         {aiSummary.keyIncidents && aiSummary.keyIncidents.length > 0 && (
                             <div className="space-y-2">
-                                <span className="text-[10px] font-mono font-extrabold text-rams-ink-muted uppercase tracking-wider block">
-                                    🔍 เหตุการณ์สำคัญที่ตรวจพบ
+                                <span className="text-xs font-semibold text-neutral block">
+                                    เหตุการณ์สำคัญที่ตรวจพบ
                                 </span>
                                 <ul className="space-y-1.5">
                                     {aiSummary.keyIncidents.map((inc, i) => (
-                                        <li key={i} className="text-xs font-sans text-rams-ink flex items-start gap-2 bg-rams-bg/50 p-2 rounded-sm border border-rams-rule-light">
-                                            <span className="font-mono font-bold text-rams-orange">{i + 1}.</span>
+                                        <li key={i} className="text-xs text-charcoal flex items-start gap-2 bg-paper-2 p-2 border border-rule">
+                                            <span className="font-num font-semibold text-plum">{i + 1}.</span>
                                             <span>{inc}</span>
                                         </li>
                                     ))}
@@ -352,13 +345,13 @@ export default function HashtagIncidentManager() {
                         {/* Actionable Recommendations */}
                         {aiSummary.recommendations && aiSummary.recommendations.length > 0 && (
                             <div className="space-y-2">
-                                <span className="text-[10px] font-mono font-extrabold text-rams-ink-muted uppercase tracking-wider block">
-                                    📌 ข้อเสนอแนะสำหรับฝ่ายบริหาร
+                                <span className="text-xs font-semibold text-neutral block">
+                                    ข้อเสนอแนะสำหรับฝ่ายบริหาร
                                 </span>
                                 <ul className="space-y-1.5">
                                     {aiSummary.recommendations.map((rec, i) => (
-                                        <li key={i} className="text-xs font-sans text-rams-ink flex items-start gap-2 bg-rams-bg/50 p-2 rounded-sm border border-rams-rule-light">
-                                            <span className="font-mono font-bold text-rams-green">✓</span>
+                                        <li key={i} className="text-xs text-charcoal flex items-start gap-2 bg-paper-2 p-2 border border-rule">
+                                            <span className="font-num font-semibold text-charcoal"></span>
                                             <span>{rec}</span>
                                         </li>
                                     ))}
@@ -369,21 +362,21 @@ export default function HashtagIncidentManager() {
 
                     {/* Recurring Patterns & Root Cause */}
                     {(aiSummary.recurringPatterns || aiSummary.rootCauseAnalysis) && (
-                        <div className="pt-2 border-t border-rams-rule-light grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-sans">
+                        <div className="pt-2 border-t border-rule grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                             {aiSummary.recurringPatterns && (
                                 <div>
-                                    <span className="text-[10px] font-mono font-bold text-rams-ink-muted uppercase block mb-0.5">
+                                    <span className="text-xs font-semibold text-neutral block mb-0.5">
                                         บุคคลหรือปัจจัยที่พบซ้ำ:
                                     </span>
-                                    <p className="text-rams-ink leading-relaxed">{aiSummary.recurringPatterns}</p>
+                                    <p className="text-charcoal leading-relaxed">{aiSummary.recurringPatterns}</p>
                                 </div>
                             )}
                             {aiSummary.rootCauseAnalysis && (
                                 <div>
-                                    <span className="text-[10px] font-mono font-bold text-rams-ink-muted uppercase block mb-0.5">
-                                        สาเหตุต้นตอ (Root Cause):
+                                    <span className="text-xs font-semibold text-neutral block mb-0.5">
+                                        สาเหตุต้นตอ:
                                     </span>
-                                    <p className="text-rams-ink leading-relaxed">{aiSummary.rootCauseAnalysis}</p>
+                                    <p className="text-charcoal leading-relaxed">{aiSummary.rootCauseAnalysis}</p>
                                 </div>
                             )}
                         </div>
@@ -394,24 +387,23 @@ export default function HashtagIncidentManager() {
             {/* 5. Incident & Chat Log Feed */}
             <div className="space-y-3">
                 <div className="flex items-center justify-between px-1">
-                    <span className="text-[10px] font-mono font-extrabold text-rams-ink-muted uppercase tracking-widest">
-                        Incident Records // รายการบันทึก ({filteredRecords.length} รายการ)
+                    <span className="text-xs font-semibold text-neutral">
+                        รายการบันทึก ({filteredRecords.length} รายการ)
                     </span>
-                    <span className="text-[10px] font-mono text-rams-ink-muted">
+                    <span className="text-xs text-neutral">
                         เดือน {formatMonthLabel(selectedMonth)}
                     </span>
                 </div>
 
                 {loading ? (
-                    <div className="py-16 text-center text-rams-ink-muted font-mono text-xs">
-                        <span className="animate-spin inline-block rounded-full h-5 w-5 border-2 border-rams-rule border-t-transparent mb-2" />
+                    <div className="py-16 text-center text-neutral font-num text-xs">
                         <p>กำลังค้นหาข้อมูลแฮชแท็ก...</p>
                     </div>
                 ) : filteredRecords.length === 0 ? (
-                    <Card className="py-16 text-center text-rams-ink-muted font-mono space-y-2">
-                        <span className="text-2xl">📋</span>
-                        <p className="text-xs font-bold text-rams-ink">ไม่พบรายการบันทึกในเดือนนี้</p>
-                        <p className="text-[11px] text-rams-ink-muted">ลองเลือกเดือนอื่น หรือเปลี่ยนแฮชแท็กที่ต้องการค้นหา</p>
+                    <Card className="py-16 text-center text-neutral font-num space-y-2">
+                        <span className="text-2xl"></span>
+                        <p className="text-xs font-semibold text-charcoal">ไม่พบรายการบันทึกในเดือนนี้</p>
+                        <p className="text-xs text-neutral">ลองเลือกเดือนอื่น หรือเปลี่ยนแฮชแท็กที่ต้องการค้นหา</p>
                     </Card>
                 ) : (
                     <div className="space-y-2.5">
@@ -430,27 +422,27 @@ export default function HashtagIncidentManager() {
                             });
 
                             return (
-                                <Card key={item.id} className="p-4 hover:border-rams-rule transition-colors space-y-2.5">
+                                <Card key={item.id} className="p-4 hover:border-charcoal transition-colors space-y-2.5">
                                     {/* Top row: Date, Sender & Badges */}
-                                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-rams-rule-light pb-2">
+                                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-rule pb-2">
                                         <div className="flex items-center gap-2">
                                             {item.senderPhoto ? (
                                                 <img
                                                     src={item.senderPhoto}
                                                     alt=""
-                                                    className="w-6 h-6 rounded-full object-cover border border-rams-rule-light"
+                                                    className="w-6 h-6 object-cover border border-rule"
                                                 />
                                             ) : (
-                                                <div className="w-6 h-6 rounded-full bg-rams-bg flex items-center justify-center text-[10px] font-bold text-rams-ink border border-rams-rule-light">
+                                                <div className="w-6 h-6 bg-cream flex items-center justify-center text-xs font-semibold text-charcoal border border-rule">
                                                     {(item.senderName || "U").slice(0, 1)}
                                                 </div>
                                             )}
                                             <div>
-                                                <span className="text-xs font-bold text-rams-ink mr-2">
+                                                <span className="text-xs font-semibold text-charcoal mr-2">
                                                     {item.senderName}
                                                 </span>
                                                 {item.senderPosition && (
-                                                    <span className="text-[10px] font-mono text-rams-ink-muted bg-rams-bg px-1.5 py-0.5 rounded-sm border border-rams-rule-light">
+                                                    <span className="text-xs font-num text-neutral bg-cream px-1.5 py-0.5 border border-rule">
                                                         {item.senderPosition}
                                                     </span>
                                                 )}
@@ -458,14 +450,14 @@ export default function HashtagIncidentManager() {
                                         </div>
 
                                         <div className="flex items-center gap-1.5">
-                                            <span className="text-[10px] font-mono text-rams-ink-muted">
+                                            <span className="text-xs text-neutral">
                                                 {formattedDate} {formattedTime} น.
                                             </span>
                                         </div>
                                     </div>
 
                                     {/* Message Content */}
-                                    <p className="text-xs font-sans text-rams-ink leading-relaxed whitespace-pre-wrap">
+                                    <p className="text-xs text-charcoal leading-relaxed whitespace-pre-wrap">
                                         {item.content}
                                     </p>
 
@@ -476,7 +468,7 @@ export default function HashtagIncidentManager() {
                                                 <span
                                                     key={t}
                                                     onClick={() => handleTagClick(t)}
-                                                    className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-sm border cursor-pointer hover:underline ${getTagBadgeStyle(t)}`}
+                                                    className={`text-xs font-num font-semibold px-2 py-0.5 border cursor-pointer hover:underline ${getTagBadgeStyle(t)}`}
                                                 >
                                                     {t}
                                                 </span>
