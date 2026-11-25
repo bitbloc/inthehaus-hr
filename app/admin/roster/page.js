@@ -5,8 +5,10 @@ import { Badge } from '../_components/ui/Badge';
 import { supabase } from '../../../lib/supabaseClient';
 import { useRealtimeSync } from '../../../lib/useRealtimeSync';
 import { startOfWeek, endOfWeek, addDays, format, subWeeks, addWeeks, parseISO } from 'date-fns';
-import { ChevronLeft, ChevronRight, Copy, CheckCircle, Save, Plus, Trash2, Printer, Search, Settings, Filter, UserCheck, UserX, AlertCircle, Sun, Sparkles, Brain, Wand2, RefreshCw } from 'lucide-react';
+import { th } from 'date-fns/locale';
 import { SYSTEM_STANDARD_PRESETS, PRESET_COLORS } from '../../../utils/roster';
+
+const weekLabelOf = (ws, we) => `${format(ws, 'd MMM', { locale: th })} – ${format(we, 'd MMM', { locale: th })} ${we.getFullYear() + 543}`;
 
 export default function AdminRosterPage() {
     const [currentDate, setCurrentDate] = useState(new Date());
@@ -44,6 +46,9 @@ export default function AdminRosterPage() {
     const [adjustingEmpModal, setAdjustingEmpModal] = useState(null);
     const [auditExceptionsOnly, setAuditExceptionsOnly] = useState(false);
     const [toast, setToast] = useState(null);
+    const [clearModal, setClearModal] = useState(null); // { keepLeaves }
+    const [undoSnapshot, setUndoSnapshot] = useState(null); // { rows, label }
+    const [customTimeOpen, setCustomTimeOpen] = useState({});
 
     const showToast = (message, type = 'success') => {
         setToast({ message, type });
@@ -363,31 +368,31 @@ export default function AdminRosterPage() {
             if (checkIn && checkOut) {
                 return {
                     type: 'OK',
-                    label: `IN ${format(checkIn, 'HH:mm')} - OUT ${format(checkOut, 'HH:mm')}`,
-                    badgeColor: 'bg-rams-green/10 text-rams-green border-rams-green/30'
+                    label: `เข้า ${format(checkIn, 'HH:mm')} · ออก ${format(checkOut, 'HH:mm')}`,
+                    badgeColor: 'bg-cream text-subtle border-rule'
                 };
             }
             if (checkIn && !checkOut) {
                 if (isToday) {
                     return {
                         type: 'ACTIVE',
-                        label: `ACTIVE (IN ${format(checkIn, 'HH:mm')})`,
-                        badgeColor: 'bg-rams-ink text-rams-panel border-rams-ink'
+                        label: `กำลังทำงาน · เข้า ${format(checkIn, 'HH:mm')}`,
+                        badgeColor: 'bg-charcoal text-cream border-charcoal'
                     };
                 }
                 if (isOwner) return null;
                 return {
                     type: 'MISSED_OUT',
-                    label: `MISSED OUT (IN ${format(checkIn, 'HH:mm')})`,
-                    badgeColor: 'bg-rams-red/10 text-rams-red border-rams-red/30'
+                    label: `ลืมลงเวลาออก · เข้า ${format(checkIn, 'HH:mm')}`,
+                    badgeColor: 'bg-plum text-cream border-plum'
                 };
             }
             if (!checkIn && checkOut) {
                 if (isOwner) return null;
                 return {
                     type: 'MISSED_IN',
-                    label: `MISSED IN (OUT ${format(checkOut, 'HH:mm')})`,
-                    badgeColor: 'bg-rams-red/10 text-rams-red border-rams-red/30'
+                    label: `ลืมลงเวลาเข้า · ออก ${format(checkOut, 'HH:mm')}`,
+                    badgeColor: 'bg-plum text-cream border-plum'
                 };
             }
             if (!checkIn && !checkOut && isPast) {
@@ -395,8 +400,8 @@ export default function AdminRosterPage() {
                 if (isOwner) return null;
                 return {
                     type: 'ABSENT',
-                    label: 'ABSENT / NO CLOCK-IN',
-                    badgeColor: 'bg-rams-red/10 text-rams-red border-rams-red/30'
+                    label: 'ขาดงาน',
+                    badgeColor: 'bg-plum text-cream border-plum'
                 };
             }
         } else {
@@ -404,24 +409,24 @@ export default function AdminRosterPage() {
             if (checkIn && checkOut) {
                 return {
                     type: 'OFF_DAY_WORK',
-                    label: `OFF-DAY WORK: ${format(checkIn, 'HH:mm')}-${format(checkOut, 'HH:mm')}`,
-                    badgeColor: 'bg-rams-orange text-rams-panel border-rams-orange font-bold'
+                    label: `มาวันหยุด ${format(checkIn, 'HH:mm')}–${format(checkOut, 'HH:mm')}`,
+                    badgeColor: 'bg-plum/10 text-plum border-plum font-semibold'
                 };
             }
             if (checkIn && !checkOut) {
                 if (isOwner) return null;
                 return {
                     type: 'OFF_DAY_MISSED_OUT',
-                    label: `OFF-DAY: MISSED OUT (IN ${format(checkIn, 'HH:mm')})`,
-                    badgeColor: 'bg-rams-orange/15 text-rams-orange border-rams-orange/40 font-bold'
+                    label: `มาวันหยุด · ลืมออก (เข้า ${format(checkIn, 'HH:mm')})`,
+                    badgeColor: 'bg-plum/10 text-plum border-plum font-semibold'
                 };
             }
             if (!checkIn && checkOut) {
                 if (isOwner) return null;
                 return {
                     type: 'OFF_DAY_MISSED_IN',
-                    label: `OFF-DAY: MISSED IN (OUT ${format(checkOut, 'HH:mm')})`,
-                    badgeColor: 'bg-rams-orange/15 text-rams-orange border-rams-orange/40 font-bold'
+                    label: `มาวันหยุด · ลืมเข้า (ออก ${format(checkOut, 'HH:mm')})`,
+                    badgeColor: 'bg-plum/10 text-plum border-plum font-semibold'
                 };
             }
         }
@@ -668,6 +673,60 @@ export default function AdminRosterPage() {
 
     const prevWeek = () => setCurrentDate(subWeeks(currentDate, 1));
     const nextWeek = () => setCurrentDate(addWeeks(currentDate, 1));
+
+    // --- Brand v2 helpers ---
+    const plainText = (s) => String(s ?? '').replace(/[\p{Extended_Pictographic}\uFE0F\u200D]/gu, '').replace(/\s{2,}/g, ' ').trim();
+
+    // --- Clear the shown week ---
+    // Runs with the admin's own Supabase session (RLS: authenticated may modify
+    // roster_transactions), not through the unauthenticated /api/roster/bulk.
+    const approvedLeaveKeys = useMemo(
+        () => new Set(leaveRequests.filter(l => l.status === 'approved').map(l => `${l.employee_id}|${l.leave_date}`)),
+        [leaveRequests]
+    );
+    const clearTargets = (keepLeaves) => transactions.filter(t => !(keepLeaves && t.is_off && approvedLeaveKeys.has(`${t.employee_id}|${t.date}`)));
+
+    const clearWeek = async () => {
+        const keep = clearModal?.keepLeaves !== false;
+        const targets = clearTargets(keep);
+        if (targets.length === 0) { setClearModal(null); return; }
+        setSaving(true);
+        try {
+            const { error, count } = await supabase
+                .from('roster_transactions')
+                .delete({ count: 'exact' })
+                .in('id', targets.map(t => t.id));
+            if (error) throw error;
+            if (!count) throw new Error('ลบไม่ได้ กรุณาล็อกอินแอดมินใหม่');
+            setUndoSnapshot({ rows: targets, label: weekLabelOf(weekStart, weekEnd) });
+            setClearModal(null);
+            await fetchData();
+            showToast(`ล้างตารางแล้ว ${count} กะ`, 'success');
+        } catch (e) {
+            showToast('ล้างตารางไม่สำเร็จ: ' + (e.message || e), 'error');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const undoClear = async () => {
+        if (!undoSnapshot) return;
+        setSaving(true);
+        try {
+            const rows = undoSnapshot.rows.map(({ id, created_at, ...rest }) => rest);
+            const { error } = await supabase
+                .from('roster_transactions')
+                .upsert(rows, { onConflict: 'employee_id,date,slot_type' });
+            if (error) throw error;
+            setUndoSnapshot(null);
+            await fetchData();
+            showToast(`กู้คืนตารางแล้ว ${rows.length} กะ`, 'success');
+        } catch (e) {
+            showToast('กู้คืนไม่สำเร็จ: ' + (e.message || e), 'error');
+        } finally {
+            setSaving(false);
+        }
+    };
 
     const getCellSlots = (empId, date) => {
         const dateStr = format(date, 'yyyy-MM-dd');
@@ -1352,424 +1411,359 @@ export default function AdminRosterPage() {
         }
     };
 
+    const weekLabel = weekLabelOf(weekStart, weekEnd);
+    const leaveTypeTh = (t) => (t === 'sick' ? 'ลาป่วย' : t === 'business' ? 'ลากิจ' : 'พักร้อน');
+    const toolBtn = 'min-h-12 px-4 flex items-center justify-center text-base font-semibold bg-cream text-charcoal hover:bg-paper-2 transition-colors duration-150 disabled:opacity-50';
+
     return (
-        <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6 text-rams-ink font-sans min-h-screen bg-rams-bg selection:bg-rams-ink/10 relative">
-            {/* In-App Toast Notification */}
+        <div className="brand-v2 min-h-screen relative">
+            {/* Toast */}
             {toast && (
-                <div className={`fixed top-5 right-5 z-50 flex items-center gap-3 px-4 py-3 rounded-sm border shadow-lg font-mono text-xs animate-in fade-in slide-in-from-top-3 duration-200 ${
-                    toast.type === 'error' 
-                        ? 'bg-rams-red text-rams-panel border-rams-red' 
-                        : toast.type === 'info'
-                        ? 'bg-rams-ink text-rams-panel border-rams-ink'
-                        : 'bg-rams-green text-rams-panel border-rams-green'
-                }`}>
-                    <span className="font-bold">{toast.message}</span>
-                    <button 
-                        type="button" 
-                        onClick={() => setToast(null)} 
-                        className="opacity-70 hover:opacity-100 p-0.5 ml-2 cursor-pointer"
-                    >
-                        ✕
+                <div role="status" className={`fixed top-4 right-4 z-[60] max-w-sm flex items-start gap-3 px-4 py-3 border text-base ${
+ toast.type === 'error'
+ ? 'bg-error text-cream border-error'
+ : 'bg-charcoal text-cream border-charcoal'
+ }`}>
+                    <span className="flex-1">{toast.message}</span>
+                    <button type="button" onClick={() => setToast(null)} className="text-sm font-semibold underline underline-offset-4 shrink-0">
+                        ปิด
                     </button>
                 </div>
             )}
 
-            <div className="mb-2">
-                <a href="/admin" className="text-xs font-mono font-bold text-rams-ink-muted hover:text-rams-ink flex items-center gap-1.5 w-fit transition-colors uppercase tracking-wider">
-                    <ChevronLeft size={14} /> กลับสู่หน้าแดชบอร์ดหลัก
-                </a>
-            </div>
-
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-rams-panel p-5 rounded-sm border border-rams-rule shadow-none">
-                <div>
-                    <div className="flex items-center gap-2">
-                        <h1 className="text-lg font-mono font-bold tracking-wider text-rams-ink uppercase">จัดการตารางงาน (Matrix View)</h1>
-                        <span className="px-2 py-0.5 text-[9px] font-mono font-bold uppercase tracking-widest bg-rams-orange text-rams-panel rounded-sm">
-                            LIVE ROSTER
-                        </span>
-                    </div>
-                    <p className="text-[10px] font-mono uppercase tracking-widest text-rams-ink-muted mt-1.5">จัดกะการทำงานรองรับแบบยืดหยุ่น ข้ามวัน และกะควบ</p>
-                </div>
-                
-                <div className="flex flex-wrap gap-2.5">
-                    <button 
-                        onClick={() => setShowAutoGenModal(true)} 
-                        className="flex items-center gap-2 px-4 py-2.5 bg-rams-ink hover:bg-rams-ink/90 text-rams-panel rounded-sm border border-rams-rule text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer min-h-[40px] shadow-[0_2px_0_0_var(--color-rams-rule)] active:translate-y-[1px] active:shadow-none"
-                    >
-                        <Sparkles size={14} className="text-rams-orange animate-pulse" /> Auto-Generate (จัดตารางอัตโนมัติ)
-                    </button>
-                    <button 
-                        onClick={copyLastWeek} 
-                        className="flex items-center gap-2 px-4 py-2.5 bg-rams-bg hover:bg-rams-ink-muted/10 text-rams-ink rounded-sm border border-rams-rule-light text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer min-h-[40px] active:translate-y-[1px]"
-                    >
-                        <Copy size={14} className="text-rams-ink-muted" /> Copy from Last Week
-                    </button>
-                    <a 
-                        href={`/admin/roster/report?start=${format(weekStart, 'yyyy-MM-dd')}`} 
-                        target="_blank"
-                        className="flex items-center gap-2 px-4 py-2.5 bg-rams-bg hover:bg-rams-ink-muted/10 text-rams-ink rounded-sm border border-rams-rule-light text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer min-h-[40px] active:translate-y-[1px]"
-                    >
-                        <Printer size={14} className="text-rams-ink-muted" /> Export PDF
+            {/* Header: plum bar */}
+            <header className="w-full bg-plum text-cream border-b border-plum-3">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-stretch">
+                    <a href="/admin" className="min-h-14 pr-4 flex items-center text-base text-on-plum-2 hover:text-cream transition-colors duration-150 border-r border-plum-3">
+                        ← แดชบอร์ด
                     </a>
-                    <button 
-                        onClick={publishWeek} 
-                        className="flex items-center gap-2 px-4 py-2.5 bg-rams-orange hover:bg-rams-orange-active text-rams-panel rounded-sm border border-rams-rule text-xs font-mono font-bold uppercase tracking-wider shadow-[0_2px_0_0_var(--color-rams-rule)] active:translate-y-[1px] active:shadow-none transition-all cursor-pointer min-h-[40px]"
-                    >
-                        <CheckCircle size={14} /> Publish & Notify
+                    <div className="flex-1 px-4 py-3 min-w-0">
+                        <h1 className="font-head text-2xl">จัดตารางงาน</h1>
+                        <p className="text-sm text-on-plum-2">กะยืดหยุ่น ข้ามวัน และกะควบ</p>
+                    </div>
+                    <div className="hidden sm:flex items-center pl-4 border-l border-plum-3">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src="/logo-inbaan-wordmark-cream-96.png" alt="ในบ้าน" width={73} height={40} className="h-10 w-auto" />
+                    </div>
+                </div>
+            </header>
+
+            <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 flex flex-col gap-4">
+
+                {/* Week navigator */}
+                <section className="border border-charcoal bg-cream grid grid-cols-[auto_1fr_auto] items-stretch">
+                    <button type="button" onClick={prevWeek} className="min-h-14 px-4 text-base font-semibold text-charcoal hover:bg-paper-2 border-r border-rule transition-colors duration-150">
+                        ← <span className="hidden sm:inline">สัปดาห์ก่อน</span>
                     </button>
-                </div>
-            </div>
+                    <div className="px-4 py-2 text-center">
+                        <h2 className="text-xl font-semibold text-charcoal">{weekLabel}</h2>
+                        <p className="text-sm text-neutral">สัปดาห์ที่ <span className="font-num">{format(weekStart, 'w')}</span></p>
+                    </div>
+                    <button type="button" onClick={nextWeek} className="min-h-14 px-4 text-base font-semibold text-charcoal hover:bg-paper-2 border-l border-rule transition-colors duration-150">
+                        <span className="hidden sm:inline">สัปดาห์ถัดไป</span> →
+                    </button>
+                </section>
 
-            {/* Audit Summary Bar */}
-            <div className="bg-rams-panel border border-rams-rule-light p-4 rounded-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-3 shadow-none">
-                <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-[9px] font-mono font-bold uppercase tracking-widest text-rams-ink-muted">
-                        AUDIT SUMMARY (สัปดาห์นี้):
-                    </span>
-                    <span className={`px-2 py-1 rounded-sm text-[9px] font-mono font-bold border uppercase tracking-wider ${weeklyAuditStats.missedCount > 0 ? 'bg-rams-red/10 text-rams-red border-rams-red/30' : 'bg-rams-bg text-rams-ink-muted border-rams-rule-light'}`}>
-                        MISSED PUNCHES: {weeklyAuditStats.missedCount}
-                    </span>
-                    <span className={`px-2 py-1 rounded-sm text-[9px] font-mono font-bold border uppercase tracking-wider ${weeklyAuditStats.offDayCount > 0 ? 'bg-rams-orange/10 text-rams-orange border-rams-orange/30' : 'bg-rams-bg text-rams-ink-muted border-rams-rule-light'}`}>
-                        OFF-DAY ATTENDANCE: {weeklyAuditStats.offDayCount}
-                    </span>
-                    <span className={`px-2 py-1 rounded-sm text-[9px] font-mono font-bold border uppercase tracking-wider ${weeklyAuditStats.absentCount > 0 ? 'bg-rams-red/10 text-rams-red border-rams-red/30' : 'bg-rams-bg text-rams-ink-muted border-rams-rule-light'}`}>
-                        ABSENT: {weeklyAuditStats.absentCount}
-                    </span>
-                </div>
+                {/* Toolbar: secondary actions as one bordered row, one charcoal primary */}
+                <section className="flex flex-col lg:flex-row gap-2">
+                    <div className="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-px bg-rule border border-rule">
+                        <button type="button" onClick={() => setShowAutoGenModal(true)} className={toolBtn}>จัดตารางอัตโนมัติ</button>
+                        <button type="button" onClick={copyLastWeek} className={toolBtn}>คัดลอกสัปดาห์ก่อน</button>
+                        <a href={`/admin/roster/report?start=${format(weekStart, 'yyyy-MM-dd')}`} target="_blank" className={toolBtn}>ส่งออก PDF</a>
+                        <button
+                            type="button"
+                            onClick={() => setClearModal({ keepLeaves: true })}
+                            disabled={transactions.length === 0}
+                            className={`${toolBtn} !text-error`}
+                        >
+                            ล้างตารางสัปดาห์นี้
+                        </button>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={publishWeek}
+                        className="min-h-12 px-6 bg-charcoal hover:bg-charcoal-2 text-cream text-base font-semibold transition-colors duration-150 lg:min-w-[220px]"
+                    >
+                        ประกาศตาราง + แจ้ง LINE
+                    </button>
+                </section>
 
-                <button
-                    type="button"
-                    onClick={() => setAuditExceptionsOnly(!auditExceptionsOnly)}
-                    className={`px-3 py-1.5 rounded-sm text-[10px] font-mono font-bold uppercase tracking-wider border transition-all cursor-pointer min-h-[34px] ${auditExceptionsOnly ? 'bg-rams-red text-rams-panel border-rams-red' : 'bg-rams-bg text-rams-ink border-rams-rule-light hover:border-rams-rule'}`}
-                >
-                    {auditExceptionsOnly ? 'SHOWING EXCEPTIONS ONLY' : 'FILTER: EXCEPTIONS ONLY'}
-                </button>
-            </div>
-
-            {/* Smart Auto-Roster & Draft Notification Banner */}
-            {(() => {
-                const weekDrafts = transactions.filter(t => t.status === 'DRAFT');
-                const weekPublished = transactions.filter(t => t.status === 'PUBLISHED');
-
-                if (weekDrafts.length > 0) {
-                    return (
-                        <div className="bg-rams-amber/10 border border-rams-amber/30 p-4 rounded-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                            <div className="flex items-center gap-3 font-mono text-xs text-rams-ink">
-                                <span className="text-rams-amber font-bold text-base">📝</span>
-                                <div>
-                                    <div className="font-bold flex items-center gap-2">
-                                        <span>สัปดาห์นี้มีตารางแบบร่าง (Draft) ทั้งหมด {weekDrafts.length} กะ</span>
-                                        <span className="text-[10px] px-2 py-0.5 rounded-sm bg-rams-amber/20 text-rams-amber font-bold">รอการประกาศ</span>
-                                    </div>
-                                    <p className="text-[10px] text-rams-ink-muted mt-0.5">
-                                        ระบบจัดเตรียมไว้ให้แล้ว บอสสามารถคลิกปรับเปลี่ยนบางช่องได้ตามต้องการ แล้วกด [Publish & Notify] ด้านบนเมื่อตรวจทานเสร็จ
-                                    </p>
-                                </div>
-                            </div>
-                            <button
-                                onClick={publishWeek}
-                                className="px-4 py-2 bg-rams-orange hover:bg-rams-orange-active text-rams-panel font-mono font-bold text-xs uppercase tracking-wider rounded-sm border border-rams-rule cursor-pointer shrink-0 shadow-[0_2px_0_0_var(--color-rams-rule)] active:translate-y-[1px] active:shadow-none transition-all"
-                            >
-                                อนุมัติ & ประกาศ (Publish)
+                {/* Undo after clearing */}
+                {undoSnapshot && (
+                    <section className="border border-charcoal bg-paper-2 px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <p className="text-base text-charcoal">
+                            ล้างตาราง {undoSnapshot.label} แล้ว <span className="font-num">{undoSnapshot.rows.length}</span> กะ
+                        </p>
+                        <div className="flex gap-2 shrink-0">
+                            <button type="button" onClick={undoClear} disabled={saving} className="min-h-12 px-4 bg-plum hover:bg-plum-2 text-cream text-base font-semibold transition-colors duration-150 disabled:opacity-50">
+                                {saving ? 'กำลังกู้คืน…' : 'เลิกทำ'}
+                            </button>
+                            <button type="button" onClick={() => setUndoSnapshot(null)} className="min-h-12 px-4 border border-charcoal text-base text-charcoal hover:bg-cream transition-colors duration-150">
+                                ปิด
                             </button>
                         </div>
-                    );
-                }
+                    </section>
+                )}
 
-                if (transactions.length === 0) {
-                    return (
-                        <div className="bg-rams-ink/5 border border-dashed border-rams-rule-light p-4 rounded-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                            <div className="flex items-center gap-3 font-mono text-xs text-rams-ink">
-                                <Sparkles size={18} className="text-rams-orange" />
+                {/* Draft / empty notice */}
+                {(() => {
+                    const weekDrafts = transactions.filter(t => t.status === 'DRAFT');
+                    if (weekDrafts.length > 0) {
+                        return (
+                            <section className="bg-plum text-cream px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                 <div>
-                                    <div className="font-bold text-rams-ink">สัปดาห์นี้ยังไม่มีตารางงาน</div>
-                                    <p className="text-[10px] text-rams-ink-muted mt-0.5">
-                                        คลิก &ldquo;จัดตารางอัตโนมัติ&rdquo; เพื่อให้ระบบเรียนรู้แบบแผนเวลาเข้างานปกติ + ซิงค์ใบลาที่อนุมัติมาลงกะให้ทันที
-                                    </p>
+                                    <p className="text-base font-semibold">ตารางร่าง <span className="font-num">{weekDrafts.length}</span> กะ ยังไม่ได้ประกาศ</p>
+                                    <p className="text-sm text-on-plum-2">ตรวจหรือแก้บางช่องได้ แล้วกด &ldquo;ประกาศตาราง + แจ้ง LINE&rdquo; เมื่อพร้อม</p>
                                 </div>
+                            </section>
+                        );
+                    }
+                    if (!loading && transactions.length === 0) {
+                        return (
+                            <section className="border border-rule bg-cream px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                <div>
+                                    <p className="text-base font-semibold text-charcoal">สัปดาห์นี้ยังไม่มีตารางงาน</p>
+                                    <p className="text-sm text-neutral">กด &ldquo;จัดตารางอัตโนมัติ&rdquo; ให้ระบบจัดตามเวลาเข้างานปกติ พร้อมใส่วันลาที่อนุมัติแล้ว</p>
+                                </div>
+                                <button type="button" onClick={() => setShowAutoGenModal(true)} className="min-h-12 px-4 border border-charcoal text-base font-semibold text-charcoal hover:bg-paper-2 transition-colors duration-150 shrink-0">
+                                    จัดตารางอัตโนมัติ
+                                </button>
+                            </section>
+                        );
+                    }
+                    return null;
+                })()}
+
+                {/* Audit summary */}
+                <section className="border border-rule bg-cream flex flex-col md:flex-row md:items-stretch">
+                    <div className="grid grid-cols-3 flex-1 divide-x divide-rule">
+                        {[
+                            { label: 'ลืมลงเวลา', n: weeklyAuditStats.missedCount },
+                            { label: 'มาทำวันหยุด', n: weeklyAuditStats.offDayCount },
+                            { label: 'ขาดงาน', n: weeklyAuditStats.absentCount },
+                        ].map((s) => (
+                            <div key={s.label} className="px-4 py-3">
+                                <p className="text-sm text-neutral">{s.label}</p>
+                                <p className={`font-num text-2xl ${s.n > 0 ? 'text-plum' : 'text-charcoal'}`}>{s.n}</p>
                             </div>
-                            <button
-                                onClick={() => setShowAutoGenModal(true)}
-                                className="px-4 py-2 bg-rams-ink hover:bg-rams-ink/90 text-rams-panel font-mono font-bold text-xs uppercase tracking-wider rounded-sm border border-rams-rule cursor-pointer flex items-center gap-2 shrink-0 shadow-[0_2px_0_0_var(--color-rams-rule)] active:translate-y-[1px] active:shadow-none transition-all"
-                            >
-                                <Sparkles size={14} className="text-rams-orange" /> จัดตารางอัตโนมัติ
-                            </button>
+                        ))}
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => setAuditExceptionsOnly(!auditExceptionsOnly)}
+                        aria-pressed={auditExceptionsOnly}
+                        className={`min-h-12 px-4 border-t md:border-t-0 md:border-l border-rule text-base font-semibold transition-colors duration-150 ${auditExceptionsOnly ? 'bg-plum text-cream' : 'text-charcoal hover:bg-paper-2'}`}
+                    >
+                        {auditExceptionsOnly ? 'แสดงเฉพาะที่ผิดปกติ' : 'ดูเฉพาะที่ผิดปกติ'}
+                    </button>
+                </section>
+
+                <section className="border border-charcoal bg-cream">
+                    {/* Filters + search */}
+                    <div className="p-4 border-b border-rule flex flex-col md:flex-row md:items-end justify-between gap-3">
+                        <div>
+                            <p className="text-sm font-semibold text-neutral mb-1">กรองพนักงาน</p>
+                            <div className="grid w-full sm:inline-grid sm:w-auto grid-cols-2 sm:grid-cols-4 gap-px bg-rule border border-rule">
+                                {[
+                                    { id: 'ALL', label: 'ทั้งหมด', n: employees.length },
+                                    { id: 'ACTIVE', label: 'ทำงานปกติ', n: activeCount },
+                                    { id: 'SUSPENDED', label: 'พักงาน', n: suspendedCount },
+                                    { id: 'VACATION', label: 'พักร้อน', n: vacationCount },
+                                ].map((f) => (
+                                    <button
+                                        key={f.id}
+                                        type="button"
+                                        onClick={() => setStatusFilter(f.id)}
+                                        aria-pressed={statusFilter === f.id}
+                                        className={`min-h-12 px-4 text-base transition-colors duration-150 ${statusFilter === f.id ? 'bg-charcoal text-cream font-semibold' : 'bg-cream text-charcoal hover:bg-paper-2'}`}
+                                    >
+                                        {f.label} <span className="font-num text-sm">{f.n}</span>
+                                    </button>
+                                ))}
+                            </div>
                         </div>
-                    );
-                }
-
-                return null;
-            })()}
-
-            <div className="bg-rams-panel border border-rams-rule rounded-sm overflow-hidden shadow-none">
-                {/* Status Filter Bar & Search */}
-                <div className="p-4 border-b border-rams-rule-light bg-rams-bg/20 flex flex-col md:flex-row justify-between items-stretch md:items-center gap-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-[10px] font-mono font-bold text-rams-ink-muted uppercase tracking-wider flex items-center gap-1">
-                            <Filter size={12} /> กรองพนักงาน:
-                        </span>
-                        <button
-                            type="button"
-                            onClick={() => setStatusFilter('ALL')}
-                            className={`px-3 py-1.5 rounded-sm text-xs font-mono font-bold transition-all cursor-pointer min-h-[34px] ${statusFilter === 'ALL' ? 'bg-rams-ink text-rams-panel' : 'bg-rams-bg border border-rams-rule-light text-rams-ink hover:border-rams-rule'}`}
-                        >
-                            ทั้งหมด ({employees.length})
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setStatusFilter('ACTIVE')}
-                            className={`px-3 py-1.5 rounded-sm text-xs font-mono font-bold transition-all flex items-center gap-1 cursor-pointer min-h-[34px] ${statusFilter === 'ACTIVE' ? 'bg-rams-green text-rams-panel' : 'bg-rams-bg border border-rams-rule-light text-rams-ink hover:border-rams-rule'}`}
-                        >
-                            <UserCheck size={12} /> ทำงานปกติ ({activeCount})
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setStatusFilter('SUSPENDED')}
-                            className={`px-3 py-1.5 rounded-sm text-xs font-mono font-bold transition-all flex items-center gap-1 cursor-pointer min-h-[34px] ${statusFilter === 'SUSPENDED' ? 'bg-rams-red text-rams-panel' : 'bg-rams-bg border border-rams-rule-light text-rams-ink hover:border-rams-rule'}`}
-                        >
-                            <UserX size={12} /> พักงาน ({suspendedCount})
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setStatusFilter('VACATION')}
-                            className={`px-3 py-1.5 rounded-sm text-xs font-mono font-bold transition-all flex items-center gap-1 cursor-pointer min-h-[34px] ${statusFilter === 'VACATION' ? 'bg-rams-ink text-rams-panel' : 'bg-rams-bg border border-rams-rule-light text-rams-ink hover:border-rams-rule'}`}
-                        >
-                            <Sun size={12} /> พักร้อน ({vacationCount})
-                        </button>
-                    </div>
-
-                    <div className="relative min-w-[200px]">
-                        <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-rams-ink-muted" />
-                        <input
-                            type="text"
-                            value={searchQuery}
-                            onChange={e => setSearchQuery(e.target.value)}
-                            placeholder="ค้นชื่อ, ตำแหน่ง..."
-                            className="w-full pl-8 pr-3 py-1.5 text-xs font-mono bg-rams-bg border border-rams-rule-light rounded-sm text-rams-ink outline-none focus:border-rams-rule min-h-[34px]"
-                        />
-                    </div>
-                </div>
-
-                <div className="flex items-center justify-between p-4 border-b border-rams-rule-light bg-rams-bg/30">
-                    <button onClick={prevWeek} className="w-9 h-9 bg-rams-panel border border-rams-rule-light hover:border-rams-rule text-rams-ink flex items-center justify-center rounded-sm transition-all cursor-pointer active:translate-y-[1px]"><ChevronLeft size={16} /></button>
-                    <div className="text-center">
-                        <h2 className="text-sm font-mono font-bold text-rams-ink uppercase tracking-wider">
-                            {format(weekStart, 'dd MMM yyyy')} - {format(weekEnd, 'dd MMM yyyy')}
-                        </h2>
-                        <div className="text-[9px] font-mono text-rams-ink-muted uppercase tracking-widest mt-0.5">
-                            สัปดาห์ที่ {format(weekStart, 'w')} ของปี {format(weekStart, 'yyyy')}
+                        <div className="md:w-72">
+                            <label htmlFor="roster-search" className="block text-sm font-semibold text-neutral mb-1">ค้นหา</label>
+                            <input
+                                id="roster-search"
+                                type="search"
+                                value={searchQuery}
+                                onChange={e => setSearchQuery(e.target.value)}
+                                placeholder="ชื่อ หรือ ตำแหน่ง"
+                                className="w-full min-h-12 px-4 text-base bg-cream border border-charcoal text-charcoal placeholder:text-neutral outline-none focus-visible:border-plum"
+                            />
                         </div>
                     </div>
-                    <button onClick={nextWeek} className="w-9 h-9 bg-rams-panel border border-rams-rule-light hover:border-rams-rule text-rams-ink flex items-center justify-center rounded-sm transition-all cursor-pointer active:translate-y-[1px]"><ChevronRight size={16} /></button>
-                </div>
 
-                <div className="overflow-x-auto">
-                    {loading ? (
-                        <div className="p-16 text-center font-mono text-xs text-rams-ink-muted uppercase tracking-wider">Loading roster data...</div>
-                    ) : filteredEmployees.length === 0 ? (
-                        <div className="p-16 text-center font-mono text-xs text-rams-ink-muted uppercase tracking-wider">ไม่พบพนักงานในเงื่อนไขที่เลือก</div>
-                    ) : (
-                        <table className="w-full text-xs text-left border-collapse">
-                            <thead className="bg-rams-bg/60 text-rams-ink-muted border-b border-rams-rule-light font-mono text-[9px] uppercase tracking-widest">
-                                <tr>
-                                    <th className="px-4 py-3 min-w-[180px] sticky left-0 bg-rams-bg z-20 border-r border-rams-rule shadow-[2px_0_5px_rgba(0,0,0,0.06)]">
-                                        พนักงาน / ตำแหน่ง
-                                    </th>
-                                    {dates.map((date, i) => (
-                                        <th key={i} className="px-3 py-3 text-center min-w-[140px] border-l border-rams-rule-light">
-                                            <div className="text-[9px] font-mono text-rams-ink-muted uppercase tracking-widest">{daysTitle[i]}</div>
-                                            <div className="font-mono font-bold text-xs text-rams-ink mt-0.5">{format(date, 'dd/MM')}</div>
-                                            <div className="mt-1">
-                                                <span className="inline-block px-1.5 py-0.5 rounded-sm text-[8px] font-mono font-bold uppercase bg-rams-panel border border-rams-rule-light text-rams-ink">
-                                                    ON DUTY: {dailyOnDutyStats[i]?.count || 0}
-                                                </span>
-                                            </div>
+                    {/* Roster grid */}
+                    <div className="overflow-x-auto">
+                        {loading ? (
+                            <p className="p-16 text-center text-base text-neutral">กำลังโหลดตารางงาน…</p>
+                        ) : filteredEmployees.length === 0 ? (
+                            <p className="p-16 text-center text-base text-neutral">ไม่พบพนักงานตามที่กรอง</p>
+                        ) : (
+                            <table className="w-full text-left border-collapse">
+                                <thead className="border-b border-charcoal">
+                                    <tr>
+                                        <th className="px-4 py-3 min-w-[168px] sticky left-0 bg-cream z-20 border-r border-charcoal text-sm font-semibold text-neutral align-bottom">
+                                            พนักงาน
                                         </th>
-                                    ))}
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-rams-rule-light">
-                                {filteredEmployees.map(emp => {
-                                    const empSuspended = isSuspended(emp);
-                                    const empVacation = hasVacation(emp);
-                                    const empLeave = hasOtherLeave(emp);
-                                    return (
-                                        <tr key={emp.id} className={`hover:bg-rams-bg/30 text-rams-ink ${empSuspended ? 'bg-rams-red/5' : empVacation ? 'bg-rams-ink/5' : ''}`}>
-                                            <td className="px-4 py-3 border-b border-rams-rule-light align-top space-y-1.5 sticky left-0 bg-rams-panel z-10 border-r border-rams-rule shadow-[2px_0_5px_rgba(0,0,0,0.06)]">
-                                                <div className="flex items-center justify-between gap-1">
-                                                    <span className="font-bold">{emp.nickname || emp.name}</span>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => openAdjustingEmpModal(emp)}
-                                                        className="p-1 text-rams-ink-muted hover:text-rams-orange border border-rams-rule-light hover:border-rams-orange rounded-sm transition-all cursor-pointer"
-                                                        title="ปรับสถานะ/การลา"
-                                                    >
-                                                        <Settings size={12} />
-                                                    </button>
-                                                </div>
-                                                <div className="text-[10px] font-mono text-rams-ink-muted uppercase tracking-wider">{emp.position}</div>
-                                                
-                                                {/* Status Badges */}
-                                                <div className="flex flex-wrap gap-1 pt-0.5 font-mono text-[9px]">
-                                                    {empSuspended && (
-                                                        <span className="px-1.5 py-0.5 font-bold bg-rams-red/10 border border-rams-red/30 text-rams-red rounded-sm uppercase">
-                                                            SUSPENDED
-                                                        </span>
-                                                    )}
-                                                    {empVacation && (
-                                                        <span className="px-1.5 py-0.5 font-bold bg-rams-ink/10 border border-rams-ink/30 text-rams-ink rounded-sm uppercase">
-                                                            VACATION
-                                                        </span>
-                                                    )}
-                                                    {empLeave && !empVacation && (
-                                                        <span className="px-1.5 py-0.5 font-bold bg-rams-amber/10 border border-rams-amber/30 text-rams-amber rounded-sm uppercase">
-                                                            HAS LEAVE
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </td>
                                         {dates.map((date, i) => {
-                                            const slots = getCellSlots(emp.id, date);
-                                            const dateStr = format(date, 'yyyy-MM-dd');
-                                            const empLeaves = leaveRequests.filter(l => l.employee_id === emp.id && l.leave_date === dateStr);
-                                            const attendanceStatus = getCellAttendanceStatus(emp.id, date, slots, emp);
-                                            const hasDiscrepancy = attendanceStatus && (attendanceStatus.type === 'OFF_DAY_WORK' || attendanceStatus.type.includes('MISSED') || attendanceStatus.type === 'ABSENT');
-
+                                            const isToday = format(date, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
                                             return (
-                                                <td key={i} className={`px-2 py-2 border-l border-rams-rule-light align-top ${hasDiscrepancy ? 'bg-rams-orange/5' : 'bg-rams-panel/50'}`}>
-                                                    <div 
-                                                        className={`group h-full min-h-[70px] w-full rounded-sm border p-1.5 space-y-1.5 transition-all flex flex-col cursor-pointer ${
-                                                            hasDiscrepancy 
-                                                                ? 'border-rams-orange/40 bg-rams-orange/5 hover:border-rams-orange' 
-                                                                : 'border-dashed border-rams-rule-light hover:border-rams-orange hover:bg-rams-orange/5'
-                                                        }`}
-                                                        onClick={() => openCellModal(emp, date)}
-                                                    >
-                                                        {slots.length === 0 && empLeaves.length === 0 && !attendanceStatus && (
-                                                            <div className="h-full flex items-center justify-center py-4">
-                                                                <span className="text-[10px] font-mono font-bold text-rams-ink-muted/40 uppercase group-hover:text-rams-orange transition-colors">
-                                                                    + กะงาน
-                                                                </span>
-                                                            </div>
-                                                        )}
-                                                        
-                                                        {/* Real-time Attendance Status Indicator */}
-                                                        {attendanceStatus && (
-                                                            <div className={`p-1 rounded-sm text-[9px] font-mono border ${attendanceStatus.badgeColor} text-center uppercase tracking-wider font-bold`}>
-                                                                {attendanceStatus.label}
-                                                            </div>
-                                                        )}
-
-                                                        {/* Leave Request Badges */}
-                                                        {empLeaves.map((l, idx) => {
-                                                            let badgeColor = 'bg-rams-amber/10 border-rams-amber/30 text-rams-amber';
-                                                            let label = `LEAVE: ${l.leave_type === 'sick' ? 'SICK' : l.leave_type === 'business' ? 'BIZ' : 'VACATION'} (PENDING)`;
-                                                            if (l.status === 'approved') {
-                                                                badgeColor = 'bg-rams-green/10 border-rams-green/30 text-rams-green';
-                                                                label = `LEAVE: ${l.leave_type === 'sick' ? 'SICK' : l.leave_type === 'business' ? 'BIZ' : 'VACATION'} (APPROVED)`;
-                                                            } else if (l.status === 'rejected') {
-                                                                badgeColor = 'bg-rams-red/10 border-rams-red/30 text-rams-red';
-                                                                label = `LEAVE: ${l.leave_type === 'sick' ? 'SICK' : l.leave_type === 'business' ? 'BIZ' : 'VACATION'} (REJECTED)`;
-                                                            }
-                                                            return (
-                                                                <div key={`leave-${idx}`} className={`p-1 rounded-sm text-[9px] font-mono font-bold border ${badgeColor} text-center uppercase tracking-wider`}>
-                                                                    {label}
-                                                                </div>
-                                                            );
-                                                        })}
-
-                                                        {/* Scheduled Shifts */}
-                                                        {slots.map((s, idx) => {
-                                                            const shiftObj = shifts.find(sh => sh.id === s.shift_id);
-                                                            const startClean = (s.custom_start_time || shiftObj?.start_time || '').slice(0, 5);
-                                                            const endClean = (s.custom_end_time || shiftObj?.end_time || '').slice(0, 5);
-                                                            const timeStr = startClean && endClean ? `${startClean}-${endClean}` : (shiftObj ? `${shiftObj.start_time.slice(0,5)}-${shiftObj.end_time.slice(0,5)}` : '');
-
-                                                            // Match against presets prioritizing shift_id and exact role
-                                                            const matchedPreset = (!s.is_off && (s.shift_id || (startClean && endClean)))
-                                                                ? allPresets.find(p => {
-                                                                    if (s.shift_id && p.shiftId && String(p.shiftId) === String(s.shift_id)) return true;
-                                                                    if (shiftObj && (p.start || '').slice(0, 5) === startClean && (p.end || '').slice(0, 5) === endClean) {
-                                                                        const normP = (p.name || '').replace(/[\s\(\)\:\-0-9\.🍳☀️🕒🌙🔥🍴⚡⏰👑✨🍸💼]/g, '').toLowerCase();
-                                                                        const normS = (shiftObj.name || '').replace(/[\s\(\)\:\-0-9\.🍳☀️🕒🌙🔥🍴⚡⏰👑✨🍸💼]/g, '').toLowerCase();
-                                                                        return normP === normS || normP.includes(normS) || normS.includes(normP);
-                                                                    }
-                                                                    return false;
-                                                                })
-                                                                : null;
-
-                                                            // Match against DB shifts only when shiftObj is missing
-                                                            const matchedDbShift = (!shiftObj && !s.is_off && startClean && endClean)
-                                                                ? shifts.find(sh => (sh.start_time || '').slice(0, 5) === startClean && (sh.end_time || '').slice(0, 5) === endClean)
-                                                                : null;
-
-                                                            const approvedLeave = empLeaves.find(l => l.status === 'approved');
-                                                            const isLeaveOff = s.is_off && approvedLeave;
-                                                            const bgColor = isLeaveOff
-                                                                ? 'bg-rams-amber/15 border-rams-amber text-rams-ink font-bold border-2 border-dashed shadow-none'
-                                                                : (matchedPreset
-                                                                    ? `${getPresetColor(matchedPreset.color).bg} ${getPresetColor(matchedPreset.color).border} ${getPresetColor(matchedPreset.color).text}`
-                                                                    : getShiftColorClass(s, shiftObj || matchedDbShift));
-                                                            const cellLabel = s.is_off
-                                                                ? (approvedLeave
-                                                                    ? `OFF (LEAVE: ${approvedLeave.leave_type === 'sick' ? 'SICK' : approvedLeave.leave_type === 'business' ? 'BIZ' : 'VACATION'})`
-                                                                    : 'OFF')
-                                                                : (shiftObj ? shiftObj.name : (matchedPreset ? matchedPreset.name : (matchedDbShift?.name || (timeStr ? `กะ ${timeStr}` : 'CUSTOM'))));
-
-                                                            return (
-                                                                <div key={idx} className={`p-1.5 rounded-sm text-[10px] font-mono border ${bgColor} ${s.status === 'DRAFT' ? 'border-dashed border-2' : ''}`}>
-                                                                    <div className="font-bold uppercase tracking-wide">{cellLabel}</div>
-                                                                    {!s.is_off && timeStr && <div className="text-[9px] font-bold text-rams-ink/80 mt-0.5">{timeStr}</div>}
-                                                                    {s.slot_type !== 'MAIN' && <div className="text-[9px] uppercase font-bold tracking-wider opacity-60 mt-0.5">{s.slot_type}</div>}
-                                                                </div>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                </td>
+                                                <th key={i} className={`px-3 py-3 text-center min-w-[136px] border-l border-rule align-bottom ${isToday ? 'bg-charcoal text-cream' : 'bg-cream'}`}>
+                                                    <div className={`text-sm font-semibold ${isToday ? 'text-cream' : 'text-charcoal'}`}>{daysTitle[i]}</div>
+                                                    <div className={`font-num text-base ${isToday ? 'text-cream' : 'text-charcoal'}`}>{format(date, 'dd/MM')}</div>
+                                                    <div className={`text-xs ${isToday ? 'text-dark-muted' : 'text-neutral'}`}>เข้างาน <span className="font-num">{dailyOnDutyStats[i]?.count || 0}</span> คน</div>
+                                                </th>
                                             );
                                         })}
                                     </tr>
-                                );
-                            })}
-                            </tbody>
-                            <tfoot>
-                                <tr className="border-t-2 border-rams-rule bg-rams-bg/60 font-mono">
-                                    <td className="px-4 py-3 sticky left-0 bg-rams-bg z-10 border-r border-rams-rule text-[10px] font-bold uppercase tracking-wider text-rams-ink shadow-[2px_0_5px_rgba(0,0,0,0.06)]">
-                                        TOTAL ON DUTY (รวม)
-                                    </td>
-                                    {dates.map((date, i) => (
-                                        <td key={`total-${i}`} className="px-3 py-2.5 text-center text-xs font-bold text-rams-ink border-l border-rams-rule-light">
-                                            {dailyOnDutyStats[i]?.count || 0} คน
-                                        </td>
-                                    ))}
-                                </tr>
-                            </tfoot>
-                        </table>
-                    )}
-                </div>
-            </div>
+                                </thead>
+                                <tbody>
+                                    {filteredEmployees.map(emp => {
+                                        const empSuspended = isSuspended(emp);
+                                        const empVacation = hasVacation(emp);
+                                        const empLeave = hasOtherLeave(emp);
+                                        return (
+                                            <tr key={emp.id} className="border-b border-rule">
+                                                <td className="p-0 sticky left-0 bg-cream z-10 border-r border-charcoal align-top">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => openAdjustingEmpModal(emp)}
+                                                        className="group/emp w-full min-h-[76px] px-4 py-3 text-left hover:bg-paper-2 transition-colors duration-150 flex flex-col"
+                                                        title="ปรับสถานะ / การลา"
+                                                    >
+                                                        <span className="text-base font-semibold text-charcoal">{emp.nickname || emp.name}</span>
+                                                        <span className="text-sm text-neutral">{emp.position}</span>
+                                                        {(empSuspended || empVacation || (empLeave && !empVacation)) && (
+                                                            <span className="flex flex-wrap gap-1 mt-1">
+                                                                {empSuspended && <span className="px-1.5 text-xs font-semibold bg-error text-cream">พักงาน</span>}
+                                                                {empVacation && <span className="px-1.5 text-xs font-semibold bg-charcoal text-cream">พักร้อน</span>}
+                                                                {empLeave && !empVacation && <span className="px-1.5 text-xs font-semibold border border-plum text-plum">มีวันลา</span>}
+                                                            </span>
+                                                        )}
+                                                        <span className="text-xs text-plum mt-1 opacity-0 group-hover/emp:opacity-100 group-focus-visible/emp:opacity-100 transition-opacity duration-150">ปรับสถานะ / การลา</span>
+                                                    </button>
+                                                </td>
+                                                {dates.map((date, i) => {
+                                                    const slots = getCellSlots(emp.id, date);
+                                                    const dateStr = format(date, 'yyyy-MM-dd');
+                                                    const empLeaves = leaveRequests.filter(l => l.employee_id === emp.id && l.leave_date === dateStr);
+                                                    const attendanceStatus = getCellAttendanceStatus(emp.id, date, slots, emp);
+                                                    const hasDiscrepancy = attendanceStatus && (attendanceStatus.type === 'OFF_DAY_WORK' || attendanceStatus.type.includes('MISSED') || attendanceStatus.type === 'ABSENT');
+
+                                                    return (
+                                                        <td key={i} className={`p-1.5 border-l border-rule align-top ${empSuspended ? 'bg-paper-2' : ''}`}>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => openCellModal(emp, date)}
+                                                                aria-label={`แก้กะ ${emp.nickname || emp.name} ${daysTitle[i]} ${format(date, 'dd/MM')}`}
+                                                                className={`group w-full min-h-[76px] p-1.5 flex flex-col gap-1 text-left transition-colors duration-150 border ${
+ hasDiscrepancy ? 'border-plum bg-plum/5 hover:bg-plum/10' : 'border-transparent hover:border-charcoal hover:bg-paper-2'
+ }`}
+                                                            >
+                                                                {slots.length === 0 && empLeaves.length === 0 && !attendanceStatus && (
+                                                                    <span className="m-auto text-sm text-neutral opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity duration-150">
+                                                                        + เพิ่มกะ
+                                                                    </span>
+                                                                )}
+
+                                                                {attendanceStatus && (
+                                                                    <span className={`px-1.5 py-0.5 text-xs border ${attendanceStatus.badgeColor}`}>
+                                                                        {attendanceStatus.label}
+                                                                    </span>
+                                                                )}
+
+                                                                {empLeaves.map((l, idx) => (
+                                                                    <span
+                                                                        key={`leave-${idx}`}
+                                                                        className={`px-1.5 py-0.5 text-xs border ${
+ l.status === 'approved' ? 'border-charcoal text-charcoal'
+ : l.status === 'rejected' ? 'border-rule text-neutral line-through'
+ : 'border-plum text-plum font-semibold'
+ }`}
+                                                                    >
+                                                                        {leaveTypeTh(l.leave_type)} · {l.status === 'approved' ? 'อนุมัติ' : l.status === 'rejected' ? 'ไม่อนุมัติ' : 'รออนุมัติ'}
+                                                                    </span>
+                                                                ))}
+
+                                                                {slots.map((s, idx) => {
+                                                                    const shiftObj = shifts.find(sh => sh.id === s.shift_id);
+                                                                    const startClean = (s.custom_start_time || shiftObj?.start_time || '').slice(0, 5);
+                                                                    const endClean = (s.custom_end_time || shiftObj?.end_time || '').slice(0, 5);
+                                                                    const timeStr = startClean && endClean ? `${startClean}–${endClean}` : (shiftObj ? `${shiftObj.start_time.slice(0, 5)}–${shiftObj.end_time.slice(0, 5)}` : '');
+
+                                                                    // Match against presets prioritizing shift_id and exact role
+                                                                    const matchedPreset = (!s.is_off && (s.shift_id || (startClean && endClean)))
+                                                                        ? allPresets.find(p => {
+                                                                            if (s.shift_id && p.shiftId && String(p.shiftId) === String(s.shift_id)) return true;
+                                                                            if (shiftObj && (p.start || '').slice(0, 5) === startClean && (p.end || '').slice(0, 5) === endClean) {
+                                                                                const normP = (p.name || '').replace(/[\s\(\)\:\-0-9\.🍳☀️🕒🌙🔥🍴⚡⏰👑✨🍸💼]/g, '').toLowerCase();
+                                                                                const normS = (shiftObj.name || '').replace(/[\s\(\)\:\-0-9\.🍳☀️🕒🌙🔥🍴⚡⏰👑✨🍸💼]/g, '').toLowerCase();
+                                                                                return normP === normS || normP.includes(normS) || normS.includes(normP);
+                                                                            }
+                                                                            return false;
+                                                                        })
+                                                                        : null;
+
+                                                                    // Match against DB shifts only when shiftObj is missing
+                                                                    const matchedDbShift = (!shiftObj && !s.is_off && startClean && endClean)
+                                                                        ? shifts.find(sh => (sh.start_time || '').slice(0, 5) === startClean && (sh.end_time || '').slice(0, 5) === endClean)
+                                                                        : null;
+
+                                                                    const approvedLeave = empLeaves.find(l => l.status === 'approved');
+                                                                    const bgColor = s.is_off
+                                                                        ? 'bg-paper-2 border-rule text-subtle'
+                                                                        : (matchedPreset
+                                                                            ? `${getPresetColor(matchedPreset.color).bg} ${getPresetColor(matchedPreset.color).border} ${getPresetColor(matchedPreset.color).text}`
+                                                                            : getShiftColorClass(s, shiftObj || matchedDbShift));
+                                                                    const cellLabel = s.is_off
+                                                                        ? (approvedLeave ? `หยุด · ${leaveTypeTh(approvedLeave.leave_type)}` : 'หยุด')
+                                                                        : plainText(shiftObj ? shiftObj.name : (matchedPreset ? matchedPreset.name : (matchedDbShift?.name || (timeStr ? `กะ ${timeStr}` : 'กะพิเศษ'))));
+
+                                                                    return (
+                                                                        <span key={idx} className={`block px-1.5 py-1 border ${bgColor} ${s.status === 'DRAFT' ? '!border-dashed' : ''}`}>
+                                                                            <span className="block text-sm font-semibold">{cellLabel}</span>
+                                                                            {!s.is_off && timeStr && <span className="block font-num text-xs">{timeStr}</span>}
+                                                                            {s.slot_type !== 'MAIN' && <span className="block text-xs opacity-70">{s.slot_type === 'SPLIT' ? 'กะแยก' : s.slot_type}</span>}
+                                                                        </span>
+                                                                    );
+                                                                })}
+                                                            </button>
+                                                        </td>
+                                                    );
+                                                })}
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        )}
+                    </div>
+                </section>
 
             {/* Section: Leave Requests of the Week */}
-            <div className="bg-rams-panel rounded-sm border border-rams-rule p-5 space-y-4 shadow-none">
+            <div className="bg-cream border border-charcoal p-5 space-y-4">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
-                        <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-rams-ink flex items-center gap-2">
+                        <h2 className="text-sm font-num font-semibold text-charcoal flex items-center gap-2">
                             ข้อมูลการลาหยุดสัปดาห์นี้ ({leaveRequests.length} รายการ)
                         </h2>
-                        <p className="text-[10px] font-mono text-rams-ink-muted uppercase tracking-wider">จัดการ อนุมัติ ปรับรายละเอียดการลา และซิงค์เข้าสู่ตารางเวร roster โดยตรง</p>
+                        <p className="text-xs font-num text-neutral">จัดการ อนุมัติ ปรับรายละเอียดการลา และซิงค์เข้าสู่ตารางเวร roster โดยตรง</p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                         {selectedLeaveIds.length > 0 && (
                             <button
                                 type="button"
                                 onClick={handleDeleteMultipleLeaves}
-                                className="flex items-center gap-2 px-3 py-1.5 bg-rams-red/10 hover:bg-rams-red/20 text-rams-red border border-rams-red/30 rounded-sm text-xs font-mono font-bold uppercase tracking-wider transition-all shadow-none cursor-pointer"
+                                className="flex items-center gap-2 px-3 py-1.5 bg-error/10 hover:bg-error/20 text-error border border-error/30 text-xs font-num font-semibold transition-colors duration-150 cursor-pointer"
                             >
                                 ลบใบลาที่เลือก ({selectedLeaveIds.length})
                             </button>
                         )}
                         {leaveRequests.length > 0 && (
-                            <label className="flex items-center gap-1.5 px-3 py-1.5 bg-rams-bg hover:bg-rams-panel border border-rams-rule-light rounded-sm text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer select-none">
+                            <label className="flex items-center gap-1.5 px-3 py-1.5 bg-cream hover:bg-cream border border-rule text-xs font-num font-semibold transition-colors duration-150 cursor-pointer select-none">
                                 <input
                                     type="checkbox"
                                     checked={leaveRequests.length > 0 && selectedLeaveIds.length === leaveRequests.length}
@@ -1780,7 +1774,7 @@ export default function AdminRosterPage() {
                                             setSelectedLeaveIds([]);
                                         }
                                     }}
-                                    className="w-3 h-3 rounded-sm border-rams-rule bg-rams-bg accent-rams-orange focus:ring-0 cursor-pointer"
+                                    className="w-3 h-3 border-charcoal bg-cream accent-plum focus:ring-0 cursor-pointer"
                                 />
                                 เลือกทั้งหมด
                             </label>
@@ -1789,16 +1783,16 @@ export default function AdminRosterPage() {
                             <button 
                                 type="button"
                                 onClick={syncAllApprovedLeaves}
-                                className="flex items-center gap-2 px-3 py-1.5 bg-rams-panel hover:bg-rams-bg text-rams-ink border border-rams-rule rounded-sm text-xs font-mono font-bold uppercase tracking-wider transition-all shadow-none cursor-pointer"
+                                className="flex items-center gap-2 px-3 py-1.5 bg-cream hover:bg-cream text-charcoal border border-charcoal text-xs font-num font-semibold transition-colors duration-150 cursor-pointer"
                             >
-                                🔄 ซิงค์ใบลาที่อนุมัติแล้วทั้งหมดเข้าตาราง
+                                ซิงค์ใบลาที่อนุมัติแล้วทั้งหมดเข้าตาราง
                             </button>
                         )}
                     </div>
                 </div>
                 
                 {leaveRequests.length === 0 ? (
-                    <div className="text-center py-8 text-rams-ink-muted text-xs font-mono uppercase tracking-wider bg-rams-bg rounded-sm border border-dashed border-rams-rule-light">
+                    <div className="text-center py-8 text-neutral text-xs font-num bg-cream border border-dashed border-rule">
                         ไม่มีคำขอลาหยุดในสัปดาห์นี้
                     </div>
                 ) : (
@@ -1806,9 +1800,9 @@ export default function AdminRosterPage() {
                         {leaveRequests.map((req) => {
                             const isEditing = editingLeaveId === req.id;
                             return (
-                                <div key={req.id} className="bg-rams-panel border border-rams-rule-light rounded-sm shadow-none overflow-hidden flex flex-col transition-all">
+                                <div key={req.id} className="bg-cream border border-rule overflow-hidden flex flex-col transition-colors duration-150">
                                     {/* Card Header */}
-                                    <div className="px-4 py-3 bg-rams-bg border-b border-rams-rule-light flex justify-between items-center">
+                                    <div className="px-4 py-3 bg-cream border-b border-rule flex justify-between items-center">
                                         <div className="flex items-center gap-2.5">
                                             <input 
                                                 type="checkbox"
@@ -1820,11 +1814,11 @@ export default function AdminRosterPage() {
                                                         setSelectedLeaveIds(selectedLeaveIds.filter(id => id !== req.id));
                                                     }
                                                 }}
-                                                className="w-3.5 h-3.5 rounded-sm border-rams-rule bg-rams-bg accent-rams-orange focus:ring-0 cursor-pointer"
+                                                className="w-3.5 h-3.5 border-charcoal bg-cream accent-plum focus:ring-0 cursor-pointer"
                                             />
                                             <div>
-                                                <div className="font-bold text-rams-ink">{req.employees?.nickname || req.employees?.name}</div>
-                                                <div className="text-[9px] text-rams-ink-muted font-mono font-bold uppercase tracking-widest">{req.employees?.position || 'พนักงาน'}</div>
+                                                <div className="font-semibold text-charcoal">{req.employees?.nickname || req.employees?.name}</div>
+                                                <div className="text-xs text-neutral font-num font-semibold">{req.employees?.position || 'พนักงาน'}</div>
                                             </div>
                                         </div>
                                         <Badge color={req.status === 'approved' ? 'emerald' : req.status === 'rejected' ? 'rose' : 'amber'}>
@@ -1833,12 +1827,12 @@ export default function AdminRosterPage() {
                                     </div>
                                     
                                     {/* Card Body */}
-                                    <div className="p-4 flex-1 space-y-3 text-xs text-rams-ink">
+                                    <div className="p-4 flex-1 space-y-3 text-xs text-charcoal">
                                         {isEditing ? (
                                             <div className="space-y-3">
                                                 <div className="grid grid-cols-2 gap-2">
                                                     <div>
-                                                        <label className="block text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1">วันที่เริ่มลา</label>
+                                                        <label className="block text-xs font-num font-semibold text-neutral mb-1">วันที่เริ่มลา</label>
                                                         <input 
                                                             type="date"
                                                             value={leaveForm.startDate}
@@ -1847,38 +1841,38 @@ export default function AdminRosterPage() {
                                                                 startDate: e.target.value,
                                                                 endDate: leaveForm.endDate < e.target.value ? e.target.value : leaveForm.endDate 
                                                             })}
-                                                            className="w-full border border-rams-rule-light rounded-sm p-2 text-xs font-mono text-rams-ink bg-rams-bg outline-none focus:border-rams-rule"
+                                                            className="w-full border border-rule p-2 text-xs font-num text-charcoal bg-cream outline-none focus:border-charcoal"
                                                         />
                                                     </div>
                                                     <div>
-                                                        <label className="block text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1">วันสิ้นสุด</label>
+                                                        <label className="block text-xs font-num font-semibold text-neutral mb-1">วันสิ้นสุด</label>
                                                         <input 
                                                             type="date"
                                                             value={leaveForm.endDate}
                                                             onChange={e => setLeaveForm({ ...leaveForm, endDate: e.target.value })}
-                                                            className="w-full border border-rams-rule-light rounded-sm p-2 text-xs font-mono text-rams-ink bg-rams-bg outline-none focus:border-rams-rule"
+                                                            className="w-full border border-rule p-2 text-xs font-num text-charcoal bg-cream outline-none focus:border-charcoal"
                                                             min={leaveForm.startDate}
                                                         />
                                                     </div>
                                                 </div>
                                                 <div>
-                                                    <label className="block text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1">ประเภท</label>
+                                                    <label className="block text-xs font-num font-semibold text-neutral mb-1">ประเภท</label>
                                                     <select
                                                         value={leaveForm.leave_type}
                                                         onChange={e => setLeaveForm({ ...leaveForm, leave_type: e.target.value })}
-                                                        className="w-full border border-rams-rule-light rounded-sm p-2 text-xs font-mono text-rams-ink bg-rams-bg outline-none focus:border-rams-rule cursor-pointer"
+                                                        className="w-full border border-rule p-2 text-xs font-num text-charcoal bg-cream outline-none focus:border-charcoal cursor-pointer"
                                                     >
-                                                        <option value="sick">ลาป่วย 😷</option>
-                                                        <option value="business">ลากิจ 💼</option>
-                                                        <option value="vacation">พักร้อน 🏖️</option>
+                                                        <option value="sick">ลาป่วย </option>
+                                                        <option value="business">ลากิจ </option>
+                                                        <option value="vacation">พักร้อน </option>
                                                     </select>
                                                 </div>
                                                 <div>
-                                                    <label className="block text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1">คนแทน</label>
+                                                    <label className="block text-xs font-num font-semibold text-neutral mb-1">คนแทน</label>
                                                     <select
                                                         value={leaveForm.replacement_employee_id}
                                                         onChange={e => setLeaveForm({ ...leaveForm, replacement_employee_id: e.target.value })}
-                                                        className="w-full border border-rams-rule-light rounded-sm p-2 text-xs font-mono text-rams-ink bg-rams-bg outline-none focus:border-rams-rule cursor-pointer"
+                                                        className="w-full border border-rule p-2 text-xs font-num text-charcoal bg-cream outline-none focus:border-charcoal cursor-pointer"
                                                     >
                                                         <option value="">-- เลือกผู้ปฏิบัติหน้าที่แทน --</option>
                                                         {employees.filter(e => e.id !== req.employee_id).map(emp => (
@@ -1889,12 +1883,12 @@ export default function AdminRosterPage() {
                                                     </select>
                                                 </div>
                                                 <div>
-                                                    <label className="block text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1">เหตุผล</label>
+                                                    <label className="block text-xs font-num font-semibold text-neutral mb-1">เหตุผล</label>
                                                     <input 
                                                         type="text"
                                                         value={leaveForm.reason}
                                                         onChange={e => setLeaveForm({ ...leaveForm, reason: e.target.value })}
-                                                        className="w-full border border-rams-rule-light rounded-sm p-2 text-xs font-sans text-rams-ink bg-rams-bg outline-none focus:border-rams-rule"
+                                                        className="w-full border border-rule p-2 text-xs font-sans text-charcoal bg-cream outline-none focus:border-charcoal"
                                                         placeholder="ระบุเหตุผล"
                                                     />
                                                 </div>
@@ -1902,26 +1896,26 @@ export default function AdminRosterPage() {
                                         ) : (
                                             <div className="space-y-2">
                                                 <div className="flex justify-between items-center">
-                                                    <span className="text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest">วันที่ลา:</span>
-                                                    <span className="font-mono text-xs font-bold text-rams-ink">
+                                                    <span className="text-xs font-num font-semibold text-neutral">วันที่ลา:</span>
+                                                    <span className="font-num text-xs font-semibold text-charcoal">
                                                         {req.leave_date ? format(parseISO(req.leave_date), 'dd/MM/yyyy') : '-'}
                                                     </span>
                                                 </div>
                                                 <div className="flex justify-between items-center">
-                                                    <span className="text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest">ประเภท:</span>
-                                                    <span className="font-bold text-rams-ink text-xs">
-                                                        {req.leave_type === 'sick' ? 'ลาป่วย 😷' : req.leave_type === 'business' ? 'ลากิจ 💼' : 'พักร้อน 🏖️'}
+                                                    <span className="text-xs font-num font-semibold text-neutral">ประเภท:</span>
+                                                    <span className="font-semibold text-charcoal text-xs">
+                                                        {req.leave_type === 'sick' ? 'ลาป่วย ' : req.leave_type === 'business' ? 'ลากิจ ' : 'พักร้อน '}
                                                     </span>
                                                 </div>
                                                 <div className="flex justify-between items-center">
-                                                    <span className="text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest">ปฏิบัติงานแทนโดย:</span>
-                                                    <span className="font-bold text-rams-ink text-xs">
+                                                    <span className="text-xs font-num font-semibold text-neutral">ปฏิบัติงานแทนโดย:</span>
+                                                    <span className="font-semibold text-charcoal text-xs">
                                                         {req.replacement_employee ? `${req.replacement_employee.name} (${req.replacement_employee.nickname || "-"})` : '-'}
                                                     </span>
                                                 </div>
-                                                <div className="pt-1 border-t border-rams-rule-light mt-1">
-                                                    <span className="text-[9px] font-mono font-bold text-rams-ink-muted block mb-0.5 uppercase tracking-widest">เหตุผลการลา:</span>
-                                                    <span className="text-rams-ink italic block text-xs">&ldquo;{req.reason || '-'}&rdquo;</span>
+                                                <div className="pt-1 border-t border-rule mt-1">
+                                                    <span className="text-xs font-num font-semibold text-neutral block mb-0.5">เหตุผลการลา:</span>
+                                                    <span className="text-charcoal italic block text-xs">&ldquo;{req.reason || '-'}&rdquo;</span>
                                                 </div>
                                                 {req.status === 'approved' && (() => {
                                                     const isRequesterOff = transactions.some(t => t.employee_id === req.employee_id && t.date === req.leave_date && t.is_off);
@@ -1929,14 +1923,14 @@ export default function AdminRosterPage() {
                                                         ? transactions.some(t => t.employee_id === req.replacement_employee_id && t.date === req.leave_date && !t.is_off)
                                                         : false;
                                                     return (
-                                                        <div className="mt-2 p-2 bg-rams-green/5 rounded-sm border border-rams-green/20 flex flex-col gap-1 text-[10px] text-rams-green font-mono font-bold uppercase tracking-wider">
+                                                        <div className="mt-2 p-2 bg-charcoal/5 border border-charcoal/20 flex flex-col gap-1 text-xs text-charcoal font-num font-semibold">
                                                             <div className="flex items-center gap-1">
-                                                                <span>{isRequesterOff ? '✅' : '❌'}</span>
+                                                                <span>{isRequesterOff ? '' : ''}</span>
                                                                 <span>พนักงานลาหยุด: {isRequesterOff ? 'บันทึกวันหยุด (OFF) แล้ว' : 'ยังไม่ได้บันทึกวันหยุด'}</span>
                                                             </div>
                                                             {req.replacement_employee_id && (
                                                                 <div className="flex items-center gap-1">
-                                                                    <span>{isReplacementScheduled ? '✅' : '❌'}</span>
+                                                                    <span>{isReplacementScheduled ? '' : ''}</span>
                                                                     <span>พนักงานแทน: {isReplacementScheduled ? 'ลงตารางกะแทนแล้ว' : 'ยังไม่ได้ลงตารางกะแทน'}</span>
                                                                 </div>
                                                             )}
@@ -1948,20 +1942,20 @@ export default function AdminRosterPage() {
                                     </div>
                                     
                                     {/* Card Footer Actions */}
-                                    <div className="px-4 py-3 bg-rams-bg border-t border-rams-rule-light flex justify-end gap-2">
+                                    <div className="px-4 py-3 bg-cream border-t border-rule flex justify-end gap-2">
                                         {isEditing ? (
                                             <>
                                                 <button 
                                                     type="button"
                                                     onClick={() => setEditingLeaveId(null)}
-                                                    className="px-3 py-1.5 bg-rams-bg hover:bg-rams-ink-muted/10 border border-rams-rule-light text-rams-ink font-mono font-bold rounded-sm text-[9px] uppercase tracking-wider transition-all cursor-pointer"
+                                                    className="px-3 py-1.5 bg-cream hover:bg-neutral/10 border border-rule text-charcoal font-num font-semibold text-xs transition-colors duration-150 cursor-pointer"
                                                 >
                                                     ยกเลิก
                                                 </button>
                                                 <button 
                                                     type="button"
                                                     onClick={() => saveLeaveEdit(req.id)}
-                                                    className="px-3 py-1.5 bg-rams-orange text-rams-panel font-mono font-bold rounded-sm text-[9px] uppercase tracking-wider border border-rams-rule shadow-[0_1.5px_0_0_var(--color-rams-rule)] hover:bg-rams-orange-active active:translate-y-[1px] active:shadow-none transition-all cursor-pointer"
+                                                    className="px-3 py-1.5 bg-plum text-cream font-num font-semibold text-xs border border-charcoal hover:bg-plum-2 transition-colors duration-150 cursor-pointer"
                                                 >
                                                     บันทึก
                                                 </button>
@@ -1971,31 +1965,31 @@ export default function AdminRosterPage() {
                                                 <button 
                                                     type="button"
                                                     onClick={() => startEditLeave(req)}
-                                                    className="px-3 py-1.5 bg-rams-bg hover:bg-rams-ink-muted/10 border border-rams-rule-light text-rams-ink font-mono font-bold rounded-sm text-[9px] uppercase tracking-wider transition-all cursor-pointer"
+                                                    className="px-3 py-1.5 bg-cream hover:bg-neutral/10 border border-rule text-charcoal font-num font-semibold text-xs transition-colors duration-150 cursor-pointer"
                                                 >
                                                     แก้ไขข้อมูล
                                                 </button>
                                                 <button 
                                                     type="button"
                                                     onClick={() => handleDeleteLeaveRequest(req)}
-                                                    className="px-3 py-1.5 bg-rams-red/10 hover:bg-rams-red/20 text-rams-red border border-rams-red/20 font-mono font-bold rounded-sm text-[9px] uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer"
+                                                    className="px-3 py-1.5 bg-error/10 hover:bg-error/20 text-error border border-error/20 font-num font-semibold text-xs transition-colors duration-150 flex items-center gap-1 cursor-pointer"
                                                     title="ลบคำขอลาหยุด"
                                                 >
-                                                    🗑️ ลบใบลา
+                                                    ลบใบลา
                                                 </button>
                                                 {req.status === 'pending' && (
                                                     <>
                                                         <button 
                                                             type="button"
                                                             onClick={() => handleApproveAndSyncLeave(req)}
-                                                            className="px-3 py-1.5 bg-rams-green text-rams-panel font-mono font-bold rounded-sm text-[9px] uppercase tracking-wider border border-rams-rule shadow-[0_1.5px_0_0_var(--color-rams-rule)] hover:bg-rams-green/90 active:translate-y-[1px] active:shadow-none cursor-pointer transition-all"
+                                                            className="px-3 py-1.5 bg-charcoal text-cream font-num font-semibold text-xs border border-charcoal hover:bg-charcoal/90 cursor-pointer transition-colors duration-150"
                                                         >
                                                             อนุมัติ & ซิงค์
                                                         </button>
                                                         <button 
                                                             type="button"
                                                             onClick={() => handleRejectLeave(req)}
-                                                            className="px-3 py-1.5 bg-rams-red text-rams-panel font-mono font-bold rounded-sm text-[9px] uppercase tracking-wider border border-rams-rule shadow-[0_1.5px_0_0_var(--color-rams-rule)] hover:bg-rams-red/90 active:translate-y-[1px] active:shadow-none transition-all cursor-pointer"
+                                                            className="px-3 py-1.5 bg-error text-cream font-num font-semibold text-xs border border-charcoal hover:bg-error/90 transition-colors duration-150 cursor-pointer"
                                                         >
                                                             ปฏิเสธ
                                                         </button>
@@ -2005,7 +1999,7 @@ export default function AdminRosterPage() {
                                                     <button 
                                                         type="button"
                                                         onClick={() => handleResetLeaveStatus(req)}
-                                                        className="px-3 py-1.5 bg-rams-amber text-rams-panel font-mono font-bold rounded-sm text-[9px] uppercase tracking-wider border border-rams-rule shadow-[0_1.5px_0_0_var(--color-rams-rule)] hover:bg-rams-amber/90 active:translate-y-[1px] active:shadow-none transition-all cursor-pointer"
+                                                        className="px-3 py-1.5 bg-plum text-cream font-num font-semibold text-xs border border-charcoal hover:bg-plum/90 transition-colors duration-150 cursor-pointer"
                                                     >
                                                         ยกเลิกการอนุมัติ
                                                     </button>
@@ -2020,367 +2014,323 @@ export default function AdminRosterPage() {
                 )}
             </div>
 
+            </main>
+
             {/* Edit Cell Modal */}
-            {editingCell && (
-                <div className="fixed inset-0 bg-rams-ink/40 backdrop-blur-[2px] flex items-center justify-center z-50 p-3 sm:p-4">
-                    <div className="bg-rams-panel border border-rams-rule rounded-sm w-full max-w-lg overflow-hidden shadow-2xl flex flex-col">
-                        <div className="px-6 py-4 border-b border-rams-rule-light flex justify-between items-center bg-rams-bg/30">
-                            <h3 className="font-mono font-bold text-sm uppercase tracking-wider text-rams-ink">
-                                จัดตาราง: {editingCell.employee.nickname} <br/>
-                                <span className="text-[10px] font-mono text-rams-ink-muted uppercase tracking-widest block mt-0.5">{format(editingCell.date, 'dd MMM yyyy')}</span>
-                            </h3>
+            {editingCell && (() => {
+                const normName = (v) => plainText(v).replace(/[\s\(\)\:\-0-9\.]/g, '').toLowerCase();
+                const durationOf = (st, en) => {
+                    if (!st || !en) return '';
+                    const [sh, sm] = st.split(':').map(Number);
+                    const [eh, em] = en.split(':').map(Number);
+                    let diff = (eh * 60 + em) - (sh * 60 + sm);
+                    if (diff < 0) diff += 24 * 60;
+                    const h = Math.floor(diff / 60);
+                    const m = diff % 60;
+                    return m > 0 ? `${h} ชม. ${m} น.` : `${h} ชม.`;
+                };
+                const isPresetSelected = (slot, preset, startClean, endClean) => {
+                    if (slot.is_off) return false;
+                    if (slot.preset_id && preset.id && slot.preset_id === preset.id) return true;
+                    if (slot.shift_id && preset.shiftId && String(slot.shift_id) === String(preset.shiftId)) return true;
+                    if (slot.shift_id) {
+                        const curShift = shifts.find(sh => String(sh.id) === String(slot.shift_id));
+                        if (curShift) {
+                            const sameTime = (curShift.start_time || '').slice(0, 5) === (preset.start || '').slice(0, 5) &&
+                                (curShift.end_time || '').slice(0, 5) === (preset.end || '').slice(0, 5);
+                            const a = normName(curShift.name), b = normName(preset.name);
+                            return sameTime && (a === b || a.includes(b) || b.includes(a));
+                        }
+                    }
+                    if (startClean && endClean && startClean === (preset.start || '').slice(0, 5) && endClean === (preset.end || '').slice(0, 5)) {
+                        if (slot.preset_name) return normName(slot.preset_name) === normName(preset.name);
+                        return allPresets.filter(p => (p.start || '').slice(0, 5) === startClean && (p.end || '').slice(0, 5) === endClean).length === 1;
+                    }
+                    return false;
+                };
+                const PRESET_GROUPS = [
+                    { key: 'floor', title: 'หน้าร้าน และบาร์', match: p => p.category === 'floor' },
+                    { key: 'kitchen', title: 'ครัว', match: p => p.category === 'kitchen' },
+                    { key: 'roles', title: 'บทบาทพิเศษ และพาร์ตไทม์', match: p => p.category === 'management' || p.category === 'parttime' },
+                    { key: 'custom', title: 'กะที่สร้างเอง', match: p => p.category === 'custom' || p.isCustom },
+                ];
+                const dateStr = format(editingCell.date, 'yyyy-MM-dd');
+                const cellLeaves = leaveRequests.filter(l => l.employee_id === editingCell.employee.id && l.leave_date === dateStr);
+                const multi = editingCell.slots.length > 1;
+                const slotTypeTh = { MAIN: 'กะหลัก', SPLIT: 'กะแยก', OVERTIME: 'OT' };
+
+                return (
+                <div className="brand-v2 !bg-charcoal/50 fixed inset-0 flex items-center justify-center z-50 p-3 sm:p-4" role="dialog" aria-modal="true" aria-labelledby="cell-modal-title">
+                    <div className="bg-cream border border-charcoal w-full max-w-lg flex flex-col max-h-[92vh]">
+                        <div className="bg-plum text-cream flex items-stretch shrink-0">
+                            <div className="flex-1 px-4 py-3 min-w-0">
+                                <h3 id="cell-modal-title" className="font-head text-2xl truncate">{editingCell.employee.nickname || editingCell.employee.name}</h3>
+                                <p className="text-sm text-on-plum-2">{format(editingCell.date, 'EEEEที่ d MMMM', { locale: th })} {editingCell.date.getFullYear() + 543}</p>
+                            </div>
+                            <button type="button" onClick={() => setEditingCell(null)} className="min-w-16 px-4 border-l border-plum-3 text-base font-semibold hover:bg-plum-2 transition-colors duration-150">
+                                ปิด
+                            </button>
                         </div>
-                        
-                        <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto bg-rams-panel custom-scrollbar">
-                            {(() => {
-                                const dateStr = format(editingCell.date, 'yyyy-MM-dd');
-                                const cellLeaves = leaveRequests.filter(l => l.employee_id === editingCell.employee.id && l.leave_date === dateStr);
-                                if (cellLeaves.length === 0) return null;
-                                return (
-                                    <div className="space-y-3 mb-2">
-                                        {cellLeaves.map((l, idx) => (
-                                            <div key={idx} className="bg-rams-amber/10 border border-rams-rule-light rounded-sm p-4 space-y-2 text-xs text-rams-ink shadow-none font-sans">
-                                                <div className="font-mono font-bold uppercase tracking-wider text-[10px] text-rams-ink flex justify-between items-center">
-                                                    <span className="flex items-center gap-1">📌 ข้อมูลการลาหยุดวันนี้</span>
-                                                    <Badge color={l.status === 'approved' ? 'emerald' : l.status === 'rejected' ? 'rose' : 'amber'}>
-                                                        {l.status === 'approved' ? 'อนุมัติแล้ว' : l.status === 'rejected' ? 'ปฏิเสธแล้ว' : 'รออนุมัติ'}
-                                                    </Badge>
-                                                </div>
-                                                <div className="grid grid-cols-2 gap-2 mt-1 font-mono text-[10px] text-rams-ink-muted uppercase tracking-wider">
-                                                    <div><strong>ประเภท:</strong> {l.leave_type === 'sick' ? 'ลาป่วย 😷' : l.leave_type === 'business' ? 'ลากิจ 💼' : 'พักร้อน 🏖️'}</div>
-                                                    <div><strong>คนปฏิบัติแทน:</strong> {l.replacement_employee ? (l.replacement_employee.nickname || l.replacement_employee.name) : '-'}</div>
-                                                </div>
-                                                <div className="mt-1 font-sans text-xs text-rams-ink"><strong>เหตุผล:</strong> {l.reason || '-'}</div>
-                                                
-                                                <div className="flex gap-2 pt-1 border-t border-rams-rule-light mt-2">
-                                                    {l.status === 'pending' && (
-                                                        <>
-                                                            <button 
-                                                                type="button"
-                                                                onClick={async () => {
-                                                                    await handleApproveAndSyncLeave(l);
-                                                                    setEditingCell(null);
-                                                                }}
-                                                                className="px-3 py-1.5 bg-rams-green text-rams-panel font-mono font-bold text-[9px] uppercase tracking-wider rounded-sm border border-rams-rule shadow-[0_1.5px_0_0_var(--color-rams-rule)] hover:bg-rams-green/90 active:translate-y-[1px] active:shadow-none cursor-pointer transition-all"
-                                                            >
-                                                                อนุมัติและปรับตารางเวร
-                                                            </button>
-                                                            <button 
-                                                                type="button"
-                                                                onClick={async () => {
-                                                                    await handleRejectLeave(l);
-                                                                    setEditingCell(null);
-                                                                }}
-                                                                className="px-3 py-1.5 bg-rams-red text-rams-panel font-mono font-bold text-[9px] uppercase tracking-wider rounded-sm border border-rams-rule shadow-[0_1.5px_0_0_var(--color-rams-rule)] hover:bg-rams-red/90 active:translate-y-[1px] active:shadow-none cursor-pointer transition-all"
-                                                            >
-                                                                ปฏิเสธคำขอลา
-                                                            </button>
-                                                        </>
-                                                    )}
-                                                    {l.status === 'approved' && (
-                                                        <button 
-                                                            type="button"
-                                                            onClick={async () => {
-                                                                await handleResetLeaveStatus(l);
-                                                                setEditingCell(null);
-                                                            }}
-                                                            className="px-3 py-1.5 bg-rams-bg border border-rams-rule-light text-rams-ink-muted font-mono font-bold rounded-sm text-[9px] uppercase tracking-wider hover:bg-rams-ink-muted/10 cursor-pointer transition-all"
-                                                        >
-                                                            ยกเลิกการอนุมัติ (กลับเป็นรออนุมัติ)
-                                                        </button>
-                                                    )}
-                                                    <button 
-                                                        type="button"
-                                                        onClick={async () => {
-                                                            await handleDeleteLeaveRequest(l);
-                                                            setEditingCell(null);
-                                                        }}
-                                                        className="px-3 py-1.5 bg-rams-red/10 hover:bg-rams-red/20 text-rams-red border border-rams-red/20 font-mono font-bold rounded-sm text-[9px] uppercase tracking-wider cursor-pointer transition-all"
-                                                    >
-                                                        🗑️ ลบใบลา
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        ))}
+
+                        <div className="p-4 flex flex-col gap-4 overflow-y-auto custom-scrollbar">
+                            {/* Leave on this day */}
+                            {cellLeaves.map((l, idx) => (
+                                <section key={idx} className="border border-plum">
+                                    <div className="px-4 py-2 bg-plum/5 border-b border-plum flex items-baseline justify-between gap-3">
+                                        <p className="text-base font-semibold text-plum">วันลา · {l.leave_type === 'sick' ? 'ลาป่วย' : l.leave_type === 'business' ? 'ลากิจ' : 'พักร้อน'}</p>
+                                        <p className="text-sm font-semibold text-charcoal">{l.status === 'approved' ? 'อนุมัติแล้ว' : l.status === 'rejected' ? 'ไม่อนุมัติ' : 'รออนุมัติ'}</p>
                                     </div>
-                                );
-                            })()}
+                                    <dl className="px-4 py-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-base">
+                                        <dt className="text-sm text-neutral">เหตุผล</dt>
+                                        <dd className="text-charcoal">{l.reason || '-'}</dd>
+                                        <dt className="text-sm text-neutral">คนแทน</dt>
+                                        <dd className="text-charcoal">{l.replacement_employee ? (l.replacement_employee.nickname || l.replacement_employee.name) : '-'}</dd>
+                                    </dl>
+                                    <div className="grid grid-cols-2 gap-px bg-rule border-t border-rule">
+                                        {l.status === 'pending' && (
+                                            <>
+                                                <button type="button" onClick={async () => { await handleApproveAndSyncLeave(l); setEditingCell(null); }} className="min-h-12 px-3 bg-plum hover:bg-plum-2 text-cream text-base font-semibold transition-colors duration-150">
+                                                    อนุมัติ + ปรับตาราง
+                                                </button>
+                                                <button type="button" onClick={async () => { await handleRejectLeave(l); setEditingCell(null); }} className="min-h-12 px-3 bg-cream hover:bg-paper-2 text-charcoal text-base transition-colors duration-150">
+                                                    ไม่อนุมัติ
+                                                </button>
+                                            </>
+                                        )}
+                                        {l.status === 'approved' && (
+                                            <button type="button" onClick={async () => { await handleResetLeaveStatus(l); setEditingCell(null); }} className="min-h-12 px-3 bg-cream hover:bg-paper-2 text-charcoal text-base transition-colors duration-150">
+                                                ยกเลิกการอนุมัติ
+                                            </button>
+                                        )}
+                                        <button type="button" onClick={async () => { await handleDeleteLeaveRequest(l); setEditingCell(null); }} className={`min-h-12 px-3 bg-cream hover:bg-paper-2 text-error text-base transition-colors duration-150 ${l.status === 'rejected' ? 'col-span-2' : ''}`}>
+                                            ลบใบลา
+                                        </button>
+                                    </div>
+                                </section>
+                            ))}
+
                             {editingCell.slots.map((slot, index) => {
                                 const startClean = (slot.custom_start_time || '').slice(0, 5);
                                 const endClean = (slot.custom_end_time || '').slice(0, 5);
+                                const selectedPreset = allPresets.find(p => isPresetSelected(slot, p, startClean, endClean));
+                                const customKey = `${dateStr}-${editingCell.employee.id}-${index}`;
+                                const customOpen = customTimeOpen[customKey] ?? (!slot.is_off && !!startClean && !selectedPreset);
 
                                 return (
-                                    <div key={index} className="bg-rams-panel p-4 rounded-sm border border-rams-rule-light shadow-none space-y-3.5 relative">
-                                        <div className="flex justify-between items-center mb-1">
-                                            <div className="flex items-center gap-2">
-                                                <select 
-                                                    value={slot.slot_type}
-                                                    onChange={e => handleSlotChange(index, 'slot_type', e.target.value)}
-                                                    className="text-[10px] font-mono font-bold uppercase bg-rams-bg text-rams-ink px-2 py-1 rounded-sm border border-rams-rule-light outline-none cursor-pointer"
-                                                >
-                                                    <option value="MAIN">Main Shift (กะหลัก)</option>
-                                                    <option value="SPLIT">Split Shift (กะพ่วง/กะแยก)</option>
-                                                    <option value="OVERTIME">Overtime (OT)</option>
-                                                </select>
+                                    <section key={index} className={multi || slot.slot_type !== 'MAIN' ? 'border border-rule' : ''}>
+                                        {/* Slot header: only when there's more than one shift, or it's an extra slot */}
+                                        {(multi || slot.slot_type !== 'MAIN') && (
+                                            <div className="px-4 py-2 border-b border-rule flex items-center justify-between gap-3">
+                                                <label className="flex items-center gap-2 text-sm text-neutral">
+                                                    <span>กะที่ <span className="font-num">{index + 1}</span></span>
+                                                    <select
+                                                        value={slot.slot_type}
+                                                        onChange={e => handleSlotChange(index, 'slot_type', e.target.value)}
+                                                        className="min-h-10 px-2 bg-cream border border-rule text-base text-charcoal"
+                                                    >
+                                                        {Object.entries(slotTypeTh).map(([v, t]) => <option key={v} value={v}>{t}</option>)}
+                                                    </select>
+                                                </label>
+                                                <button type="button" onClick={() => removeSlot(index)} className="min-h-10 px-3 text-base text-error hover:bg-paper-2 transition-colors duration-150">
+                                                    ลบกะนี้
+                                                </button>
                                             </div>
-                                            <button 
-                                                type="button" 
-                                                onClick={() => removeSlot(index)} 
-                                                className="text-rams-red hover:text-rams-red/80 transition-colors cursor-pointer p-1"
-                                                title="ลบกะนี้"
-                                            >
-                                                <Trash2 size={15} />
-                                            </button>
-                                        </div>
-                                        
-                                        {/* Quick Status / OFF Toggle */}
-                                        <div className="flex items-center justify-between gap-2 bg-rams-bg/60 p-2.5 rounded-sm border border-rams-rule-light">
-                                            <label className="flex items-center gap-2.5 text-xs font-mono font-bold uppercase tracking-wider text-rams-ink cursor-pointer select-none">
-                                                <input 
-                                                    type="checkbox" 
-                                                    checked={slot.is_off}
-                                                    onChange={e => {
-                                                        if (e.target.checked) {
-                                                            updateSlot(index, { is_off: true, shift_id: '', custom_start_time: '', custom_end_time: '' });
-                                                        } else {
-                                                            updateSlot(index, { is_off: false });
-                                                        }
-                                                    }}
-                                                    className="w-4 h-4 rounded-sm border-rams-rule bg-rams-bg accent-rams-red focus:ring-0 cursor-pointer"
-                                                />
-                                                <span className={slot.is_off ? "text-rams-red font-black" : ""}>กำหนดเป็น วันหยุด (OFF)</span>
-                                            </label>
-                                            {slot.is_off && (
-                                                <span className="text-[10px] font-mono font-bold text-rams-red uppercase px-2 py-0.5 bg-rams-red/10 border border-rams-red/20 rounded-sm">
-                                                    OFF
-                                                </span>
-                                            )}
-                                        </div>
+                                        )}
 
-                                        {!slot.is_off && (
-                                            <div className="space-y-4 pt-1">
-                                                {/* Presets Grid - Organized Cleanly by Role/Category (Zero Duplicates) */}
-                                                <div className="space-y-3">
-                                                    <div className="flex justify-between items-center pb-1 border-b border-rams-rule-light">
-                                                        <label className="text-[10px] font-mono font-bold text-rams-ink uppercase tracking-wider flex items-center gap-1.5">
-                                                            <Sparkles size={12} className="text-rams-orange" />
-                                                            PRESET กะงานประจำร้าน (คลิกเพื่อเลือกทันที):
-                                                        </label>
-                                                        <button
-                                                            type="button"
-                                                            onClick={resetToDefaultPresets}
-                                                            className="text-[9px] font-mono text-rams-ink-muted hover:text-rams-red underline transition-colors cursor-pointer"
-                                                            title="ล้างแคชและคืนค่ากะมาตรฐานตามเวลาเปิดร้านใหม่ (11:00-21:30 ครัวปิด 20:45)"
-                                                        >
-                                                            ↺ คืนค่ากะมาตรฐานร้านใหม่
-                                                        </button>
-                                                    </div>
+                                        <div className={`${multi || slot.slot_type !== 'MAIN' ? 'p-4' : ''} flex flex-col gap-4`}>
+                                            {/* Work / OFF */}
+                                            <div className="grid grid-cols-2 gap-px bg-rule border border-charcoal" role="radiogroup" aria-label="สถานะวันนี้">
+                                                {[{ off: false, label: 'ทำงาน' }, { off: true, label: 'หยุด' }].map(o => (
+                                                    <button
+                                                        key={o.label}
+                                                        type="button"
+                                                        role="radio"
+                                                        aria-checked={!!slot.is_off === o.off}
+                                                        onClick={() => updateSlot(index, o.off ? { is_off: true, shift_id: '', preset_id: null, custom_start_time: '', custom_end_time: '' } : { is_off: false })}
+                                                        className={`min-h-12 text-base transition-colors duration-150 ${!!slot.is_off === o.off ? 'bg-charcoal text-cream font-semibold' : 'bg-cream text-charcoal hover:bg-paper-2'}`}
+                                                    >
+                                                        {o.label}
+                                                    </button>
+                                                ))}
+                                            </div>
 
-                                                    {/* Categorized Shift Groups */}
-                                                    {[
-                                                        { key: 'floor', title: '☕ หน้าร้าน & บาร์ (Bar & Floor)' },
-                                                        { key: 'kitchen', title: '🍳 ครัวหลัก & ผู้ช่วย (Kitchen)' },
-                                                        { key: 'roles', title: '👑 กะร้าน & พาร์ตไทม์ (Roles & Part-time)' },
-                                                        { key: 'custom', title: '✨ กะกำหนดเอง (Custom)' }
-                                                    ].map(group => {
-                                                        const groupPresets = allPresets.filter(p => {
-                                                            if (group.key === 'floor') return p.category === 'floor';
-                                                            if (group.key === 'kitchen') return p.category === 'kitchen';
-                                                            if (group.key === 'roles') return p.category === 'management' || p.category === 'parttime';
-                                                            return p.category === 'custom' || p.isCustom;
+                                            {!slot.is_off && (
+                                                <>
+                                                    {PRESET_GROUPS.map(group => {
+                                                        const seen = new Set();
+                                                        const groupPresets = allPresets.filter(group.match).filter(p => {
+                                                            const k = `${normName(p.name)}|${(p.start || '').slice(0, 5)}|${(p.end || '').slice(0, 5)}`;
+                                                            if (seen.has(k)) return false;
+                                                            seen.add(k);
+                                                            return true;
                                                         });
-
                                                         if (groupPresets.length === 0) return null;
-
                                                         return (
-                                                            <div key={group.key} className="space-y-1.5">
-                                                                <div className="text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-wider pl-0.5">
-                                                                    {group.title}
-                                                                </div>
-                                                                <div className="grid grid-cols-2 gap-1.5">
+                                                            <div key={group.key}>
+                                                                <p className="text-sm font-semibold text-neutral mb-1">{group.title}</p>
+                                                                <div className="grid grid-cols-2 gap-px bg-rule border border-rule">
                                                                     {groupPresets.map((preset, pIdx) => {
-                                                                        const pc = getPresetColor(preset.color);
-                                                                        const isSelected = !slot.is_off && (() => {
-                                                                            // 1. Explicit preset ID match
-                                                                            if (slot.preset_id && preset.id && slot.preset_id === preset.id) return true;
-
-                                                                            // 2. Direct shift_id match
-                                                                            if (slot.shift_id && preset.shiftId && String(slot.shift_id) === String(preset.shiftId)) return true;
-
-                                                                            // 3. Match via assigned shiftObj (matches both role name and working hours)
-                                                                            if (slot.shift_id) {
-                                                                                const curShift = shifts.find(sh => String(sh.id) === String(slot.shift_id));
-                                                                                if (curShift) {
-                                                                                    const sameTime = (curShift.start_time || '').slice(0, 5) === (preset.start || '').slice(0, 5) &&
-                                                                                                     (curShift.end_time || '').slice(0, 5) === (preset.end || '').slice(0, 5);
-                                                                                    const normCur = (curShift.name || '').replace(/[\s\(\)\:\-0-9\.🍳☀️🕒🌙🔥🍴⚡⏰👑✨🍸💼]/g, '').toLowerCase();
-                                                                                    const normPre = (preset.name || '').replace(/[\s\(\)\:\-0-9\.🍳☀️🕒🌙🔥🍴⚡⏰👑✨🍸💼]/g, '').toLowerCase();
-                                                                                    return sameTime && (normCur === normPre || normCur.includes(normPre) || normPre.includes(normCur));
-                                                                                }
-                                                                            }
-
-                                                                            // 4. Custom time match: match by preset_name or unique timing
-                                                                            if (startClean && endClean && startClean === (preset.start || '').slice(0, 5) && endClean === (preset.end || '').slice(0, 5)) {
-                                                                                if (slot.preset_name) {
-                                                                                    const normSlotName = (slot.preset_name || '').replace(/[\s\(\)\:\-0-9\.🍳☀️🕒🌙🔥🍴⚡⏰👑✨🍸💼]/g, '').toLowerCase();
-                                                                                    const normPre = (preset.name || '').replace(/[\s\(\)\:\-0-9\.🍳☀️🕒🌙🔥🍴⚡⏰👑✨🍸💼]/g, '').toLowerCase();
-                                                                                    return normSlotName === normPre;
-                                                                                }
-                                                                                const presetsWithSameTime = allPresets.filter(p => (p.start || '').slice(0, 5) === startClean && (p.end || '').slice(0, 5) === endClean);
-                                                                                if (presetsWithSameTime.length === 1) return true;
-                                                                            }
-
-                                                                            return false;
-                                                                        })();
-
+                                                                        const sel = selectedPreset === preset;
                                                                         return (
-                                                                            <div
+                                                                            <button
                                                                                 key={preset.id || pIdx}
-                                                                                className={`group flex items-center justify-between px-2.5 py-2 rounded-sm border transition-all text-xs font-mono select-none cursor-pointer ${
-                                                                                    isSelected
-                                                                                        ? `${pc.bg} ${pc.text} border-rams-ink ring-2 ring-rams-ink shadow-xs font-bold`
-                                                                                        : 'bg-rams-panel text-rams-ink border-rams-rule-light hover:border-rams-rule hover:bg-rams-bg'
-                                                                                }`}
+                                                                                type="button"
                                                                                 onClick={() => applyPreset(index, preset)}
+                                                                                aria-pressed={sel}
+                                                                                className={`min-h-14 px-3 py-2 text-left flex flex-col justify-center transition-colors duration-150 ${sel ? 'bg-charcoal text-cream' : 'bg-cream text-charcoal hover:bg-paper-2'}`}
                                                                             >
-                                                                                <div className="flex items-center gap-1.5 min-w-0">
-                                                                                    <span className="text-sm shrink-0">{preset.icon || '⏰'}</span>
-                                                                                    <span className="font-bold truncate">{preset.name}</span>
-                                                                                </div>
-                                                                                <div className="flex items-center gap-1.5 shrink-0 pl-1">
-                                                                                    <span className="text-[10px] font-mono text-rams-ink-muted bg-rams-bg/80 px-1.5 py-0.5 rounded-sm border border-rams-rule-light">
-                                                                                        {(preset.start || '').slice(0, 5)}-{(preset.end || '').slice(0, 5)}
-                                                                                    </span>
-                                                                                    {isSelected ? (
-                                                                                        <span className="text-rams-green font-black text-xs">✓</span>
-                                                                                    ) : (
-                                                                                        <button
-                                                                                            type="button"
-                                                                                            onClick={(e) => {
-                                                                                                e.stopPropagation();
-                                                                                                openEditPresetModal(preset);
-                                                                                            }}
-                                                                                            className="opacity-0 group-hover:opacity-70 hover:opacity-100 hover:text-rams-orange p-0.5 rounded-sm transition-all"
-                                                                                            title="แก้ไขเวลากะนี้"
-                                                                                        >
-                                                                                            <Settings size={12} />
-                                                                                        </button>
-                                                                                    )}
-                                                                                </div>
-                                                                            </div>
+                                                                                <span className="font-num text-base">{(preset.start || '').slice(0, 5)}–{(preset.end || '').slice(0, 5)}</span>
+                                                                                <span className={`text-sm ${sel ? 'text-cream' : 'text-subtle'}`}>{plainText(preset.name)}</span>
+                                                                            </button>
                                                                         );
                                                                     })}
+                                                                    {groupPresets.length % 2 === 1 && <span className="bg-cream" aria-hidden="true" />}
                                                                 </div>
                                                             </div>
                                                         );
                                                     })}
 
-                                                    {/* Quick Add Preset Link */}
-                                                    <div className="pt-0.5 flex justify-end">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => openPresetModal(slot.custom_start_time || '10:00', slot.custom_end_time || '18:00')}
-                                                            className="flex items-center gap-1 px-2.5 py-1 rounded-sm text-[10px] font-mono font-bold border border-dashed border-rams-rule-light hover:border-rams-orange text-rams-ink-muted hover:text-rams-orange transition-all uppercase cursor-pointer"
-                                                        >
-                                                            <Plus size={11} /> เพิ่มกะใหม่
-                                                        </button>
-                                                    </div>
-                                                </div>
-
-                                                {/* Manual Timing Adjustment */}
-                                                <div className="space-y-2 border-t border-rams-rule-light pt-3">
-                                                    <div className="flex justify-between items-center mb-1">
-                                                        <label className="text-[10px] font-mono font-bold text-rams-ink-muted uppercase tracking-wider">
-                                                            ปรับเวลาละเอียด (Manual Adjustment)
-                                                        </label>
-                                                        {slot.custom_start_time && slot.custom_end_time && (() => {
-                                                            const [sh, sm] = slot.custom_start_time.split(':').map(Number);
-                                                            const [eh, em] = slot.custom_end_time.split(':').map(Number);
-                                                            let diff = (eh * 60 + em) - (sh * 60 + sm);
-                                                            if (diff < 0) diff += 24 * 60;
-                                                            const h = Math.floor(diff / 60);
-                                                            const m = diff % 60;
-                                                            const durationStr = m > 0 ? `${h} ชม. ${m} น.` : `${h} ชั่วโมง`;
-                                                            return (
-                                                                <span className="text-[10px] font-mono font-bold text-rams-ink bg-rams-bg px-2 py-0.5 rounded-sm border border-rams-rule-light">
-                                                                    ⏱️ รวม: {durationStr}
-                                                                </span>
-                                                            );
-                                                        })()}
-                                                    </div>
-                                                    <div className="grid grid-cols-2 gap-3">
-                                                        <div>
-                                                            <label className="block text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1">เวลาเริ่ม (Start)</label>
-                                                            <input 
-                                                                type="time" 
-                                                                value={slot.custom_start_time || ''}
-                                                                onChange={e => updateSlot(index, { custom_start_time: e.target.value, shift_id: '', is_off: false })}
-                                                                className="w-full border border-rams-rule-light rounded-sm p-2 text-xs font-mono text-rams-ink bg-rams-bg outline-none focus:border-rams-rule font-bold"
-                                                            />
-                                                        </div>
-                                                        <div>
-                                                            <label className="block text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1">เวลาเลิก (End)</label>
-                                                            <input 
-                                                                type="time" 
-                                                                value={slot.custom_end_time || ''}
-                                                                onChange={e => updateSlot(index, { custom_end_time: e.target.value, shift_id: '', is_off: false })}
-                                                                className="w-full border border-rams-rule-light rounded-sm p-2 text-xs font-mono text-rams-ink bg-rams-bg outline-none focus:border-rams-rule font-bold"
-                                                            />
-                                                        </div>
-                                                    </div>
-
-                                                    {slot.custom_start_time && slot.custom_end_time && (
-                                                        <div className="pt-1">
-                                                            <button 
-                                                                type="button" 
-                                                                onClick={() => openPresetModal(slot.custom_start_time, slot.custom_end_time)}
-                                                                className="text-[10px] font-mono font-bold text-rams-orange hover:text-rams-orange-active uppercase tracking-wider flex items-center gap-1 transition-colors cursor-pointer"
+                                                    {/* Time summary + optional manual edit */}
+                                                    <div className="border border-rule">
+                                                        <div className="px-4 py-3 flex items-center justify-between gap-3">
+                                                            <div className="min-w-0">
+                                                                <p className="text-sm text-neutral">เวลาทำงาน</p>
+                                                                <p className="text-base text-charcoal">
+                                                                    {startClean && endClean
+                                                                        ? <><span className="font-num">{startClean}–{endClean}</span> · รวม {durationOf(startClean, endClean)}</>
+                                                                        : 'ยังไม่ได้เลือกกะ'}
+                                                                </p>
+                                                            </div>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setCustomTimeOpen(prev => ({ ...prev, [customKey]: !customOpen }))}
+                                                                aria-expanded={customOpen}
+                                                                className="min-h-12 px-3 text-base text-plum font-semibold hover:bg-paper-2 transition-colors duration-150 shrink-0"
                                                             >
-                                                                💾 บันทึกเวลานี้เป็น Preset ({slot.custom_start_time} - {slot.custom_end_time})
+                                                                {customOpen ? 'ซ่อน' : 'ปรับเวลาเอง'}
                                                             </button>
                                                         </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
+                                                        {customOpen && (
+                                                            <div className="px-4 pb-4 flex flex-col gap-3">
+                                                                <div className="grid grid-cols-2 gap-3">
+                                                                    <label className="text-sm text-neutral">
+                                                                        เริ่ม
+                                                                        <input type="time" value={slot.custom_start_time || ''} onChange={e => updateSlot(index, { custom_start_time: e.target.value, shift_id: '', preset_id: null, preset_name: null, is_off: false })} className="mt-1 w-full min-h-12 px-3 border border-charcoal bg-cream font-num text-base text-charcoal" />
+                                                                    </label>
+                                                                    <label className="text-sm text-neutral">
+                                                                        เลิก
+                                                                        <input type="time" value={slot.custom_end_time || ''} onChange={e => updateSlot(index, { custom_end_time: e.target.value, shift_id: '', preset_id: null, preset_name: null, is_off: false })} className="mt-1 w-full min-h-12 px-3 border border-charcoal bg-cream font-num text-base text-charcoal" />
+                                                                    </label>
+                                                                </div>
+                                                                {startClean && endClean && !selectedPreset && (
+                                                                    <button type="button" onClick={() => openPresetModal(startClean, endClean)} className="self-start min-h-10 text-base text-plum font-semibold underline underline-offset-4">
+                                                                        บันทึกเวลานี้เป็นกะมาตรฐาน
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Preset management: one row instead of a gear on every button */}
+                                                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                                                        {selectedPreset && (
+                                                            <button type="button" onClick={() => openEditPresetModal(selectedPreset)} className="min-h-10 text-plum underline underline-offset-4">
+                                                                แก้กะ &ldquo;{plainText(selectedPreset.name)}&rdquo;
+                                                            </button>
+                                                        )}
+                                                        <button type="button" onClick={() => openPresetModal(startClean || '10:00', endClean || '18:00')} className="min-h-10 text-plum underline underline-offset-4">
+                                                            เพิ่มกะมาตรฐานใหม่
+                                                        </button>
+                                                        <button type="button" onClick={resetToDefaultPresets} className="min-h-10 text-neutral underline underline-offset-4" title="คืนค่ากะมาตรฐานตามเวลาเปิดร้าน">
+                                                            คืนค่ากะมาตรฐาน
+                                                        </button>
+                                                    </div>
+                                                </>
+                                            )}
+                                        </div>
+                                    </section>
                                 );
                             })}
- 
-                            <button onClick={addSlot} className="w-full py-2 border border-dashed border-rams-rule-light rounded-sm text-rams-ink-muted font-mono font-bold text-xs uppercase tracking-wider hover:bg-rams-bg transition-colors flex justify-center items-center gap-2 cursor-pointer">
-                                <Plus size={16} /> เพิ่มกะในวันนี้ (Split Shift)
+
+                            <button type="button" onClick={addSlot} className="min-h-12 border border-charcoal text-base text-charcoal hover:bg-paper-2 transition-colors duration-150">
+                                + เพิ่มกะแยกในวันนี้
                             </button>
                         </div>
- 
-                        <div className="px-6 py-4 border-t border-rams-rule-light flex justify-end gap-3 bg-rams-bg/30 shrink-0">
-                            <button 
-                                onClick={() => setEditingCell(null)}
-                                className="px-4 py-2 text-rams-ink hover:bg-rams-ink-muted/10 border border-rams-rule-light rounded-sm font-mono font-bold text-xs uppercase tracking-wider transition-all cursor-pointer"
-                            >
+
+                        <div className="px-4 py-3 border-t border-rule grid grid-cols-2 gap-3 shrink-0">
+                            <button type="button" onClick={() => setEditingCell(null)} className="min-h-12 border border-charcoal text-base text-charcoal hover:bg-paper-2 transition-colors duration-150">
                                 ยกเลิก
                             </button>
-                            <button 
-                                onClick={saveCell}
-                                disabled={saving}
-                                className="px-4 py-2 bg-rams-orange text-rams-panel font-mono font-bold text-xs uppercase tracking-wider rounded-sm border border-rams-rule shadow-[0_2px_0_0_var(--color-rams-rule)] hover:bg-rams-orange-active active:translate-y-[1px] active:shadow-none transition-all flex items-center gap-2 cursor-pointer"
-                            >
-                                {saving ? 'กำลังบันทึก...' : <><Save size={16} /> บันทึก</>}
+                            <button type="button" onClick={saveCell} disabled={saving} className="min-h-12 bg-charcoal hover:bg-charcoal-2 text-cream text-base font-semibold transition-colors duration-150 disabled:opacity-50">
+                                {saving ? 'กำลังบันทึก…' : 'บันทึก'}
                             </button>
                         </div>
                     </div>
                 </div>
-            )}
+                );
+            })()}
+
+            {/* Clear-week confirmation */}
+            {clearModal && (() => {
+                const keep = clearModal.keepLeaves !== false;
+                const targets = clearTargets(keep);
+                const people = new Set(targets.map(t => t.employee_id)).size;
+                const kept = transactions.length - targets.length;
+                const published = targets.filter(t => t.status === 'PUBLISHED').length;
+                return (
+                    <div className="brand-v2 !bg-charcoal/50 fixed inset-0 flex items-center justify-center z-50 p-4" role="alertdialog" aria-modal="true" aria-labelledby="clear-week-title">
+                        <div className="bg-cream border border-charcoal w-full max-w-md">
+                            <div className="bg-error text-cream px-4 py-3">
+                                <h3 id="clear-week-title" className="text-xl font-semibold">ล้างตารางสัปดาห์นี้?</h3>
+                                <p className="text-sm">{weekLabel}</p>
+                            </div>
+                            <div className="p-4 flex flex-col gap-3">
+                                <p className="text-base text-charcoal">
+                                    จะลบ <span className="font-num font-semibold">{targets.length}</span> กะ ของ <span className="font-num font-semibold">{people}</span> คน
+                                    {kept > 0 && <> · เก็บไว้ <span className="font-num">{kept}</span> รายการ</>}
+                                </p>
+                                <label className="flex items-start gap-3 min-h-12 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={keep}
+                                        onChange={e => setClearModal({ keepLeaves: e.target.checked })}
+                                        className="mt-1 w-5 h-5 accent-charcoal"
+                                    />
+                                    <span className="text-base text-charcoal">
+                                        เก็บวันหยุดจากใบลาที่อนุมัติแล้วไว้
+                                        <span className="block text-sm text-neutral">ไม่ต้องอนุมัติใบลาซ้ำหลังจัดตารางใหม่</span>
+                                    </span>
+                                </label>
+                                {published > 0 && (
+                                    <p className="border border-plum px-3 py-2 text-sm text-plum">
+                                        ในนี้มี <span className="font-num">{published}</span> กะที่ประกาศไปแล้ว พนักงานจะเห็นตารางว่างจนกว่าจะประกาศใหม่ (ระบบไม่ส่งแจ้งเตือน LINE ตอนล้าง)
+                                    </p>
+                                )}
+                                <p className="text-sm text-neutral">กด &ldquo;เลิกทำ&rdquo; ได้ทันทีหลังล้าง ตราบใดที่ยังไม่ปิดหรือรีเฟรชหน้านี้</p>
+                            </div>
+                            <div className="px-4 pb-4 grid grid-cols-2 gap-3">
+                                <button type="button" onClick={() => setClearModal(null)} className="min-h-12 border border-charcoal text-base text-charcoal hover:bg-paper-2 transition-colors duration-150">
+                                    ยกเลิก
+                                </button>
+                                <button type="button" onClick={clearWeek} disabled={saving || targets.length === 0} className="min-h-12 bg-error hover:opacity-90 text-cream text-base font-semibold transition-opacity duration-150 disabled:opacity-50">
+                                    {saving ? 'กำลังล้าง…' : `ล้าง ${targets.length} กะ`}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
 
             {/* Preset Creation & Edit Modal */}
             {presetModal && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-rams-ink/40 backdrop-blur-[2px] p-4">
-                    <div className="bg-rams-panel border border-rams-rule rounded-sm w-full max-w-sm overflow-hidden shadow-none animate-in fade-in zoom-in-95 duration-150 flex flex-col">
-                        <div className="px-6 py-4 border-b border-rams-rule-light bg-rams-bg/30 flex justify-between items-center">
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-charcoal/50 p-4">
+                    <div className="bg-cream border border-charcoal w-full max-w-sm overflow-hidden flex flex-col">
+                        <div className="px-6 py-4 border-b border-rule bg-paper-2 flex justify-between items-center">
                             <div>
-                                <h3 className="font-mono font-bold text-sm uppercase tracking-wider text-rams-ink">
-                                    {presetModal.isEditing ? `✏️ แก้ไข Preset` : '✨ สร้าง Preset ใหม่'}
+                                <h3 className="font-num font-semibold text-sm text-charcoal">
+                                    {presetModal.isEditing ? `แก้ไข Preset` : 'สร้าง Preset ใหม่'}
                                 </h3>
-                                <p className="text-[10px] font-mono text-rams-ink-muted uppercase tracking-widest block mt-0.5">
+                                <p className="text-xs font-num text-neutral block mt-0.5">
                                     {presetModal.isEditing ? (presetModal.originalName || presetModal.name) : 'กำหนดเวลาและชื่อกะงาน'}
                                 </p>
                             </div>
@@ -2388,10 +2338,10 @@ export default function AdminRosterPage() {
                                 <button
                                     type="button"
                                     onClick={() => deleteOrResetPreset(presetModal)}
-                                    className="text-[10px] font-mono font-bold text-rams-red hover:underline p-1 cursor-pointer transition-all"
+                                    className="text-xs font-num font-semibold text-error hover:underline p-1 cursor-pointer transition-colors duration-150"
                                     title={presetModal.isSystem ? 'คืนค่าเริ่มต้น' : 'ลบ Preset'}
                                 >
-                                    {presetModal.isSystem ? '🔄 คืนค่าเดิม' : '🗑️ ลบ Preset'}
+                                    {presetModal.isSystem ? 'คืนค่าเดิม' : 'ลบ Preset'}
                                 </button>
                             )}
                         </div>
@@ -2400,32 +2350,32 @@ export default function AdminRosterPage() {
                             {/* Timing (Start and End) */}
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="block text-[9px] font-mono font-bold text-rams-ink uppercase tracking-widest mb-1.5">
+                                    <label className="block text-xs font-num font-semibold text-charcoal mb-1.5">
                                         เวลาเริ่ม (Start)
                                     </label>
                                     <input
                                         type="time"
                                         value={presetModal.start || ''}
                                         onChange={e => setPresetModal(p => ({ ...p, start: e.target.value }))}
-                                        className="w-full border border-rams-rule rounded-sm px-3 py-2 text-xs font-mono font-bold text-rams-ink bg-rams-bg outline-none focus:border-rams-orange"
+                                        className="w-full border border-charcoal px-3 py-2 text-xs font-num font-semibold text-charcoal bg-cream outline-none focus:border-plum"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-[9px] font-mono font-bold text-rams-ink uppercase tracking-widest mb-1.5">
+                                    <label className="block text-xs font-num font-semibold text-charcoal mb-1.5">
                                         เวลาเลิก (End)
                                     </label>
                                     <input
                                         type="time"
                                         value={presetModal.end || ''}
                                         onChange={e => setPresetModal(p => ({ ...p, end: e.target.value }))}
-                                        className="w-full border border-rams-rule rounded-sm px-3 py-2 text-xs font-mono font-bold text-rams-ink bg-rams-bg outline-none focus:border-rams-orange"
+                                        className="w-full border border-charcoal px-3 py-2 text-xs font-num font-semibold text-charcoal bg-cream outline-none focus:border-plum"
                                     />
                                 </div>
                             </div>
 
                             {/* Name */}
                             <div>
-                                <label className="block text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1.5">
+                                <label className="block text-xs font-num font-semibold text-neutral mb-1.5">
                                     ชื่อ Preset
                                 </label>
                                 <input
@@ -2433,13 +2383,13 @@ export default function AdminRosterPage() {
                                     value={presetModal.name || ''}
                                     onChange={e => setPresetModal(p => ({ ...p, name: e.target.value }))}
                                     placeholder={`เช่น INTHEHAUS, ควบกะ, กะค่ำ...`}
-                                    className="w-full border border-rams-rule-light rounded-sm px-3 py-2 text-xs font-sans text-rams-ink bg-rams-bg outline-none focus:border-rams-rule"
+                                    className="w-full border border-rule px-3 py-2 text-xs font-sans text-charcoal bg-cream outline-none focus:border-charcoal"
                                 />
                             </div>
 
                             {/* Icon */}
                             <div>
-                                <label className="block text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1.5">
+                                <label className="block text-xs font-num font-semibold text-neutral mb-1.5">
                                     เลือก Icon
                                 </label>
                                 <div className="flex flex-wrap gap-1.5">
@@ -2448,11 +2398,11 @@ export default function AdminRosterPage() {
                                             key={icon}
                                             type="button"
                                             onClick={() => setPresetModal(p => ({ ...p, icon }))}
-                                            className={`w-8 h-8 rounded-sm text-xs flex items-center justify-center border transition-all cursor-pointer ${
-                                                presetModal.icon === icon
-                                                    ? 'border-rams-rule bg-rams-ink text-rams-panel'
-                                                    : 'border-rams-rule-light bg-rams-bg hover:border-rams-rule text-rams-ink'
-                                            }`}
+                                            className={`w-8 h-8 text-xs flex items-center justify-center border transition-colors duration-150 cursor-pointer ${
+ presetModal.icon === icon
+ ? 'border-charcoal bg-charcoal text-cream'
+ : 'border-rule bg-cream hover:border-charcoal text-charcoal'
+ }`}
                                         >
                                             {icon}
                                         </button>
@@ -2462,7 +2412,7 @@ export default function AdminRosterPage() {
 
                             {/* Color */}
                             <div>
-                                <label className="block text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1.5">
+                                <label className="block text-xs font-num font-semibold text-neutral mb-1.5">
                                     เลือกสี
                                 </label>
                                 <div className="flex flex-wrap gap-1.5">
@@ -2471,13 +2421,13 @@ export default function AdminRosterPage() {
                                             key={c.id}
                                             type="button"
                                             onClick={() => setPresetModal(p => ({ ...p, color: c.id }))}
-                                            className={`flex items-center gap-1.5 px-2 py-1 rounded-sm text-[10px] font-mono font-bold border transition-all cursor-pointer ${c.bg} ${c.text} ${
+                                            className={`flex items-center gap-1.5 px-2 py-1  text-xs font-num font-semibold border transition-colors duration-150 cursor-pointer ${c.bg} ${c.text} ${
                                                 presetModal.color === c.id
-                                                    ? `${c.border} border-rams-rule ring-1 ring-rams-rule`
-                                                    : 'border-rams-rule-light hover:border-rams-rule'
+                                                    ? `${c.border} border-charcoal ring-1 ring-charcoal`
+                                                    : 'border-rule hover:border-charcoal'
                                             }`}
                                         >
-                                            <span className={`w-2 h-2 rounded-sm ${c.dot}`}></span>
+                                            <span className={`w-2 h-2 ${c.dot}`}></span>
                                             {c.label}
                                         </button>
                                     ))}
@@ -2486,36 +2436,36 @@ export default function AdminRosterPage() {
 
                             {/* Preview */}
                             <div>
-                                <label className="block text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1.5">
+                                <label className="block text-xs font-num font-semibold text-neutral mb-1.5">
                                     ตัวอย่างแสดงผล
                                 </label>
                                 {(() => {
                                     const pc = getPresetColor(presetModal.color);
                                     return (
-                                        <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 ${pc.bg} ${pc.text} rounded-sm text-xs font-mono font-bold border ${pc.border} uppercase tracking-wider`}>
+                                        <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 ${pc.bg} ${pc.text} text-xs font-num font-semibold border ${pc.border}`}>
                                             <span>{presetModal.icon || '⏰'}</span>
                                             <span>{presetModal.name || `${presetModal.start || ''}-${presetModal.end || ''}`}</span>
-                                            <span className="opacity-70 text-[10px] font-normal">({presetModal.start || ''}-{presetModal.end || ''})</span>
+                                            <span className="opacity-70 text-xs font-normal">({presetModal.start || ''}-{presetModal.end || ''})</span>
                                         </div>
                                     );
                                 })()}
                             </div>
                         </div>
 
-                        <div className="px-6 py-4 border-t border-rams-rule-light flex justify-end gap-3 bg-rams-bg/30">
+                        <div className="px-6 py-4 border-t border-rule flex justify-end gap-3 bg-paper-2">
                             <button
                                 type="button"
                                 onClick={() => setPresetModal(null)}
-                                className="px-4 py-2 text-rams-ink hover:bg-rams-ink-muted/10 border border-rams-rule-light rounded-sm font-mono font-bold text-xs uppercase tracking-wider transition-all cursor-pointer"
+                                className="px-4 py-2 text-charcoal hover:bg-neutral/10 border border-rule font-num font-semibold text-xs transition-colors duration-150 cursor-pointer"
                             >
                                 ยกเลิก
                             </button>
                             <button
                                 type="button"
                                 onClick={confirmSavePreset}
-                                className="px-5 py-2 bg-rams-orange text-rams-panel font-mono font-bold text-xs uppercase tracking-wider rounded-sm border border-rams-rule shadow-[0_2px_0_0_var(--color-rams-rule)] hover:bg-rams-orange-active active:translate-y-[1px] active:shadow-none transition-all cursor-pointer"
+                                className="px-5 py-2 bg-plum text-cream font-num font-semibold text-xs border border-charcoal hover:bg-plum-2 transition-colors duration-150 cursor-pointer"
                             >
-                                💾 บันทึก Preset
+                                บันทึก Preset
                             </button>
                         </div>
                     </div>
@@ -2524,63 +2474,63 @@ export default function AdminRosterPage() {
  
             {/* Employee Status & Leave Adjuster Modal */}
             {adjustingEmpModal && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-rams-ink/40 backdrop-blur-[2px] p-4">
-                    <div className="bg-rams-panel border border-rams-rule rounded-sm w-full max-w-lg overflow-hidden shadow-none flex flex-col max-h-[90vh]">
-                        <div className="px-6 py-4 border-b border-rams-rule-light bg-rams-bg/30 flex justify-between items-center">
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-charcoal/50 p-4">
+                    <div className="bg-cream border border-charcoal w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+                        <div className="px-6 py-4 border-b border-rule bg-paper-2 flex justify-between items-center">
                             <div>
-                                <h3 className="font-mono font-bold text-sm uppercase tracking-wider text-rams-ink flex items-center gap-2">
-                                    ⚙️ ปรับสถานะ & วันพักงาน/พักร้อน
+                                <h3 className="font-num font-semibold text-sm text-charcoal flex items-center gap-2">
+                                    ปรับสถานะ & วันพักงาน/พักร้อน
                                 </h3>
-                                <p className="text-[10px] font-mono text-rams-ink-muted uppercase tracking-widest block mt-0.5">
+                                <p className="text-xs font-num text-neutral block mt-0.5">
                                     {adjustingEmpModal.emp.name} ({adjustingEmpModal.emp.nickname || 'ไม่มีชื่อเล่น'}) - {adjustingEmpModal.emp.position || 'พนักงาน'}
                                 </p>
                             </div>
                             <button
                                 type="button"
                                 onClick={() => setAdjustingEmpModal(null)}
-                                className="text-rams-ink-muted hover:text-rams-ink font-mono text-sm"
+                                className="text-neutral hover:text-charcoal font-num text-sm"
                             >
-                                ✕
+                                
                             </button>
                         </div>
 
-                        <div className="p-6 space-y-5 overflow-y-auto custom-scrollbar bg-rams-panel flex-1">
+                        <div className="p-6 space-y-5 overflow-y-auto custom-scrollbar bg-cream flex-1">
                             {/* Section 1: Main Status */}
-                            <div className="bg-rams-bg p-4 border border-rams-rule-light rounded-sm space-y-4">
-                                <h4 className="text-xs font-mono font-bold text-rams-ink uppercase tracking-wider flex items-center gap-1.5">
-                                    👤 สถานะการทำงานของพนักงาน (Employment Status)
+                            <div className="bg-cream p-4 border border-rule space-y-4">
+                                <h4 className="text-xs font-num font-semibold text-charcoal flex items-center gap-1.5">
+                                    สถานะการทำงานของพนักงาน (Employment Status)
                                 </h4>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div>
-                                        <label className="block text-[10px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1.5">
+                                        <label className="block text-xs font-num font-semibold text-neutral mb-1.5">
                                             สถานะการจ้างงาน
                                         </label>
                                         <select
                                             value={adjustingEmpModal.employment_status}
                                             onChange={e => setAdjustingEmpModal(prev => ({ ...prev, employment_status: e.target.value }))}
-                                            className="w-full p-2 rounded-sm border border-rams-rule-light bg-rams-panel text-xs font-mono text-rams-ink outline-none focus:border-rams-rule cursor-pointer"
+                                            className="w-full p-2 border border-rule bg-cream text-xs font-num text-charcoal outline-none focus:border-charcoal cursor-pointer"
                                         >
                                             <option value="Fulltime">Fulltime (ประจำ)</option>
                                             <option value="Probation">Probation (ทดลองงาน)</option>
                                             <option value="Contract">Contract (สัญญาจ้าง / Part-time)</option>
-                                            <option value="Suspended">🛑 Suspended (พักงาน)</option>
-                                            <option value="Vacation">🏖️ Vacation (พักร้อน)</option>
+                                            <option value="Suspended">Suspended (พักงาน)</option>
+                                            <option value="Vacation">Vacation (พักร้อน)</option>
                                             <option value="Resigned">Resigned (ลาออก)</option>
                                         </select>
                                     </div>
                                     <div>
-                                        <label className="block text-[10px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1.5">
+                                        <label className="block text-xs font-num font-semibold text-neutral mb-1.5">
                                             สถานะบัญชี (Account Active)
                                         </label>
-                                        <label className="flex items-center gap-2 p-2 border border-rams-rule-light bg-rams-panel rounded-sm cursor-pointer select-none">
+                                        <label className="flex items-center gap-2 p-2 border border-rule bg-cream cursor-pointer select-none">
                                             <input
                                                 type="checkbox"
                                                 checked={adjustingEmpModal.is_active}
                                                 onChange={e => setAdjustingEmpModal(prev => ({ ...prev, is_active: e.target.checked }))}
-                                                className="w-4 h-4 rounded-sm border-rams-rule bg-rams-bg accent-rams-green focus:ring-0 cursor-pointer"
+                                                className="w-4 h-4 border-charcoal bg-cream accent-charcoal focus:ring-0 cursor-pointer"
                                             />
-                                            <span className={`text-xs font-mono font-bold ${adjustingEmpModal.is_active ? 'text-rams-green' : 'text-rams-red'}`}>
-                                                {adjustingEmpModal.is_active ? '✅ เปิดใช้งาน (Active)' : '🛑 ระงับบัญชี (Inactive / พักงาน)'}
+                                            <span className={`text-xs font-num font-semibold ${adjustingEmpModal.is_active ? 'text-charcoal' : 'text-error'}`}>
+                                                {adjustingEmpModal.is_active ? 'เปิดใช้งาน (Active)' : 'ระงับบัญชี (Inactive / พักงาน)'}
                                             </span>
                                         </label>
                                     </div>
@@ -2588,40 +2538,40 @@ export default function AdminRosterPage() {
                             </div>
 
                             {/* Section 2: Create Leave or Suspension Range */}
-                            <div className="bg-rams-bg p-4 border border-rams-rule-light rounded-sm space-y-4">
+                            <div className="bg-cream p-4 border border-rule space-y-4">
                                 <label className="flex items-center justify-between cursor-pointer select-none">
-                                    <span className="text-xs font-mono font-bold text-rams-ink uppercase tracking-wider flex items-center gap-1.5">
-                                        📅 บันทึกวันพักงาน / พักร้อน / วันลา เข้าสู่ระบบ
+                                    <span className="text-xs font-num font-semibold text-charcoal flex items-center gap-1.5">
+                                        บันทึกวันพักงาน / พักร้อน / วันลา เข้าสู่ระบบ
                                     </span>
                                     <input
                                         type="checkbox"
                                         checked={adjustingEmpModal.createLeave}
                                         onChange={e => setAdjustingEmpModal(prev => ({ ...prev, createLeave: e.target.checked }))}
-                                        className="w-4 h-4 rounded-sm border-rams-rule bg-rams-bg accent-rams-orange focus:ring-0 cursor-pointer"
+                                        className="w-4 h-4 border-charcoal bg-cream accent-plum focus:ring-0 cursor-pointer"
                                     />
                                 </label>
 
                                 {adjustingEmpModal.createLeave && (
-                                    <div className="space-y-4 pt-2 border-t border-rams-rule-light">
+                                    <div className="space-y-4 pt-2 border-t border-rule">
                                         <div>
-                                            <label className="block text-[10px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1.5">
+                                            <label className="block text-xs font-num font-semibold text-neutral mb-1.5">
                                                 ประเภทการพัก/ลา
                                             </label>
                                             <select
                                                 value={adjustingEmpModal.leave_type}
                                                 onChange={e => setAdjustingEmpModal(prev => ({ ...prev, leave_type: e.target.value }))}
-                                                className="w-full p-2 rounded-sm border border-rams-rule-light bg-rams-panel text-xs font-mono text-rams-ink outline-none focus:border-rams-rule cursor-pointer"
+                                                className="w-full p-2 border border-rule bg-cream text-xs font-num text-charcoal outline-none focus:border-charcoal cursor-pointer"
                                             >
-                                                <option value="vacation">🏖️ พักร้อน (Vacation)</option>
-                                                <option value="suspension">🛑 พักงาน (Suspension)</option>
-                                                <option value="sick">😷 ลาป่วย (Sick Leave)</option>
-                                                <option value="business">💼 ลากิจ (Business Leave)</option>
+                                                <option value="vacation">พักร้อน (Vacation)</option>
+                                                <option value="suspension">พักงาน (Suspension)</option>
+                                                <option value="sick">ลาป่วย (Sick Leave)</option>
+                                                <option value="business">ลากิจ (Business Leave)</option>
                                             </select>
                                         </div>
 
                                         <div className="grid grid-cols-2 gap-3">
                                             <div>
-                                                <label className="block text-[10px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1.5">
+                                                <label className="block text-xs font-num font-semibold text-neutral mb-1.5">
                                                     วันที่เริ่ม
                                                 </label>
                                                 <input
@@ -2632,11 +2582,11 @@ export default function AdminRosterPage() {
                                                         startDate: e.target.value,
                                                         endDate: prev.endDate < e.target.value ? e.target.value : prev.endDate
                                                     }))}
-                                                    className="w-full p-2 rounded-sm border border-rams-rule-light bg-rams-panel text-xs font-mono text-rams-ink outline-none focus:border-rams-rule"
+                                                    className="w-full p-2 border border-rule bg-cream text-xs font-num text-charcoal outline-none focus:border-charcoal"
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-[10px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1.5">
+                                                <label className="block text-xs font-num font-semibold text-neutral mb-1.5">
                                                     วันที่สิ้นสุด
                                                 </label>
                                                 <input
@@ -2644,19 +2594,19 @@ export default function AdminRosterPage() {
                                                     value={adjustingEmpModal.endDate}
                                                     min={adjustingEmpModal.startDate}
                                                     onChange={e => setAdjustingEmpModal(prev => ({ ...prev, endDate: e.target.value }))}
-                                                    className="w-full p-2 rounded-sm border border-rams-rule-light bg-rams-panel text-xs font-mono text-rams-ink outline-none focus:border-rams-rule"
+                                                    className="w-full p-2 border border-rule bg-cream text-xs font-num text-charcoal outline-none focus:border-charcoal"
                                                 />
                                             </div>
                                         </div>
 
                                         <div>
-                                            <label className="block text-[10px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1.5">
+                                            <label className="block text-xs font-num font-semibold text-neutral mb-1.5">
                                                 พนักงานปฏิบัติงานแทน (Optional)
                                             </label>
                                             <select
                                                 value={adjustingEmpModal.replacement_employee_id}
                                                 onChange={e => setAdjustingEmpModal(prev => ({ ...prev, replacement_employee_id: e.target.value }))}
-                                                className="w-full p-2 rounded-sm border border-rams-rule-light bg-rams-panel text-xs font-mono text-rams-ink outline-none focus:border-rams-rule cursor-pointer"
+                                                className="w-full p-2 border border-rule bg-cream text-xs font-num text-charcoal outline-none focus:border-charcoal cursor-pointer"
                                             >
                                                 <option value="">-- ไม่ระบุผู้แทน --</option>
                                                 {employees.filter(e => e.id !== adjustingEmpModal.emp.id).map(emp => (
@@ -2668,7 +2618,7 @@ export default function AdminRosterPage() {
                                         </div>
 
                                         <div>
-                                            <label className="block text-[10px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1.5">
+                                            <label className="block text-xs font-num font-semibold text-neutral mb-1.5">
                                                 เหตุผล / หมายเหตุ
                                             </label>
                                             <input
@@ -2676,7 +2626,7 @@ export default function AdminRosterPage() {
                                                 value={adjustingEmpModal.reason}
                                                 onChange={e => setAdjustingEmpModal(prev => ({ ...prev, reason: e.target.value }))}
                                                 placeholder="เช่น พักงานทางวินัย 3 วัน, ลาพักร้อนประจำปี..."
-                                                className="w-full p-2 rounded-sm border border-rams-rule-light bg-rams-panel text-xs font-sans text-rams-ink outline-none focus:border-rams-rule"
+                                                className="w-full p-2 border border-rule bg-cream text-xs font-sans text-charcoal outline-none focus:border-charcoal"
                                             />
                                         </div>
 
@@ -2685,10 +2635,10 @@ export default function AdminRosterPage() {
                                                 type="checkbox"
                                                 checked={adjustingEmpModal.autoSyncRoster}
                                                 onChange={e => setAdjustingEmpModal(prev => ({ ...prev, autoSyncRoster: e.target.checked }))}
-                                                className="w-3.5 h-3.5 rounded-sm border-rams-rule bg-rams-bg accent-rams-orange focus:ring-0 cursor-pointer"
+                                                className="w-3.5 h-3.5 border-charcoal bg-cream accent-plum focus:ring-0 cursor-pointer"
                                             />
-                                            <span className="text-xs font-mono font-bold text-rams-ink">
-                                                🔄 ปรับตั้งค่าในตารางเวร Roster เป็นวันหยุด (OFF) โดยอัตโนมัติ
+                                            <span className="text-xs font-num font-semibold text-charcoal">
+                                                ปรับตั้งค่าในตารางเวร Roster เป็นวันหยุด (OFF) โดยอัตโนมัติ
                                             </span>
                                         </label>
                                     </div>
@@ -2696,11 +2646,11 @@ export default function AdminRosterPage() {
                             </div>
                         </div>
 
-                        <div className="px-6 py-4 border-t border-rams-rule-light flex justify-end gap-3 bg-rams-bg/30 shrink-0">
+                        <div className="px-6 py-4 border-t border-rule flex justify-end gap-3 bg-paper-2 shrink-0">
                             <button
                                 type="button"
                                 onClick={() => setAdjustingEmpModal(null)}
-                                className="px-4 py-2 text-rams-ink hover:bg-rams-ink-muted/10 border border-rams-rule-light rounded-sm font-mono font-bold text-xs uppercase tracking-wider transition-all cursor-pointer"
+                                className="px-4 py-2 text-charcoal hover:bg-neutral/10 border border-rule font-num font-semibold text-xs transition-colors duration-150 cursor-pointer"
                             >
                                 ยกเลิก
                             </button>
@@ -2708,9 +2658,9 @@ export default function AdminRosterPage() {
                                 type="button"
                                 onClick={handleSaveAdjustingEmp}
                                 disabled={saving}
-                                className="px-5 py-2 bg-rams-orange text-rams-panel font-mono font-bold text-xs uppercase tracking-wider rounded-sm border border-rams-rule shadow-[0_2px_0_0_var(--color-rams-rule)] hover:bg-rams-orange-active active:translate-y-[1px] active:shadow-none transition-all cursor-pointer flex items-center gap-2"
+                                className="px-5 py-2 bg-plum text-cream font-num font-semibold text-xs border border-charcoal hover:bg-plum-2 transition-colors duration-150 cursor-pointer flex items-center gap-2"
                             >
-                                {saving ? 'กำลังบันทึก...' : <><Save size={16} /> บันทึกการเปลี่ยนแปลง</>}
+                                {saving ? 'กำลังบันทึก...' : <>บันทึกการเปลี่ยนแปลง</>}
                             </button>
                         </div>
                     </div>
@@ -2720,103 +2670,102 @@ export default function AdminRosterPage() {
 
             {/* Smart Auto-Generate Roster Modal */}
             {showAutoGenModal && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-rams-ink/40 backdrop-blur-[2px] p-4">
-                    <div className="bg-rams-panel border border-rams-rule rounded-sm w-full max-w-lg overflow-hidden shadow-none flex flex-col animate-in fade-in zoom-in-95 duration-150">
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-charcoal/50 p-4">
+                    <div className="bg-cream border border-charcoal w-full max-w-lg overflow-hidden flex flex-col">
                         {/* Header */}
-                        <div className="px-6 py-4 border-b border-rams-rule-light flex justify-between items-center bg-rams-bg/30">
+                        <div className="px-6 py-4 border-b border-rule flex justify-between items-center bg-paper-2">
                             <div>
-                                <h3 className="font-mono font-bold text-sm uppercase tracking-wider text-rams-ink flex items-center gap-2">
-                                    <Sparkles size={16} className="text-rams-orange animate-pulse" />
-                                    จัดตารางงานอัตโนมัติ (AI & Smart Auto-Roster)
+                                <h3 className="font-num font-semibold text-sm text-charcoal flex items-center gap-2">
+                                                                        จัดตารางงานอัตโนมัติ (AI & Smart Auto-Roster)
                                 </h3>
-                                <p className="text-[10px] font-mono text-rams-ink-muted uppercase tracking-widest mt-0.5">
+                                <p className="text-xs font-num text-neutral mt-0.5">
                                     สัปดาห์: {format(weekStart, 'dd/MM/yyyy')} — {format(weekEnd, 'dd/MM/yyyy')}
                                 </p>
                             </div>
                             <button
                                 type="button"
                                 onClick={() => setShowAutoGenModal(false)}
-                                className="w-7 h-7 flex items-center justify-center border border-rams-rule-light hover:border-rams-rule bg-rams-bg text-rams-ink font-mono text-xs transition-all cursor-pointer rounded-sm"
+                                className="w-7 h-7 flex items-center justify-center border border-rule hover:border-charcoal bg-cream text-charcoal font-num text-xs transition-colors duration-150 cursor-pointer"
                             >
-                                ✕
+                                
                             </button>
                         </div>
 
                         {/* Body */}
-                        <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto font-sans text-xs text-rams-ink custom-scrollbar">
-                            <div className="bg-rams-bg/60 border border-rams-rule-light p-3.5 rounded-sm space-y-2 font-mono text-[11px]">
-                                <div className="font-bold text-rams-ink flex items-center gap-1.5">
-                                    <span>🧠</span>
+                        <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto font-sans text-xs text-charcoal custom-scrollbar">
+                            <div className="bg-paper-2 border border-rule p-3.5 space-y-2 font-num text-xs">
+                                <div className="font-semibold text-charcoal flex items-center gap-1.5">
+                                    <span></span>
                                     <span>ระบบจะเรียนรู้และจัดตารางให้อัตโนมัติ:</span>
                                 </div>
-                                <ul className="space-y-1.5 text-rams-ink-muted list-disc list-inside">
+                                <ul className="space-y-1.5 text-neutral list-disc list-inside">
                                     <li>วิเคราะห์เวลาเข้างานและวันหยุดประจำของพนักงานทั้ง {employees.length} คน จากสถิติย้อนหลัง 8 สัปดาห์</li>
                                     <li>ดึงใบลาที่อนุมัติแล้ว ({leaveRequests.filter(l => l.status === 'approved').length} รายการในสัปดาห์นี้) มาเป็นวันหยุด (OFF) อัตโนมัติ</li>
                                     <li>หากในใบระบุคนแทน จะสลับกะให้พนักงานปฏิบัติหน้าที่แทนโดยตรง</li>
-                                    <li>บันทึกเป็น <strong className="text-rams-ink">แบบร่าง (Draft)</strong> เพื่อให้บอสเข้ามาตรวจและปรับแต่งบางจุดได้ตามต้องการ</li>
+                                    <li>บันทึกเป็น <strong className="text-charcoal">แบบร่าง (Draft)</strong> เพื่อให้บอสเข้ามาตรวจและปรับแต่งบางจุดได้ตามต้องการ</li>
                                 </ul>
                             </div>
 
                             <div className="space-y-2.5 pt-1">
-                                <label className="block text-[10px] font-mono font-bold text-rams-ink uppercase tracking-widest">
-                                    ⚙️ ตัวเลือกการจัดตาราง:
+                                <label className="block text-xs font-num font-semibold text-charcoal">
+                                    ตัวเลือกการจัดตาราง:
                                 </label>
 
-                                <label className="flex items-center gap-2.5 p-2.5 rounded-sm border border-rams-rule-light bg-rams-bg/30 cursor-pointer select-none">
+                                <label className="flex items-center gap-2.5 p-2.5 border border-rule bg-paper-2 cursor-pointer select-none">
                                     <input
                                         type="checkbox"
                                         checked={autoGenForm.applyLeaves}
                                         onChange={e => setAutoGenForm(prev => ({ ...prev, applyLeaves: e.target.checked }))}
-                                        className="w-4 h-4 rounded-sm border-rams-rule bg-rams-bg accent-rams-orange focus:ring-0 cursor-pointer"
+                                        className="w-4 h-4 border-charcoal bg-cream accent-plum focus:ring-0 cursor-pointer"
                                     />
                                     <div>
-                                        <div className="font-mono font-bold text-xs text-rams-ink">รวมใบลาที่อนุมัติแล้ว (Apply Approved Leaves)</div>
-                                        <div className="text-[10px] font-mono text-rams-ink-muted">ปรับเป็นวันหยุด (OFF) และจัดกะให้คนแทนตามข้อมูลใบลา</div>
+                                        <div className="font-num font-semibold text-xs text-charcoal">รวมใบลาที่อนุมัติแล้ว (Apply Approved Leaves)</div>
+                                        <div className="text-xs font-num text-neutral">ปรับเป็นวันหยุด (OFF) และจัดกะให้คนแทนตามข้อมูลใบลา</div>
                                     </div>
                                 </label>
 
-                                <label className="flex items-center gap-2.5 p-2.5 rounded-sm border border-rams-rule-light bg-rams-bg/30 cursor-pointer select-none">
+                                <label className="flex items-center gap-2.5 p-2.5 border border-rule bg-paper-2 cursor-pointer select-none">
                                     <input
                                         type="checkbox"
                                         checked={autoGenForm.syncTemplate}
                                         onChange={e => setAutoGenForm(prev => ({ ...prev, syncTemplate: e.target.checked }))}
-                                        className="w-4 h-4 rounded-sm border-rams-rule bg-rams-bg accent-rams-orange focus:ring-0 cursor-pointer"
+                                        className="w-4 h-4 border-charcoal bg-cream accent-plum focus:ring-0 cursor-pointer"
                                     />
                                     <div>
-                                        <div className="font-mono font-bold text-xs text-rams-ink">ซิงค์แบบแผนเข้าสู่ตารางฐาน (Sync to Template)</div>
-                                        <div className="text-[10px] font-mono text-rams-ink-muted">อัปเดตตารางเวลาประจำ (employee_schedules) ในระบบให้ตรงกับสถิติล่าสุด</div>
+                                        <div className="font-num font-semibold text-xs text-charcoal">ซิงค์แบบแผนเข้าสู่ตารางฐาน (Sync to Template)</div>
+                                        <div className="text-xs font-num text-neutral">อัปเดตตารางเวลาประจำ (employee_schedules) ในระบบให้ตรงกับสถิติล่าสุด</div>
                                     </div>
                                 </label>
 
-                                <label className="flex items-center gap-2.5 p-2.5 rounded-sm border border-rams-rule-light bg-rams-bg/30 cursor-pointer select-none">
+                                <label className="flex items-center gap-2.5 p-2.5 border border-rule bg-paper-2 cursor-pointer select-none">
                                     <input
                                         type="checkbox"
                                         checked={autoGenForm.overwrite}
                                         onChange={e => setAutoGenForm(prev => ({ ...prev, overwrite: e.target.checked }))}
-                                        className="w-4 h-4 rounded-sm border-rams-rule bg-rams-bg accent-rams-orange focus:ring-0 cursor-pointer"
+                                        className="w-4 h-4 border-charcoal bg-cream accent-plum focus:ring-0 cursor-pointer"
                                     />
                                     <div>
-                                        <div className="font-mono font-bold text-xs text-rams-ink">เขียนทับกะที่เป็นแบบร่าง (Draft) เดิม</div>
-                                        <div className="text-[10px] font-mono text-rams-ink-muted">ล้างกะ Draft เก่าในสัปดาห์นี้และลงชุดใหม่ที่ระบบเรียนรู้</div>
+                                        <div className="font-num font-semibold text-xs text-charcoal">เขียนทับกะที่เป็นแบบร่าง (Draft) เดิม</div>
+                                        <div className="text-xs font-num text-neutral">ล้างกะ Draft เก่าในสัปดาห์นี้และลงชุดใหม่ที่ระบบเรียนรู้</div>
                                     </div>
                                 </label>
                             </div>
                         </div>
 
                         {/* Footer */}
-                        <div className="px-6 py-4 border-t border-rams-rule-light flex flex-wrap justify-between items-center gap-2 bg-rams-bg/30 shrink-0">
+                        <div className="px-6 py-4 border-t border-rule flex flex-wrap justify-between items-center gap-2 bg-paper-2 shrink-0">
                             <button
                                 type="button"
                                 onClick={handleViewLearnedHabits}
-                                className="px-3 py-2 bg-rams-bg hover:bg-rams-ink-muted/10 text-rams-ink border border-rams-rule-light rounded-sm font-mono font-bold text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5"
+                                className="px-3 py-2 bg-cream hover:bg-neutral/10 text-charcoal border border-rule font-num font-semibold text-xs transition-colors duration-150 cursor-pointer flex items-center gap-1.5"
                             >
-                                <Brain size={14} className="text-rams-orange" /> ดูแบบแผนที่ระบบเรียนรู้
+                                ดูแบบแผนที่ระบบเรียนรู้
                             </button>
                             <div className="flex items-center gap-2">
                                 <button
                                     type="button"
                                     onClick={() => setShowAutoGenModal(false)}
-                                    className="px-4 py-2 text-rams-ink hover:bg-rams-ink-muted/10 border border-rams-rule-light rounded-sm font-mono font-bold text-xs uppercase tracking-wider transition-all cursor-pointer"
+                                    className="px-4 py-2 text-charcoal hover:bg-neutral/10 border border-rule font-num font-semibold text-xs transition-colors duration-150 cursor-pointer"
                                 >
                                     ยกเลิก
                                 </button>
@@ -2824,13 +2773,13 @@ export default function AdminRosterPage() {
                                     type="button"
                                     onClick={handleExecuteAutoGenerate}
                                     disabled={isAutoGenerating}
-                                    className="px-5 py-2 bg-rams-ink hover:bg-rams-ink/90 text-rams-panel font-mono font-bold text-xs uppercase tracking-wider rounded-sm border border-rams-rule shadow-[0_2px_0_0_var(--color-rams-rule)] active:translate-y-[1px] active:shadow-none transition-all cursor-pointer flex items-center gap-2"
+                                    className="px-5 py-2 bg-charcoal hover:bg-charcoal-2 text-cream font-num font-semibold text-xs border border-charcoal transition-colors duration-150 cursor-pointer flex items-center gap-2"
                                 >
                                     {isAutoGenerating ? (
                                         <>กำลังสร้างตาราง...</>
                                     ) : (
                                         <>
-                                            <Sparkles size={14} className="text-rams-orange" /> ยืนยันจัดตารางอัตโนมัติ
+                                            ยืนยันจัดตารางอัตโนมัติ
                                         </>
                                     )}
                                 </button>
@@ -2842,30 +2791,29 @@ export default function AdminRosterPage() {
 
             {/* Learned Habits Modal */}
             {learnedHabitsModal && (
-                <div className="fixed inset-0 z-[70] flex items-center justify-center bg-rams-ink/40 backdrop-blur-[2px] p-4">
-                    <div className="bg-rams-panel border border-rams-rule rounded-sm w-full max-w-3xl overflow-hidden shadow-none flex flex-col animate-in fade-in zoom-in-95 duration-150">
-                        <div className="px-6 py-4 border-b border-rams-rule-light flex justify-between items-center bg-rams-bg/30">
+                <div className="fixed inset-0 z-[70] flex items-center justify-center bg-charcoal/50 p-4">
+                    <div className="bg-cream border border-charcoal w-full max-w-3xl overflow-hidden flex flex-col">
+                        <div className="px-6 py-4 border-b border-rule flex justify-between items-center bg-paper-2">
                             <div>
-                                <h3 className="font-mono font-bold text-sm uppercase tracking-wider text-rams-ink flex items-center gap-2">
-                                    <Brain size={16} className="text-rams-orange" />
-                                    แบบแผนเวลาทำงานที่ระบบเรียนรู้ (Learned Regular Habits)
+                                <h3 className="font-num font-semibold text-sm text-charcoal flex items-center gap-2">
+                                                                        แบบแผนเวลาทำงานที่ระบบเรียนรู้ (Learned Regular Habits)
                                 </h3>
-                                <p className="text-[10px] font-mono text-rams-ink-muted uppercase tracking-widest mt-0.5">
+                                <p className="text-xs font-num text-neutral mt-0.5">
                                     วิเคราะห์จากสถิติย้อนหลัง {learnedHabitsModal.weeksAnalyzed} สัปดาห์ (ข้อมูล {learnedHabitsModal.totalHistoricalTxs} กะ)
                                 </p>
                             </div>
                             <button
                                 type="button"
                                 onClick={() => setLearnedHabitsModal(null)}
-                                className="w-7 h-7 flex items-center justify-center border border-rams-rule-light hover:border-rams-rule bg-rams-bg text-rams-ink font-mono text-xs transition-all cursor-pointer rounded-sm"
+                                className="w-7 h-7 flex items-center justify-center border border-rule hover:border-charcoal bg-cream text-charcoal font-num text-xs transition-colors duration-150 cursor-pointer"
                             >
-                                ✕
+                                
                             </button>
                         </div>
 
                         <div className="p-6 max-h-[65vh] overflow-y-auto custom-scrollbar">
-                            <table className="w-full text-xs text-left border-collapse font-mono">
-                                <thead className="bg-rams-bg/60 text-rams-ink-muted border-b border-rams-rule-light text-[9px] uppercase tracking-widest">
+                            <table className="w-full text-xs text-left border-collapse font-num">
+                                <thead className="bg-paper-2 text-neutral border-b border-rule text-xs">
                                     <tr>
                                         <th className="px-3 py-2">พนักงาน</th>
                                         <th className="px-2 py-2 text-center">จันทร์</th>
@@ -2877,14 +2825,14 @@ export default function AdminRosterPage() {
                                         <th className="px-2 py-2 text-center">อาทิตย์</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-rams-rule-light">
+                                <tbody className="divide-y divide-rule">
                                     {Object.values(learnedHabitsModal.learnedHabits || {}).map(empHabit => {
                                         const dayOrder = [1, 2, 3, 4, 5, 6, 0]; // Mon to Sun
                                         return (
-                                            <tr key={empHabit.employee_id} className="hover:bg-rams-bg/30">
-                                                <td className="px-3 py-2.5 font-bold text-rams-ink">
+                                            <tr key={empHabit.employee_id} className="hover:bg-paper-2">
+                                                <td className="px-3 py-2.5 font-semibold text-charcoal">
                                                     <div>{empHabit.name}</div>
-                                                    <div className="text-[9px] text-rams-ink-muted font-normal uppercase">{empHabit.position}</div>
+                                                    <div className="text-xs text-neutral font-normal">{empHabit.position}</div>
                                                 </td>
                                                 {dayOrder.map(d => {
                                                     const shiftInfo = empHabit.routine[d] || { is_off: true };
@@ -2894,11 +2842,11 @@ export default function AdminRosterPage() {
                                                         : (shiftInfo.shift_id ? `กะ ${shiftInfo.shift_id}` : 'OFF');
 
                                                     return (
-                                                        <td key={d} className="px-2 py-2 text-center border-l border-rams-rule-light">
-                                                            <div className={`p-1 rounded-sm text-[10px] font-bold ${isOff ? 'bg-rams-red/10 text-rams-red' : 'bg-rams-green/10 text-rams-green'}`}>
+                                                        <td key={d} className="px-2 py-2 text-center border-l border-rule">
+                                                            <div className={`p-1 text-xs font-semibold ${isOff ? 'bg-error/10 text-error' : 'bg-charcoal/10 text-charcoal'}`}>
                                                                 {isOff ? 'OFF' : timeStr}
                                                             </div>
-                                                            <div className="text-[8px] text-rams-ink-muted mt-0.5">
+                                                            <div className="text-xs text-neutral mt-0.5">
                                                                 {shiftInfo.confidence}%
                                                             </div>
                                                         </td>
@@ -2911,14 +2859,14 @@ export default function AdminRosterPage() {
                             </table>
                         </div>
 
-                        <div className="px-6 py-4 border-t border-rams-rule-light flex justify-between items-center bg-rams-bg/30 shrink-0">
-                            <span className="text-[10px] font-mono text-rams-ink-muted">
+                        <div className="px-6 py-4 border-t border-rule flex justify-between items-center bg-paper-2 shrink-0">
+                            <span className="text-xs font-num text-neutral">
                                 *ระบบจะนำแบบแผนเหล่านี้ไปลงกะอัตโนมัติเมื่อกดจัดตาราง และสามารถปรับแก้รายกะได้ตลอดเวลา
                             </span>
                             <button
                                 type="button"
                                 onClick={() => setLearnedHabitsModal(null)}
-                                className="px-4 py-2 bg-rams-ink text-rams-panel font-mono font-bold text-xs uppercase tracking-wider rounded-sm border border-rams-rule cursor-pointer"
+                                className="px-4 py-2 bg-charcoal text-cream font-num font-semibold text-xs border border-charcoal cursor-pointer"
                             >
                                 ปิดหน้าต่าง
                             </button>
@@ -2931,7 +2879,7 @@ export default function AdminRosterPage() {
 }
 
 const getShiftColorClass = (s, shiftObj) => {
-    if (s.is_off) return 'bg-red-50 border-red-200 text-red-700';
+    if (s.is_off) return 'bg-paper-2 border-rule text-subtle';
 
     const name = (shiftObj?.name || '').toLowerCase();
     const startClean = (s.custom_start_time || shiftObj?.start_time || '').slice(0, 5);
