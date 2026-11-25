@@ -3,6 +3,7 @@ import React, { useEffect, useState, useMemo, useReducer } from "react";
 import { supabase } from "../../lib/supabaseClient";
 import { useRealtimeSync } from "../../lib/useRealtimeSync";
 import { format, parseISO, startOfMonth, endOfMonth, differenceInMinutes, startOfWeek, addDays, subDays } from "date-fns";
+import { th } from "date-fns/locale";
 import * as XLSX from 'xlsx';
 import { calculatePayroll } from "../../utils/payroll";
 import { getEffectiveDailyRoster } from "../../utils/roster_logic";
@@ -359,11 +360,11 @@ export default function AdminDashboard() {
             fetchSchedules(); // Revert
         }
     };
-    const handleNotifySchedule = async () => { if (confirm("Publish?")) try { await fetch('/api/notify-schedule', { method: 'POST' }); alert("Success"); } catch (e) { } };
+    const handleNotifySchedule = async () => { if (confirm("ส่งตารางงานเข้า LINE?")) try { await fetch('/api/notify-schedule', { method: 'POST' }); alert("ส่งแล้ว"); } catch (e) { } };
 
     // Employee Action
     const handleDeleteEmployee = async (id) => {
-        if (!confirm("⚠️ This will PERMANENTLY delete this staff and all their history.\n\nAre you sure you want to completely remove them from the system so they can register again?")) return;
+        if (!confirm("This will PERMANENTLY delete this staff and all their history.\n\nAre you sure you want to completely remove them from the system so they can register again?")) return;
 
         try {
             // 1. Delete Attendance Logs
@@ -987,7 +988,7 @@ export default function AdminDashboard() {
             const targetDateObj = parseISO(targetDateStr);
 
             return {
-                label: `🌙 ออกกะเมื่อวาน (${formatDate(targetDateObj)})`,
+                label: `ออกกะเมื่อวาน (${formatDate(targetDateObj)})`,
                 color: 'purple',
                 isOvernight: true,
                 shiftDate: targetDateStr
@@ -1113,264 +1114,134 @@ export default function AdminDashboard() {
 
     const navigationCategories = [
         {
-            title: "Main HR & Scheduling",
+            title: "งานหลัก",
             items: [
-                { id: 'dashboard', label: 'Overview', icon: Icons.Sun },
-                { id: 'roster', label: 'Roster', icon: Icons.Clock, isLink: true, href: '/admin/roster' },
-                { id: 'shift_manage', label: 'Shifts', icon: Icons.Swap },
-                { id: 'requests', label: 'Leave Requests', icon: Icons.Bell },
-                { id: 'payroll', label: 'Payroll', icon: Icons.Money, isLink: true, href: '/admin/payroll' },
+                { id: 'dashboard', label: 'ภาพรวม' },
+                { id: 'roster', label: 'ตารางงาน', isLink: true, href: '/admin/roster' },
+                { id: 'shift_manage', label: 'แลกกะ' },
+                { id: 'requests', label: 'ใบลา' },
+                { id: 'payroll', label: 'เงินเดือน', isLink: true, href: '/admin/payroll' },
             ]
         },
         {
-            title: "Restaurant Operations",
+            title: "ร้าน",
             items: [
-                { id: 'nfc_stations', label: 'NFC Stations', icon: Icons.Clock },
-                { id: 'applications', label: 'Hiring', icon: Icons.Job },
+                { id: 'nfc_stations', label: 'จุดแตะ NFC' },
+                { id: 'applications', label: 'รับสมัครงาน' },
             ]
         },
         {
-            title: "System Tools",
+            title: "ระบบ",
             items: [
-                { id: 'employees', label: 'Staff Directory', icon: Icons.Staff },
-                { id: 'announcements', label: 'News/Alerts', icon: Icons.Alert },
-                { id: 'meetings', label: 'Meeting Notes', icon: Icons.File },
-                { id: 'history', label: 'Individual History', icon: Icons.File },
-                { id: 'yuzu', label: 'Yuzu AI', icon: Icons.Yuzu },
-                { id: 'settings', label: 'Shift Config', icon: Icons.Settings },
+                { id: 'employees', label: 'รายชื่อพนักงาน' },
+                { id: 'announcements', label: 'ประกาศ' },
+                { id: 'meetings', label: 'บันทึกการประชุม' },
+                { id: 'history', label: 'ประวัติรายคน' },
+                { id: 'yuzu', label: 'Yuzu AI' },
+                { id: 'settings', label: 'ตั้งค่ากะ' },
             ]
         }
     ];
+    const tabTitle = navigationCategories.flatMap(c => c.items).find(i => i.id === activeTab)?.label || activeTab;
 
     const pendingLeaveCount = data.leaveRequests.filter(r => r.status === 'pending').length;
     const pendingSwapCount = data.swapRequests.filter(r => r.status === 'PENDING_MANAGER').length;
     const pendingStaffCount = data.pendingEmployees?.length || 0;
     const totalAlertsCount = pendingLeaveCount + pendingSwapCount + pendingStaffCount;
+    const pendingApplications = data.jobApplications.filter(r => r.status === 'Pending').length;
+    const countFor = (id) => id === 'requests' ? pendingLeaveCount : id === 'shift_manage' ? pendingSwapCount : id === 'applications' ? pendingApplications : 0;
+
+    // One menu for the desktop sidebar and the phone drawer
+    const renderNav = () => (
+        <>
+            <div className="bg-plum text-cream px-5 py-4 border-b border-plum-3 shrink-0">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/logo-inbaan-wordmark-cream-96.png" alt="ในบ้าน" width={73} height={40} className="h-10 w-auto" />
+                <p className="text-sm text-on-plum-2 mt-1">หลังบ้าน · HR</p>
+            </div>
+            <nav aria-label="เมนูหลังบ้าน" className="flex-1 overflow-y-auto py-4 custom-scrollbar">
+                {navigationCategories.map((category) => (
+                    <div key={category.title} className="mb-4">
+                        <p className="px-5 pb-1 text-sm font-semibold text-neutral">{category.title}</p>
+                        {category.items.map(item => {
+                            const active = activeTab === item.id;
+                            const n = countFor(item.id);
+                            return (
+                                <button
+                                    key={item.id}
+                                    type="button"
+                                    aria-current={active ? 'page' : undefined}
+                                    onClick={() => {
+                                        if (item.isLink) {
+                                            window.location.href = item.href;
+                                        } else {
+                                            setActiveTab(item.id);
+                                            setIsDrawerOpen(false);
+                                        }
+                                    }}
+                                    className={`w-full min-h-11 px-5 flex items-center justify-between gap-3 text-left text-base transition-colors duration-150 ${active ? 'bg-plum text-cream font-semibold' : 'text-charcoal hover:bg-paper-2'}`}
+                                >
+                                    <span>{item.label}{item.isLink && <span className={`ml-1 text-sm ${active ? 'text-on-plum-2' : 'text-neutral'}`}>↗</span>}</span>
+                                    {n > 0 && <span className={`font-num text-sm px-1.5 ${active ? 'bg-cream text-plum' : 'bg-charcoal text-cream'}`}>{n}</span>}
+                                </button>
+                            );
+                        })}
+                    </div>
+                ))}
+            </nav>
+            <div className="border-t border-rule px-5 py-3 shrink-0">
+                <p className="text-sm text-neutral truncate" title={user?.email || "admin"}>{user?.email || "admin"}</p>
+                <button type="button" onClick={signOut} className="mt-1 min-h-11 text-base text-plum underline underline-offset-4">ออกจากระบบ</button>
+            </div>
+        </>
+    );
 
     return (
-        <div className="flex min-h-screen bg-rams-bg text-rams-ink font-sans selection:bg-rams-ink/10">
-            {/* Desktop Sidebar */}
-            <aside className="hidden lg:flex flex-col w-64 bg-rams-panel border-r border-rams-rule sticky top-0 h-screen shrink-0 z-30">
-                <div className="flex items-center gap-3 px-6 py-6 border-b border-rams-rule-light shrink-0 bg-rams-bg/50">
-                    <img src="/logo.png" className="w-10 h-10 object-contain rounded-sm" alt="Logo" onError={(e) => { e.target.style.display = 'none'; }} />
-                    <div>
-                        <h1 className="text-sm font-mono font-bold tracking-wider text-rams-ink uppercase leading-none">In the Haus</h1>
-                        <p className="text-[9px] uppercase tracking-widest text-rams-orange font-mono font-bold mt-1.5">HR & Operations</p>
-                    </div>
-                </div>
-
-                <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-6 custom-scrollbar">
-                    {navigationCategories.map((category, idx) => (
-                        <div key={idx} className="space-y-2.5">
-                            <span className="text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest px-3">{category.title}</span>
-                            <div className="space-y-1">
-                                {category.items.map(item => {
-                                    const active = activeTab === item.id;
-                                    const Icon = item.icon;
-                                    return (
-                                        <button
-                                            key={item.id}
-                                            onClick={() => {
-                                                if (item.isLink) {
-                                                    window.location.href = item.href;
-                                                } else {
-                                                    setActiveTab(item.id);
-                                                    setIsDrawerOpen(false);
-                                                }
-                                            }}
-                                            className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-sm text-xs font-mono font-bold uppercase tracking-wider transition-all duration-150 border cursor-pointer ${
-                                                active
-                                                    ? "bg-rams-ink text-rams-panel border-rams-rule shadow-none"
-                                                    : "text-rams-ink-muted border-transparent hover:bg-rams-bg hover:text-rams-ink"
-                                            }`}
-                                        >
-                                            {Icon && <Icon size={16} strokeWidth={active ? 2.5 : 2} className={active ? "text-rams-orange" : "text-rams-ink-muted"} />}
-                                            <span>{item.label}</span>
-                                            {item.id === 'requests' && pendingLeaveCount > 0 && (
-                                                <span className="ml-auto px-2 py-0.5 bg-rams-red text-rams-panel rounded-sm text-[9px] font-mono font-bold tracking-normal animate-pulse border border-rams-rule">
-                                                    {pendingLeaveCount}
-                                                </span>
-                                            )}
-                                            {item.id === 'applications' && data.jobApplications.filter(r => r.status === 'Pending').length > 0 && (
-                                                <span className="ml-auto px-2 py-0.5 bg-rams-amber text-rams-ink rounded-sm text-[9px] font-mono font-bold tracking-normal border border-rams-rule">
-                                                    {data.jobApplications.filter(r => r.status === 'Pending').length}
-                                                </span>
-                                            )}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    ))}
-                </nav>
-
-                <div className="p-4 border-t border-rams-rule-light bg-rams-bg/50 shrink-0">
-                    <div className="flex items-center gap-3 px-2 py-1.5">
-                        <div className="w-8 h-8 rounded-sm bg-rams-ink border border-rams-rule flex items-center justify-center text-xs font-mono font-black text-rams-panel">
-                            {user?.email ? user.email.slice(0, 2).toUpperCase() : "AD"}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <p className="text-xs font-mono font-bold text-rams-ink truncate">Administrator</p>
-                            <p className="text-[9px] font-mono text-rams-ink-muted uppercase tracking-widest truncate" title={user?.email || "admin"}>
-                                {user?.email || "admin"}
-                            </p>
-                        </div>
-                        <button 
-                            onClick={signOut}
-                            className="p-1.5 border border-rams-rule-light hover:border-rams-rule hover:bg-rams-bg text-rams-ink-muted hover:text-rams-ink rounded-sm transition-all cursor-pointer"
-                            title="Log Out (Supabase Auth)"
-                        >
-                            <Icons.Out size={14} />
-                        </button>
-                    </div>
-                    <div className="text-center py-2.5 text-[8px] font-mono text-rams-ink-muted uppercase border-t border-rams-rule-light/30 tracking-wider bg-rams-bg/30">
-                        ONHAUS SYSTEM © {new Date().getFullYear()}
-                    </div>
-                </div>
+        <div className="brand-v2 flex min-h-screen">
+            {/* Desktop sidebar */}
+            <aside className="hidden lg:flex flex-col w-64 bg-cream border-r border-charcoal sticky top-0 h-screen shrink-0 z-30">
+                {renderNav()}
             </aside>
 
-            {/* Mobile Drawer (Slide-over) */}
+            {/* Phone drawer */}
             {isDrawerOpen && (
-                <div className="fixed inset-0 z-50 lg:hidden flex">
-                    <div 
-                        onClick={() => setIsDrawerOpen(false)}
-                        className="fixed inset-0 bg-rams-ink/40 backdrop-blur-[2px] transition-opacity duration-300"
-                    />
-                    
-                    <aside className="relative flex flex-col w-64 max-w-xs bg-rams-panel border-r border-rams-rule h-full shadow-none animate-in slide-in-from-left duration-250 z-50">
-                        <div className="absolute top-4 right-4">
-                            <button 
-                                onClick={() => setIsDrawerOpen(false)}
-                                className="w-8 h-8 border border-rams-rule-light hover:border-rams-rule bg-rams-bg text-rams-ink-muted hover:text-rams-ink flex items-center justify-center font-mono text-xs transition-all cursor-pointer"
-                            >
-                                <Icons.X size={16} />
-                            </button>
-                        </div>
-                        
-                        <div className="flex items-center gap-3 px-6 py-6 border-b border-rams-rule-light shrink-0 bg-rams-bg/50">
-                            <img src="/logo.png" className="w-10 h-10 object-contain rounded-sm" alt="Logo" onError={(e) => { e.target.style.display = 'none'; }} />
-                            <div>
-                                <h1 className="text-sm font-mono font-bold tracking-wider text-rams-ink uppercase leading-none">In the Haus</h1>
-                                <p className="text-[9px] uppercase tracking-widest text-rams-orange font-mono font-bold mt-1.5">HR & Operations</p>
-                            </div>
-                        </div>
-                        
-                        <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-6 custom-scrollbar bg-rams-panel">
-                            {navigationCategories.map((category, idx) => (
-                                <div key={idx} className="space-y-2.5">
-                                    <span className="text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest px-3">{category.title}</span>
-                                    <div className="space-y-1">
-                                        {category.items.map(item => {
-                                            const active = activeTab === item.id;
-                                            const Icon = item.icon;
-                                            return (
-                                                <button
-                                                    key={item.id}
-                                                    onClick={() => {
-                                                        if (item.isLink) {
-                                                            window.location.href = item.href;
-                                                        } else {
-                                                            setActiveTab(item.id);
-                                                            setIsDrawerOpen(false);
-                                                        }
-                                                    }}
-                                                    className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-sm text-xs font-mono font-bold uppercase tracking-wider transition-all duration-150 border cursor-pointer ${
-                                                        active
-                                                            ? "bg-rams-ink text-rams-panel border-rams-rule shadow-none"
-                                                            : "text-rams-ink-muted border-transparent hover:bg-rams-bg hover:text-rams-ink"
-                                                    }`}
-                                                >
-                                                    {Icon && <Icon size={16} strokeWidth={active ? 2.5 : 2} className={active ? "text-rams-orange" : "text-rams-ink-muted"} />}
-                                                    <span>{item.label}</span>
-                                                    {item.id === 'requests' && pendingLeaveCount > 0 && (
-                                                        <span className="ml-auto px-2 py-0.5 bg-rams-red text-rams-panel rounded-sm text-[9px] font-mono font-bold tracking-normal animate-pulse border border-rams-rule">
-                                                            {pendingLeaveCount}
-                                                        </span>
-                                                    )}
-                                                    {item.id === 'applications' && data.jobApplications.filter(r => r.status === 'Pending').length > 0 && (
-                                                        <span className="ml-auto px-2 py-0.5 bg-rams-amber text-rams-ink rounded-sm text-[9px] font-mono font-bold tracking-normal border border-rams-rule">
-                                                            {data.jobApplications.filter(r => r.status === 'Pending').length}
-                                                        </span>
-                                                    )}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            ))}
-                        </nav>
-                        
-                        <div className="p-4 border-t border-rams-rule-light bg-rams-bg/50 shrink-0">
-                            <div className="flex items-center gap-3 px-2 py-1.5">
-                                <div className="w-8 h-8 rounded-sm bg-rams-ink border border-rams-rule flex items-center justify-center text-xs font-mono font-black text-rams-panel">
-                                    {user?.email ? user.email.slice(0, 2).toUpperCase() : "AD"}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-xs font-mono font-bold text-rams-ink truncate">Administrator</p>
-                                    <p className="text-[9px] font-mono text-rams-ink-muted uppercase tracking-widest truncate" title={user?.email || "admin"}>
-                                        {user?.email || "admin"}
-                                    </p>
-                                </div>
-                                <button 
-                                    onClick={signOut}
-                                    className="p-1.5 border border-rams-rule-light hover:border-rams-rule hover:bg-rams-bg text-rams-ink-muted hover:text-rams-ink rounded-sm transition-all cursor-pointer"
-                                    title="Log Out (Supabase Auth)"
-                                >
-                                    <Icons.Out size={14} />
-                                </button>
-                            </div>
-                            <div className="text-center py-2.5 text-[8px] font-mono text-rams-ink-muted uppercase border-t border-rams-rule-light/30 tracking-wider bg-rams-bg/30">
-                                ONHAUS SYSTEM © {new Date().getFullYear()}
-                            </div>
-                        </div>
+                <div className="fixed inset-0 z-50 lg:hidden flex" role="dialog" aria-modal="true" aria-label="เมนู">
+                    <div onClick={() => setIsDrawerOpen(false)} className="fixed inset-0 bg-charcoal/50" />
+                    <aside className="relative flex flex-col w-72 max-w-[85vw] bg-cream border-r border-charcoal h-full z-50">
+                        <button type="button" onClick={() => setIsDrawerOpen(false)} className="absolute top-3 right-3 z-10 min-h-11 px-3 text-base font-semibold text-cream hover:bg-plum-2 transition-colors duration-150">ปิด</button>
+                        {renderNav()}
                     </aside>
                 </div>
             )}
 
-            {/* Main content wrapper */}
             <div className="flex-1 flex flex-col min-w-0">
-                {/* Mobile Top Header */}
-                <header className="lg:hidden sticky top-0 z-40 bg-rams-panel/90 backdrop-blur-[2px] border-b border-rams-rule px-4 py-3 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <button 
-                            onClick={() => setIsDrawerOpen(true)}
-                            className="p-2 -ml-2 text-rams-ink hover:bg-rams-bg rounded-sm border border-transparent hover:border-rams-rule-light transition-all cursor-pointer"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-                            </svg>
-                        </button>
-                        <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 bg-rams-ink border border-rams-rule rounded-sm flex items-center justify-center text-rams-panel text-sm font-mono font-black">H</div>
-                            <h1 className="text-sm font-mono font-bold tracking-wider text-rams-ink uppercase leading-none">In the Haus</h1>
-                        </div>
+                {/* Phone top bar */}
+                <header className="lg:hidden sticky top-0 z-40 bg-plum text-cream border-b border-plum-3 flex items-stretch">
+                    <button type="button" onClick={() => setIsDrawerOpen(true)} className="min-h-14 px-4 border-r border-plum-3 text-base font-semibold hover:bg-plum-2 transition-colors duration-150">
+                        เมนู{totalAlertsCount > 0 && <span className="ml-1.5 font-num text-sm bg-cream text-plum px-1.5">{totalAlertsCount}</span>}
+                    </button>
+                    <div className="flex-1 px-4 flex items-center min-w-0">
+                        <span className="font-head text-xl truncate">{tabTitle}</span>
                     </div>
-                    
-                    <div className="group relative bg-rams-bg px-3 py-1 rounded-sm border border-rams-rule-light flex items-center gap-1.5 shadow-none">
-                        <Icons.Calendar size={12} className="text-rams-ink-muted" />
-                        <input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="bg-transparent font-mono font-bold text-rams-ink outline-none text-[10px] cursor-pointer border-none p-0 focus:ring-0 w-24 uppercase" />
-                    </div>
+                    <label className="flex items-center px-3 border-l border-plum-3">
+                        <span className="sr-only">เดือน</span>
+                        <input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="bg-transparent font-num text-sm text-cream outline-none w-[10rem] [color-scheme:dark]" />
+                    </label>
                 </header>
 
-                {/* Main Scrollable Content */}
                 <main className="flex-1 p-4 md:p-6 lg:p-8 max-w-7xl w-full mx-auto space-y-6">
-                    {/* Header bar on Desktop */}
-                    <div className="hidden lg:flex justify-between items-center mb-2">
-                        <div>
-                            <h1 className="text-xl font-mono font-bold text-rams-ink uppercase tracking-wider">
-                                {activeTab === 'dashboard' ? 'Overview' : activeTab === 'shift_manage' ? 'Shifts Approval' : activeTab.replace('_', ' ')}
-                            </h1>
-                        </div>
-                        
-                        <div className="flex items-center gap-2 bg-rams-panel px-3.5 py-1.5 rounded-sm border border-rams-rule shadow-[0_2px_0_0_var(--color-rams-rule)] transition-all">
-                            <Icons.Calendar size={14} className="text-rams-orange" />
-                            <input 
-                                type="month" 
-                                value={selectedMonth} 
-                                onChange={e => setSelectedMonth(e.target.value)} 
-                                className="bg-transparent font-mono font-bold text-rams-ink outline-none text-xs cursor-pointer border-none p-0 focus:ring-0 uppercase" 
+                    {/* Desktop page header */}
+                    <div className="hidden lg:flex justify-between items-end border-b-2 border-charcoal pb-3">
+                        <h1 className="font-head text-3xl leading-normal text-charcoal">{tabTitle}</h1>
+                        <label className="text-sm font-semibold text-neutral">
+                            เดือน
+                            <input
+                                type="month"
+                                value={selectedMonth}
+                                onChange={e => setSelectedMonth(e.target.value)}
+                                className="block mt-1 min-h-11 px-3 bg-cream border border-charcoal font-num text-base text-charcoal outline-none focus-visible:border-plum"
                             />
-                        </div>
+                        </label>
                     </div>
 
                     {/* --- DASHBOARD OVERVIEW --- */}
@@ -1407,18 +1278,18 @@ export default function AdminDashboard() {
 
                     {/* Manual Entry Modal */}
                     {showManualModal && (
-                        <div className="fixed inset-0 z-[60] bg-rams-ink/40 backdrop-blur-[2px] flex items-center justify-center p-4">
-                            <div className="bg-rams-panel border border-rams-rule rounded-sm w-full max-w-sm p-6 space-y-4 shadow-none">
-                                <div className="flex justify-between items-center border-b border-rams-rule-light pb-2">
-                                    <h3 className="font-mono font-bold text-rams-ink text-sm uppercase tracking-wider">Manual Attendance</h3>
-                                    <button onClick={() => setShowManualModal(false)} className="w-7 h-7 flex items-center justify-center border border-rams-rule-light hover:border-rams-rule bg-rams-bg text-rams-ink font-mono text-xs transition-all cursor-pointer">✕</button>
+                        <div className="fixed inset-0 z-[60] bg-charcoal/50 flex items-center justify-center p-4">
+                            <div className="bg-cream border border-charcoal w-full max-w-sm p-6 space-y-4">
+                                <div className="flex justify-between items-center border-b border-rule pb-2">
+                                    <h3 className="font-num font-semibold text-charcoal text-sm">Manual Attendance</h3>
+                                    <button onClick={() => setShowManualModal(false)} className="flex items-center justify-center border border-rule hover:border-charcoal bg-cream text-charcoal text-xs transition-colors duration-150 cursor-pointer min-h-11 px-3 text-sm font-semibold underline-offset-4 hover:underline">ปิด</button>
                                 </div>
 
                                 <div className="space-y-4">
                                     <div>
-                                        <label className="block text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1.5">Employee</label>
+                                        <label className="block text-xs font-num font-semibold text-neutral mb-1.5">Employee</label>
                                         <select
-                                            className="w-full p-2.5 bg-rams-bg border border-rams-rule-light rounded-sm text-xs font-mono font-bold text-rams-ink outline-none focus:border-rams-rule transition-all cursor-pointer appearance-none"
+                                            className="w-full p-2.5 bg-cream border border-rule text-xs font-num font-semibold text-charcoal outline-none focus:border-charcoal transition-colors duration-150 cursor-pointer appearance-none"
                                             value={manualForm.empId}
                                             onChange={e => setManualForm({ ...manualForm, empId: e.target.value })}
                                         >
@@ -1429,19 +1300,19 @@ export default function AdminDashboard() {
 
                                     <div className="grid grid-cols-2 gap-3">
                                         <div>
-                                            <label className="block text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1.5">Date</label>
+                                            <label className="block text-xs font-num font-semibold text-neutral mb-1.5">Date</label>
                                             <input
                                                 type="date"
-                                                className="w-full p-2.5 bg-rams-bg border border-rams-rule-light rounded-sm text-xs font-mono font-bold text-rams-ink outline-none focus:border-rams-rule transition-all"
+                                                className="w-full p-2.5 bg-cream border border-rule text-xs font-num font-semibold text-charcoal outline-none focus:border-charcoal transition-colors duration-150"
                                                 value={manualForm.date}
                                                 onChange={e => setManualForm({ ...manualForm, date: e.target.value })}
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1.5">Time</label>
+                                            <label className="block text-xs font-num font-semibold text-neutral mb-1.5">Time</label>
                                             <input
                                                 type="time"
-                                                className="w-full p-2.5 bg-rams-bg border border-rams-rule-light rounded-sm text-xs font-mono font-bold text-rams-ink outline-none focus:border-rams-rule transition-all"
+                                                className="w-full p-2.5 bg-cream border border-rule text-xs font-num font-semibold text-charcoal outline-none focus:border-charcoal transition-colors duration-150"
                                                 value={manualForm.time}
                                                 onChange={e => setManualForm({ ...manualForm, time: e.target.value })}
                                             />
@@ -1449,17 +1320,17 @@ export default function AdminDashboard() {
                                     </div>
 
                                     <div>
-                                        <label className="block text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest mb-1.5">Action Type</label>
+                                        <label className="block text-xs font-num font-semibold text-neutral mb-1.5">Action Type</label>
                                         <div className="grid grid-cols-2 gap-2 mt-1">
                                             <button
                                                 onClick={() => setManualForm({ ...manualForm, type: 'check_in' })}
-                                                className={`p-2.5 rounded-sm text-xs font-mono font-bold uppercase tracking-wider border transition-all cursor-pointer ${manualForm.type === 'check_in' ? 'bg-rams-green/10 border-rams-green text-rams-green' : 'bg-rams-bg border-rams-rule-light text-rams-ink-muted hover:border-rams-rule'}`}
+                                                className={`p-2.5 text-xs font-num font-semibold border transition-colors duration-150 cursor-pointer ${manualForm.type === 'check_in' ? 'bg-charcoal/10 border-charcoal text-charcoal' : 'bg-cream border-rule text-neutral hover:border-charcoal'}`}
                                             >
                                                 Check In
                                             </button>
                                             <button
                                                 onClick={() => setManualForm({ ...manualForm, type: 'check_out' })}
-                                                className={`p-2.5 rounded-sm text-xs font-mono font-bold uppercase tracking-wider border transition-all cursor-pointer ${manualForm.type === 'check_out' ? 'bg-rams-orange/10 border-rams-orange text-rams-orange' : 'bg-rams-bg border-rams-rule-light text-rams-ink-muted hover:border-rams-rule'}`}
+                                                className={`p-2.5 text-xs font-num font-semibold border transition-colors duration-150 cursor-pointer ${manualForm.type === 'check_out' ? 'bg-plum/10 border-plum text-plum' : 'bg-cream border-rule text-neutral hover:border-charcoal'}`}
                                             >
                                                 Check Out
                                             </button>
@@ -1468,7 +1339,7 @@ export default function AdminDashboard() {
 
                                     <button
                                         onClick={handleManualSubmit}
-                                        className="w-full py-2.5 bg-rams-orange text-rams-panel border border-rams-rule rounded-sm font-mono font-bold text-xs uppercase tracking-wider shadow-[0_2px_0_0_var(--color-rams-rule)] hover:bg-rams-orange-active active:translate-y-[2px] active:shadow-none transition-all cursor-pointer mt-4"
+                                        className="w-full py-2.5 bg-plum text-cream border border-charcoal font-num font-semibold text-xs hover:bg-plum-2 transition-colors duration-150 cursor-pointer mt-4"
                                     >
                                         Confirm Entry
                                     </button>
@@ -1479,7 +1350,7 @@ export default function AdminDashboard() {
 
                     {/* --- STAFF DIRECTORY --- */}
                     {activeTab === 'employees' && (
-                        <div className="space-y-6 animate-in fade-in duration-200">
+                        <div className="space-y-6">
                             <StaffDirectoryManager
                                 employees={data.employees}
                                 pendingEmployees={data.pendingEmployees}
@@ -1574,36 +1445,36 @@ export default function AdminDashboard() {
                                 {/* Header Title */}
                                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                                     <div>
-                                        <h3 className="font-extrabold text-slate-800 text-2xl">Leave Requests (คำขอลาหยุดพนักงาน)</h3>
-                                        <p className="text-slate-500 text-xs mt-1 font-medium font-bold">จัดการใบลา อนุมัติ และตรวจสอบการทำงานแทนกันในระบบ</p>
+                                        <h3 className="font-semibold text-charcoal text-2xl">ใบลาของพนักงาน</h3>
+                                        <p className="text-neutral text-xs mt-1 font-medium font-semibold">จัดการใบลา อนุมัติ และตรวจสอบการทำงานแทนกันในระบบ</p>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         {selectedLeaveIds.length > 0 && (
                                             <button
                                                 type="button"
                                                 onClick={handleDeleteMultipleLeaves}
-                                                className="px-4 py-2 rounded-xl text-xs font-bold transition-all border shadow-sm bg-rose-600 text-white border-rose-700 hover:bg-rose-700 active:scale-95"
+                                                className="px-4 py-2 text-xs font-semibold transition-colors duration-150 border bg-error text-cream border-error hover:bg-error/90 "
                                             >
-                                                🗑️ ลบใบลาที่เลือก ({selectedLeaveIds.length})
+                                                ลบใบลาที่เลือก ({selectedLeaveIds.length})
                                             </button>
                                         )}
                                         <button
                                             type="button"
                                             onClick={() => setLeaveShowAllMonths(prev => !prev)}
-                                            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border shadow-sm ${
-                                                leaveShowAllMonths
-                                                    ? 'bg-slate-900 text-white border-slate-950 hover:bg-black'
-                                                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                                            }`}
+                                            className={`px-4 py-2 text-xs font-semibold transition-colors duration-150 border ${
+ leaveShowAllMonths
+ ? 'bg-charcoal text-cream border-charcoal hover:bg-charcoal-2'
+ : 'bg-cream text-charcoal border-rule hover:bg-paper-2'
+ }`}
                                         >
-                                            {leaveShowAllMonths ? '📅 แสดงเฉพาะเดือนที่เลือก' : '🌐 แสดงประวัติทั้งหมด'}
+                                            {leaveShowAllMonths ? 'แสดงเฉพาะเดือนที่เลือก' : 'แสดงประวัติทั้งหมด'}
                                         </button>
                                         <button
                                             type="button"
                                             onClick={() => setShowAdminLeaveModal(true)}
-                                            className="px-4 py-2 rounded-xl text-xs font-bold transition-all border shadow-sm bg-indigo-600 text-white border-indigo-700 hover:bg-indigo-700 active:scale-95"
+                                            className="px-4 py-2 text-xs font-semibold transition-colors duration-150 border bg-charcoal text-cream border-plum hover:bg-charcoal-2 "
                                         >
-                                            ➕ เพิ่มใบลา (Admin)
+                                            บันทึกใบลาแทนพนักงาน
                                         </button>
                                     </div>
                                 </div>
@@ -1611,55 +1482,51 @@ export default function AdminDashboard() {
 
                                 {/* Stat Cards */}
                                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                    <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm flex items-center gap-4">
-                                        <div className="w-12 h-12 bg-slate-55 text-slate-600 rounded-xl flex items-center justify-center text-lg select-none">📋</div>
+                                    <div className="bg-cream border border-rule p-4 flex items-center gap-4">
                                         <div>
-                                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">ทั้งหมด (เดือนนี้)</div>
-                                            <div className="text-xl font-extrabold text-slate-850">{stats.total} รายการ</div>
+                                            <div className="text-xs font-semibold text-neutral">ทั้งหมด (เดือนนี้)</div>
+                                            <div className="text-xl font-semibold text-charcoal">{stats.total} รายการ</div>
                                         </div>
                                     </div>
-                                    <div className="bg-amber-50/50 border border-amber-200 rounded-2xl p-4 shadow-sm flex items-center gap-4">
-                                        <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center text-lg select-none">⏳</div>
+                                    <div className="bg-paper-2 border border-plum p-4 flex items-center gap-4">
                                         <div>
-                                            <div className="text-[10px] font-bold text-amber-500 uppercase tracking-wider">รออนุมัติ</div>
-                                            <div className="text-xl font-extrabold text-amber-700">{stats.pending} รายการ</div>
+                                            <div className="text-xs font-semibold text-plum">รออนุมัติ</div>
+                                            <div className="text-xl font-semibold text-plum">{stats.pending} รายการ</div>
                                         </div>
                                     </div>
-                                    <div className="bg-emerald-50/50 border border-emerald-250 rounded-2xl p-4 shadow-sm flex items-center gap-4">
-                                        <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center text-lg select-none">✅</div>
+                                    <div className="bg-paper-2 border border-plum p-4 flex items-center gap-4">
                                         <div>
-                                            <div className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider">อนุมัติแล้ว</div>
-                                            <div className="text-xl font-extrabold text-emerald-700">{stats.approved} รายการ</div>
+                                            <div className="text-xs font-semibold text-plum">อนุมัติแล้ว</div>
+                                            <div className="text-xl font-semibold text-plum">{stats.approved} รายการ</div>
                                         </div>
                                     </div>
-                                    <div className="bg-rose-50/50 border border-rose-250 rounded-2xl p-4 shadow-sm flex items-center gap-4">
-                                        <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-xl flex items-center justify-center text-lg select-none">❌</div>
+                                    <div className="bg-cream border border-rule p-4 flex items-center gap-4">
                                         <div>
-                                            <div className="text-[10px] font-bold text-rose-500 uppercase tracking-wider">ปฏิเสธแล้ว</div>
-                                            <div className="text-xl font-extrabold text-rose-700">{stats.rejected} รายการ</div>
+                                            <div className="text-xs font-semibold text-neutral">ปฏิเสธแล้ว</div>
+                                            <div className="text-xl font-semibold text-charcoal">{stats.rejected} รายการ</div>
                                         </div>
                                     </div>
                                 </div>
 
                                 {/* Filters and Search Row */}
-                                <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4">
+                                <div className="bg-cream border border-rule p-4 flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4">
                                     {/* Tabs */}
-                                    <div className="flex bg-slate-100 p-1 rounded-xl gap-1">
+                                    <div className="flex bg-paper-2 p-1 gap-1">
                                         {[
                                             { id: 'all', label: 'ทั้งหมด' },
-                                            { id: 'pending', label: 'รออนุมัติ ⏳' },
-                                            { id: 'approved', label: 'อนุมัติแล้ว ✅' },
-                                            { id: 'rejected', label: 'ปฏิเสธแล้ว ❌' }
+                                            { id: 'pending', label: 'รออนุมัติ' },
+                                            { id: 'approved', label: 'อนุมัติแล้ว ' },
+                                            { id: 'rejected', label: 'ปฏิเสธแล้ว ' }
                                         ].map(tab => (
                                             <button
                                                 key={tab.id}
                                                 type="button"
                                                 onClick={() => setLeaveStatusFilter(tab.id)}
-                                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                                                    leaveStatusFilter === tab.id
-                                                        ? 'bg-white text-slate-800 shadow-sm'
-                                                        : 'text-slate-500 hover:text-slate-800'
-                                                }`}
+                                                className={`px-3 py-1.5 text-xs font-semibold transition-colors duration-150 ${
+ leaveStatusFilter === tab.id
+ ? 'bg-cream text-charcoal '
+ : 'text-neutral hover:text-charcoal'
+ }`}
                                             >
                                                 {tab.label}
                                             </button>
@@ -1673,16 +1540,16 @@ export default function AdminDashboard() {
                                             value={leaveSearchQuery}
                                             onChange={e => setLeaveSearchQuery(e.target.value)}
                                             placeholder="ค้นหาตามชื่อพนักงาน, คนปฏิบัติแทน หรือเหตุผล..."
-                                            className="w-full bg-slate-55 border border-slate-200 rounded-xl pl-4 pr-10 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-200 transition-all placeholder:text-slate-400 font-bold"
+                                            className="w-full bg-paper-2 border border-rule pl-4 pr-10 py-2 text-xs font-semibold text-charcoal focus:outline-none focus:ring-2 focus:ring-slate-200 transition-colors duration-150 placeholder:text-neutral font-semibold"
                                         />
-                                        <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 select-none text-xs">🔍</span>
+                                        <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-neutral select-none text-xs"></span>
                                     </div>
                                 </div>
 
                                 {/* Table Card */}
-                                <Card className="p-0 overflow-hidden border border-slate-200/80">
+                                <Card className="p-0 overflow-hidden border border-rule">
                                     <table className="w-full text-sm text-left">
-                                        <thead className="bg-slate-50 text-slate-500 font-extrabold text-xs uppercase tracking-wider border-b border-slate-100">
+                                        <thead className="bg-paper-2 text-neutral font-semibold text-xs border-b border-rule">
                                             <tr>
                                                 <th className="p-4 w-10">
                                                     <input
@@ -1695,7 +1562,7 @@ export default function AdminDashboard() {
                                                                 setSelectedLeaveIds([]);
                                                             }
                                                         }}
-                                                        className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 cursor-pointer"
+                                                        className="w-4 h-4 text-plum focus:ring-indigo-500 border-rule cursor-pointer"
                                                     />
                                                 </th>
                                                 <th className="p-4">พนักงาน</th>
@@ -1710,14 +1577,14 @@ export default function AdminDashboard() {
                                         <tbody className="divide-y divide-slate-100">
                                             {filteredLeaveRequests.map(req => {
                                                 const leaveTypeMap = {
-                                                    sick: { label: 'ลาป่วย 😷', color: 'bg-rose-50 text-rose-700 border-rose-200' },
-                                                    business: { label: 'ลากิจ 💼', color: 'bg-blue-50 text-blue-700 border-blue-200' },
-                                                    vacation: { label: 'พักร้อน 🏖️', color: 'bg-emerald-50 text-emerald-700 border-emerald-250' }
+                                                    sick: { label: 'ลาป่วย ', color: 'bg-paper-2 text-error border-error' },
+                                                    business: { label: 'ลากิจ ', color: 'bg-paper-2 text-plum border-plum' },
+                                                    vacation: { label: 'พักร้อน ', color: 'bg-paper-2 text-plum border-plum' }
                                                 };
-                                                const currentType = leaveTypeMap[req.leave_type] || { label: req.leave_type, color: 'bg-slate-100 text-slate-700 border-slate-200' };
+                                                const currentType = leaveTypeMap[req.leave_type] || { label: req.leave_type, color: 'bg-paper-2 text-charcoal border-rule' };
 
                                                 return (
-                                                    <tr key={req.id} className="hover:bg-slate-50/50 transition-colors">
+                                                    <tr key={req.id} className="hover:bg-paper-2/50 transition-colors">
                                                         <td className="p-4 w-10">
                                                             <input
                                                                 type="checkbox"
@@ -1729,34 +1596,34 @@ export default function AdminDashboard() {
                                                                         setSelectedLeaveIds(selectedLeaveIds.filter(id => id !== req.id));
                                                                     }
                                                                 }}
-                                                                className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 cursor-pointer"
+                                                                className="w-4 h-4 text-plum focus:ring-indigo-500 border-rule cursor-pointer"
                                                             />
                                                         </td>
                                                         {/* Employee Name & Profile */}
                                                         <td className="p-4">
                                                             <div className="flex items-center gap-3">
-                                                                <EmployeeAvatar employee={req.employees} className="w-9 h-9 rounded-xl" textClassName="text-xs font-bold" />
+                                                                <EmployeeAvatar employee={req.employees} className="w-9 h-9" textClassName="text-xs font-semibold" />
                                                                 <div>
-                                                                    <div className="font-extrabold text-slate-900">{req.employees?.nickname || req.employees?.name}</div>
-                                                                    <div className="text-[10px] text-slate-400 font-bold tracking-wide uppercase">{req.employees?.position || 'Staff'}</div>
+                                                                    <div className="font-semibold text-charcoal">{req.employees?.nickname || req.employees?.name}</div>
+                                                                    <div className="text-xs text-neutral font-semibold">{req.employees?.position || 'พนักงาน'}</div>
                                                                 </div>
                                                             </div>
                                                         </td>
 
                                                         {/* Date */}
-                                                        <td className="p-4 font-bold text-slate-700 text-xs">
+                                                        <td className="p-4 font-semibold text-charcoal text-xs">
                                                             {formatThaiLeaveDate(req.leave_date)}
                                                         </td>
 
                                                         {/* Leave Type */}
                                                         <td className="p-4">
-                                                            <span className={`px-2.5 py-1.5 rounded-lg text-xs font-bold border ${currentType.color} inline-block`}>
+                                                            <span className={`px-2.5 py-1.5 text-xs font-semibold border ${currentType.color} inline-block`}>
                                                                 {currentType.label}
                                                             </span>
                                                         </td>
 
                                                         {/* Reason */}
-                                                        <td className="p-4 text-xs font-medium text-slate-600 italic max-w-[200px] truncate" title={req.reason}>
+                                                        <td className="p-4 text-xs font-medium text-neutral max-w-[200px] truncate" title={req.reason}>
                                                             &ldquo;{req.reason || '-'}&rdquo;
                                                         </td>
 
@@ -1764,25 +1631,25 @@ export default function AdminDashboard() {
                                                         <td className="p-4">
                                                             {req.replacement_employee ? (
                                                                 <div className="flex items-center gap-2">
-                                                                    <EmployeeAvatar employee={req.replacement_employee} className="w-6 h-6 rounded-lg" textClassName="text-[9px] font-bold" />
-                                                                    <span className="font-bold text-slate-800 text-xs">
+                                                                    <EmployeeAvatar employee={req.replacement_employee} className="w-6 h-6" textClassName="text-xs font-semibold" />
+                                                                    <span className="font-semibold text-charcoal text-xs">
                                                                         {req.replacement_employee.nickname || req.replacement_employee.name}
                                                                     </span>
                                                                 </div>
                                                             ) : (
-                                                                <span className="text-slate-400 text-xs font-semibold">-</span>
+                                                                <span className="text-neutral text-xs font-semibold">-</span>
                                                             )}
                                                         </td>
 
                                                         {/* Status Badge */}
                                                         <td className="p-4 text-center">
-                                                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-black tracking-wide uppercase border ${
-                                                                req.status === 'approved' 
-                                                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-250' 
-                                                                    : req.status === 'rejected' 
-                                                                        ? 'bg-rose-50 text-rose-700 border-rose-250' 
-                                                                        : 'bg-amber-50 text-amber-700 border-amber-250 animate-pulse'
-                                                            }`}>
+                                                            <span className={`px-2.5 py-1 text-xs font-semibold border ${
+ req.status === 'approved' 
+ ? 'bg-paper-2 text-plum border-plum' 
+ : req.status === 'rejected' 
+ ? 'bg-paper-2 text-error border-error' 
+ : 'bg-paper-2 text-plum border-plum '
+ }`}>
                                                                 {req.status === 'approved' ? 'อนุมัติแล้ว' : req.status === 'rejected' ? 'ปฏิเสธแล้ว' : 'รออนุมัติ'}
                                                             </span>
                                                         </td>
@@ -1794,31 +1661,31 @@ export default function AdminDashboard() {
                                                                     <>
                                                                         <button 
                                                                             onClick={() => handleLeaveAction(req, 'approved')} 
-                                                                            className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] rounded-lg transition-colors shadow-sm flex items-center gap-1"
+                                                                            className="px-2.5 py-1.5 bg-charcoal hover:bg-charcoal-2 text-cream font-semibold text-xs transition-colors flex items-center gap-1"
                                                                         >
-                                                                            <span>✓</span> อนุมัติ & ซิงค์
+                                                                            <span></span> อนุมัติ & ซิงค์
                                                                         </button>
                                                                         <button 
                                                                             onClick={() => handleLeaveAction(req, 'rejected')} 
-                                                                            className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-[10px] rounded-lg transition-colors shadow-sm flex items-center gap-1"
+                                                                            className="px-2.5 py-1.5 bg-charcoal hover:bg-charcoal-2 text-cream font-semibold text-xs transition-colors flex items-center gap-1"
                                                                         >
-                                                                            <span>✕</span> ปฏิเสธคำขอ
+                                                                            <span></span> ปฏิเสธคำขอ
                                                                         </button>
                                                                     </>
                                                                 ) : (
                                                                     <button 
                                                                         onClick={() => handleLeaveAction(req, 'pending')}
-                                                                        className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-650 border border-slate-200 font-bold text-[10px] rounded-lg transition-colors"
+                                                                        className="px-2 py-1 bg-paper-2 hover:bg-paper-3 text-charcoal border border-rule font-semibold text-xs transition-colors"
                                                                     >
-                                                                        🔄 เปลี่ยนเป็นรออนุมัติ
+                                                                        เปลี่ยนเป็นรออนุมัติ
                                                                     </button>
                                                                 )}
                                                                 <button 
                                                                     onClick={() => handleDeleteLeaveRequest(req)}
-                                                                    className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-bold text-[10px] rounded-lg transition-colors flex items-center gap-1 shadow-sm"
+                                                                    className="px-2.5 py-1.5 bg-paper-2 hover:bg-paper-2 text-error border border-error font-semibold text-xs transition-colors flex items-center gap-1"
                                                                     title="ลบใบลาหยุด"
                                                                 >
-                                                                    <span>🗑️</span> ลบใบลา
+                                                                    <span></span> ลบใบลา
                                                                 </button>
                                                             </div>
                                                         </td>
@@ -1828,7 +1695,7 @@ export default function AdminDashboard() {
                                         </tbody>
                                     </table>
                                     {filteredLeaveRequests.length === 0 && (
-                                        <div className="p-12 text-center text-slate-400 font-bold bg-slate-50/50">
+                                        <div className="p-12 text-center text-neutral font-semibold bg-paper-2/50">
                                             ไม่พบรายการคำขอลาหยุดในเงื่อนไขการกรองนี้
                                         </div>
                                     )}
@@ -1839,16 +1706,16 @@ export default function AdminDashboard() {
 
                     {/* Admin Leave Creation Modal */}
                     {showAdminLeaveModal && (
-                        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowAdminLeaveModal(false)}>
-                            <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowAdminLeaveModal(false)}>
+                            <div className="bg-cream max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
                                 {/* Modal Header */}
-                                <div className="bg-gradient-to-r from-indigo-600 to-indigo-800 text-white p-6 rounded-t-3xl">
+                                <div className="bg-gradient-to-r from-indigo-600 to-indigo-800 text-cream p-6 rounded-t-3xl">
                                     <div className="flex items-center justify-between">
                                         <div>
-                                            <h3 className="text-lg font-extrabold">➕ เพิ่มใบลาหยุด (Admin)</h3>
-                                            <p className="text-indigo-200 text-xs mt-1 font-medium">สร้างใบลาให้พนักงานโดย Admin พร้อม Sync Roster อัตโนมัติ</p>
+                                            <h3 className="text-lg font-semibold">เพิ่มใบลาหยุด</h3>
+                                            <p className="text-plum text-xs mt-1 font-medium">สร้างใบลาให้พนักงานโดย Admin พร้อม Sync Roster อัตโนมัติ</p>
                                         </div>
-                                        <button onClick={() => setShowAdminLeaveModal(false)} className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 transition-colors text-sm font-bold">✕</button>
+                                        <button onClick={() => setShowAdminLeaveModal(false)} className="bg-cream/20 flex items-center justify-center hover:bg-cream/30 transition-colors text-sm font-semibold min-h-11 px-3 text-sm font-semibold underline-offset-4 hover:underline">ปิด</button>
                                     </div>
                                 </div>
 
@@ -1856,11 +1723,11 @@ export default function AdminDashboard() {
                                 <div className="p-6 space-y-5">
                                     {/* Employee Selection */}
                                     <div>
-                                        <label className="block text-[10px] font-extrabold text-indigo-600 uppercase tracking-widest mb-1.5">👤 เลือกพนักงาน</label>
+                                        <label className="block text-xs font-semibold text-plum mb-1.5">เลือกพนักงาน</label>
                                         <select
                                             value={adminLeaveForm.empId}
                                             onChange={e => setAdminLeaveForm(prev => ({ ...prev, empId: e.target.value, replacementId: "" }))}
-                                            className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 text-slate-900 font-bold text-sm outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition"
+                                            className="w-full p-3 border border-rule bg-paper-2 text-charcoal font-semibold text-sm outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-plum transition"
                                         >
                                             <option value="">-- เลือกพนักงาน --</option>
                                             {data.employees.map(emp => (
@@ -1874,7 +1741,7 @@ export default function AdminDashboard() {
                                     {/* Date Range */}
                                     <div className="grid grid-cols-2 gap-3">
                                         <div>
-                                            <label className="block text-[10px] font-extrabold text-indigo-600 uppercase tracking-widest mb-1.5">📅 เริ่มวันที่</label>
+                                            <label className="block text-xs font-semibold text-plum mb-1.5">เริ่มวันที่</label>
                                             <input
                                                 type="date"
                                                 value={adminLeaveForm.startDate}
@@ -1886,17 +1753,17 @@ export default function AdminDashboard() {
                                                         endDate: !prev.endDate || prev.endDate < v ? v : prev.endDate
                                                     }));
                                                 }}
-                                                className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 text-slate-900 font-bold text-sm outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition"
+                                                className="w-full p-3 border border-rule bg-paper-2 text-charcoal font-semibold text-sm outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-plum transition"
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-[10px] font-extrabold text-indigo-600 uppercase tracking-widest mb-1.5">📅 ถึงวันที่</label>
+                                            <label className="block text-xs font-semibold text-plum mb-1.5">ถึงวันที่</label>
                                             <input
                                                 type="date"
                                                 value={adminLeaveForm.endDate}
                                                 min={adminLeaveForm.startDate}
                                                 onChange={e => setAdminLeaveForm(prev => ({ ...prev, endDate: e.target.value }))}
-                                                className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 text-slate-900 font-bold text-sm outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition"
+                                                className="w-full p-3 border border-rule bg-paper-2 text-charcoal font-semibold text-sm outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-plum transition"
                                             />
                                         </div>
                                     </div>
@@ -1907,46 +1774,46 @@ export default function AdminDashboard() {
                                         const e = new Date(adminLeaveForm.endDate);
                                         const totalDays = Math.max(0, Math.floor((e - s) / (1000 * 60 * 60 * 24)) + 1);
                                         return (
-                                            <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3 flex items-center justify-between">
-                                                <span className="text-xs font-bold text-indigo-700">📊 จำนวนวันที่เลือก</span>
-                                                <span className="text-lg font-extrabold text-indigo-700">{totalDays} วัน</span>
+                                            <div className="bg-paper-2 border border-plum p-3 flex items-center justify-between">
+                                                <span className="text-xs font-semibold text-plum">จำนวนวันที่เลือก</span>
+                                                <span className="text-lg font-semibold text-plum">{totalDays} วัน</span>
                                             </div>
                                         );
                                     })()}
 
                                     {/* Leave Type */}
                                     <div>
-                                        <label className="block text-[10px] font-extrabold text-indigo-600 uppercase tracking-widest mb-1.5">📋 ประเภทการลา</label>
+                                        <label className="block text-xs font-semibold text-plum mb-1.5">ประเภทการลา</label>
                                         <select
                                             value={adminLeaveForm.type}
                                             onChange={e => setAdminLeaveForm(prev => ({ ...prev, type: e.target.value }))}
-                                            className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 text-slate-900 font-bold text-sm outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition cursor-pointer"
+                                            className="w-full p-3 border border-rule bg-paper-2 text-charcoal font-semibold text-sm outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-plum transition cursor-pointer"
                                         >
-                                            <option value="sick">😷 ลาป่วย (Sick Leave)</option>
-                                            <option value="business">💼 ลากิจ (Business Leave)</option>
-                                            <option value="vacation">🏖️ พักร้อน (Vacation)</option>
+                                            <option value="sick">ลาป่วย</option>
+                                            <option value="business">ลากิจ</option>
+                                            <option value="vacation">พักร้อน</option>
                                         </select>
                                     </div>
 
                                     {/* Reason */}
                                     <div>
-                                        <label className="block text-[10px] font-extrabold text-indigo-600 uppercase tracking-widest mb-1.5">📝 เหตุผล</label>
+                                        <label className="block text-xs font-semibold text-plum mb-1.5">เหตุผล</label>
                                         <textarea
                                             value={adminLeaveForm.reason}
                                             onChange={e => setAdminLeaveForm(prev => ({ ...prev, reason: e.target.value }))}
                                             rows={2}
                                             placeholder="ระบุเหตุผลการลา..."
-                                            className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 text-slate-900 font-medium text-sm outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition resize-none placeholder:text-slate-400"
+                                            className="w-full p-3 border border-rule bg-paper-2 text-charcoal font-medium text-sm outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-plum transition resize-none placeholder:text-neutral"
                                         />
                                     </div>
 
                                     {/* Replacement Employee */}
                                     <div>
-                                        <label className="block text-[10px] font-extrabold text-indigo-600 uppercase tracking-widest mb-1.5">👥 พนักงานทำงานแทน (ไม่บังคับ)</label>
+                                        <label className="block text-xs font-semibold text-plum mb-1.5">พนักงานทำงานแทน (ไม่บังคับ)</label>
                                         <select
                                             value={adminLeaveForm.replacementId}
                                             onChange={e => setAdminLeaveForm(prev => ({ ...prev, replacementId: e.target.value }))}
-                                            className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 text-slate-900 font-bold text-sm outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition cursor-pointer"
+                                            className="w-full p-3 border border-rule bg-paper-2 text-charcoal font-semibold text-sm outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-plum transition cursor-pointer"
                                         >
                                             <option value="">-- ไม่ระบุ --</option>
                                             {data.employees
@@ -1962,26 +1829,26 @@ export default function AdminDashboard() {
 
                                     {/* Status */}
                                     <div>
-                                        <label className="block text-[10px] font-extrabold text-indigo-600 uppercase tracking-widest mb-1.5">📌 สถานะใบลา</label>
+                                        <label className="block text-xs font-semibold text-plum mb-1.5">สถานะใบลา</label>
                                         <div className="flex gap-2">
                                             {[
-                                                { id: 'approved', label: '✅ อนุมัติทันที', desc: 'Sync ลง Roster อัตโนมัติ' },
-                                                { id: 'pending', label: '⏳ รออนุมัติ', desc: 'ยังไม่ Sync Roster' },
+                                                { id: 'approved', label: 'อนุมัติทันที', desc: 'Sync ลง Roster อัตโนมัติ' },
+                                                { id: 'pending', label: ' รออนุมัติ', desc: 'ยังไม่ Sync Roster' },
                                             ].map(s => (
                                                 <button
                                                     key={s.id}
                                                     type="button"
                                                     onClick={() => setAdminLeaveForm(prev => ({ ...prev, status: s.id }))}
-                                                    className={`flex-1 p-3 rounded-xl text-xs font-bold border-2 transition-all ${
-                                                        adminLeaveForm.status === s.id
-                                                            ? s.id === 'approved'
-                                                                ? 'bg-emerald-50 border-emerald-400 text-emerald-700 ring-2 ring-emerald-200'
-                                                                : 'bg-amber-50 border-amber-400 text-amber-700 ring-2 ring-amber-200'
-                                                            : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'
-                                                    }`}
+                                                    className={`flex-1 p-3 text-xs font-semibold border-2 transition-colors duration-150 ${
+ adminLeaveForm.status === s.id
+ ? s.id === 'approved'
+ ? 'bg-paper-2 border-plum text-plum ring-2 ring-emerald-200'
+ : 'bg-paper-2 border-plum text-plum ring-2 ring-amber-200'
+ : 'bg-paper-2 border-rule text-neutral hover:bg-paper-2'
+ }`}
                                                 >
                                                     <div>{s.label}</div>
-                                                    <div className="text-[9px] mt-0.5 font-medium opacity-70">{s.desc}</div>
+                                                    <div className="text-xs mt-0.5 font-medium opacity-70">{s.desc}</div>
                                                 </button>
                                             ))}
                                         </div>
@@ -1993,7 +1860,7 @@ export default function AdminDashboard() {
                                     <button
                                         type="button"
                                         onClick={() => setShowAdminLeaveModal(false)}
-                                        className="flex-1 py-3 rounded-xl font-bold text-sm bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200 transition-all"
+                                        className="flex-1 py-3 font-semibold text-sm bg-paper-2 text-neutral hover:bg-paper-3 border border-rule transition-colors duration-150"
                                     >
                                         ยกเลิก
                                     </button>
@@ -2001,13 +1868,13 @@ export default function AdminDashboard() {
                                         type="button"
                                         onClick={handleAdminCreateLeave}
                                         disabled={adminLeaveLoading}
-                                        className={`flex-1 py-3 rounded-xl font-extrabold text-sm transition-all shadow-md ${
-                                            adminLeaveLoading
-                                                ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
-                                                : 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white hover:from-indigo-700 hover:to-indigo-800 active:scale-[0.98] shadow-indigo-500/20'
-                                        }`}
+                                        className={`flex-1 py-3 font-semibold text-sm transition-colors duration-150 ${
+ adminLeaveLoading
+ ? 'bg-paper-3 text-neutral cursor-not-allowed'
+ : 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-cream hover:from-indigo-700 hover:to-indigo-800  '
+ }`}
                                     >
-                                        {adminLeaveLoading ? '⏳ กำลังบันทึก...' : '💾 บันทึกใบลา'}
+                                        {adminLeaveLoading ? ' กำลังบันทึก...' : 'บันทึกใบลา'}
                                     </button>
                                 </div>
                             </div>
@@ -2017,20 +1884,20 @@ export default function AdminDashboard() {
                     {/* --- HIRING (APPLICATIONS) --- */}
                     {activeTab === 'applications' && (
                         <div className="space-y-6">
-                            <h3 className="font-extrabold text-slate-800">Job Applications</h3>
+                            <h3 className="font-semibold text-charcoal">ใบสมัครงาน</h3>
                             <Card className="p-0 overflow-hidden">
                                 <table className="w-full text-sm text-left">
-                                    <thead className="bg-slate-50 text-slate-500 font-extrabold text-xs uppercase">
-                                        <tr><th className="p-4">Name</th><th className="p-4">Position</th><th className="p-4">Status</th><th className="p-4 text-right">Action</th></tr>
+                                    <thead className="bg-paper-2 text-neutral font-semibold text-xs">
+                                        <tr><th className="p-4">ชื่อ</th><th className="p-4">ตำแหน่ง</th><th className="p-4">สถานะ</th><th className="p-4 text-right">จัดการ</th></tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
                                         {data.jobApplications.map(app => (
-                                            <tr key={app.id} className="hover:bg-slate-50">
-                                                <td className="p-4 font-black text-slate-900">{app.full_name}</td>
-                                                <td className="p-4 font-bold text-slate-800">{app.position_applied}</td>
+                                            <tr key={app.id} className="hover:bg-paper-2">
+                                                <td className="p-4 font-semibold text-charcoal">{app.full_name}</td>
+                                                <td className="p-4 font-semibold text-charcoal">{app.position_applied}</td>
                                                 <td className="p-4"><Badge color="slate">{app.status}</Badge></td>
                                                 <td className="p-4 text-right">
-                                                    <select value={app.status} onChange={(e) => handleUpdateApplicationStatus(app.id, e.target.value)} className="bg-slate-50 border rounded-lg text-xs p-1.5 font-bold outline-none">
+                                                    <select value={app.status} onChange={(e) => handleUpdateApplicationStatus(app.id, e.target.value)} className="bg-paper-2 border text-xs p-1.5 font-semibold outline-none">
                                                         <option>Pending</option>
                                                         <option>Hired</option>
                                                         <option>Rejected</option>
@@ -2051,76 +1918,76 @@ export default function AdminDashboard() {
                                 {/* Creation Form */}
                                 <div className="lg:col-span-2">
                                     <Card className="p-6">
-                                        <h3 className="font-extrabold text-slate-800 text-lg mb-4 flex items-center gap-2">
-                                            <span>📢</span> โพสต์ประกาศใหม่
+                                        <h3 className="font-semibold text-charcoal text-lg mb-4 flex items-center gap-2">
+                                            <span></span> โพสต์ประกาศใหม่
                                         </h3>
                                         <form onSubmit={handleAddAnnouncement} className="space-y-4">
                                             {/* Type Selection */}
                                             <div>
-                                                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">ประเภทประกาศ</label>
+                                                <label className="text-xs font-semibold text-neutral block mb-2">ประเภทประกาศ</label>
                                                 <div className="flex gap-2">
                                                     <button
                                                         type="button"
                                                         onClick={() => setAnnouncementType("fixed")}
-                                                        className={`flex-1 py-3 px-4 rounded-xl border text-xs font-bold transition-all duration-200 ${
-                                                            announcementType === "fixed"
-                                                                ? "bg-slate-900 text-white border-slate-950 shadow-sm"
-                                                                : "bg-slate-50 border-slate-200 text-slate-650 hover:bg-slate-100"
-                                                        }`}
+                                                        className={`flex-1 py-3 px-4 border text-xs font-semibold transition-colors duration-150 duration-200 ${
+ announcementType === "fixed"
+ ? "bg-charcoal text-cream border-charcoal "
+ : "bg-paper-2 border-rule text-charcoal hover:bg-paper-2"
+ }`}
                                                     >
-                                                        📌 ปักหมุด (ถาวร)
+                                                        ปักหมุด (ถาวร)
                                                     </button>
                                                     <button
                                                         type="button"
                                                         onClick={() => setAnnouncementType("temporary")}
-                                                        className={`flex-1 py-3 px-4 rounded-xl border text-xs font-bold transition-all duration-200 ${
-                                                            announcementType === "temporary"
-                                                                ? "bg-slate-900 text-white border-slate-950 shadow-sm"
-                                                                : "bg-slate-50 border-slate-200 text-slate-650 hover:bg-slate-100"
-                                                        }`}
+                                                        className={`flex-1 py-3 px-4 border text-xs font-semibold transition-colors duration-150 duration-200 ${
+ announcementType === "temporary"
+ ? "bg-charcoal text-cream border-charcoal "
+ : "bg-paper-2 border-rule text-charcoal hover:bg-paper-2"
+ }`}
                                                     >
-                                                        ⏰ ชั่วคราว (กำหนดวันหมดอายุ)
+                                                        ชั่วคราว (กำหนดวันหมดอายุ)
                                                     </button>
                                                 </div>
                                             </div>
 
                                             {/* Message Input */}
                                             <div>
-                                                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1.5">ข้อความประกาศ</label>
+                                                <label className="text-xs font-semibold text-neutral block mb-1.5">ข้อความประกาศ</label>
                                                 <textarea
                                                     rows="3"
                                                     value={newAnnouncement}
                                                     onChange={e => setNewAnnouncement(e.target.value)}
                                                     placeholder="พิมพ์ข้อความประกาศหรือระเบียบการที่นี่..."
-                                                    className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-805 outline-none focus:ring-2 focus:ring-slate-300 transition-all placeholder:text-slate-400 placeholder:font-medium resize-none"
+                                                    className="w-full p-4 bg-paper-2 border border-rule text-sm font-semibold text-charcoal outline-none focus:ring-2 focus:ring-slate-300 transition-colors duration-150 placeholder:text-neutral placeholder:font-medium resize-none"
                                                 />
                                             </div>
 
                                             {/* Expiration Settings (Only for temporary) */}
                                             {announcementType === "temporary" && (
-                                                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-3 animate-in fade-in duration-200">
-                                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">ตั้งเวลาหมดอายุ</label>
+                                                <div className="bg-paper-2 p-4 border border-rule space-y-3">
+                                                    <label className="text-xs font-semibold text-neutral block">ตั้งเวลาหมดอายุ</label>
                                                     <input
                                                         type="datetime-local"
                                                         value={expiresAt}
                                                         onChange={e => setExpiresAt(e.target.value)}
-                                                        className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:ring-2"
+                                                        className="w-full p-3 bg-cream border border-rule text-sm font-semibold text-charcoal outline-none focus:ring-2"
                                                     />
                                                     {/* Presets */}
                                                     <div className="flex flex-wrap gap-1.5 pt-1">
-                                                        <button type="button" onClick={() => applyPresetExpiresAt('1h')} className="px-2.5 py-1.5 bg-white border border-slate-200 hover:border-slate-300 text-[10px] font-bold text-slate-600 rounded-lg shadow-sm">
+                                                        <button type="button" onClick={() => applyPresetExpiresAt('1h')} className="px-2.5 py-1.5 bg-cream border border-rule hover:border-rule text-xs font-semibold text-neutral">
                                                             +1 ชม.
                                                         </button>
-                                                        <button type="button" onClick={() => applyPresetExpiresAt('today')} className="px-2.5 py-1.5 bg-white border border-slate-200 hover:border-slate-300 text-[10px] font-bold text-slate-600 rounded-lg shadow-sm">
+                                                        <button type="button" onClick={() => applyPresetExpiresAt('today')} className="px-2.5 py-1.5 bg-cream border border-rule hover:border-rule text-xs font-semibold text-neutral">
                                                             สิ้นสุดวันนี้ (23:59)
                                                         </button>
-                                                        <button type="button" onClick={() => applyPresetExpiresAt('tomorrow')} className="px-2.5 py-1.5 bg-white border border-slate-200 hover:border-slate-300 text-[10px] font-bold text-slate-600 rounded-lg shadow-sm">
+                                                        <button type="button" onClick={() => applyPresetExpiresAt('tomorrow')} className="px-2.5 py-1.5 bg-cream border border-rule hover:border-rule text-xs font-semibold text-neutral">
                                                             สิ้นสุดพรุ่งนี้ (23:59)
                                                         </button>
-                                                        <button type="button" onClick={() => applyPresetExpiresAt('3d')} className="px-2.5 py-1.5 bg-white border border-slate-200 hover:border-slate-300 text-[10px] font-bold text-slate-600 rounded-lg shadow-sm">
+                                                        <button type="button" onClick={() => applyPresetExpiresAt('3d')} className="px-2.5 py-1.5 bg-cream border border-rule hover:border-rule text-xs font-semibold text-neutral">
                                                             +3 วัน
                                                         </button>
-                                                        <button type="button" onClick={() => applyPresetExpiresAt('1w')} className="px-2.5 py-1.5 bg-white border border-slate-200 hover:border-slate-300 text-[10px] font-bold text-slate-600 rounded-lg shadow-sm">
+                                                        <button type="button" onClick={() => applyPresetExpiresAt('1w')} className="px-2.5 py-1.5 bg-cream border border-rule hover:border-rule text-xs font-semibold text-neutral">
                                                             +1 สัปดาห์
                                                         </button>
                                                     </div>
@@ -2129,29 +1996,29 @@ export default function AdminDashboard() {
 
                                             {/* Priority Settings */}
                                             <div>
-                                                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">ระดับความสำคัญ</label>
+                                                <label className="text-xs font-semibold text-neutral block mb-2">ระดับความสำคัญ</label>
                                                 <div className="flex gap-2">
                                                     <button
                                                         type="button"
                                                         onClick={() => setAnnouncementPriority(1)}
-                                                        className={`flex-1 py-2 px-4 rounded-xl border text-xs font-bold transition-all duration-200 ${
-                                                            announcementPriority === 1
-                                                                ? "bg-slate-100 border-slate-300 text-slate-800 font-extrabold shadow-inner"
-                                                                : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100"
-                                                        }`}
+                                                        className={`flex-1 py-2 px-4 border text-xs font-semibold transition-colors duration-150 duration-200 ${
+ announcementPriority === 1
+ ? "bg-paper-2 border-rule text-charcoal font-semibold "
+ : "bg-paper-2 border-rule text-neutral hover:bg-paper-2"
+ }`}
                                                     >
-                                                        ปกติ (Normal)
+                                                        ปกติ
                                                     </button>
                                                     <button
                                                         type="button"
                                                         onClick={() => setAnnouncementPriority(2)}
-                                                        className={`flex-1 py-2 px-4 rounded-xl border text-xs font-bold transition-all duration-200 ${
-                                                            announcementPriority === 2
-                                                                ? "bg-rose-50 border-rose-250 text-rose-700 font-extrabold shadow-inner"
-                                                                : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100"
-                                                        }`}
+                                                        className={`flex-1 py-2 px-4 border text-xs font-semibold transition-colors duration-150 duration-200 ${
+ announcementPriority === 2
+ ? "bg-paper-2 border-error text-error font-semibold "
+ : "bg-paper-2 border-rule text-neutral hover:bg-paper-2"
+ }`}
                                                     >
-                                                        🚨 สำคัญ/ด่วน (High)
+                                                        สำคัญ / ด่วน
                                                     </button>
                                                 </div>
                                             </div>
@@ -2159,9 +2026,9 @@ export default function AdminDashboard() {
                                             {/* Submit Button */}
                                             <button
                                                 type="submit"
-                                                className="w-full py-4 bg-slate-900 hover:bg-slate-850 active:scale-[0.99] text-white rounded-xl text-sm font-black shadow-lg shadow-slate-900/10 transition-all flex items-center justify-center gap-2"
+                                                className="w-full py-4 bg-charcoal hover:bg-charcoal-2 text-cream text-sm font-semibold transition-colors duration-150 flex items-center justify-center gap-2"
                                             >
-                                                <span>Publish</span> เผยแพร่ประกาศใช้งาน
+                                                เผยแพร่ประกาศ
                                             </button>
                                         </form>
                                     </Card>
@@ -2169,61 +2036,61 @@ export default function AdminDashboard() {
 
                                 {/* Live Preview Frame */}
                                 <div>
-                                    <Card className="p-6 h-full flex flex-col justify-between bg-slate-50/50 border-dashed border-slate-200">
+                                    <Card className="p-6 h-full flex flex-col justify-between bg-paper-2/50 border-dashed border-rule">
                                         <div>
-                                            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-1.5">
-                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                                                Live Mobile Preview (ตัวอย่างบนจอมือถือ)
+                                            <h4 className="text-xs font-semibold text-neutral mb-4 flex items-center gap-1.5">
+                                                <span className="w-1.5 h-1.5 bg-paper-2"></span>
+                                                ตัวอย่างบนมือถือ
                                             </h4>
-                                            <div className="bg-[#F2F2F2] rounded-[2.5rem] p-4 pt-8 pb-12 border-4 border-slate-300 shadow-inner relative max-w-sm mx-auto overflow-hidden">
+                                            <div className="bg-paper-2 p-4 pt-8 pb-12 border-4 border-rule relative max-w-sm mx-auto overflow-hidden">
                                                 {/* Phone speaker mimic */}
-                                                <div className="absolute top-3 left-1/2 -translate-x-1/2 w-16 h-4 bg-slate-300 rounded-full flex items-center justify-center">
-                                                    <span className="w-8 h-1 bg-slate-400 rounded-full"></span>
+                                                <div className="absolute top-3 left-1/2 -translate-x-1/2 w-16 h-4 bg-paper-3 flex items-center justify-center">
+                                                    <span className="w-8 h-1 bg-neutral"></span>
                                                 </div>
 
                                                 {/* Weather Card Compact Mockup */}
-                                                <div className="bg-white/80 border border-white/80 rounded-3xl p-3 shadow-sm mb-4 text-[9px] font-bold text-slate-500 flex items-center justify-between">
+                                                <div className="bg-cream/80 border border-white/80 p-3 mb-4 text-xs font-semibold text-neutral flex items-center justify-between">
                                                     <div className="flex items-center gap-1.5">
-                                                        <span className="text-xl">🌤️</span>
-                                                        <span className="text-slate-805 text-xs font-black">32°C • แจ่มใส</span>
+                                                        <span className="text-xl"></span>
+                                                        <span className="text-charcoal text-xs font-semibold">32°C • แจ่มใส</span>
                                                     </div>
-                                                    <span>In The Haus 🏡</span>
+                                                    <span>ในบ้าน</span>
                                                 </div>
 
                                                 {/* Simulated Announcement Display */}
                                                 <div className="space-y-3">
                                                     {announcementType === "fixed" ? (
-                                                        <div className="w-full bg-white border border-white rounded-3xl p-3.5 shadow-sm flex items-start gap-2 relative overflow-hidden">
-                                                            <div className="absolute top-0 left-0 w-1 h-full bg-blue-500" />
-                                                            <span className="text-sm shrink-0">📌</span>
+                                                        <div className="w-full bg-cream border border-white p-3.5 flex items-start gap-2 relative overflow-hidden">
+                                                            <div className="absolute top-0 left-0 w-1 h-full bg-paper-2" />
+                                                            <span className="text-sm shrink-0"></span>
                                                             <div>
                                                                 <div className="flex gap-1 mb-1">
-                                                                    <span className="text-[8px] font-extrabold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 uppercase tracking-wider">Pinned</span>
-                                                                    {announcementPriority === 2 && <span className="text-[8px] font-extrabold text-red-655 bg-red-50 px-1.5 py-0.5 rounded border border-red-100 uppercase tracking-wider animate-pulse">Urgent</span>}
+                                                                    <span className="text-xs font-semibold text-plum bg-paper-2 px-1.5 py-0.5 border border-plum">ปักหมุด</span>
+                                                                    {announcementPriority === 2 && <span className="text-xs font-semibold text-error bg-paper-2 px-1.5 py-0.5 border border-error">Urgent</span>}
                                                                 </div>
-                                                                <p className="text-[11px] font-bold text-neutral-800 leading-normal break-words">{newAnnouncement || "พิมพ์ข้อความในแบบฟอร์มเพื่อดูตัวอย่าง..."}</p>
+                                                                <p className="text-xs font-semibold text-charcoal leading-normal break-words">{newAnnouncement || "พิมพ์ข้อความในแบบฟอร์มเพื่อดูตัวอย่าง..."}</p>
                                                             </div>
                                                         </div>
                                                     ) : (
-                                                        <div className={`w-full ${announcementPriority === 2 ? 'bg-gradient-to-br from-orange-50 to-white border-orange-200' : 'bg-white border-white'} border rounded-3xl p-3.5 shadow-sm flex items-start gap-2 relative overflow-hidden`}>
-                                                            <div className={`absolute top-0 left-0 w-1 h-full ${announcementPriority === 2 ? 'bg-orange-500' : 'bg-amber-500'}`} />
+                                                        <div className={`w-full ${announcementPriority === 2 ? 'bg-gradient-to-br from-orange-50 to-white border-plum' : 'bg-cream border-white'} border p-3.5 flex items-start gap-2 relative overflow-hidden`}>
+                                                            <div className={`absolute top-0 left-0 w-1 h-full ${announcementPriority === 2 ? 'bg-paper-2' : 'bg-paper-2'}`} />
                                                             <span className="text-sm shrink-0">{announcementPriority === 2 ? '🚨' : '📢'}</span>
                                                             <div className="pr-4">
                                                                 <div className="flex items-center gap-1 mb-1 flex-wrap">
-                                                                    <span className={`text-[8px] font-extrabold ${announcementPriority === 2 ? 'text-orange-600 bg-orange-50 border-orange-100' : 'text-amber-600 bg-amber-50 border-amber-100'} px-1.5 py-0.5 rounded border uppercase tracking-wider`}>
+                                                                    <span className={`text-xs font-semibold ${announcementPriority === 2 ? 'text-plum bg-paper-2 border-plum' : 'text-plum bg-paper-2 border-plum'} px-1.5 py-0.5 border`}>
                                                                         {announcementPriority === 2 ? 'Important' : 'News'}
                                                                     </span>
-                                                                    <span className="text-[8px] font-bold text-neutral-400">⏰ {expiresAt ? "หมดใน " + format(new Date(expiresAt), "HH:mm") : "สิ้นสุดวันนี้"}</span>
+                                                                    <span className="text-xs font-semibold text-neutral"> {expiresAt ? "หมดใน " + format(new Date(expiresAt), "HH:mm") : "สิ้นสุดวันนี้"}</span>
                                                                 </div>
-                                                                <p className="text-[11px] font-semibold text-neutral-800 leading-normal break-words">{newAnnouncement || "พิมพ์ข้อความในแบบฟอร์มเพื่อดูตัวอย่าง..."}</p>
+                                                                <p className="text-xs font-semibold text-charcoal leading-normal break-words">{newAnnouncement || "พิมพ์ข้อความในแบบฟอร์มเพื่อดูตัวอย่าง..."}</p>
                                                             </div>
-                                                            <span className="absolute top-2 right-2 text-[9px] text-slate-350">✕</span>
+                                                            <span className="absolute top-2 right-2 text-xs text-charcoal"></span>
                                                         </div>
                                                     )}
                                                 </div>
                                             </div>
                                         </div>
-                                        <p className="text-[10px] text-slate-400 font-bold text-center mt-4">
+                                        <p className="text-xs text-neutral font-semibold text-center mt-4">
                                             *ตัวอย่างเสมือนจริงบนสเกลของเครื่องจริงหน้างาน
                                         </p>
                                     </Card>
@@ -2233,9 +2100,9 @@ export default function AdminDashboard() {
                             {/* Announcements List Manager */}
                             <Card className="p-0 overflow-hidden">
                                 {/* Tab filters */}
-                                <div className="flex border-b border-slate-100 p-2 bg-slate-50 gap-1 flex-wrap">
+                                <div className="flex border-b border-rule p-2 bg-paper-2 gap-1 flex-wrap">
                                     {['active', 'expired', 'hidden', 'all'].map((f) => {
-                                        const labelMap = { active: 'กำลังแสดงผล', expired: 'หมดอายุการใช้งาน', hidden: 'ปิดแสดงผล (Hidden)', all: 'ทั้งหมด' };
+                                        const labelMap = { active: 'กำลังแสดงผล', expired: 'หมดอายุการใช้งาน', hidden: 'ปิดแสดงผล ', all: 'ทั้งหมด' };
                                         const count = data.announcements.filter(a => {
                                             const isExpired = a.expires_at && new Date(a.expires_at) <= new Date();
                                             if (f === 'active') return a.is_active && !isExpired;
@@ -2248,11 +2115,11 @@ export default function AdminDashboard() {
                                                 key={f}
                                                 type="button"
                                                 onClick={() => setAnnouncementFilter(f)}
-                                                className={`py-2 px-4 rounded-xl text-xs font-black transition-all ${
-                                                    announcementFilter === f
-                                                        ? 'bg-slate-900 text-white shadow-sm'
-                                                        : 'text-slate-500 hover:bg-slate-200/50 hover:text-slate-800'
-                                                }`}
+                                                className={`py-2 px-4 text-xs font-semibold transition-colors duration-150 ${
+ announcementFilter === f
+ ? 'bg-charcoal text-cream '
+ : 'text-neutral hover:bg-paper-3/50 hover:text-charcoal'
+ }`}
                                             >
                                                 {labelMap[f]} ({count})
                                             </button>
@@ -2263,14 +2130,14 @@ export default function AdminDashboard() {
                                 {/* Table layout */}
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-sm text-left">
-                                        <thead className="bg-slate-50 text-slate-500 font-extrabold text-[10px] uppercase tracking-wider border-b border-slate-100">
+                                        <thead className="bg-paper-2 text-neutral font-semibold text-xs border-b border-rule">
                                             <tr>
-                                                <th className="px-6 py-4">ข้อมูลประกาศ</th>
-                                                <th className="px-6 py-4">ระดับ</th>
-                                                <th className="px-6 py-4">ประเภท</th>
-                                                <th className="px-6 py-4">วันหมดอายุ / สถานะเวลา</th>
-                                                <th className="px-6 py-4">วันที่สร้าง</th>
-                                                <th className="px-6 py-4 text-right">การจัดการ</th>
+                                                <th className="px-4 py-3 whitespace-nowrap">ข้อมูลประกาศ</th>
+                                                <th className="px-4 py-3 whitespace-nowrap">ระดับ</th>
+                                                <th className="px-4 py-3 whitespace-nowrap">ประเภท</th>
+                                                <th className="px-4 py-3 whitespace-nowrap">หมดอายุ</th>
+                                                <th className="px-4 py-3 whitespace-nowrap">วันที่สร้าง</th>
+                                                <th className="px-4 py-3 whitespace-nowrap text-right">การจัดการ</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100">
@@ -2306,57 +2173,57 @@ export default function AdminDashboard() {
                                                     }
 
                                                     return (
-                                                        <tr key={a.id} className="hover:bg-slate-50/50">
-                                                            <td className="px-6 py-4">
-                                                                <div className="font-extrabold text-slate-800 max-w-sm truncate" title={a.message}>
+                                                        <tr key={a.id} className="hover:bg-paper-2/50">
+                                                            <td className="px-4 py-3">
+                                                                <div className="font-semibold text-charcoal max-w-xs truncate" title={a.message}>
                                                                     {a.message}
                                                                 </div>
                                                             </td>
-                                                            <td className="px-6 py-4">
+                                                            <td className="px-4 py-3 whitespace-nowrap">
                                                                 <Badge color={a.priority > 1 ? 'rose' : 'slate'}>
-                                                                    {a.priority > 1 ? 'ด่วน 🚨' : 'ปกติ'}
+                                                                    {a.priority > 1 ? 'ด่วน ' : 'ปกติ'}
                                                                 </Badge>
                                                             </td>
-                                                            <td className="px-6 py-4">
+                                                            <td className="px-4 py-3 whitespace-nowrap">
                                                                 <Badge color={isFixed ? 'blue' : 'amber'}>
-                                                                    {isFixed ? '📌 Fixed' : '⏰ Temporary'}
+                                                                    {isFixed ? 'ถาวร' : 'มีวันหมดอายุ'}
                                                                 </Badge>
                                                             </td>
-                                                            <td className="px-6 py-4">
-                                                                <div className="font-bold text-slate-805 text-xs">
-                                                                    {!isFixed && format(new Date(a.expires_at), "dd MMM yyyy, HH:mm")}
+                                                            <td className="px-4 py-3 whitespace-nowrap">
+                                                                <div className="font-semibold text-charcoal text-xs">
+                                                                    {!isFixed && format(new Date(a.expires_at), "d MMM yy · HH:mm", { locale: th })}
                                                                 </div>
-                                                                <div className={`text-[10px] font-extrabold ${isExpired ? 'text-red-500' : isFixed ? 'text-blue-500' : 'text-emerald-600'} mt-0.5`}>
+                                                                <div className={`text-xs font-semibold ${isExpired ? 'text-error' : isFixed ? 'text-plum' : 'text-plum'} mt-0.5`}>
                                                                     {timeStatus}
                                                                 </div>
                                                             </td>
-                                                            <td className="px-6 py-4 font-bold text-xs text-slate-500">
+                                                            <td className="px-4 py-3 whitespace-nowrap font-semibold text-xs text-neutral">
                                                                 {format(new Date(a.created_at), "dd/MM/yyyy HH:mm")}
                                                             </td>
-                                                            <td className="px-6 py-4 text-right space-x-2">
+                                                            <td className="px-4 py-3">
+                                                                <div className="flex justify-end gap-1 whitespace-nowrap">
                                                                 <button
                                                                     onClick={() => handleToggleAnnouncement(a.id, a.is_active)}
-                                                                    className={`px-2 py-1 rounded text-xs font-black border transition-all ${
-                                                                        a.is_active
-                                                                            ? "bg-slate-900/5 hover:bg-slate-900/10 border-slate-200 text-slate-650"
-                                                                            : "bg-emerald-50 hover:bg-emerald-100 border-emerald-100 text-emerald-700"
-                                                                    }`}
+                                                                    className={`min-h-11 px-3 text-sm font-semibold border transition-colors duration-150 ${
+ a.is_active
+ ? "bg-cream hover:bg-paper-2 border-rule text-charcoal"
+ : "bg-cream hover:bg-paper-2 border-plum text-plum"
+ }`}
                                                                     title={a.is_active ? "คลิกเพื่อซ่อน" : "คลิกเพื่อเปิดใช้งาน"}
                                                                 >
-                                                                    {a.is_active ? 'แสดงผลอยู่' : 'ปิดการแสดงผล'}
+                                                                    {a.is_active ? 'ซ่อน' : 'แสดง'}
                                                                 </button>
                                                                 <button
                                                                     onClick={() => handleEditAnnouncement(a)}
-                                                                    className="px-2 py-1 bg-indigo-50 border border-indigo-100 text-indigo-700 hover:bg-indigo-100 text-xs font-black rounded transition-all"
+                                                                    className="min-h-11 px-3 bg-cream border border-charcoal text-charcoal hover:bg-paper-2 text-sm font-semibold transition-colors duration-150"
                                                                 >
                                                                     แก้ไข
                                                                 </button>
                                                                 <button
                                                                     onClick={() => handleDeleteAnnouncement(a.id)}
-                                                                    className="p-1 hover:bg-rose-50 text-rose-500 hover:text-rose-700 rounded transition-all"
-                                                                >
-                                                                    🗑️
-                                                                </button>
+                                                                    className="hover:bg-paper-2 transition-colors duration-150 min-h-11 px-3 text-sm font-semibold underline-offset-4 hover:underline text-error"
+                                                                >ลบ</button>
+                                                                </div>
                                                             </td>
                                                         </tr>
                                                     );
@@ -2364,85 +2231,85 @@ export default function AdminDashboard() {
                                         </tbody>
                                     </table>
                                     {data.announcements.length === 0 && (
-                                        <div className="p-12 text-center text-slate-400 font-bold">ไม่มีข้อมูลประกาศบันทึกอยู่</div>
+                                        <div className="p-12 text-center text-neutral font-semibold">ไม่มีข้อมูลประกาศบันทึกอยู่</div>
                                     )}
                                 </div>
                             </Card>
 
                             {/* Edit Announcement Modal */}
                             {editingAnnouncement && (
-                                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                                    <Card className="w-full max-w-lg bg-white p-6 shadow-2xl rounded-3xl relative animate-in zoom-in-95 duration-150">
-                                        <h3 className="text-lg font-extrabold text-slate-800 mb-4 flex items-center gap-1.5">
-                                            ✏️ แก้ไขข้อมูลประกาศ
+                                <div className="fixed inset-0 bg-charcoal/60 flex items-center justify-center z-50 p-4">
+                                    <Card className="w-full max-w-lg bg-cream p-6 relative">
+                                        <h3 className="text-lg font-semibold text-charcoal mb-4 flex items-center gap-1.5">
+                                            แก้ไขข้อมูลประกาศ
                                         </h3>
                                         
                                         <div className="space-y-4">
                                             {/* Type */}
                                             <div>
-                                                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">ประเภทประกาศ</label>
+                                                <label className="text-xs font-semibold text-neutral block mb-2">ประเภทประกาศ</label>
                                                 <div className="flex gap-2">
                                                     <button
                                                         type="button"
                                                         onClick={() => setEditingAnnouncement(prev => ({ ...prev, type: "fixed" }))}
-                                                        className={`flex-1 py-2.5 px-4 rounded-xl border text-xs font-bold transition-all duration-200 ${
-                                                            editingAnnouncement.type === "fixed"
-                                                                ? "bg-slate-900 text-white border-slate-950 shadow-sm"
-                                                                : "bg-slate-50 border-slate-200 text-slate-650 hover:bg-slate-100"
-                                                        }`}
+                                                        className={`flex-1 py-2.5 px-4 border text-xs font-semibold transition-colors duration-150 duration-200 ${
+ editingAnnouncement.type === "fixed"
+ ? "bg-charcoal text-cream border-charcoal "
+ : "bg-paper-2 border-rule text-charcoal hover:bg-paper-2"
+ }`}
                                                     >
-                                                        📌 ปักหมุด (ถาวร)
+                                                        ปักหมุด (ถาวร)
                                                     </button>
                                                     <button
                                                         type="button"
                                                         onClick={() => setEditingAnnouncement(prev => ({ ...prev, type: "temporary" }))}
-                                                        className={`flex-1 py-2.5 px-4 rounded-xl border text-xs font-bold transition-all duration-200 ${
-                                                            editingAnnouncement.type === "temporary"
-                                                                ? "bg-slate-900 text-white border-slate-950 shadow-sm"
-                                                                : "bg-slate-50 border-slate-200 text-slate-650 hover:bg-slate-100"
-                                                        }`}
+                                                        className={`flex-1 py-2.5 px-4 border text-xs font-semibold transition-colors duration-150 duration-200 ${
+ editingAnnouncement.type === "temporary"
+ ? "bg-charcoal text-cream border-charcoal "
+ : "bg-paper-2 border-rule text-charcoal hover:bg-paper-2"
+ }`}
                                                     >
-                                                        ⏰ ชั่วคราว (กำหนดวันหมดอายุ)
+                                                        ชั่วคราว (กำหนดวันหมดอายุ)
                                                     </button>
                                                 </div>
                                             </div>
 
                                             {/* Message */}
                                             <div>
-                                                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1.5">ข้อความประกาศ</label>
+                                                <label className="text-xs font-semibold text-neutral block mb-1.5">ข้อความประกาศ</label>
                                                 <textarea
                                                     rows="3"
                                                     value={editingAnnouncement.message}
                                                     onChange={e => setEditingAnnouncement(prev => ({ ...prev, message: e.target.value }))}
-                                                    className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-805 outline-none focus:ring-2 focus:ring-slate-300 transition-all resize-none"
+                                                    className="w-full p-4 bg-paper-2 border border-rule text-sm font-semibold text-charcoal outline-none focus:ring-2 focus:ring-slate-300 transition-colors duration-150 resize-none"
                                                 />
                                             </div>
 
                                             {/* Expiration Settings (Only for temporary) */}
                                             {editingAnnouncement.type === "temporary" && (
-                                                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-3">
-                                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">ตั้งเวลาหมดอายุ</label>
+                                                <div className="bg-paper-2 p-4 border border-rule space-y-3">
+                                                    <label className="text-xs font-semibold text-neutral block">ตั้งเวลาหมดอายุ</label>
                                                     <input
                                                         type="datetime-local"
                                                         value={editingAnnouncement.expires_at_formatted}
                                                         onChange={e => setEditingAnnouncement(prev => ({ ...prev, expires_at_formatted: e.target.value }))}
-                                                        className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:ring-2"
+                                                        className="w-full p-3 bg-cream border border-rule text-sm font-semibold text-charcoal outline-none focus:ring-2"
                                                     />
                                                     {/* Presets for edit */}
                                                     <div className="flex flex-wrap gap-1.5 pt-1">
-                                                        <button type="button" onClick={() => applyPresetExpiresAt('1h', true)} className="px-2 py-1 bg-white border border-slate-200 hover:border-slate-300 text-[10px] font-bold text-slate-600 rounded-lg shadow-sm">
+                                                        <button type="button" onClick={() => applyPresetExpiresAt('1h', true)} className="px-2 py-1 bg-cream border border-rule hover:border-rule text-xs font-semibold text-neutral">
                                                             +1 ชม.
                                                         </button>
-                                                        <button type="button" onClick={() => applyPresetExpiresAt('today', true)} className="px-2 py-1 bg-white border border-slate-200 hover:border-slate-300 text-[10px] font-bold text-slate-600 rounded-lg shadow-sm">
+                                                        <button type="button" onClick={() => applyPresetExpiresAt('today', true)} className="px-2 py-1 bg-cream border border-rule hover:border-rule text-xs font-semibold text-neutral">
                                                             สิ้นสุดวันนี้
                                                         </button>
-                                                        <button type="button" onClick={() => applyPresetExpiresAt('tomorrow', true)} className="px-2 py-1 bg-white border border-slate-200 hover:border-slate-300 text-[10px] font-bold text-slate-600 rounded-lg shadow-sm">
+                                                        <button type="button" onClick={() => applyPresetExpiresAt('tomorrow', true)} className="px-2 py-1 bg-cream border border-rule hover:border-rule text-xs font-semibold text-neutral">
                                                             สิ้นสุดพรุ่งนี้
                                                         </button>
-                                                        <button type="button" onClick={() => applyPresetExpiresAt('3d', true)} className="px-2 py-1 bg-white border border-slate-200 hover:border-slate-300 text-[10px] font-bold text-slate-600 rounded-lg shadow-sm">
+                                                        <button type="button" onClick={() => applyPresetExpiresAt('3d', true)} className="px-2 py-1 bg-cream border border-rule hover:border-rule text-xs font-semibold text-neutral">
                                                             +3 วัน
                                                         </button>
-                                                        <button type="button" onClick={() => applyPresetExpiresAt('1w', true)} className="px-2 py-1 bg-white border border-slate-200 hover:border-slate-300 text-[10px] font-bold text-slate-600 rounded-lg shadow-sm">
+                                                        <button type="button" onClick={() => applyPresetExpiresAt('1w', true)} className="px-2 py-1 bg-cream border border-rule hover:border-rule text-xs font-semibold text-neutral">
                                                             +1 สัปดาห์
                                                         </button>
                                                     </div>
@@ -2451,29 +2318,29 @@ export default function AdminDashboard() {
 
                                             {/* Priority Settings */}
                                             <div>
-                                                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">ระดับความสำคัญ</label>
+                                                <label className="text-xs font-semibold text-neutral block mb-2">ระดับความสำคัญ</label>
                                                 <div className="flex gap-2">
                                                     <button
                                                         type="button"
                                                         onClick={() => setEditingAnnouncement(prev => ({ ...prev, priority: 1 }))}
-                                                        className={`flex-1 py-2 px-4 rounded-xl border text-xs font-bold transition-all duration-200 ${
-                                                            Number(editingAnnouncement.priority) === 1
-                                                                ? "bg-slate-100 border-slate-300 text-slate-800 font-extrabold"
-                                                                : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100"
-                                                        }`}
+                                                        className={`flex-1 py-2 px-4 border text-xs font-semibold transition-colors duration-150 duration-200 ${
+ Number(editingAnnouncement.priority) === 1
+ ? "bg-paper-2 border-rule text-charcoal font-semibold"
+ : "bg-paper-2 border-rule text-neutral hover:bg-paper-2"
+ }`}
                                                     >
-                                                        ปกติ (Normal)
+                                                        ปกติ
                                                     </button>
                                                     <button
                                                         type="button"
                                                         onClick={() => setEditingAnnouncement(prev => ({ ...prev, priority: 2 }))}
-                                                        className={`flex-1 py-2 px-4 rounded-xl border text-xs font-bold transition-all duration-200 ${
-                                                            Number(editingAnnouncement.priority) === 2
-                                                                ? "bg-rose-50 border-rose-250 text-rose-700 font-extrabold"
-                                                                : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100"
-                                                        }`}
+                                                        className={`flex-1 py-2 px-4 border text-xs font-semibold transition-colors duration-150 duration-200 ${
+ Number(editingAnnouncement.priority) === 2
+ ? "bg-paper-2 border-error text-error font-semibold"
+ : "bg-paper-2 border-rule text-neutral hover:bg-paper-2"
+ }`}
                                                     >
-                                                        🚨 สำคัญ/ด่วน (High)
+                                                        สำคัญ / ด่วน
                                                     </button>
                                                 </div>
                                             </div>
@@ -2483,14 +2350,14 @@ export default function AdminDashboard() {
                                             <button
                                                 type="button"
                                                 onClick={() => setEditingAnnouncement(null)}
-                                                className="flex-1 py-3 border border-slate-200 text-slate-500 hover:bg-slate-50 rounded-xl text-sm font-bold transition-colors"
+                                                className="flex-1 py-3 border border-rule text-neutral hover:bg-paper-2 text-sm font-semibold transition-colors"
                                             >
                                                 ยกเลิก
                                             </button>
                                             <button
                                                 type="button"
                                                 onClick={handleSaveEditAnnouncement}
-                                                className="flex-1 py-3 bg-slate-900 hover:bg-slate-850 text-white rounded-xl text-sm font-black transition-colors"
+                                                className="flex-1 py-3 bg-charcoal hover:bg-charcoal-2 text-cream text-sm font-semibold transition-colors"
                                             >
                                                 บันทึกการแก้ไข
                                             </button>
@@ -2537,13 +2404,13 @@ export default function AdminDashboard() {
                     {/* --- SHIFT CONFIGURATION (SETTINGS) --- */}
                     {activeTab === 'settings' && (
                         <div className="space-y-6">
-                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-rams-panel p-5 rounded-sm border border-rams-rule shadow-none">
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-cream p-5 border border-charcoal">
                                 <div>
-                                    <h2 className="text-base font-mono font-bold uppercase tracking-wider text-rams-ink">
-                                        ตั้งค่ากะงานและอัตราค่าจ้างมาตรฐาน (Shift Preset Configuration)
+                                    <h2 className="text-base font-semibold text-charcoal">
+                                        ตั้งค่ากะงานและค่าจ้างมาตรฐาน
                                     </h2>
-                                    <p className="text-[10px] font-mono text-rams-ink-muted uppercase tracking-widest mt-1">
-                                        กำหนดช่วงเวลาทำงาน (Time Window), เวลาพัก, และเรทค่าจ้างมาตรฐานเริ่มต้นสำหรับแต่ละกะ
+                                    <p className="text-xs text-neutral mt-1">
+                                        กำหนดช่วงเวลาทำงาน ทำงาน, เวลาพัก, และเรทค่าจ้างมาตรฐานเริ่มต้นสำหรับแต่ละกะ
                                     </p>
                                 </div>
                                 <button
@@ -2564,68 +2431,68 @@ export default function AdminDashboard() {
                                         });
                                         if (!error) fetchData('shifts', 'shifts');
                                     }}
-                                    className="flex items-center gap-1.5 px-4 py-2 bg-rams-orange hover:bg-rams-orange-active text-rams-panel rounded-sm font-mono text-xs font-bold uppercase tracking-wider shadow-[0_2px_0_0_var(--color-rams-rule)] active:translate-y-[1px] transition-all cursor-pointer"
+                                    className="flex items-center gap-1.5 px-4 py-2 bg-plum hover:bg-plum-2 text-cream text-xs font-semibold transition-colors duration-150 cursor-pointer"
                                 >
-                                    + เพิ่มกะงานใหม่ (New Shift)
+                                    + เพิ่มกะงานใหม่
                                 </button>
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {data.shifts.map(s => (
-                                    <div key={s.id} className="p-4 bg-rams-panel rounded-sm border border-rams-rule space-y-3 shadow-none">
-                                        <div className="flex items-center justify-between border-b border-rams-rule-light pb-2.5">
+                                    <div key={s.id} className="p-4 bg-cream border border-charcoal space-y-3">
+                                        <div className="flex items-center justify-between border-b border-rule pb-2.5">
                                             <div className="flex items-center gap-2">
-                                                <div className="w-2.5 h-2.5 rounded-full bg-rams-orange"></div>
+                                                <div className="w-2.5 h-2.5 bg-plum"></div>
                                                 <input 
                                                     type="text" 
                                                     value={s.name} 
                                                     onChange={e => handleUpdateShift(s.id, 'name', e.target.value)} 
-                                                    className="font-mono font-bold text-sm text-rams-ink bg-transparent outline-none border-b border-transparent focus:border-rams-orange transition-all"
+                                                    className="font-num font-semibold text-sm text-charcoal bg-transparent outline-none border-b border-transparent focus:border-plum transition-colors duration-150"
                                                 />
                                             </div>
-                                            <span className="text-[10px] font-mono text-rams-ink-muted uppercase">
+                                            <span className="text-xs font-num text-neutral">
                                                 ID: #{s.id}
                                             </span>
                                         </div>
 
-                                        <div className="grid grid-cols-2 gap-3 text-xs font-mono">
+                                        <div className="grid grid-cols-2 gap-3 text-xs font-num">
                                             <div>
-                                                <label className="block text-[9px] text-rams-ink-muted uppercase mb-1">เวลาเข้า - ออกงาน</label>
-                                                <div className="flex items-center gap-1.5 bg-rams-bg p-1.5 rounded-xs border border-rams-rule-light">
+                                                <label className="block text-xs text-neutral mb-1">เวลาเข้า - ออกงาน</label>
+                                                <div className="flex items-center gap-1.5 bg-cream p-1.5 border border-rule">
                                                     <input 
                                                         type="time" 
                                                         value={s.start_time} 
                                                         onChange={e => handleUpdateShift(s.id, 'start_time', e.target.value)} 
-                                                        className="w-full bg-transparent font-mono text-center font-bold text-rams-ink outline-none text-xs" 
+                                                        className="w-full bg-transparent font-num text-center font-semibold text-charcoal outline-none text-xs" 
                                                     />
-                                                    <span className="text-rams-ink-muted text-xs">➜</span>
+                                                    <span className="text-neutral text-xs"></span>
                                                     <input 
                                                         type="time" 
                                                         value={s.end_time} 
                                                         onChange={e => handleUpdateShift(s.id, 'end_time', e.target.value)} 
-                                                        className="w-full bg-transparent font-mono text-center font-bold text-rams-ink outline-none text-xs" 
+                                                        className="w-full bg-transparent font-num text-center font-semibold text-charcoal outline-none text-xs" 
                                                     />
                                                 </div>
                                             </div>
 
                                             <div>
-                                                <label className="block text-[9px] text-rams-ink-muted uppercase mb-1">ค่าจ้างประจำกะ (บาท/กะ)</label>
-                                                <div className="flex items-center bg-rams-bg p-1.5 rounded-xs border border-rams-rule-light">
-                                                    <span className="text-rams-ink-muted text-[10px] mr-1">฿</span>
+                                                <label className="block text-xs text-neutral mb-1">ค่าจ้างประจำกะ (บาท/กะ)</label>
+                                                <div className="flex items-center bg-cream p-1.5 border border-rule">
+                                                    <span className="text-neutral text-xs mr-1">฿</span>
                                                     <input 
                                                         type="number" 
                                                         value={s.rate ?? ''} 
                                                         placeholder="350"
                                                         onChange={e => handleUpdateShift(s.id, 'rate', Number(e.target.value))} 
-                                                        className="w-full bg-transparent font-mono font-bold text-rams-green outline-none text-xs" 
+                                                        className="w-full bg-transparent font-num font-semibold text-charcoal outline-none text-xs" 
                                                     />
                                                 </div>
                                             </div>
                                         </div>
 
-                                        <div className="flex justify-between items-center text-[10px] font-mono text-rams-ink-muted pt-1">
+                                        <div className="flex justify-between items-center text-xs font-num text-neutral pt-1">
                                             <span>หักเวลาพัก: {s.break_minutes || 60} นาที</span>
-                                            <span className="text-rams-orange font-bold">
+                                            <span className="text-plum font-semibold">
                                                 {s.start_time} - {s.end_time}
                                             </span>
                                         </div>
@@ -2644,39 +2511,26 @@ export default function AdminDashboard() {
                     {activeTab === 'shift_manage' && (
                         <div className="grid md:grid-cols-2 gap-6">
                             <div className="space-y-4">
-                                <h3 className="font-extrabold text-slate-800">Pending Swap Approvals</h3>
-                                {data.swapRequests.filter(r => r.status === 'PENDING_MANAGER').length === 0 ? <Card className="text-center text-slate-455 py-8 font-bold">No pending swap requests</Card> :
+                                <h3 className="font-semibold text-charcoal">คำขอแลกกะรออนุมัติ</h3>
+                                {data.swapRequests.filter(r => r.status === 'PENDING_MANAGER').length === 0 ? <Card className="text-center text-neutral py-8 font-semibold">ไม่มีคำขอแลกกะค้าง</Card> :
                                     data.swapRequests.filter(r => r.status === 'PENDING_MANAGER').map(req => (
-                                        <Card key={req.id} className="space-y-3 border border-slate-100">
-                                            <div className="flex justify-between"><Badge color="blue">{req.type}</Badge><span className="text-xs font-black text-slate-900">{req.target_date}</span></div>
-                                            <div className="flex items-center gap-2 text-sm text-slate-800 font-black"><span>{req.requester?.name}</span><span>➜</span><span>{req.peer?.name || 'Open Pool'}</span></div>
-                                            <div className="text-xs text-slate-600 font-bold">&quot;{req.notes}&quot;</div>
+                                        <Card key={req.id} className="space-y-3 border border-rule">
+                                            <div className="flex justify-between"><Badge color="blue">{req.type}</Badge><span className="text-xs font-semibold text-charcoal">{req.target_date}</span></div>
+                                            <div className="flex items-center gap-2 text-sm text-charcoal font-semibold"><span>{req.requester?.name}</span><span></span><span>{req.peer?.name || 'ใครก็ได้'}</span></div>
+                                            <div className="text-xs text-neutral font-semibold">&quot;{req.notes}&quot;</div>
                                             <div className="grid grid-cols-2 gap-2">
-                                                <button onClick={() => handleSwapDecision(req.id, 'APPROVE')} className="bg-slate-850 hover:bg-slate-900 text-white py-2 rounded-lg text-xs font-bold shadow-sm">Approve</button>
-                                                <button onClick={() => handleSwapDecision(req.id, 'REJECT')} className="bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 rounded-lg text-xs font-bold">Reject</button>
+                                                <button onClick={() => handleSwapDecision(req.id, 'APPROVE')} className="bg-charcoal hover:bg-charcoal text-cream py-2 text-xs font-semibold">อนุมัติ</button>
+                                                <button onClick={() => handleSwapDecision(req.id, 'REJECT')} className="bg-paper-2 hover:bg-paper-3 text-charcoal py-2 text-xs font-semibold">ไม่อนุมัติ</button>
                                             </div>
                                         </Card>
                                     ))}
                             </div>
-                            <div className="space-y-4">
-                                <h3 className="font-extrabold text-slate-800">Roster Monitor</h3>
-                                <Card className="min-h-[200px] flex items-center justify-center text-slate-500 border border-slate-100 font-bold">
-                                    Aggregator Visualization Here (Monitored Active Transactions)
-                                </Card>
-                            </div>
                         </div>
                     )}
-                    <footer className="w-full text-center py-6 mt-12 border-t border-rams-rule-light text-[9px] font-mono tracking-[0.2em] text-rams-ink-muted uppercase select-none">
-                        ONHAUS SYSTEM © {new Date().getFullYear()}
+                    <footer className="w-full text-center py-6 mt-12 border-t border-rule text-xs text-neutral select-none">
+                        ในบ้าน · หลังบ้าน HR
                     </footer>
                 </main>
-
-                {/* Global FAB */}
-                <div className="fixed bottom-6 right-6 z-40">
-                    <button className="w-14 h-14 bg-slate-900 hover:bg-slate-800 text-white rounded-full shadow-2xl flex items-center justify-center hover:scale-110 transition-transform">
-                        <Icons.More size={24} />
-                    </button>
-                </div>
             </div>
         </div>
     );
@@ -2684,7 +2538,7 @@ export default function AdminDashboard() {
 
 // A reusable component to handle profile image loading errors gracefully.
 // It falls back to a text-based initial avatar if the image fails to load.
-const EmployeeAvatar = ({ employee, className = "w-9 h-9 rounded-xl", textClassName = "text-xs font-bold" }) => {
+const EmployeeAvatar = ({ employee, className = "w-9 h-9 ", textClassName = "text-xs font-semibold" }) => {
     const photoUrl = employee?.photo_url;
     const [prevPhotoUrl, setPrevPhotoUrl] = useState(photoUrl);
     const [imgError, setImgError] = useState(false);
@@ -2700,7 +2554,7 @@ const EmployeeAvatar = ({ employee, className = "w-9 h-9 rounded-xl", textClassN
                 src={photoUrl}
                 alt=""
                 onError={() => setImgError(true)}
-                className={`${className} object-cover border border-slate-200 shadow-sm`}
+                className={`${className} object-cover border border-rule `}
                 referrerPolicy="no-referrer"
             />
         );
@@ -2709,7 +2563,7 @@ const EmployeeAvatar = ({ employee, className = "w-9 h-9 rounded-xl", textClassN
     const name = employee?.nickname || employee?.name || "??";
     const initials = name.slice(0, 2);
     return (
-        <div className={`${className} bg-slate-100 border border-slate-200 text-slate-600 flex items-center justify-center ${textClassName}`}>
+        <div className={`${className} bg-paper-2 border border-rule text-neutral flex items-center justify-center ${textClassName}`}>
             {initials}
         </div>
     );

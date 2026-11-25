@@ -1,9 +1,6 @@
 "use client";
+import { initialOf } from "../../utils/initial";
 import React, { useState, useEffect } from "react";
-import { 
-    User, Briefcase, DollarSign, Shield, X, Check, AlertCircle, 
-    Smartphone, CreditCard, Sparkles, Building2, HelpCircle, Calculator 
-} from "lucide-react";
 
 export default function StaffModal({ isOpen, onClose, onSave, initialData, isEditing }) {
     const [activeTab, setActiveTab] = useState("core");
@@ -163,10 +160,10 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
     };
 
     const tabs = [
-        { id: "core", label: "ข้อมูลส่วนตัว & LINE", icon: User },
-        { id: "employment", label: "ตำแหน่ง & การจ้างงาน", icon: Briefcase },
-        { id: "compensation", label: "โครงสร้างค่าจ้าง & Payroll", icon: DollarSign },
-        { id: "compliance", label: "บัญชี & ผู้ติดต่อฉุกเฉิน", icon: Shield },
+        { id: "core", label: "ข้อมูลส่วนตัว และ LINE" },
+        { id: "employment", label: "ตำแหน่ง" },
+        { id: "compensation", label: "ค่าจ้าง" },
+        { id: "compliance", label: "บัญชี และผู้ติดต่อฉุกเฉิน" },
     ];
 
     const currentWageType = formData.shift_rates?.wage_type || 'daily';
@@ -174,26 +171,26 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-rams-ink/40 backdrop-blur-xs flex items-center justify-center z-50 p-3 sm:p-4 overflow-y-auto selection:bg-rams-ink/10">
-            <div className="bg-rams-panel border border-rams-rule rounded-sm w-full max-w-4xl max-h-[92vh] overflow-hidden shadow-2xl flex flex-col my-auto animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 bg-charcoal/50 flex items-center justify-center z-50 p-3 sm:p-4 overflow-y-auto">
+            <div className="bg-cream border border-charcoal w-full max-w-4xl max-h-[92vh] overflow-hidden flex flex-col my-auto">
                 {/* Header */}
-                <div className="px-6 py-4.5 border-b border-rams-rule-light flex justify-between items-center bg-rams-bg/60 shrink-0">
+                <div className="px-6 py-4.5 border-b border-rule flex justify-between items-center bg-paper-2 shrink-0">
                     <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-sm bg-rams-ink text-rams-panel flex items-center justify-center font-mono font-bold text-sm">
-                            {formData.nickname ? formData.nickname.charAt(0).toUpperCase() : (isEditing ? 'E' : '+')}
+                        <div className="w-9 h-9 bg-charcoal text-cream flex items-center justify-center font-num font-semibold text-sm">
+                            {formData.nickname || formData.name ? initialOf(formData.nickname, formData.name) : (isEditing ? 'E' : '+')}
                         </div>
                         <div>
                             <div className="flex items-center gap-2">
-                                <h2 className="text-base font-mono font-bold text-rams-ink uppercase tracking-wider">
-                                    {isEditing ? (formData.name || 'แก้ไขข้อมูลพนักงาน') : 'เพิ่มพนักงานใหม่ (Add Staff)'}
+                                <h2 className="text-base font-semibold text-charcoal">
+                                    {isEditing ? (formData.name || 'แก้ไขข้อมูลพนักงาน') : 'เพิ่มพนักงานใหม่'}
                                 </h2>
                                 {formData.nickname && (
-                                    <span className="px-2 py-0.5 rounded-sm bg-rams-orange/15 text-rams-orange border border-rams-orange/30 font-mono text-[10px] font-bold">
+                                    <span className="px-2 py-0.5 bg-plum/15 text-plum border border-plum/30 font-num text-xs font-semibold">
                                         {formData.nickname}
                                     </span>
                                 )}
                             </div>
-                            <p className="text-[10px] font-mono text-rams-ink-muted uppercase tracking-widest mt-0.5">
+                            <p className="text-xs text-neutral mt-0.5">
                                 กำหนดโปรไฟล์และโครงสร้างการคำนวณเงินเดือนสำหรับระบบ Payroll
                             </p>
                         </div>
@@ -201,29 +198,25 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
                     <button 
                         type="button"
                         onClick={onClose} 
-                        className="w-8 h-8 flex items-center justify-center border border-rams-rule-light hover:border-rams-rule hover:bg-rams-bg text-rams-ink rounded-sm font-mono text-sm transition-all cursor-pointer"
-                    >
-                        <X size={16} />
-                    </button>
+                        className="flex items-center justify-center border border-rule hover:border-charcoal hover:bg-cream text-charcoal text-sm transition-colors duration-150 cursor-pointer min-h-11 px-3 text-sm font-semibold underline-offset-4 hover:underline"
+                    >ปิด</button>
                 </div>
 
                 {/* Navigation Tabs */}
-                <div className="flex px-6 border-b border-rams-rule-light overflow-x-auto bg-rams-bg/30 shrink-0 custom-scrollbar">
+                <div className="flex px-6 border-b border-rule overflow-x-auto bg-paper-2 shrink-0 custom-scrollbar">
                     {tabs.map(tab => {
-                        const Icon = tab.icon;
                         const isActive = activeTab === tab.id;
                         return (
                             <button
                                 key={tab.id}
                                 type="button"
                                 onClick={() => setActiveTab(tab.id)}
-                                className={`flex items-center gap-2 px-4 py-3 text-xs font-mono font-bold uppercase tracking-wider transition-all border-b-2 whitespace-nowrap -mb-[1px] cursor-pointer ${
-                                    isActive 
-                                        ? 'border-rams-ink text-rams-ink bg-rams-panel shadow-[0_-2px_0_0_inset_var(--color-rams-ink)]' 
-                                        : 'border-transparent text-rams-ink-muted hover:text-rams-ink hover:bg-rams-bg/50'
-                                }`}
+                                className={`flex items-center gap-2 min-h-12 px-4 text-sm font-semibold transition-colors duration-150 border-b-2 whitespace-nowrap -mb-[1px] cursor-pointer ${
+ isActive 
+ ? 'border-charcoal text-charcoal bg-cream ' 
+ : 'border-transparent text-neutral hover:text-charcoal hover:bg-paper-2'
+ }`}
                             >
-                                <Icon size={14} className={isActive ? 'text-rams-orange' : 'text-rams-ink-muted'} />
                                 <span>{tab.label}</span>
                             </button>
                         );
@@ -231,22 +224,22 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
                 </div>
 
                 {/* Form Content */}
-                <div className="flex-1 overflow-y-auto p-6 bg-rams-panel custom-scrollbar">
+                <div className="flex-1 overflow-y-auto p-6 bg-cream custom-scrollbar">
                     <form id="staffForm" onSubmit={handleSubmit} className="space-y-6">
                         
                         {/* --- TAB 1: CORE PERSONAL & LINE --- */}
                         {activeTab === 'core' && (
                             <div className="space-y-6">
                                 {/* Active Toggle Banner */}
-                                <div className="bg-rams-bg p-4 border border-rams-rule-light rounded-sm flex items-center justify-between">
+                                <div className="bg-cream p-4 border border-rule flex items-center justify-between">
                                     <div className="flex items-center gap-3">
-                                        <div className={`w-3 h-3 rounded-full ${formData.is_active ? 'bg-rams-green' : 'bg-rams-ink-muted/50'} ring-4 ring-rams-bg`}></div>
+                                        <div className={`w-3 h-3 ${formData.is_active ? 'bg-charcoal' : 'bg-neutral/50'}`}></div>
                                         <div>
-                                            <span className="text-xs font-mono font-bold text-rams-ink uppercase tracking-wider block">
-                                                สถานะบัญชีพนักงาน (Account Status)
+                                            <span className="text-xs font-semibold text-charcoal block">
+                                                สถานะบัญชีพนักงาน
                                             </span>
-                                            <span className="text-[10px] text-rams-ink-muted">
-                                                {formData.is_active ? 'พนักงานยังคงปฏิบัติงานอยู่ในระบบ' : 'ปิดการใช้งาน / พ้นสภาพพนักงานแล้ว (Inactive)'}
+                                            <span className="text-xs text-neutral">
+                                                {formData.is_active ? 'พนักงานยังคงปฏิบัติงานอยู่ในระบบ' : 'ปิดการใช้งาน / พ้นสภาพพนักงานแล้ว'}
                                             </span>
                                         </div>
                                     </div>
@@ -258,9 +251,9 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
                                             onChange={e => setFormData({ ...formData, is_active: e.target.checked })} 
                                             className="sr-only peer" 
                                         />
-                                        <div className="w-10 h-5 bg-rams-ink-muted/20 border border-rams-rule-light rounded-sm peer peer-focus:outline-none peer-checked:after:translate-x-5 after:content-[''] after:absolute after:top-[3px] after:left-[3px] after:bg-rams-ink after:rounded-xs after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-rams-green/30 peer-checked:border-rams-green"></div>
-                                        <span className="ml-3 text-[10px] font-mono font-bold text-rams-ink uppercase tracking-wider">
-                                            {formData.is_active ? 'ACTIVE' : 'INACTIVE'}
+                                        <div className="w-10 h-5 bg-neutral/20 border border-rule peer peer-focus:outline-none peer-checked:after:translate-x-5 after:content-[''] after:absolute after:top-[3px] after:left-[3px] after:bg-charcoal after: after:h-3.5 after:w-3.5 after:transition-colors duration-150 peer-checked:bg-charcoal/30 peer-checked:border-charcoal"></div>
+                                        <span className="ml-3 text-sm font-semibold text-charcoal whitespace-nowrap">
+                                            {formData.is_active ? 'ทำงานอยู่' : 'พ้นสภาพ'}
                                         </span>
                                     </label>
                                 </div>
@@ -275,14 +268,14 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
                                         placeholder="เช่น สมชาย ใจดี" 
                                     />
                                     <FormInput 
-                                        label="ชื่อ - นามสกุล (English)" 
+                                        label="ชื่อ - นามสกุล (อังกฤษ)" 
                                         name="name_en" 
                                         value={formData.name_en || ''} 
                                         onChange={handleChange} 
                                         placeholder="e.g. Somchai Jaidee" 
                                     />
                                     <FormInput 
-                                        label="ชื่อเล่น (Nickname) *" 
+                                        label="ชื่อเล่น *" 
                                         name="nickname" 
                                         value={formData.nickname || ''} 
                                         onChange={handleChange} 
@@ -291,10 +284,9 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
                                 </div>
 
                                 {/* LINE Integrations Card */}
-                                <div className="bg-rams-bg/50 border border-rams-rule-light p-4 rounded-sm space-y-4">
+                                <div className="bg-paper-2 border border-rule p-4 space-y-4">
                                     <div className="flex items-center gap-2">
-                                        <Smartphone size={15} className="text-rams-orange" />
-                                        <h4 className="text-xs font-mono font-bold text-rams-ink uppercase tracking-wider">
+                                                                                <h4 className="text-xs font-semibold text-charcoal">
                                             การเชื่อมต่อระบบ LINE (LIFF Check-in & Yuzu Bot)
                                         </h4>
                                     </div>
@@ -309,7 +301,7 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
                                                 placeholder="U1234567890abcdef..." 
                                                 mono 
                                             />
-                                            <p className="text-[9px] text-rams-ink-muted mt-1 font-mono">
+                                            <p className="text-xs text-neutral mt-1">
                                                 * รหัสประจำตัว LINE ที่พนักงานใช้ลงเวลาผ่าน LIFF หน้าเว็บ
                                             </p>
                                         </div>
@@ -322,7 +314,7 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
                                                 placeholder="U9876543210fedcba..." 
                                                 mono 
                                             />
-                                            <p className="text-[9px] text-rams-ink-muted mt-1 font-mono">
+                                            <p className="text-xs text-neutral mt-1">
                                                 * รหัส LINE สำหรับการแจ้งเตือนงานและพูดคุยกับ AI ประจำร้าน
                                             </p>
                                         </div>
@@ -331,7 +323,7 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
 
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <FormInput 
-                                        label="เบอร์โทรศัพท์ (Phone)" 
+                                        label="เบอร์โทรศัพท์" 
                                         name="phone" 
                                         value={formData.phone || ''} 
                                         onChange={handleChange} 
@@ -339,7 +331,7 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
                                         placeholder="08x-xxx-xxxx" 
                                     />
                                     <FormInput 
-                                        label="อีเมล (Email)" 
+                                        label="อีเมล" 
                                         name="email" 
                                         value={formData.email || ''} 
                                         onChange={handleChange} 
@@ -347,7 +339,7 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
                                         placeholder="staff@inthehaus.com" 
                                     />
                                     <FormInput 
-                                        label="เลขบัตรประชาชน (ID Card)" 
+                                        label="เลขบัตรประชาชน" 
                                         name="id_card" 
                                         value={formData.id_card || ''} 
                                         onChange={handleChange} 
@@ -357,14 +349,14 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
                                 </div>
 
                                 <div>
-                                    <label className="block text-[10px] font-mono font-bold text-rams-ink-muted mb-1.5 uppercase tracking-wider">
-                                        ที่อยู่ตามทะเบียนบ้าน / ที่พักปัจจุบัน (Address)
+                                    <label className="block text-xs font-semibold text-neutral mb-1.5">
+                                        ที่อยู่ตามทะเบียนบ้าน / ที่พักปัจจุบัน
                                     </label>
                                     <textarea 
                                         name="address" 
                                         value={formData.address || ''} 
                                         onChange={handleChange} 
-                                        className="w-full p-2.5 rounded-sm border border-rams-rule-light focus:border-rams-rule outline-none bg-rams-bg text-rams-ink font-sans text-xs min-h-[70px] transition-all" 
+                                        className="w-full p-2.5 border border-rule focus:border-charcoal outline-none bg-cream text-charcoal text-xs min-h-[70px] transition-colors duration-150" 
                                         placeholder="ระบุที่อยู่..." 
                                     />
                                 </div>
@@ -376,7 +368,7 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
                             <div className="space-y-6">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <FormSelect 
-                                        label="สถานะการจ้างงาน (Employment Status) *" 
+                                        label="สถานะการจ้างงาน *" 
                                         name="employment_status" 
                                         value={formData.employment_status || 'Fulltime'} 
                                         onChange={handleChange} 
@@ -391,7 +383,7 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
                                     />
                                     <div>
                                         <FormInput 
-                                            label="ตำแหน่ง / หน้าที่ (Position / Role) *" 
+                                            label="ตำแหน่ง / หน้าที่ *" 
                                             name="position" 
                                             value={formData.position || ''} 
                                             onChange={handleChange} 
@@ -399,10 +391,10 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
                                             placeholder="เช่น Bar & Floor, Cooking, Kitchen, Owner, Manager" 
                                         />
                                         {((formData.position || '').toLowerCase().includes('owner') || (formData.position || '').toLowerCase().includes('ceo')) && (
-                                            <div className="mt-2 p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-sm flex items-start gap-2">
-                                                <span className="text-sm shrink-0">👑</span>
-                                                <span className="text-amber-800 text-[11px] font-sans leading-tight">
-                                                    <strong>ตำแหน่ง Owner / ผู้บริหาร:</strong> ได้รับการยกเว้นการบังคับลงเวลาเข้างาน (Check-in Exempt), ไม่แสดงเตือนมาสาย และไม่ถูกแจ้งเตือนขาดงานใน LINE
+                                            <div className="mt-2 p-2.5 bg-paper-2 border border-plum flex items-start gap-2">
+                                                <span className="text-sm shrink-0"></span>
+                                                <span className="text-plum text-xs leading-tight">
+                                                    <strong>ตำแหน่ง Owner / ผู้บริหาร:</strong> ได้รับการยกเว้นการบังคับลงเวลาเข้างาน, ไม่แสดงเตือนมาสาย และไม่ถูกแจ้งเตือนขาดงานใน LINE
                                                 </span>
                                             </div>
                                         )}
@@ -411,21 +403,21 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
 
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <FormInput 
-                                        label="ระดับตำแหน่ง (Job Level)" 
+                                        label="ระดับตำแหน่ง" 
                                         name="job_level" 
                                         value={formData.job_level || ''} 
                                         onChange={handleChange} 
                                         placeholder="เช่น Junior, Senior, Supervisor, Head" 
                                     />
                                     <FormInput 
-                                        label="วันที่เริ่มงาน (Start Date)" 
+                                        label="วันที่เริ่มงาน" 
                                         name="start_date" 
                                         type="date" 
                                         value={formData.start_date || ''} 
                                         onChange={handleChange} 
                                     />
                                     <FormInput 
-                                        label="วันสิ้นสุดทดลองงาน (Probation End)" 
+                                        label="วันสิ้นสุดทดลองงาน" 
                                         name="probation_date" 
                                         type="date" 
                                         value={formData.probation_date || ''} 
@@ -433,13 +425,12 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
                                     />
                                 </div>
 
-                                <div className="bg-rams-bg/60 p-4 rounded-sm border border-rams-rule-light space-y-2">
-                                    <h4 className="text-xs font-mono font-bold text-rams-ink uppercase tracking-wider flex items-center gap-2">
-                                        <AlertCircle size={14} className="text-rams-orange" />
-                                        ข้อแนะนำสำหรับการจัดสรรตารางงาน (Roster Scheduling)
+                                <div className="bg-paper-2 p-4 border border-rule space-y-2">
+                                    <h4 className="text-xs font-semibold text-charcoal flex items-center gap-2">
+                                                                                ข้อแนะนำสำหรับการจัดสรรตารางงาน
                                     </h4>
-                                    <p className="text-[11px] text-rams-ink-muted leading-relaxed">
-                                        ระบบจะใช้ข้อมูลตำแหน่งงานและประเภทการจ้างงานนี้เพื่อตรวจสอบความพร้อมในกะงาน (Team Schedule), การแจ้งเตือนตารางงานผ่าน LINE, และการจับคู่เข้ากะใน Roster Template
+                                    <p className="text-xs text-neutral leading-relaxed">
+                                        ระบบจะใช้ข้อมูลตำแหน่งงานและประเภทการจ้างงานนี้เพื่อตรวจสอบความพร้อมในกะงาน, การแจ้งเตือนตารางงานผ่าน LINE, และการจับคู่เข้ากะใน Roster Template
                                     </p>
                                 </div>
                             </div>
@@ -451,24 +442,24 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
                                 
                                 {/* Step 1: Select Wage Type */}
                                 <div>
-                                    <label className="block text-[10px] font-mono font-bold text-rams-ink-muted mb-2 uppercase tracking-wider">
-                                        1. รูปแบบโครงสร้างค่าจ้างหลัก (Wage Model) *
+                                    <label className="block text-xs font-semibold text-neutral mb-2">
+                                        1. รูปแบบโครงสร้างค่าจ้างหลัก *
                                     </label>
                                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                         {[
                                             { 
                                                 id: 'daily', 
-                                                title: 'รายกะ / รายวัน (Daily Shift)', 
+                                                title: 'รายกะ / รายวัน', 
                                                 desc: 'คิดค่าจ้างตามตารางเวลาที่จัดไว้ใน Roster (กะปกติ / กะควบ / OT)' 
                                             },
                                             { 
                                                 id: 'monthly', 
-                                                title: 'รายเดือนประจำ (Monthly Salary)', 
+                                                title: 'รายเดือนประจำ', 
                                                 desc: 'เงินเดือนคงที่ประจำเดือน + ค่า OT และเบี้ยเลี้ยง' 
                                             },
                                             { 
                                                 id: 'hourly', 
-                                                title: 'รายชั่วโมง (Hourly Rate)', 
+                                                title: 'รายชั่วโมง', 
                                                 desc: 'คำนวณตามจำนวนชั่วโมงที่ลงเวลาจริง' 
                                             }
                                         ].map(model => {
@@ -478,19 +469,19 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
                                                     key={model.id}
                                                     type="button"
                                                     onClick={() => handleWageTypeSelect(model.id)}
-                                                    className={`p-3.5 rounded-sm text-left border transition-all cursor-pointer flex flex-col justify-between ${
-                                                        isSelected 
-                                                            ? 'border-rams-ink bg-rams-ink text-rams-panel shadow-[0_2px_0_0_var(--color-rams-rule)]' 
-                                                            : 'border-rams-rule-light bg-rams-bg/50 hover:bg-rams-bg text-rams-ink'
-                                                    }`}
+                                                    className={`p-3.5 text-left border transition-colors duration-150 cursor-pointer flex flex-col justify-between ${
+ isSelected 
+ ? 'border-charcoal bg-charcoal text-cream ' 
+ : 'border-rule bg-cream hover:bg-paper-2 text-charcoal'
+ }`}
                                                 >
                                                     <div className="flex items-center justify-between mb-1">
-                                                        <span className="font-mono font-bold text-xs uppercase tracking-wider">
+                                                        <span className="font-num font-semibold text-xs">
                                                             {model.title}
                                                         </span>
-                                                        {isSelected && <Check size={14} className="text-rams-orange" />}
+                                                        {isSelected && <span className="text-sm font-semibold text-plum">เลือกแล้ว</span>}
                                                     </div>
-                                                    <p className={`text-[10px] mt-1 leading-snug ${isSelected ? 'text-rams-panel/80' : 'text-rams-ink-muted'}`}>
+                                                    <p className={`text-xs mt-1 leading-snug ${isSelected ? 'text-cream/80' : 'text-neutral'}`}>
                                                         {model.desc}
                                                     </p>
                                                 </button>
@@ -500,19 +491,19 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
                                 </div>
 
                                 {/* Step 2: Rate Configurations based on Wage Type */}
-                                <div className="bg-rams-bg/70 p-5 rounded-sm border border-rams-rule-light space-y-4">
-                                    <h4 className="text-xs font-mono font-bold text-rams-ink uppercase tracking-wider flex items-center justify-between">
-                                        <span>2. กำหนดอัตราค่าแรง (Pay Rates Configuration)</span>
-                                        <span className="text-[10px] text-rams-orange font-mono font-bold">
+                                <div className="bg-paper-2 p-5 border border-rule space-y-4">
+                                    <h4 className="text-xs font-num font-semibold text-charcoal flex items-center justify-between">
+                                        <span>2. กำหนดอัตราค่าแรง</span>
+                                        <span className="text-xs text-plum font-num font-semibold">
                                             MODE: {currentWageType.toUpperCase()}
                                         </span>
                                     </h4>
 
                                     {/* Monthly Salary Input */}
                                     {currentWageType === 'monthly' && (
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in duration-100">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             <FormInput 
-                                                label="ฐานเงินเดือนประจำ (Base Monthly Salary - THB) *" 
+                                                label="ฐานเงินเดือนประจำ (บาท) *" 
                                                 name="base_salary" 
                                                 type="number" 
                                                 value={formData.base_salary || ''} 
@@ -535,22 +526,22 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
 
                                     {/* Daily Shift Rates (Single Unified Shift Rate) */}
                                     {currentWageType === 'daily' && (
-                                        <div className="space-y-4 animate-in fade-in duration-100">
-                                            <div className="p-3 bg-rams-bg border border-rams-rule-light rounded-sm">
-                                                <p className="text-[11px] text-rams-ink font-bold font-mono">
-                                                    📅 ระบบจะคำนวณค่าแรงอัตโนมัติตามช่วงเวลาที่จัดไว้ในตาราง Roster:
+                                        <div className="space-y-4">
+                                            <div className="p-3 bg-cream border border-rule">
+                                                <p className="text-xs text-charcoal font-semibold">
+                                                    ระบบจะคำนวณค่าแรงอัตโนมัติตามช่วงเวลาที่จัดไว้ในตาราง Roster:
                                                 </p>
-                                                <ul className="text-[10px] text-rams-ink-muted mt-1 space-y-0.5 font-mono list-disc list-inside">
-                                                    <li>กะงานปกติใน Roster (6-10 ชม.) ➜ คำนวณตามค่าแรงกะปกติ</li>
-                                                    <li>กะควบใน Roster (11+ ชม. เช่น 10:00-00:30) ➜ คำนวณตามค่าแรงกะควบ</li>
-                                                    <li>กะสั้น/พาร์ทไทม์ใน Roster (≤5 ชม. เช่น 18:00-22:30) ➜ คำนวณตาม ชม. จริง</li>
-                                                    <li>ทำงานเกินเวลาเลิกงานใน Roster ➜ คิดเป็นค่า OT รายชั่วโมงอัตโนมัติ</li>
+                                                <ul className="text-xs text-neutral mt-1 space-y-0.5 font-num list-disc list-inside">
+                                                    <li>กะงานปกติใน Roster (6-10 ชม.) คำนวณตามค่าแรงกะปกติ</li>
+                                                    <li>กะควบใน Roster (11+ ชม. เช่น 10:00-00:30) คำนวณตามค่าแรงกะควบ</li>
+                                                    <li>กะสั้น/พาร์ทไทม์ใน Roster (≤5 ชม. เช่น 18:00-22:30) คำนวณตาม ชม. จริง</li>
+                                                    <li>ทำงานเกินเวลาเลิกงานใน Roster คิดเป็นค่า OT รายชั่วโมงอัตโนมัติ</li>
                                                 </ul>
                                             </div>
 
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                                 <FormInput 
-                                                    label="ค่าแรง กะปกติ (Standard Shift Rate) ฿/กะ *" 
+                                                    label="ค่าแรง กะปกติ ฿/กะ *" 
                                                     name="rate_daily_rate" 
                                                     type="number" 
                                                     value={formData.shift_rates?.daily_rate ?? formData.shift_rates?.morning ?? 350} 
@@ -569,7 +560,7 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
                                                     mono 
                                                 />
                                             </div>
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-rams-rule-light">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-rule">
                                                 <FormInput 
                                                     label="อัตรา OT ล่วงเวลาเกินตาราง Roster (บาท / ชม.)" 
                                                     name="rate_ot_rate" 
@@ -594,7 +585,7 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
 
                                     {/* Hourly Rate */}
                                     {currentWageType === 'hourly' && (
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in duration-100">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             <FormInput 
                                                 label="ค่าจ้างปกติ (บาท / ชั่วโมง) *" 
                                                 name="rate_hourly_rate" 
@@ -621,13 +612,12 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
                                 {/* Step 3: Allowances & Statutory Deductions */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     {/* Allowances Box */}
-                                    <div className="p-4 bg-rams-bg border border-rams-rule-light rounded-sm space-y-3">
-                                        <h4 className="text-xs font-mono font-bold text-rams-ink uppercase tracking-wider flex items-center gap-1.5">
-                                            <Sparkles size={14} className="text-rams-green" />
-                                            เงินเพิ่ม & สวัสดิการ (Allowances)
+                                    <div className="p-4 bg-cream border border-rule space-y-3">
+                                        <h4 className="text-xs font-semibold text-charcoal flex items-center gap-1.5">
+                                                                                        เงินเพิ่ม & สวัสดิการ
                                         </h4>
                                         <FormInput 
-                                            label="ค่าตำแหน่ง / เบี้ยเลี้ยงคงที่รายเดือน (THB)" 
+                                            label="ค่าตำแหน่ง / เบี้ยเลี้ยงคงที่รายเดือน" 
                                             name="rate_monthly_allowance" 
                                             type="number" 
                                             value={formData.shift_rates?.monthly_allowance ?? 0} 
@@ -647,19 +637,18 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
                                     </div>
 
                                     {/* Statutory Deductions Box */}
-                                    <div className="p-4 bg-rams-bg border border-rams-rule-light rounded-sm space-y-3">
-                                        <h4 className="text-xs font-mono font-bold text-rams-ink uppercase tracking-wider flex items-center gap-1.5">
-                                            <Shield size={14} className="text-rams-red" />
-                                            รายการหักตามกฎหมาย (Statutory Deductions)
+                                    <div className="p-4 bg-cream border border-rule space-y-3">
+                                        <h4 className="text-xs font-semibold text-charcoal flex items-center gap-1.5">
+                                                                                        รายการหักตามกฎหมาย
                                         </h4>
                                         
                                         <div className="pt-1 pb-2">
                                             <label className="flex items-center justify-between cursor-pointer">
                                                 <div>
-                                                    <span className="text-xs font-mono font-bold text-rams-ink uppercase tracking-wider block">
+                                                    <span className="text-xs font-semibold text-charcoal block">
                                                         หักประกันสังคม (Social Security 5%)
                                                     </span>
-                                                    <span className="text-[10px] text-rams-ink-muted">
+                                                    <span className="text-xs text-neutral">
                                                         หัก 5% ของค่าจ้าง (สูงสุดไม่เกิน 750 บาท/เดือน)
                                                     </span>
                                                 </div>
@@ -668,7 +657,7 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
                                                     name="rate_social_security_enrolled" 
                                                     checked={!!formData.shift_rates?.social_security_enrolled} 
                                                     onChange={handleChange} 
-                                                    className="w-4 h-4 rounded-xs border-rams-rule-light accent-rams-ink cursor-pointer" 
+                                                    className="w-4 h-4 border-rule accent-charcoal cursor-pointer" 
                                                 />
                                             </label>
                                         </div>
@@ -690,32 +679,31 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
                         {/* --- TAB 4: COMPLIANCE & BANK DETAILS --- */}
                         {activeTab === 'compliance' && (
                             <div className="space-y-6">
-                                <div className="p-4 bg-rams-bg border border-rams-rule-light rounded-sm space-y-4">
+                                <div className="p-4 bg-cream border border-rule space-y-4">
                                     <div className="flex items-center gap-2">
-                                        <CreditCard size={16} className="text-rams-orange" />
-                                        <h4 className="text-xs font-mono font-bold text-rams-ink uppercase tracking-wider">
-                                            ข้อมูลบัญชีสำหรับการโอนเงินเดือน (Payout Bank Details)
+                                                                                <h4 className="text-xs font-semibold text-charcoal">
+                                            ข้อมูลบัญชีสำหรับการโอนเงินเดือน
                                         </h4>
                                     </div>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <FormSelect 
-                                            label="ธนาคาร (Bank Name)" 
+                                            label="ธนาคาร" 
                                             name="bank_name" 
                                             value={formData.bank_name || 'KBANK'} 
                                             onChange={handleChange} 
                                             options={[
-                                                { value: 'KBANK', label: 'ธนาคารกสิกรไทย (KBANK)' },
-                                                { value: 'SCB', label: 'ธนาคารไทยพาณิชย์ (SCB)' },
-                                                { value: 'BBL', label: 'ธนาคารกรุงเทพ (BBL)' },
-                                                { value: 'KTB', label: 'ธนาคารกรุงไทย (KTB)' },
-                                                { value: 'TTB', label: 'ธนาคารทหารไทยธนชาต (TTB)' },
-                                                { value: 'BAY', label: 'ธนาคารกรุงศรีอยุธยา (BAY)' },
-                                                { value: 'GSB', label: 'ธนาคารออมสิน (GSB)' },
-                                                { value: 'PROMPTPAY', label: 'พร้อมเพย์ (PromptPay)' }
+                                                { value: 'KBANK', label: 'ธนาคารกสิกรไทย' },
+                                                { value: 'SCB', label: 'ธนาคารไทยพาณิชย์' },
+                                                { value: 'BBL', label: 'ธนาคารกรุงเทพ' },
+                                                { value: 'KTB', label: 'ธนาคารกรุงไทย' },
+                                                { value: 'TTB', label: 'ธนาคารทหารไทยธนชาต' },
+                                                { value: 'BAY', label: 'ธนาคารกรุงศรีอยุธยา' },
+                                                { value: 'GSB', label: 'ธนาคารออมสิน' },
+                                                { value: 'PROMPTPAY', label: 'พร้อมเพย์' }
                                             ]} 
                                         />
                                         <FormInput 
-                                            label="เลขที่บัญชีธนาคาร (Bank Account Number)" 
+                                            label="เลขที่บัญชีธนาคาร" 
                                             name="bank_account" 
                                             value={formData.bank_account || ''} 
                                             onChange={handleChange} 
@@ -727,7 +715,7 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <FormInput 
-                                        label="เลขประจำตัวผู้เสียภาษี (Tax ID)" 
+                                        label="เลขประจำตัวผู้เสียภาษี" 
                                         name="tax_id" 
                                         value={formData.tax_id || ''} 
                                         onChange={handleChange} 
@@ -735,7 +723,7 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
                                         mono 
                                     />
                                     <FormInput 
-                                        label="ผู้ติดต่อฉุกเฉิน & เบอร์โทร (Emergency Contact)" 
+                                        label="ผู้ติดต่อฉุกเฉิน & เบอร์โทร" 
                                         name="emergency_contact" 
                                         value={formData.emergency_contact || ''} 
                                         onChange={handleChange} 
@@ -749,25 +737,24 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
                 </div>
 
                 {/* Footer Buttons */}
-                <div className="p-4.5 px-6 border-t border-rams-rule-light flex justify-between items-center bg-rams-bg shrink-0">
-                    <div className="text-[10px] font-mono text-rams-ink-muted">
+                <div className="p-4.5 px-6 border-t border-rule flex justify-between items-center bg-cream shrink-0">
+                    <div className="hidden sm:block text-sm text-neutral">
                         * โปรดตรวจสอบความถูกต้องของ LINE ID และอัตราค่าแรงก่อนบันทึก
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 ml-auto">
                         <button 
                             type="button" 
                             onClick={onClose} 
-                            className="px-4 py-2 rounded-sm font-mono font-bold text-xs uppercase tracking-wider text-rams-ink-muted hover:bg-rams-ink-muted/10 border border-transparent transition-all cursor-pointer"
+                            className="min-h-12 px-4 font-semibold text-base text-charcoal hover:bg-paper-2 border border-transparent transition-colors duration-150 cursor-pointer"
                         >
-                            ยกเลิก (Cancel)
+                            ยกเลิก
                         </button>
                         <button 
                             type="submit" 
                             form="staffForm" 
-                            className="px-6 py-2 rounded-sm font-mono font-bold text-xs uppercase tracking-wider text-rams-panel bg-rams-orange border border-rams-rule shadow-[0_2px_0_0_var(--color-rams-rule)] hover:bg-rams-orange-active active:translate-y-[2px] active:shadow-none transition-all cursor-pointer flex items-center gap-2"
+                            className="min-h-12 px-6 font-semibold text-base whitespace-nowrap text-cream bg-charcoal border border-charcoal hover:bg-charcoal-2 transition-colors duration-150 cursor-pointer flex items-center gap-2"
                         >
-                            <Check size={14} />
-                            <span>{isEditing ? 'บันทึกการแก้ไข' : 'สร้างโปรไฟล์พนักงาน'}</span>
+                                                        <span>{isEditing ? 'บันทึกการแก้ไข' : 'สร้างโปรไฟล์พนักงาน'}</span>
                         </button>
                     </div>
                 </div>
@@ -779,15 +766,15 @@ export default function StaffModal({ isOpen, onClose, onSave, initialData, isEdi
 // Helper Form Elements
 const FormInput = ({ label, mono, ...props }) => (
     <div>
-        <label className="block text-[10px] font-mono font-bold text-rams-ink-muted mb-1.5 uppercase tracking-wider">{label}</label>
-        <input {...props} className={`w-full p-2.5 rounded-sm border border-rams-rule-light focus:border-rams-rule outline-none bg-rams-bg text-rams-ink font-sans text-xs transition-all ${mono ? 'font-mono' : ''}`} />
+        <label className="block text-xs font-num font-semibold text-neutral mb-1.5">{label}</label>
+        <input {...props} className={`w-full p-2.5 border border-rule focus:border-charcoal outline-none bg-cream text-charcoal  text-xs transition-colors duration-150 ${mono ? 'font-num' : ''}`} />
     </div>
 );
 
 const FormSelect = ({ label, options, ...props }) => (
     <div>
-        <label className="block text-[10px] font-mono font-bold text-rams-ink-muted mb-1.5 uppercase tracking-wider">{label}</label>
-        <select {...props} className="w-full p-2.5 rounded-sm border border-rams-rule-light focus:border-rams-rule outline-none bg-rams-bg text-rams-ink font-sans text-xs transition-all cursor-pointer">
+        <label className="block text-xs font-num font-semibold text-neutral mb-1.5">{label}</label>
+        <select {...props} className="w-full p-2.5 border border-rule focus:border-charcoal outline-none bg-cream text-charcoal text-xs transition-colors duration-150 cursor-pointer">
             {options.map(o => (
                 typeof o === 'string' 
                     ? <option key={o} value={o}>{o}</option>

@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import clsx from "clsx";
 
-export function LongPressButton({ onLongPress, className, label = "Delete", duration = 1500 }) {
+export function LongPressButton({ onLongPress, className, label = "กดค้างเพื่อลบ", duration = 1500 }) {
     const [pressing, setPressing] = useState(false);
     const [progress, setProgress] = useState(0);
     const timerRef = useRef(null);
@@ -46,12 +46,12 @@ export function LongPressButton({ onLongPress, className, label = "Delete", dura
             onMouseLeave={stop}
             onTouchStart={start}
             onTouchEnd={stop}
-            className={clsx("relative overflow-hidden bg-rams-red/10 text-rams-red border border-rams-red/20 px-3 py-1 rounded-sm font-mono font-bold text-[10px] uppercase tracking-wider select-none hover:bg-rams-red/20 active:translate-y-[1px] transition-all cursor-pointer", className)}
+            className={clsx("relative overflow-hidden bg-cream text-error border border-error min-h-11 px-3 font-semibold text-sm whitespace-nowrap select-none hover:bg-error/10 transition-colors duration-150 cursor-pointer", className)}
         >
-            <span className="relative z-10">{pressing ? "HOLD..." : label}</span>
+            <span className="relative z-10">{pressing ? "ค้างไว้…" : label}</span>
             <div
                 style={{ width: `${progress}%` }}
-                className="absolute left-0 top-0 bottom-0 bg-rams-red/35 z-0 transition-all duration-75 ease-linear"
+                className="absolute left-0 top-0 bottom-0 bg-error/25 z-0"
             />
         </button>
     );

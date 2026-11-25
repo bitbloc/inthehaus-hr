@@ -1,7 +1,6 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
 import { format } from "date-fns";
-import { FileText, Upload, Trash2, Pencil, ExternalLink, X } from "lucide-react";
 import { supabase } from "../../../lib/supabaseClient";
 import { useAdminAuth } from "../AdminAuthContext";
 
@@ -183,46 +182,43 @@ export default function MeetingNotesManager() {
   };
 
   const inputCls =
-    "w-full px-3 py-2 bg-rams-bg border border-rams-rule-light focus:border-rams-rule rounded-sm text-sm text-rams-ink outline-none";
-  const labelCls = "text-[10px] font-mono font-bold uppercase tracking-widest text-rams-ink-muted block mb-1";
+    "w-full px-3 py-2 bg-cream border border-rule focus:border-charcoal  text-sm text-charcoal outline-none";
+  const labelCls = "text-xs font-num font-semibold text-neutral block mb-1";
 
   return (
     <div className="space-y-6">
-      <div className="bg-rams-panel border-2 border-rams-rule rounded-sm p-5 shadow-[0_2px_0_0_var(--color-rams-rule)]">
+      <div className="bg-cream border-2 border-charcoal p-5">
         <div className="flex items-center gap-2">
-          <span className="w-2.5 h-2.5 rounded-full bg-rams-orange" />
-          <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-rams-ink-muted">
-            STAFF DOCUMENTS · MEETING NOTES
-          </span>
+          <span className="w-2.5 h-2.5 bg-plum" />
+          <span className="text-xs font-semibold text-neutral">เอกสารทีม · บันทึกการประชุม</span>
         </div>
-        <h2 className="text-lg font-mono font-bold text-rams-ink mt-1">บันทึกการประชุม (PDF)</h2>
-        <p className="text-xs text-rams-ink-muted mt-1 leading-relaxed">
+        <h2 className="text-lg font-semibold text-charcoal mt-1">บันทึกการประชุม (PDF)</h2>
+        <p className="text-xs text-neutral mt-1 leading-relaxed">
           อัปโหลดไฟล์ PDF สรุปการประชุม พนักงานจะเปิดอ่านได้จากหน้าเข้า-ออกงาน (เมนู &quot;บันทึกการประชุม&quot;) ผ่าน LINE
         </p>
       </div>
 
       {message && (
         <div
-          className={`p-3 rounded-sm border font-mono text-xs font-bold flex items-center justify-between ${
-            message.type === "success"
-              ? "bg-rams-green/10 border-rams-green text-rams-green"
-              : "bg-rams-red/10 border-rams-red text-rams-red"
-          }`}
+          className={`p-3 border font-num text-xs font-semibold flex items-center justify-between ${
+ message.type === "success"
+ ? "bg-charcoal/10 border-charcoal text-charcoal"
+ : "bg-error/10 border-error text-error"
+ }`}
         >
           <span>{message.text}</span>
           <button onClick={() => setMessage(null)} className="ml-4 cursor-pointer" aria-label="ปิด">
-            <X className="w-3.5 h-3.5" />
-          </button>
+                      </button>
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="bg-rams-panel border border-rams-rule-light rounded-sm p-5 space-y-4">
+      <form onSubmit={handleSubmit} className="bg-cream border border-rule p-5 space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-mono font-bold text-rams-ink uppercase">
+          <h3 className="text-sm font-semibold text-charcoal">
             {editing ? "แก้ไขบันทึกการประชุม" : "อัปโหลดบันทึกใหม่"}
           </h3>
           {editing && (
-            <button type="button" onClick={resetForm} className="text-xs font-mono text-rams-ink-muted hover:text-rams-ink cursor-pointer">
+            <button type="button" onClick={resetForm} className="text-xs text-neutral hover:text-charcoal cursor-pointer">
               ยกเลิกการแก้ไข
             </button>
           )}
@@ -270,24 +266,24 @@ export default function MeetingNotesManager() {
             type="file"
             accept="application/pdf,.pdf"
             onChange={onPickFile}
-            className="block w-full text-xs text-rams-ink file:mr-3 file:px-3 file:py-2 file:border file:border-rams-rule file:rounded-sm file:bg-rams-bg file:text-xs file:font-mono file:font-bold file:cursor-pointer"
+            className="block w-full text-xs text-charcoal file:mr-3 file:px-3 file:py-2 file:border file:border-charcoal file: file:bg-cream file:text-xs file:font-num file:font-semibold file:cursor-pointer"
           />
           {editing && !file && (
-            <p className="text-[11px] text-rams-ink-muted mt-1">ไฟล์ปัจจุบัน: {editing.file_name || editing.file_path}</p>
+            <p className="text-xs text-neutral mt-1">ไฟล์ปัจจุบัน: {editing.file_name || editing.file_path}</p>
           )}
         </div>
 
         {!editing && (
-          <label className="flex items-start gap-2 text-sm text-rams-ink cursor-pointer select-none">
+          <label className="flex items-start gap-2 text-sm text-charcoal cursor-pointer select-none">
             <input
               type="checkbox"
               checked={notifyTeam}
               onChange={(e) => setNotifyTeam(e.target.checked)}
-              className="mt-1 w-4 h-4 accent-rams-ink"
+              className="mt-1 w-4 h-4 accent-charcoal"
             />
             <span>
               แจ้งทีมในกลุ่ม LINE ว่ามีบันทึกการประชุมใหม่
-              <span className="block text-[11px] text-rams-ink-muted">ส่งการ์ดพร้อมปุ่มเปิดบันทึก เข้ากลุ่มพนักงานทั้ง 2 กลุ่ม</span>
+              <span className="block text-xs text-neutral">ส่งการ์ดพร้อมปุ่มเปิดบันทึก เข้ากลุ่มพนักงานทั้ง 2 กลุ่ม</span>
             </span>
           </label>
         )}
@@ -295,41 +291,33 @@ export default function MeetingNotesManager() {
         <button
           type="submit"
           disabled={saving}
-          className="px-4 py-2.5 bg-rams-ink text-rams-panel border border-rams-rule rounded-sm text-xs font-mono font-bold uppercase flex items-center gap-2 cursor-pointer hover:bg-neutral-800 disabled:opacity-50"
+          className="px-4 py-2.5 bg-charcoal text-cream border border-charcoal text-xs font-semibold flex items-center gap-2 cursor-pointer hover:bg-charcoal disabled:opacity-50"
         >
-          <Upload className="w-3.5 h-3.5" />
-          {saving ? "กำลังบันทึก..." : editing ? "บันทึกการแก้ไข" : "อัปโหลด"}
+                    {saving ? "กำลังบันทึก..." : editing ? "บันทึกการแก้ไข" : "อัปโหลด"}
         </button>
       </form>
 
-      <div className="bg-rams-panel border border-rams-rule-light rounded-sm">
-        <div className="px-5 py-3 border-b border-rams-rule-light text-[10px] font-mono font-bold uppercase tracking-widest text-rams-ink-muted">
+      <div className="bg-cream border border-rule">
+        <div className="px-5 py-3 border-b border-rule text-xs font-semibold text-neutral">
           ทั้งหมด {notes.length} รายการ
         </div>
         {loading ? (
-          <div className="p-5 text-xs text-rams-ink-muted">กำลังโหลด...</div>
+          <div className="p-5 text-xs text-neutral">กำลังโหลด...</div>
         ) : notes.length === 0 ? (
-          <div className="p-5 text-xs text-rams-ink-muted">ยังไม่มีบันทึกการประชุม</div>
+          <div className="p-5 text-xs text-neutral">ยังไม่มีบันทึกการประชุม</div>
         ) : (
-          <ul className="divide-y divide-rams-rule-light">
+          <ul className="divide-y divide-rule">
             {notes.map((n) => (
               <li key={n.id} className="px-5 py-3 flex items-start gap-3">
-                <FileText className="w-4 h-4 text-rams-ink mt-0.5 shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <div className="text-[10px] font-mono font-bold text-rams-ink-muted">{n.meeting_date}</div>
-                  <div className="text-sm font-bold text-rams-ink break-words">{n.title}</div>
-                  {n.summary && <p className="text-xs text-rams-ink-muted mt-0.5 line-clamp-2">{n.summary}</p>}
+                                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-num font-semibold text-neutral">{n.meeting_date}</div>
+                  <div className="text-sm font-semibold text-charcoal break-words">{n.title}</div>
+                  {n.summary && <p className="text-xs text-neutral mt-0.5 line-clamp-2">{n.summary}</p>}
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
-                  <button onClick={() => openFile(n)} title="เปิด PDF" className="p-2 border border-rams-rule-light rounded-sm hover:bg-rams-bg cursor-pointer">
-                    <ExternalLink className="w-3.5 h-3.5" />
-                  </button>
-                  <button onClick={() => startEdit(n)} title="แก้ไข" className="p-2 border border-rams-rule-light rounded-sm hover:bg-rams-bg cursor-pointer">
-                    <Pencil className="w-3.5 h-3.5" />
-                  </button>
-                  <button onClick={() => handleDelete(n)} title="ลบ" className="p-2 border border-rams-rule-light rounded-sm hover:bg-rams-red/10 text-rams-red cursor-pointer">
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  <button onClick={() => openFile(n)} title="เปิด PDF" className="border border-rule hover:bg-cream cursor-pointer min-h-11 px-3 text-sm font-semibold underline-offset-4 hover:underline">เปิดไฟล์</button>
+                  <button onClick={() => startEdit(n)} title="แก้ไข" className="border border-rule hover:bg-cream cursor-pointer min-h-11 px-3 text-sm font-semibold underline-offset-4 hover:underline">แก้ไข</button>
+                  <button onClick={() => handleDelete(n)} title="ลบ" className="border border-rule hover:bg-error/10 cursor-pointer min-h-11 px-3 text-sm font-semibold underline-offset-4 hover:underline text-error">ลบ</button>
                 </div>
               </li>
             ))}

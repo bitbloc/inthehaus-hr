@@ -1,6 +1,8 @@
 "use client";
+import { initialOf } from "../../../utils/initial";
 import React, { useState, useMemo, useEffect } from "react";
 import { format, parseISO, differenceInMinutes, subDays, startOfWeek, addDays, isToday, isFuture, isPast } from "date-fns";
+import { th } from "date-fns/locale";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card } from "./ui/Card";
 import { Badge } from "./ui/Badge";
@@ -55,7 +57,7 @@ function StaffAvatar({ employee, className = "w-10 h-10", textClassName = "text-
         setImgError(false);
     }
 
-    const initialChar = (employee?.name || employee?.nickname || "E").charAt(0);
+    const initialChar = initialOf(employee?.nickname, employee?.name);
 
     return (
         <div className="relative shrink-0">
@@ -65,16 +67,16 @@ function StaffAvatar({ employee, className = "w-10 h-10", textClassName = "text-
                     alt=""
                     onError={() => setImgError(true)}
                     referrerPolicy="no-referrer"
-                    className={`${className} rounded-sm object-cover border border-rams-rule-light bg-rams-bg`}
+                    className={`${className} object-cover border border-rule bg-cream`}
                 />
             ) : (
-                <div className={`${className} rounded-sm bg-rams-ink text-rams-panel font-mono font-black ${textClassName} flex items-center justify-center border border-rams-rule select-none uppercase`}>
+                <div className={`${className} bg-charcoal text-cream font-num font-semibold ${textClassName} flex items-center justify-center border border-charcoal select-none`}>
                     {initialChar}
                 </div>
             )}
             {isWorking && (
-                <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-rams-green border-2 border-rams-panel flex items-center justify-center">
-                    <span className="w-1.5 h-1.5 rounded-full bg-rams-green animate-ping"></span>
+                <span className="absolute -top-1 -right-1 w-3 h-3 bg-charcoal border-2 border-cream flex items-center justify-center">
+                    <span className="w-1.5 h-1.5 bg-charcoal"></span>
                 </span>
             )}
         </div>
@@ -144,7 +146,7 @@ export default function DashboardOverview({
 
         if (isOwner) {
             return log.action_type === 'check_in'
-                ? { label: '👑 Owner (ลงเวลา)', color: 'amber', isLate: false, lateMinutes: 0 }
+                ? { label: 'Owner (ลงเวลา)', color: 'amber', isLate: false, lateMinutes: 0 }
                 : { label: 'ออกงาน', color: 'slate' };
         }
 
@@ -166,7 +168,7 @@ export default function DashboardOverview({
             const targetDateObj = parseISO(targetDateStr);
 
             return {
-                label: `🌙 กะข้ามคืน (${formatDate(targetDateObj)})`,
+                label: `กะข้ามคืน (${formatDate(targetDateObj)})`,
                 color: 'purple',
                 isOvernight: true,
                 shiftDate: targetDateStr
@@ -259,13 +261,13 @@ export default function DashboardOverview({
 
             if (isLeaveToday) {
                 statusCategory = 'LEAVE';
-                statusLabel = 'ลาหยุด (Approved)';
+                statusLabel = 'ลาหยุด';
                 statusBadgeColor = 'rose';
             } else if (isOwner) {
                 // Owner is exempt from required check-in
                 if (latestLog && latestLog.action_type === 'check_in') {
                     statusCategory = 'ON_DUTY';
-                    statusLabel = '👑 ปฏิบัติงาน (Owner)';
+                    statusLabel = 'ปฏิบัติงาน';
                     statusBadgeColor = 'emerald';
                     punchTime = latestLog.timestamp;
                 } else if (latestLog && latestLog.action_type === 'check_out') {
@@ -275,17 +277,17 @@ export default function DashboardOverview({
                     punchTime = latestLog.timestamp;
                 } else if (rosterItem.is_off) {
                     statusCategory = 'OFF';
-                    statusLabel = 'วันหยุด (Owner)';
+                    statusLabel = 'วันหยุด';
                     statusBadgeColor = 'slate';
                 } else {
                     statusCategory = 'UPCOMING';
-                    statusLabel = '👑 ยกเว้นการลงเวลา';
+                    statusLabel = 'ยกเว้นการลงเวลา';
                     statusBadgeColor = 'amber';
                 }
             } else if (rosterItem.is_off) {
                 if (latestLog && latestLog.action_type === 'check_in') {
                     statusCategory = 'ON_DUTY';
-                    statusLabel = 'ทำงานวันหยุด (On Duty)';
+                    statusLabel = 'ทำงานวันหยุด';
                     statusBadgeColor = 'purple';
                     punchTime = latestLog.timestamp;
                 } else if (latestLog && latestLog.action_type === 'check_out') {
@@ -295,7 +297,7 @@ export default function DashboardOverview({
                     punchTime = latestLog.timestamp;
                 } else {
                     statusCategory = 'OFF';
-                    statusLabel = rosterItem.source === 'TRANSACTION' ? 'วันหยุดตามตาราง' : 'ไม่ได้ลงตาราง (OFF)';
+                    statusLabel = rosterItem.source === 'TRANSACTION' ? 'วันหยุดตามตาราง' : 'ไม่ได้ลงตาราง';
                     statusBadgeColor = 'slate';
                 }
             } else {
@@ -304,12 +306,12 @@ export default function DashboardOverview({
                     const statusInfo = getShiftStatusForLog(latestLog);
                     if (statusInfo.isLate) {
                         statusCategory = 'LATE';
-                        statusLabel = `สาย +${statusInfo.lateMinutes}น. (On Duty)`;
+                        statusLabel = `สาย +${statusInfo.lateMinutes}น.`;
                         statusBadgeColor = 'amber';
                         lateMins = statusInfo.lateMinutes;
                     } else {
                         statusCategory = 'ON_DUTY';
-                        statusLabel = 'กำลังปฏิบัติงาน (On Duty)';
+                        statusLabel = 'อยู่ในกะ';
                         statusBadgeColor = 'emerald';
                     }
                     punchTime = latestLog.timestamp;
@@ -369,9 +371,9 @@ export default function DashboardOverview({
                 const isOnDuty = latestLog.action_type === 'check_in';
                 list.push({
                     employee: emp,
-                    roster: { is_off: true, shift_name: 'กะพิเศษ (Unscheduled)' },
+                    roster: { is_off: true, shift_name: 'กะพิเศษ' },
                     statusCategory: isOnDuty ? 'ON_DUTY' : 'COMPLETED',
-                    statusLabel: isOnDuty ? 'ทำงานนอกตาราง (On Duty)' : 'ออกกะแล้ว',
+                    statusLabel: isOnDuty ? 'ทำงานนอกตาราง' : 'ออกกะแล้ว',
                     statusBadgeColor: isOnDuty ? 'purple' : 'slate',
                     latestLog,
                     punchTime: latestLog.timestamp,
@@ -434,13 +436,13 @@ export default function DashboardOverview({
         const weekStart = startOfWeek(todayObj, { weekStartsOn: 1 }); // Monday
         const activeEmployees = (data.employees || []).filter(e => e.is_active !== false);
         const dayLabels = [
-            { short: "Mon", th: "จันทร์" },
-            { short: "Tue", th: "อังคาร" },
-            { short: "Wed", th: "พุธ" },
-            { short: "Thu", th: "พฤหัสฯ" },
-            { short: "Fri", th: "ศุกร์" },
-            { short: "Sat", th: "เสาร์" },
-            { short: "Sun", th: "อาทิตย์" },
+            { short: "จ.", th: "จันทร์" },
+            { short: "อ.", th: "อังคาร" },
+            { short: "พ.", th: "พุธ" },
+            { short: "พฤ.", th: "พฤหัสฯ" },
+            { short: "ศ.", th: "ศุกร์" },
+            { short: "ส.", th: "เสาร์" },
+            { short: "อา.", th: "อาทิตย์" },
         ];
 
         const days = dayLabels.map((lbl, idx) => {
@@ -473,7 +475,7 @@ export default function DashboardOverview({
                 short: lbl.short,
                 th: lbl.th,
                 dateStr: dStr,
-                dateFormatted: format(dObj, "dd MMM"),
+                dateFormatted: format(dObj, "d MMM", { locale: th }),
                 isToday: dStr === todayStr,
                 isFuture: isFuture(dObj) && dStr !== todayStr,
                 scheduled,
@@ -548,185 +550,90 @@ export default function DashboardOverview({
     }, [data.logs, activityFilter, activitySearch, todayStr]);
 
     return (
-        <div className="space-y-6 pb-12 font-sans">
-            {/* --- SECTION 1: COMMAND HEADER & QUICK ACTIONS BAR --- */}
-            <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-                className="bg-rams-panel border border-rams-rule rounded-sm p-5 sm:p-6 shadow-none relative overflow-hidden"
-            >
-                <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-5 relative z-10">
-                    <div className="space-y-1.5">
-                        <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-[9px] tracking-widest uppercase font-mono font-bold text-rams-ink bg-rams-bg border border-rams-rule-light px-2.5 py-1 rounded-sm">
-                                IN THE HAUS · COMMAND OS
-                            </span>
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-[9px] font-mono font-bold uppercase tracking-widest bg-rams-green/10 text-rams-green border border-rams-green/30">
-                                <span className="w-1.5 h-1.5 rounded-full bg-rams-green animate-ping"></span>
-                                Telemetry Live
-                            </span>
-                        </div>
-                        <h2 className="text-2xl md:text-3xl font-sans font-bold tracking-tight text-rams-ink">
-                            ยินดีต้อนรับกลับมา, บอส 👋
-                        </h2>
-                        <p className="text-xs text-rams-ink-muted font-sans flex flex-wrap items-center gap-2">
-                            <span className="font-mono">{formatDate(todayObj)}</span>
-                            <span>•</span>
-                            <span className="font-mono font-bold text-rams-ink">
-                                พนักงานปฏิบัติงาน {currentlyOnDutyCount}/{scheduledTodayCount} กะ · ความตรงเวลา {todayPunctualityRate}%
-                            </span>
-                        </p>
-                    </div>
-
-                    {/* Tactile Micro-Interaction Command Buttons */}
-                    <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
-                        <button
-                            onClick={() => {
-                                window.location.href = '/admin/roster';
-                            }}
-                            className="px-3.5 py-2 bg-rams-ink hover:bg-rams-ink/90 text-rams-panel text-xs font-mono font-bold uppercase tracking-wider rounded-sm border border-rams-rule shadow-[0_2px_0_0_var(--color-rams-rule)] hover:-translate-y-[1px] active:translate-y-[1px] active:scale-[0.985] active:shadow-none transition-all duration-150 cursor-pointer flex items-center gap-1.5"
-                            title="จัดตารางอัตโนมัติ / ตรวจสอบ Roster"
-                        >
-                            <span className="text-rams-orange font-bold">✨</span>
-                            <span>Auto-Roster</span>
-                        </button>
-                        <button
-                            onClick={() => handleNotify('/api/notify')}
-                            className="px-3.5 py-2 bg-rams-bg hover:bg-rams-panel text-rams-ink text-xs font-mono font-bold uppercase tracking-wider rounded-sm border border-rams-rule-light hover:border-rams-rule hover:-translate-y-[1px] active:translate-y-[1px] active:scale-[0.985] transition-all duration-150 cursor-pointer flex items-center gap-1.5"
-                            title="ส่งสรุปเข้า LINE กลุ่ม"
-                        >
-                            <Icons.Yuzu size={14} className="text-rams-orange" />
-                            <span>LINE Summary</span>
-                        </button>
-                        <button
-                            onClick={() => setShowManualModal(true)}
-                            className="px-3.5 py-2 bg-rams-orange hover:bg-rams-orange-active text-rams-panel text-xs font-mono font-bold uppercase tracking-wider rounded-sm border border-rams-rule shadow-[0_2px_0_0_var(--color-rams-rule)] hover:-translate-y-[1px] active:translate-y-[1px] active:scale-[0.985] active:shadow-none transition-all duration-150 cursor-pointer flex items-center gap-1.5"
-                        >
-                            <span>+ Manual Entry</span>
-                        </button>
-                        <button
-                            onClick={() => onTabChange?.('requests')}
-                            className="px-3 py-2 bg-rams-panel hover:bg-rams-bg text-rams-ink text-xs font-mono font-bold uppercase tracking-wider rounded-sm border border-rams-rule-light hover:border-rams-rule hover:-translate-y-[1px] active:translate-y-[1px] active:scale-[0.985] transition-all duration-150 cursor-pointer flex items-center gap-1.5"
-                        >
-                            <span>+ บันทึกใบลา</span>
-                        </button>
-                        <button
-                            onClick={handleFinalizeDay}
-                            className="px-3.5 py-2 bg-rams-ink text-rams-panel hover:bg-rams-ink-muted text-xs font-mono font-bold uppercase tracking-wider rounded-sm border border-rams-rule hover:-translate-y-[1px] active:translate-y-[1px] active:scale-[0.985] transition-all duration-150 cursor-pointer flex items-center gap-1.5"
-                        >
-                            <span>🏁 Cut-off วัน</span>
-                        </button>
-                    </div>
+        <div className="space-y-6 pb-12">
+            {/* --- Header: greeting, today's numbers, actions (Brand v2) --- */}
+            <section className="border border-charcoal bg-cream">
+                <div className="px-5 py-4">
+                    <p className="text-sm text-neutral">{formatDate(todayObj)}</p>
+                    <h2 className="font-head text-3xl leading-normal text-charcoal">สวัสดีครับบอส</h2>
+                    <p className="text-base text-subtle">
+                        วันนี้เข้างานแล้ว <span className="font-num text-charcoal">{currentlyOnDutyCount}/{scheduledTodayCount}</span> กะ · ตรงเวลา <span className="font-num text-charcoal">{todayPunctualityRate}%</span>
+                    </p>
                 </div>
-            </motion.div>
-
-            {/* --- SECTION 2: DRAFT SCHEDULES WARNING (IF ANY) --- */}
-            {draftWeeks.map(week => (
-                <div key={week.start} className="relative bg-rams-amber/10 border border-rams-rule rounded-sm p-4 pr-12 sm:pr-14 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-none animate-fade-in-up">
-                    <div className="flex gap-3">
-                        <div className="w-10 h-10 bg-rams-amber/20 rounded-sm flex items-center justify-center border border-rams-rule text-rams-ink shrink-0">
-                            <Icons.Alert size={18} />
-                        </div>
-                        <div>
-                            <h4 className="font-mono font-bold text-rams-ink text-xs uppercase tracking-wider">
-                                พบตารางงานร่าง (Draft Roster) ที่ยังไม่เผยแพร่
-                            </h4>
-                            <p className="text-[11px] font-sans text-rams-ink-muted mt-1">
-                                สัปดาห์วันที่ {formatDate(week.start)} - {formatDate(week.end)} (มีทั้งหมด {week.count} กะงานที่ยังไม่ได้เผยแพร่)
-                            </p>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <button
-                            onClick={() => onTabChange?.('roster')}
-                            className="px-3 py-2 bg-rams-bg border border-rams-rule-light text-rams-ink font-mono font-bold text-xs uppercase tracking-wider rounded-sm hover:bg-rams-bg-active transition-all cursor-pointer shrink-0"
-                        >
-                            ดูตาราง Roster
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-px bg-rule border-t border-rule">
+                    {[
+                        { label: 'ตารางงาน', onClick: () => { window.location.href = '/admin/roster'; } },
+                        { label: 'ลงเวลาแทนพนักงาน', onClick: () => setShowManualModal(true) },
+                        { label: 'บันทึกใบลา', onClick: () => onTabChange?.('requests') },
+                        { label: 'ส่งสรุปเข้า LINE', onClick: () => handleNotify('/api/notify') },
+                        { label: 'ปิดยอดวันนี้', onClick: handleFinalizeDay },
+                    ].map(a => (
+                        <button key={a.label} type="button" onClick={a.onClick} className="min-h-12 px-3 bg-cream hover:bg-paper-2 text-base font-semibold text-charcoal transition-colors duration-150 last:col-span-2 sm:last:col-span-1">
+                            {a.label}
                         </button>
-                        <button
-                            onClick={() => handlePublishRoster(week.start, week.end)}
-                            className="px-4 py-2 bg-rams-orange text-rams-panel font-mono font-bold text-xs uppercase tracking-wider rounded-sm border border-rams-rule shadow-[0_2px_0_0_var(--color-rams-rule)] hover:bg-rams-orange-active active:translate-y-[2px] active:shadow-none transition-all cursor-pointer shrink-0"
-                        >
-                            อนุมัติ & ประกาศ LINE
-                        </button>
-                    </div>
-                    <button
-                        onClick={() => handleDismissDraftWeek(week.start)}
-                        className="absolute top-4 right-4 w-6 h-6 flex items-center justify-center border border-rams-rule-light hover:border-rams-rule bg-rams-panel text-rams-ink-muted hover:text-rams-ink font-mono text-[10px] transition-all cursor-pointer rounded-sm"
-                        title="ซ่อนคำเตือนนี้"
-                    >
-                        <Icons.X size={12} />
-                    </button>
+                    ))}
                 </div>
-            ))}
+            </section>
+            {/* Draft-roster banners removed: no draft stage (owner, 2026-11-25) */}
 
             {/* --- SECTION 3: TASTESKILL APP-SCREEN TELEMETRY PANEL (QUIET PANELS, ALIGNED FIGURES, COLOUR SPENT ON DATA) --- */}
             <motion.div
                 initial={{ opacity: 0, y: 18 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.55, delay: 0.06, ease: [0.22, 1, 0.36, 1] }}
-                className="bg-rams-panel border border-rams-rule rounded-sm overflow-hidden shadow-[0_14px_34px_-18px_rgba(25,25,24,0.12)]"
+                transition={{ duration: 0.16, delay: 0.06, ease: 'easeOut' }}
+                className="bg-cream border border-charcoal overflow-hidden"
             >
                 {/* Top Header Strip: Overview | This week */}
-                <div className="px-6 py-3.5 border-b border-rams-rule-light flex flex-wrap items-center justify-between gap-3 bg-rams-panel">
+                <div className="px-6 py-3.5 border-b border-rule flex flex-wrap items-center justify-between gap-3 bg-cream">
                     <div className="flex items-center gap-2.5">
-                        <span className="text-xs font-sans font-semibold text-rams-ink-muted tracking-tight">
-                            Overview
-                        </span>
-                        <span className="text-rams-rule-light">·</span>
-                        <span className="text-[11px] font-mono text-rams-ink font-bold uppercase tracking-wider">
+                        <span className="text-sm text-charcoal font-semibold">
                             ภาพรวมการปฏิบัติงานและวินัยเข้ากะ
                         </span>
                     </div>
                     <div className="flex items-center gap-2">
-                        <div className="inline-flex items-center bg-rams-bg p-0.5 rounded-sm border border-rams-rule-light">
+                        <div className="inline-flex items-center bg-cream p-0.5 border border-rule">
                             {[
-                                { id: "shifts", label: "Shifts by day" },
-                                { id: "punctuality", label: "Punctuality %" }
+                                { id: "shifts", label: "กะรายวัน" },
+                                { id: "punctuality", label: "ตรงเวลา %" }
                             ].map(tab => (
                                 <button
                                     key={tab.id}
                                     type="button"
                                     onClick={() => setChartMetric(tab.id)}
-                                    className={`relative px-2.5 py-1 text-[10px] font-mono font-bold uppercase tracking-wider rounded-xs transition-colors cursor-pointer ${
-                                        chartMetric === tab.id ? "text-rams-panel" : "text-rams-ink-muted hover:text-rams-ink"
-                                    }`}
+                                    className={`relative px-2.5 py-1 text-xs font-num font-semibold transition-colors cursor-pointer ${
+ chartMetric === tab.id ? "text-cream" : "text-neutral hover:text-charcoal"
+ }`}
                                 >
                                     {chartMetric === tab.id && (
                                         <motion.span
                                             layoutId="overviewChartModePill"
                                             transition={{ type: "spring", stiffness: 420, damping: 34 }}
-                                            className="absolute inset-0 bg-rams-ink rounded-xs"
+                                            className="absolute inset-0 bg-charcoal"
                                         />
                                     )}
                                     <span className="relative z-10">{tab.label}</span>
                                 </button>
                             ))}
                         </div>
-                        <span className="text-xs font-sans font-medium text-rams-ink-muted pl-1">
-                            This week
-                        </span>
+                        <span className="text-xs font-medium text-neutral pl-1">สัปดาห์นี้</span>
                     </div>
                 </div>
 
                 {/* Row 1: Aligned Tabular Figures separated by 1px hairlines */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 divide-y lg:divide-y-0 divide-x divide-rams-rule-light border-b border-rams-rule-light bg-rams-panel">
+                <div className="grid grid-cols-2 lg:grid-cols-4 divide-y lg:divide-y-0 divide-x divide-rule border-b border-rule bg-cream">
                     {/* Metric 1: Live On Duty / Attendance Today */}
-                    <div className="p-5 sm:p-6 transition-colors hover:bg-rams-bg/35">
-                        <p className="text-xs font-sans text-rams-ink-muted font-medium">
-                            On Duty Now
-                        </p>
+                    <div className="p-5 sm:p-6 transition-colors hover:bg-paper-2">
+                        <p className="text-xs text-neutral font-medium">อยู่ในกะตอนนี้</p>
                         <div className="mt-1.5 flex items-baseline gap-2">
-                            <span className="text-3xl sm:text-4xl font-mono font-bold tracking-tight text-rams-ink tabular-nums">
+                            <span className="text-3xl sm:text-4xl font-num font-semibold text-charcoal tabular-nums">
                                 <AnimatedNumber value={currentlyOnDutyCount} />
                             </span>
-                            <span className="text-sm font-mono font-semibold text-rams-ink-muted tabular-nums">
+                            <span className="text-sm font-semibold text-neutral tabular-nums">
                                 / {scheduledTodayCount} กะ
                             </span>
                         </div>
-                        <div className="mt-2 flex items-center gap-1.5 text-xs font-mono font-bold">
-                            <span className="text-rams-green">
+                        <div className="mt-2 flex items-center gap-1.5 text-xs font-num font-semibold">
+                            <span className="text-charcoal">
                                 ● ลงเวลาวันนี้ {todayCheckInsCount} ครั้ง
                             </span>
                         </div>
@@ -735,49 +642,45 @@ export default function DashboardOverview({
                     {/* Metric 2: Monthly Check-ins */}
                     <div
                         onClick={() => onTabChange?.("payroll")}
-                        className="p-5 sm:p-6 transition-colors hover:bg-rams-bg/35 cursor-pointer group"
+                        className="p-5 sm:p-6 transition-colors hover:bg-paper-2 cursor-pointer group"
                     >
                         <div className="flex items-center justify-between">
-                            <p className="text-xs font-sans text-rams-ink-muted font-medium">
-                                Monthly Shifts
-                            </p>
-                            <span className="text-[10px] font-mono text-rams-ink-muted group-hover:text-rams-orange transition-colors">
-                                Payroll ↗
+                            <p className="text-xs text-neutral font-medium">กะเดือนนี้</p>
+                            <span className="text-xs text-neutral group-hover:text-plum transition-colors">
+                                เงินเดือน ↗
                             </span>
                         </div>
                         <div className="mt-1.5 flex items-baseline gap-2">
-                            <span className="text-3xl sm:text-4xl font-mono font-bold tracking-tight text-rams-ink tabular-nums">
+                            <span className="text-3xl sm:text-4xl font-num font-semibold text-charcoal tabular-nums">
                                 <AnimatedNumber value={monthCheckInsCount} />
                             </span>
-                            <span className="text-xs font-mono text-rams-ink-muted">
+                            <span className="text-xs text-neutral">
                                 กะสะสม
                             </span>
                         </div>
-                        <div className="mt-2 flex items-center gap-1.5 text-xs font-mono font-bold">
-                            <span className="text-rams-green">
+                        <div className="mt-2 flex items-center gap-1.5 text-xs font-num font-semibold">
+                            <span className="text-charcoal">
                                 +{todayCheckInsCount} วันนี้
                             </span>
-                            <span className="text-rams-ink-muted font-normal text-[11px]">
+                            <span className="text-neutral font-normal text-xs">
                                 ({activeStaffCount} พนักงาน)
                             </span>
                         </div>
                     </div>
 
                     {/* Metric 3: Punctuality Rate */}
-                    <div className="p-5 sm:p-6 transition-colors hover:bg-rams-bg/35">
-                        <p className="text-xs font-sans text-rams-ink-muted font-medium">
-                            Punctuality Rate
-                        </p>
+                    <div className="p-5 sm:p-6 transition-colors hover:bg-paper-2">
+                        <p className="text-xs text-neutral font-medium">ตรงเวลาเดือนนี้</p>
                         <div className="mt-1.5 flex items-baseline gap-2">
-                            <span className="text-3xl sm:text-4xl font-mono font-bold tracking-tight text-rams-ink tabular-nums">
+                            <span className="text-3xl sm:text-4xl font-num font-semibold text-charcoal tabular-nums">
                                 <AnimatedNumber value={monthPunctualityRate} suffix="%" />
                             </span>
                         </div>
-                        <div className="mt-2 flex items-center gap-2 text-xs font-mono font-bold">
+                        <div className="mt-2 flex items-center gap-2 text-xs font-num font-semibold">
                             {todayLateCount === 0 ? (
-                                <span className="text-rams-green">วันนี้ตรงเวลา 100%</span>
+                                <span className="text-charcoal">วันนี้ตรงเวลา 100%</span>
                             ) : (
-                                <span className="text-rams-orange">วันนี้สาย {todayLateCount} คน ({todayPunctualityRate}%)</span>
+                                <span className="text-plum">วันนี้สาย {todayLateCount} คน ({todayPunctualityRate}%)</span>
                             )}
                         </div>
                     </div>
@@ -785,58 +688,58 @@ export default function DashboardOverview({
                     {/* Metric 4: Pending & NFC Stations */}
                     <div
                         onClick={() => onTabChange?.(totalAlertsCount > 0 ? "requests" : "nfc_stations")}
-                        className="p-5 sm:p-6 transition-colors hover:bg-rams-bg/35 cursor-pointer group"
+                        className="p-5 sm:p-6 transition-colors hover:bg-paper-2 cursor-pointer group"
                     >
                         <div className="flex items-center justify-between">
-                            <p className="text-xs font-sans text-rams-ink-muted font-medium">
-                                {totalAlertsCount > 0 ? "Pending Requests" : "NFC Hardware Stations"}
+                            <p className="text-xs text-neutral font-medium">
+                                {totalAlertsCount > 0 ? "คำขอรออนุมัติ" : "จุดแตะ NFC"}
                             </p>
-                            <span className="text-[10px] font-mono text-rams-ink-muted group-hover:text-rams-orange transition-colors">
-                                {totalAlertsCount > 0 ? "Review ↗" : "Manage ↗"}
+                            <span className="text-xs text-neutral group-hover:text-plum transition-colors">
+                                {totalAlertsCount > 0 ? "ตรวจ ↗" : "จัดการ ↗"}
                             </span>
                         </div>
                         <div className="mt-1.5 flex items-baseline gap-2">
-                            <span className={`text-3xl sm:text-4xl font-mono font-bold tracking-tight tabular-nums ${totalAlertsCount > 0 ? "text-rams-orange" : "text-rams-ink"}`}>
+                            <span className={`text-3xl sm:text-4xl font-num font-semibold tabular-nums ${totalAlertsCount > 0 ? "text-plum" : "text-charcoal"}`}>
                                 <AnimatedNumber value={totalAlertsCount > 0 ? totalAlertsCount : 9} />
                             </span>
-                            <span className="text-xs font-mono text-rams-ink-muted">
+                            <span className="text-xs text-neutral">
                                 {totalAlertsCount > 0 ? "รายการรออนุมัติ" : "จุดแตะในร้าน"}
                             </span>
                         </div>
-                        <div className="mt-2 flex items-center gap-1.5 text-xs font-mono font-bold">
+                        <div className="mt-2 flex items-center gap-1.5 text-xs font-num font-semibold">
                             {totalAlertsCount > 0 ? (
-                                <span className="text-rams-orange">● รอกดอนุมัติใบลา/สลับกะ</span>
+                                <span className="text-plum">● รอกดอนุมัติใบลา/สลับกะ</span>
                             ) : (
-                                <span className="text-rams-green">● Tap-to-Punch & SOP Active</span>
+                                <span className="text-charcoal">● ใช้งานอยู่</span>
                             )}
                         </div>
                     </div>
                 </div>
 
                 {/* Row 2: Interactive 7-Day Bar Chart (Mon - Sun) with Dashed Avg Line & Signal Orange Active Callout */}
-                <div className="p-6 sm:p-7 bg-rams-panel">
+                <div className="p-6 sm:p-7 bg-cream">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-8">
                         <div>
-                            <h3 className="text-xs font-sans font-semibold text-rams-ink-muted">
+                            <h3 className="text-xs font-semibold text-neutral">
                                 {chartMetric === "shifts"
-                                    ? "Shifts & attendance by day (จำนวนกะและการลงเวลารายวัน)"
-                                    : "Punctuality rate by day (อัตราการเข้างานตรงเวลารายวัน)"}
+                                    ? "จำนวนกะและการลงเวลารายวัน"
+                                    : "อัตราเข้างานตรงเวลารายวัน"}
                             </h3>
                         </div>
                         {activeDayData && (
-                            <div className="flex items-center gap-3 text-xs font-mono">
-                                <span className="text-rams-ink-muted">
+                            <div className="flex items-center gap-3 text-xs font-num">
+                                <span className="text-neutral">
                                     วัน{activeDayData.th} ({activeDayData.dateFormatted}):
                                 </span>
-                                <span className="font-bold text-rams-ink tabular-nums">
+                                <span className="font-semibold text-charcoal tabular-nums">
                                     ลงเวลา {activeDayData.checkInCount} ครั้ง
                                 </span>
-                                <span className="text-rams-rule-light">|</span>
-                                <span className="font-bold text-rams-ink tabular-nums">
+                                <span className="text-rule">|</span>
+                                <span className="font-semibold text-charcoal tabular-nums">
                                     ตาราง {activeDayData.scheduled} กะ
                                 </span>
-                                <span className="text-rams-rule-light">|</span>
-                                <span className={`font-bold tabular-nums ${activeDayData.lateCount > 0 ? "text-rams-orange" : "text-rams-green"}`}>
+                                <span className="text-rule">|</span>
+                                <span className={`font-semibold tabular-nums ${activeDayData.lateCount > 0 ? "text-plum" : "text-charcoal"}`}>
                                     ตรงเวลา {activeDayData.punctuality}%
                                 </span>
                             </div>
@@ -850,17 +753,17 @@ export default function DashboardOverview({
                     >
                         {/* Horizontal Dashed Average Reference Line (like tasteskill reference) */}
                         <div
-                            className="absolute left-0 right-0 pointer-events-none z-10 transition-all duration-500"
+                            className="absolute left-0 right-0 pointer-events-none z-10 transition-colors duration-150 duration-500"
                             style={{
                                 bottom: `calc(28px + ${Math.round(weeklyTelemetry.avgRatio * 124)}px)`
                             }}
                         >
-                            <div className="text-[11px] font-mono font-medium text-rams-ink-muted mb-1 tabular-nums">
+                            <div className="text-xs font-medium text-neutral mb-1 tabular-nums">
                                 {chartMetric === "shifts"
-                                    ? `avg ${weeklyTelemetry.avgShifts} กะ/วัน`
-                                    : `avg ${weeklyTelemetry.avgPunctuality}%`}
+                                    ? `เฉลี่ย ${weeklyTelemetry.avgShifts} กะ/วัน`
+                                    : `เฉลี่ย ${weeklyTelemetry.avgPunctuality}%`}
                             </div>
-                            <div className="w-full border-b border-dashed border-rams-ink-muted/45" />
+                            <div className="w-full border-b border-dashed border-neutral/45" />
                         </div>
 
                         {/* 7 Bars Grid (Mon - Sun) */}
@@ -887,8 +790,8 @@ export default function DashboardOverview({
                                                     initial={{ opacity: 0, y: 6, scale: 0.94 }}
                                                     animate={{ opacity: 1, y: 0, scale: 1 }}
                                                     exit={{ opacity: 0, y: 4, scale: 0.95 }}
-                                                    transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-                                                    className="mb-2 px-2.5 py-1 rounded-md bg-rams-ink text-rams-panel text-[11px] font-mono font-bold tracking-tight whitespace-nowrap shadow-md z-30 tabular-nums"
+                                                    transition={{ duration: 0.16, ease: 'easeOut' }}
+                                                    className="mb-2 px-2.5 py-1 bg-charcoal text-cream text-xs font-semibold whitespace-nowrap z-30 tabular-nums"
                                                 >
                                                     {day.short}{" "}
                                                     {chartMetric === "shifts"
@@ -904,43 +807,43 @@ export default function DashboardOverview({
                                                 initial={{ scaleY: 0 }}
                                                 animate={{ scaleY: 1 }}
                                                 transition={{
-                                                    duration: 0.65,
+                                                    duration: 0.16,
                                                     delay: 0.08 + idx * 0.045,
-                                                    ease: [0.22, 1, 0.36, 1]
+                                                    ease: 'easeOut'
                                                 }}
                                                 style={{
                                                     height: `${Math.round(ratio * 100)}%`,
                                                     transformOrigin: "bottom"
                                                 }}
-                                                className={`w-full rounded-t-md transition-colors duration-200 relative ${
-                                                    isHighlighted
-                                                        ? "bg-rams-orange shadow-[0_8px_20px_-6px_rgba(224,79,38,0.45)]"
-                                                        : day.isToday
-                                                        ? "bg-[#D5CEC0] group-hover:bg-rams-orange/80"
-                                                        : day.isFuture
-                                                        ? "bg-[#EAE5DA] border border-dashed border-rams-rule-light group-hover:bg-[#DDD6C7]"
-                                                        : "bg-[#E4DED1] group-hover:bg-[#D6CFC0]"
-                                                }`}
+                                                className={`w-full transition-colors duration-200 relative ${
+ isHighlighted
+ ? "bg-plum "
+ : day.isToday
+ ? "bg-plum/40 group-hover:bg-plum/60"
+ : day.isFuture
+ ? "bg-paper-2 border border-dashed border-neutral"
+ : "bg-neutral/35 group-hover:bg-neutral/50"
+ }`}
                                             />
                                         </div>
 
                                         {/* Day Label (Mon .. Sun) */}
                                         <div className="mt-2.5 flex items-center gap-1">
                                             <span
-                                                className={`text-xs font-mono transition-colors ${
-                                                    isHighlighted
-                                                        ? "font-bold text-rams-ink"
-                                                        : day.isToday
-                                                        ? "font-bold text-rams-orange"
-                                                        : "font-medium text-rams-ink-muted group-hover:text-rams-ink"
-                                                }`}
+                                                className={`text-xs font-num transition-colors ${
+ isHighlighted
+ ? "font-semibold text-charcoal"
+ : day.isToday
+ ? "font-semibold text-plum"
+ : "font-medium text-neutral group-hover:text-charcoal"
+ }`}
                                             >
                                                 {day.short}
                                             </span>
                                             {day.isToday && (
                                                 <span
-                                                    className="w-1.5 h-1.5 rounded-full bg-rams-orange"
-                                                    title="วันนี้ (Today)"
+                                                    className="w-1.5 h-1.5 bg-plum"
+                                                    title="วันนี้"
                                                 />
                                             )}
                                         </div>
@@ -956,42 +859,42 @@ export default function DashboardOverview({
             <motion.div
                 initial={{ opacity: 0, y: 18 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.55, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
-                className="bg-rams-panel border border-rams-rule rounded-sm overflow-hidden shadow-none"
+                transition={{ duration: 0.16, delay: 0.12, ease: 'easeOut' }}
+                className="bg-cream border border-charcoal overflow-hidden"
             >
-                <div className="p-5 border-b border-rams-rule-light bg-rams-bg/40 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div className="p-5 border-b border-rule bg-paper-2 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
                         <div className="flex items-center gap-2.5">
-                            <h3 className="font-mono font-bold text-rams-ink text-sm uppercase tracking-wider">Live Floor Radar · สถานะพนักงานวันนี้</h3>
-                            <Badge color="emerald">{currentlyOnDutyCount} On Duty</Badge>
+                            <h3 className="font-semibold text-charcoal text-sm">สถานะพนักงานวันนี้</h3>
+                            <Badge color="emerald">อยู่ในกะ {currentlyOnDutyCount}</Badge>
                         </div>
-                        <p className="text-[11px] font-sans text-rams-ink-muted mt-0.5">สรุปสถานะการเข้ากะของทีมงานตามตาราง Roster ประจำวัน ({todayStr})</p>
+                        <p className="text-xs text-neutral mt-0.5">สรุปสถานะการเข้ากะของทีมงานตามตารางงานวันนี้ ({todayStr})</p>
                     </div>
                     <div className="flex flex-wrap items-center gap-1.5">
                         {[
-                            { id: 'all', label: `ALL (${liveFloorList.length})` },
-                            { id: 'on_duty', label: `ON DUTY (${currentlyOnDutyCount})` },
-                            { id: 'upcoming', label: 'UPCOMING' },
-                            { id: 'completed', label: 'COMPLETED' },
-                            { id: 'late', label: 'LATE' },
-                            { id: 'off', label: 'OFF' }
+                            { id: 'all', label: `ทั้งหมด (${liveFloorList.length})` },
+                            { id: 'on_duty', label: `อยู่ในกะ (${currentlyOnDutyCount})` },
+                            { id: 'upcoming', label: 'ยังไม่ถึงเวลา' },
+                            { id: 'completed', label: 'ออกกะแล้ว' },
+                            { id: 'late', label: 'สาย' },
+                            { id: 'off', label: 'หยุด/ลา' }
                         ].map(tab => {
                             const active = rosterFilter === tab.id;
                             return (
                                 <button
                                     key={tab.id}
                                     onClick={() => setRosterFilter(tab.id)}
-                                    className={`relative px-2.5 py-1 rounded-sm text-[10px] font-mono font-bold uppercase tracking-wider transition-colors cursor-pointer border ${
-                                        active
-                                            ? 'text-rams-panel border-rams-rule'
-                                            : 'bg-rams-bg text-rams-ink-muted border-rams-rule-light hover:text-rams-ink hover:border-rams-rule'
-                                    }`}
+                                    className={`relative px-2.5 py-1 text-xs font-num font-semibold transition-colors cursor-pointer border ${
+ active
+ ? 'text-cream border-charcoal'
+ : 'bg-cream text-neutral border-rule hover:text-charcoal hover:border-charcoal'
+ }`}
                                 >
                                     {active && (
                                         <motion.span
                                             layoutId="floorRadarFilterPill"
                                             transition={{ type: "spring", stiffness: 420, damping: 34 }}
-                                            className="absolute inset-0 bg-rams-ink rounded-xs"
+                                            className="absolute inset-0 bg-charcoal"
                                         />
                                     )}
                                     <span className="relative z-10">{tab.label}</span>
@@ -1030,47 +933,47 @@ export default function DashboardOverview({
                                         initial={{ opacity: 0, y: 10 }}
                                         animate={{ opacity: 1, y: 0 }}
                                         exit={{ opacity: 0, scale: 0.96 }}
-                                        transition={{ duration: 0.25, delay: Math.min(idx * 0.03, 0.24), ease: [0.22, 1, 0.36, 1] }}
+                                        transition={{ duration: 0.16, delay: Math.min(idx * 0.03, 0.24), ease: 'easeOut' }}
                                         key={emp.id || idx}
-                                        className={`p-3.5 rounded-sm border transition-all duration-150 hover:-translate-y-[2px] hover:shadow-[0_10px_22px_-10px_rgba(25,25,24,0.12)] ${
-                                            isWorking
-                                                ? 'bg-rams-panel border-rams-rule'
-                                                : 'bg-rams-bg/40 border-rams-rule-light hover:border-rams-rule'
-                                        }`}
+                                        className={`p-3.5 border transition-colors duration-150 duration-150 hover:-translate-y-[2px] hover: ${
+ isWorking
+ ? 'bg-cream border-charcoal'
+ : 'bg-paper-2 border-rule hover:border-charcoal'
+ }`}
                                     >
                                         <div className="flex items-start gap-3">
                                             <StaffAvatar employee={emp} className="w-10 h-10" textClassName="text-sm" isWorking={isWorking} />
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center justify-between gap-1">
-                                                    <h4 className="text-xs font-bold text-rams-ink truncate">
+                                                    <h4 className="text-xs font-semibold text-charcoal truncate">
                                                         {emp.name}
-                                                        {emp.nickname ? <span className="text-rams-ink-muted font-mono font-normal ml-1">({emp.nickname})</span> : null}
+                                                        {emp.nickname ? <span className="text-neutral font-num font-normal ml-1">({emp.nickname})</span> : null}
                                                     </h4>
                                                 </div>
-                                                <p className="text-[9px] font-mono text-rams-ink-muted uppercase">{emp.position || 'Staff'}</p>
-                                                <div className="mt-2 text-[10px] font-mono flex justify-between tabular-nums">
-                                                    <span className="font-bold text-rams-ink">{item.shiftName}</span>
-                                                    <span className="text-rams-ink-muted">{item.shiftTime}</span>
+                                                <p className="text-xs text-neutral">{emp.position || 'พนักงาน'}</p>
+                                                <div className="mt-2 text-xs font-num flex justify-between tabular-nums">
+                                                    <span className="font-semibold text-charcoal">{item.shiftName}</span>
+                                                    <span className="text-neutral">{item.shiftTime}</span>
                                                 </div>
                                                 <div className="mt-1.5 flex items-center justify-between">
-                                                    <Badge color={item.statusBadgeColor} className="text-[8px] px-1.5">{item.statusLabel}</Badge>
-                                                    {item.punchTime && <span className="text-[9px] font-mono text-rams-ink-muted font-bold tabular-nums">{formatTime(item.punchTime)}</span>}
+                                                    <Badge color={item.statusBadgeColor} className="text-xs px-1.5">{item.statusLabel}</Badge>
+                                                    {item.punchTime && <span className="text-xs font-num text-neutral font-semibold tabular-nums">{formatTime(item.punchTime)}</span>}
                                                 </div>
 
                                                 {/* Subtle Shift Telemetry Progress Bar */}
                                                 {(isWorking || isCompleted) && (
-                                                    <div className="mt-2.5 w-full h-1 bg-rams-bg rounded-full overflow-hidden">
+                                                    <div className="mt-2.5 w-full h-1 bg-cream overflow-hidden">
                                                         <motion.div
                                                             initial={{ width: 0 }}
                                                             animate={{ width: `${shiftProgressPct}%` }}
-                                                            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-                                                            className={`h-full rounded-full ${
-                                                                item.statusCategory === 'LATE'
-                                                                    ? 'bg-rams-orange'
-                                                                    : isCompleted
-                                                                    ? 'bg-rams-ink-muted'
-                                                                    : 'bg-rams-green'
-                                                            }`}
+                                                            transition={{ duration: 0.16, ease: 'easeOut' }}
+                                                            className={`h-full ${
+ item.statusCategory === 'LATE'
+ ? 'bg-plum'
+ : isCompleted
+ ? 'bg-neutral'
+ : 'bg-charcoal'
+ }`}
                                                         />
                                                     </div>
                                                 )}
@@ -1087,45 +990,45 @@ export default function DashboardOverview({
             {/* --- SECTION 5: ACTION CENTER & RESTAURANT OPERATIONS HUB --- */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* 5.1 Action Center & Alerts Hub */}
-                <div className="bg-rams-panel border border-rams-rule rounded-sm p-5 shadow-none flex flex-col">
-                    <div className="flex justify-between items-center mb-4 pb-3 border-b border-rams-rule-light -mx-5 -mt-5 p-5 bg-rams-bg/40">
+                <div className="bg-cream border border-charcoal p-5 flex flex-col">
+                    <div className="flex justify-between items-center mb-4 pb-3 border-b border-rule -mx-5 -mt-5 p-5 bg-paper-2">
                         <div>
-                            <h3 className="font-mono font-bold text-rams-ink text-sm uppercase tracking-wider">
-                                Action Center · ศูนย์จัดการคำขอ
+                            <h3 className="font-semibold text-charcoal text-sm">
+                                คำขอรออนุมัติ
                             </h3>
-                            <p className="text-[10px] font-mono text-rams-ink-muted mt-0.5">
+                            <p className="text-xs text-neutral mt-0.5">
                                 อนุมัติใบลา, คำขอสลับกะ, และบัญชีพนักงาน
                             </p>
                         </div>
                         <Badge color={totalAlertsCount > 0 ? "orange" : "emerald"}>
-                            {totalAlertsCount > 0 ? `${totalAlertsCount} pending` : "All cleared ✓"}
+                            {totalAlertsCount > 0 ? `รอ ${totalAlertsCount} รายการ` : "ไม่มีค้าง"}
                         </Badge>
                     </div>
 
                     <div className="space-y-3.5 max-h-[380px] overflow-y-auto pr-1 custom-scrollbar flex-1">
                         {totalAlertsCount === 0 ? (
-                            <div className="text-center py-10 space-y-3 bg-rams-panel my-auto">
-                                <div className="w-10 h-10 bg-rams-green/10 border border-rams-green/30 text-rams-green rounded-sm flex items-center justify-center mx-auto text-sm font-mono font-bold">
-                                    ✓
+                            <div className="text-center py-10 space-y-3 bg-cream my-auto">
+                                <div className="w-10 h-10 bg-charcoal/10 border border-charcoal/30 text-charcoal flex items-center justify-center mx-auto text-sm font-num font-semibold">
+                                    
                                 </div>
-                                <p className="text-xs font-mono font-bold text-rams-ink uppercase tracking-wider">
+                                <p className="text-xs font-semibold text-charcoal">
                                     ทุกอย่างเรียบร้อยดี!
                                 </p>
-                                <p className="text-[10px] font-mono text-rams-ink-muted">
+                                <p className="text-xs text-neutral">
                                     ไม่มีคำขออนุมัติใบลา สลับกะ หรือพนักงานสมัครใหม่ตกค้าง
                                 </p>
                                 <div className="pt-2 flex justify-center gap-2">
                                     <button
                                         onClick={() => onTabChange?.('roster')}
-                                        className="px-3 py-1.5 bg-rams-bg border border-rams-rule-light text-rams-ink font-mono text-[9px] font-bold uppercase rounded-sm hover:border-rams-rule cursor-pointer"
+                                        className="px-3 py-1.5 bg-cream border border-rule text-charcoal text-xs font-semibold hover:border-charcoal cursor-pointer"
                                     >
                                         จัดการ Roster
                                     </button>
                                     <button
                                         onClick={() => onTabChange?.('payroll')}
-                                        className="px-3 py-1.5 bg-rams-bg border border-rams-rule-light text-rams-ink font-mono text-[9px] font-bold uppercase rounded-sm hover:border-rams-rule cursor-pointer"
+                                        className="px-3 py-1.5 bg-cream border border-rule text-charcoal text-xs font-semibold hover:border-charcoal cursor-pointer"
                                     >
-                                        สรุป Payroll
+                                        สรุปเงินเดือน
                                     </button>
                                 </div>
                             </div>
@@ -1133,34 +1036,34 @@ export default function DashboardOverview({
                             <>
                                 {/* 1. Leave Requests */}
                                 {(data.leaveRequests || []).filter(r => r.status === 'pending').map(req => (
-                                    <div key={`leave-${req.id}`} className="p-3.5 bg-rams-red/5 border border-rams-rule-light rounded-sm space-y-2.5 animate-fade-in-up">
+                                    <div key={`leave-${req.id}`} className="p-3.5 bg-error/5 border border-rule space-y-2.5 animate-fade-in-up">
                                         <div className="flex justify-between items-start">
                                             <Badge color="rose">ขอลาหยุด</Badge>
-                                            <span className="text-[10px] font-mono font-bold text-rams-ink">{formatDate(req.leave_date)}</span>
+                                            <span className="text-xs font-num font-semibold text-charcoal">{formatDate(req.leave_date)}</span>
                                         </div>
-                                        <div className="text-xs text-rams-ink font-sans">
-                                            <span className="font-bold">{req.employees?.name} {req.employees?.nickname ? `(${req.employees.nickname})` : ''}</span> ขอลาหยุดประเภท <span className="font-mono font-bold text-rams-orange">{req.leave_type}</span>
-                                            <div className="mt-1.5 p-2 bg-rams-bg border border-rams-rule-light rounded-sm font-mono text-[10px] text-rams-ink-muted leading-normal">
+                                        <div className="text-xs text-charcoal">
+                                            <span className="font-semibold">{req.employees?.name} {req.employees?.nickname ? `(${req.employees.nickname})` : ''}</span> ขอลาหยุดประเภท <span className="font-num font-semibold text-plum">{req.leave_type}</span>
+                                            <div className="mt-1.5 p-2 bg-cream border border-rule text-xs text-neutral leading-normal">
                                                 เหตุผล: &quot;{req.reason || '-'}&quot;
                                             </div>
                                             {req.replacement_employee && (
-                                                <p className="mt-1.5 text-xs font-mono font-bold text-rams-ink-muted">
-                                                    👤 คนทำงานแทน: <span className="bg-rams-bg border border-rams-rule-light text-rams-ink font-mono px-1.5 py-0.5 rounded-sm">{req.replacement_employee.name} {req.replacement_employee.nickname ? `(${req.replacement_employee.nickname})` : ""}</span>
+                                                <p className="mt-1.5 text-xs font-semibold text-neutral">
+                                                    คนทำงานแทน: <span className="bg-cream border border-rule text-charcoal font-num px-1.5 py-0.5">{req.replacement_employee.name} {req.replacement_employee.nickname ? `(${req.replacement_employee.nickname})` : ""}</span>
                                                 </p>
                                             )}
                                         </div>
                                         <div className="flex gap-2 justify-end pt-1">
                                             <button
                                                 onClick={() => handleLeaveAction(req, 'approved')}
-                                                className="px-3 py-1.5 bg-rams-green text-rams-panel font-mono font-bold text-[9px] uppercase tracking-wider rounded-sm border border-rams-rule shadow-[0_1.5px_0_0_var(--color-rams-rule)] hover:bg-rams-green/90 active:translate-y-[1px] active:shadow-none cursor-pointer transition-all"
+                                                className="px-3 py-1.5 bg-charcoal text-cream font-semibold text-xs border border-charcoal hover:bg-charcoal/90 cursor-pointer transition-colors duration-150"
                                             >
-                                                ✓ อนุมัติ
+                                                อนุมัติ
                                             </button>
                                             <button
                                                 onClick={() => handleLeaveAction(req, 'rejected')}
-                                                className="px-3 py-1.5 bg-rams-bg border border-rams-rule-light text-rams-ink-muted font-mono font-bold text-[9px] uppercase tracking-wider rounded-sm hover:bg-rams-ink-muted/10 cursor-pointer transition-all"
+                                                className="px-3 py-1.5 bg-cream border border-rule text-neutral font-semibold text-xs hover:bg-neutral/10 cursor-pointer transition-colors duration-150"
                                             >
-                                                ✕ ปฏิเสธ
+                                                ปฏิเสธ
                                             </button>
                                         </div>
                                     </div>
@@ -1168,29 +1071,29 @@ export default function DashboardOverview({
 
                                 {/* 2. Shift Swaps */}
                                 {(data.swapRequests || []).filter(r => r.status === 'PENDING_MANAGER').map(req => (
-                                    <div key={`swap-${req.id}`} className="p-3.5 bg-rams-orange/5 border border-rams-rule-light rounded-sm space-y-2.5 animate-fade-in-up">
+                                    <div key={`swap-${req.id}`} className="p-3.5 bg-plum/5 border border-rule space-y-2.5 animate-fade-in-up">
                                         <div className="flex justify-between items-start">
                                             <Badge color="blue">สลับกะ</Badge>
-                                            <span className="text-[10px] font-mono font-bold text-rams-ink">{req.target_date}</span>
+                                            <span className="text-xs font-num font-semibold text-charcoal">{req.target_date}</span>
                                         </div>
-                                        <div className="text-xs text-rams-ink font-sans">
-                                            <span className="font-bold">{req.requester?.name}</span> ขอสลับกะกับ <span className="font-bold">{req.peer?.name || 'Open Pool'}</span>
-                                            <div className="mt-1.5 p-2 bg-rams-bg border border-rams-rule-light rounded-sm font-mono text-[10px] text-rams-ink-muted leading-normal">
+                                        <div className="text-xs text-charcoal">
+                                            <span className="font-semibold">{req.requester?.name}</span> ขอสลับกะกับ <span className="font-semibold">{req.peer?.name || 'Open Pool'}</span>
+                                            <div className="mt-1.5 p-2 bg-cream border border-rule text-xs text-neutral leading-normal">
                                                 โน้ต: &quot;{req.notes || '-'}&quot;
                                             </div>
                                         </div>
                                         <div className="flex gap-2 justify-end pt-1">
                                             <button
                                                 onClick={() => handleSwapDecision(req.id, 'APPROVE')}
-                                                className="px-3 py-1.5 bg-rams-green text-rams-panel font-mono font-bold text-[9px] uppercase tracking-wider rounded-sm border border-rams-rule shadow-[0_1.5px_0_0_var(--color-rams-rule)] hover:bg-rams-green/90 active:translate-y-[1px] active:shadow-none cursor-pointer transition-all"
+                                                className="px-3 py-1.5 bg-charcoal text-cream font-semibold text-xs border border-charcoal hover:bg-charcoal/90 cursor-pointer transition-colors duration-150"
                                             >
-                                                ✓ อนุมัติ
+                                                อนุมัติ
                                             </button>
                                             <button
                                                 onClick={() => handleSwapDecision(req.id, 'REJECT')}
-                                                className="px-3 py-1.5 bg-rams-bg border border-rams-rule-light text-rams-ink-muted font-mono font-bold text-[9px] uppercase tracking-wider rounded-sm hover:bg-rams-ink-muted/10 cursor-pointer transition-all"
+                                                className="px-3 py-1.5 bg-cream border border-rule text-neutral font-semibold text-xs hover:bg-neutral/10 cursor-pointer transition-colors duration-150"
                                             >
-                                                ✕ ปฏิเสธ
+                                                ปฏิเสธ
                                             </button>
                                         </div>
                                     </div>
@@ -1198,18 +1101,18 @@ export default function DashboardOverview({
 
                                 {/* 3. Pending Staff Registration */}
                                 {data.pendingEmployees?.map(emp => (
-                                    <div key={`emp-${emp.id}`} className="p-3.5 bg-rams-amber/5 border border-rams-rule-light rounded-sm space-y-2.5 animate-fade-in-up">
+                                    <div key={`emp-${emp.id}`} className="p-3.5 bg-plum/5 border border-rule space-y-2.5 animate-fade-in-up">
                                         <div className="flex justify-between items-start">
                                             <Badge color="amber">พนักงานสมัครใหม่</Badge>
-                                            <span className="text-[9px] font-mono font-bold text-rams-ink uppercase tracking-wider">สมัครทาง LINE</span>
+                                            <span className="text-xs font-semibold text-charcoal">สมัครทาง LINE</span>
                                         </div>
-                                        <div className="text-xs text-rams-ink font-sans">
-                                            <span className="font-bold">{emp.name}</span> ได้สมัครบัญชีพนักงานเข้ามา รอคุณอนุมัติ
+                                        <div className="text-xs text-charcoal">
+                                            <span className="font-semibold">{emp.name}</span> ได้สมัครบัญชีพนักงานเข้ามา รอคุณอนุมัติ
                                         </div>
                                         <div className="flex justify-end pt-1">
                                             <button
                                                 onClick={() => { setEditingStaff(emp); setShowStaffModal(true); }}
-                                                className="px-3 py-1.5 bg-rams-orange text-rams-panel font-mono font-bold text-[9px] uppercase tracking-wider rounded-sm border border-rams-rule shadow-[0_1.5px_0_0_var(--color-rams-rule)] hover:bg-rams-orange-active active:translate-y-[1px] active:shadow-none cursor-pointer transition-all"
+                                                className="px-3 py-1.5 bg-plum text-cream font-semibold text-xs border border-charcoal hover:bg-plum-2 cursor-pointer transition-colors duration-150"
                                             >
                                                 ตั้งค่า & อนุมัติบัญชี
                                             </button>
@@ -1219,18 +1122,18 @@ export default function DashboardOverview({
 
                                 {/* 4. Pending Job Applications */}
                                 {(data.jobApplications || []).filter(r => r.status === 'Pending').map(app => (
-                                    <div key={`job-${app.id}`} className="p-3.5 bg-rams-bg border border-rams-rule-light rounded-sm space-y-2 animate-fade-in-up">
+                                    <div key={`job-${app.id}`} className="p-3.5 bg-cream border border-rule space-y-2 animate-fade-in-up">
                                         <div className="flex justify-between items-start">
                                             <Badge color="slate">ใบสมัครงาน</Badge>
-                                            <span className="text-[9px] font-mono text-rams-ink-muted">{formatDate(app.created_at)}</span>
+                                            <span className="text-xs font-num text-neutral">{formatDate(app.created_at)}</span>
                                         </div>
-                                        <div className="text-xs text-rams-ink">
-                                            <span className="font-bold">{app.full_name}</span> สมัครตำแหน่ง <span className="font-mono font-bold text-rams-orange">{app.position_applied}</span>
+                                        <div className="text-xs text-charcoal">
+                                            <span className="font-semibold">{app.full_name}</span> สมัครตำแหน่ง <span className="font-num font-semibold text-plum">{app.position_applied}</span>
                                         </div>
                                         <div className="flex justify-end pt-1">
                                             <button
                                                 onClick={() => onTabChange?.('applications')}
-                                                className="px-3 py-1 bg-rams-bg border border-rams-rule-light text-rams-ink font-mono font-bold text-[9px] uppercase rounded-sm hover:border-rams-rule cursor-pointer"
+                                                className="px-3 py-1 bg-cream border border-rule text-charcoal font-semibold text-xs hover:border-charcoal cursor-pointer"
                                             >
                                                 ดูใบสมัคร
                                             </button>
@@ -1243,20 +1146,19 @@ export default function DashboardOverview({
                 </div>
 
                 {/* 5.2 Operations & Reservations Glance */}
-                <div className="bg-rams-panel border border-rams-rule rounded-sm p-5 shadow-none flex flex-col">
-                    <div className="flex justify-between items-center mb-4 pb-3 border-b border-rams-rule-light -mx-5 -mt-5 p-5 bg-rams-bg/40">
+                <div className="bg-cream border border-charcoal p-5 flex flex-col">
+                    <div className="flex justify-between items-center mb-4 pb-3 border-b border-rule -mx-5 -mt-5 p-5 bg-paper-2">
                         <div>
-                            <h3 className="font-mono font-bold text-rams-ink text-sm uppercase tracking-wider flex items-center gap-2">
-                                <Icons.Clock size={15} className="text-rams-orange" />
-                                <span>Hardware & NFC Stations · จุดแตะบัตรร้าน</span>
+                            <h3 className="font-num font-semibold text-charcoal text-sm flex items-center gap-2">
+                                                                <span>จุดแตะ NFC ในร้าน</span>
                             </h3>
-                            <p className="text-[10px] font-mono text-rams-ink-muted mt-0.5">
+                            <p className="text-xs text-neutral mt-0.5">
                                 ระบบจุดแตะแผ่น NFC ลงเวลา เช็กลิสต์ และนับสต็อก ({todayStr})
                             </p>
                         </div>
                         <button
                             onClick={() => onTabChange?.('nfc_stations')}
-                            className="text-[10px] font-mono font-bold text-rams-orange hover:underline cursor-pointer uppercase tracking-wider bg-rams-bg px-2.5 py-1 rounded-sm border border-rams-rule-light"
+                            className="text-xs font-semibold text-plum hover:underline cursor-pointer bg-cream px-2.5 py-1 border border-rule"
                         >
                             จัดการแผ่น NFC →
                         </button>
@@ -1264,34 +1166,32 @@ export default function DashboardOverview({
 
                     <div className="space-y-4 flex-1">
                         <div className="space-y-2">
-                            <div className="p-3 bg-rams-bg/50 border border-rams-rule-light rounded-sm flex justify-between items-center text-xs">
+                            <div className="p-3 bg-paper-2 border border-rule flex justify-between items-center text-xs">
                                 <div>
-                                    <span className="font-mono font-bold text-rams-ink">BAR_PUNCH & KITCHEN_PUNCH</span>
-                                    <p className="text-[10px] font-mono text-rams-ink-muted mt-0.5">จุดแตะลงเวลาเข้า-ออกงาน (แก้ปัญหา GPS ในอาคาร)</p>
+                                    <span className="font-semibold text-charcoal">จุดลงเวลา บาร์ และ ครัว</span>
+                                    <p className="text-xs text-neutral mt-0.5">จุดแตะลงเวลาเข้า-ออกงาน (แก้ปัญหา GPS ในอาคาร)</p>
                                 </div>
-                                <Badge color="emerald" className="text-[9px]">ACTIVE</Badge>
+                                <Badge color="emerald" className="text-xs">ใช้งานอยู่</Badge>
                             </div>
-                            <div className="p-3 bg-rams-bg/50 border border-rams-rule-light rounded-sm flex justify-between items-center text-xs">
+                            <div className="p-3 bg-paper-2 border border-rule flex justify-between items-center text-xs">
                                 <div>
-                                    <span className="font-mono font-bold text-rams-ink">ESPRESSO_CAL & ZONE SOP</span>
-                                    <p className="text-[10px] font-mono text-rams-ink-muted mt-0.5">จุดแตะเครื่องชงกาแฟ & ตรวจเช็กลิสต์ 4 โซน</p>
+                                    <span className="font-semibold text-charcoal">เครื่องชงกาแฟ และเช็กลิสต์โซน</span>
+                                    <p className="text-xs text-neutral mt-0.5">จุดแตะเครื่องชงกาแฟ & ตรวจเช็กลิสต์ 4 โซน</p>
                                 </div>
-                                <Badge color="amber" className="text-[9px]">4 ZONES</Badge>
+                                <Badge color="amber" className="text-xs">4 โซน</Badge>
                             </div>
                         </div>
 
                         {/* Store Quick Telemetry */}
-                        <div className="pt-3 border-t border-rams-rule-light/50 grid grid-cols-2 gap-3">
+                        <div className="pt-3 border-t border-rule grid grid-cols-2 gap-3">
                             <a
                                 href="/checkin/qr-display"
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="p-3 bg-rams-bg/40 hover:bg-rams-bg border border-rams-rule-light hover:border-rams-rule rounded-sm transition block"
+                                className="p-3 bg-paper-2 hover:bg-cream border border-rule hover:border-charcoal transition block"
                             >
-                                <div className="text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest">
-                                    POS QR Display
-                                </div>
-                                <div className="text-xs font-mono font-bold text-rams-orange mt-1">
+                                <div className="text-xs font-semibold text-neutral">จอ QR หน้าร้าน</div>
+                                <div className="text-xs font-semibold text-plum mt-1">
                                     เปิดจอ QR ร้าน →
                                 </div>
                             </a>
@@ -1299,13 +1199,11 @@ export default function DashboardOverview({
                                 href="/checklist"
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="p-3 bg-rams-bg/40 hover:bg-rams-bg border border-rams-rule-light hover:border-rams-rule rounded-sm transition block"
+                                className="p-3 bg-paper-2 hover:bg-cream border border-rule hover:border-charcoal transition block"
                             >
-                                <div className="text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest">
-                                    Checklist & SOP
-                                </div>
-                                <div className="text-xs font-mono font-bold text-rams-green mt-1 flex items-center gap-1">
-                                    <span>✓ เปิดหน้าเช็กลิสต์ →</span>
+                                <div className="text-xs font-semibold text-neutral">เช็กลิสต์และ SOP</div>
+                                <div className="text-xs font-num font-semibold text-charcoal mt-1 flex items-center gap-1">
+                                    <span>เปิดหน้าเช็กลิสต์ →</span>
                                 </div>
                             </a>
                         </div>
@@ -1314,20 +1212,20 @@ export default function DashboardOverview({
             </div>
 
             {/* --- SECTION 6: REAL-TIME ACTIVITY FEED (EXPANSIVE FULL-WIDTH AUDIT HUB) --- */}
-            <div className="bg-rams-panel border border-rams-rule rounded-sm overflow-hidden flex flex-col shadow-none">
+            <div className="bg-cream border border-charcoal overflow-hidden flex flex-col">
                 {/* Feed Header */}
-                <div className="p-5 md:p-6 border-b border-rams-rule-light bg-rams-bg/30 space-y-4">
+                <div className="p-5 md:p-6 border-b border-rule bg-paper-2 space-y-4">
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                         <div>
                             <div className="flex items-center gap-2.5">
-                                <h3 className="font-mono font-bold text-rams-ink text-base uppercase tracking-wider">
-                                    Real-Time Activity Feed · บันทึกเวลาปฏิบัติงาน
+                                <h3 className="font-semibold text-charcoal text-base">
+                                    บันทึกเวลาเข้า-ออก
                                 </h3>
-                                <span className="px-2 py-0.5 bg-rams-bg border border-rams-rule-light rounded-sm text-[9px] font-mono font-bold text-rams-ink uppercase">
+                                <span className="px-2 py-0.5 bg-cream border border-rule text-xs font-semibold text-charcoal">
                                     {filteredLogs.length} รายการ
                                 </span>
                             </div>
-                            <p className="text-xs font-sans text-rams-ink-muted mt-0.5">
+                            <p className="text-xs text-neutral mt-0.5">
                                 ตรวจสอบการสแกนเวลาเข้า-ออกงาน, สถานะตรงต่อเวลา, รูปถ่าย และอารมณ์/บันทึกการทำงาน
                             </p>
                         </div>
@@ -1339,46 +1237,43 @@ export default function DashboardOverview({
                                 placeholder="ค้นหาชื่อ, ชื่อเล่น, กะ, โน้ต..."
                                 value={activitySearch}
                                 onChange={e => setActivitySearch(e.target.value)}
-                                className="w-full pl-8 pr-4 py-2 bg-rams-panel border border-rams-rule-light rounded-sm text-xs font-mono text-rams-ink outline-none focus:border-rams-rule transition-all"
+                                className="w-full pl-8 pr-4 py-2 bg-cream border border-rule text-xs font-num text-charcoal outline-none focus:border-charcoal transition-colors duration-150"
                             />
-                            <Icons.Search size={14} className="absolute left-2.5 top-2.5 text-rams-ink-muted" />
-                            {activitySearch && (
+                                                        {activitySearch && (
                                 <button
                                     onClick={() => setActivitySearch("")}
-                                    className="absolute right-2.5 top-2 text-xs font-mono text-rams-ink-muted hover:text-rams-ink cursor-pointer"
-                                >
-                                    ✕
-                                </button>
+                                    className="absolute right-2.5 top-2 text-xs text-neutral hover:text-charcoal cursor-pointer min-h-11 px-3 text-sm font-semibold underline-offset-4 hover:underline"
+                                >ล้าง</button>
                             )}
                         </div>
                     </div>
 
                     {/* Activity Filter Chips with Sliding Pill */}
-                    <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-rams-rule-light/40">
+                    <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-rule">
                         {[
-                            { id: 'today', label: `เฉพาะวันนี้ (Today - ${todayLogs.length})` },
-                            { id: 'all', label: `ทั้งเดือน (All - ${(data.logs || []).length})` },
-                            { id: 'check_in', label: 'เข้างาน (Check In)' },
-                            { id: 'check_out', label: 'ออกงาน (Check Out)' },
-                            { id: 'late', label: 'เข้างานสาย (Late)' },
-                            { id: 'overnight', label: '🌙 กะข้ามคืน (Overnight)' },
+                            { id: 'today', label: `วันนี้ (${todayLogs.length})` },
+                            { id: 'all', label: `ทั้งเดือน (${(data.logs || []).length})` },
+                            { id: 'check_in', label: 'เข้างาน' },
+                            { id: 'check_out', label: 'ออกงาน' },
+                            { id: 'late', label: 'เข้าสาย' },
+                            { id: 'overnight', label: 'ข้ามคืน' },
                         ].map(tab => {
                             const active = activityFilter === tab.id;
                             return (
                                 <button
                                     key={tab.id}
                                     onClick={() => setActivityFilter(tab.id)}
-                                    className={`relative px-3 py-1.5 rounded-sm text-[10px] font-mono font-bold uppercase tracking-wider transition-colors cursor-pointer border ${
-                                        active
-                                            ? 'text-rams-panel border-rams-rule'
-                                            : 'bg-rams-panel text-rams-ink-muted border-rams-rule-light hover:text-rams-ink hover:border-rams-rule'
-                                    }`}
+                                    className={`relative px-3 py-1.5 text-xs font-num font-semibold transition-colors cursor-pointer border ${
+ active
+ ? 'text-cream border-charcoal'
+ : 'bg-cream text-neutral border-rule hover:text-charcoal hover:border-charcoal'
+ }`}
                                 >
                                     {active && (
                                         <motion.span
                                             layoutId="activityFeedFilterPill"
                                             transition={{ type: "spring", stiffness: 420, damping: 34 }}
-                                            className="absolute inset-0 bg-rams-ink rounded-xs"
+                                            className="absolute inset-0 bg-charcoal"
                                         />
                                     )}
                                     <span className="relative z-10">{tab.label}</span>
@@ -1391,21 +1286,21 @@ export default function DashboardOverview({
                 {/* Table */}
                 <div className="overflow-x-auto max-h-[600px] custom-scrollbar">
                     <table className="w-full text-xs text-left relative border-collapse">
-                        <thead className="bg-rams-bg text-rams-ink-muted uppercase text-[9px] font-mono font-bold tracking-widest sticky top-0 z-10 border-b border-rams-rule-light shadow-none">
+                        <thead className="bg-cream text-neutral text-xs font-num font-semibold sticky top-0 z-10 border-b border-rule">
                             <tr>
-                                <th className="px-6 py-3.5 whitespace-nowrap min-w-[150px]">Date / Time</th>
-                                <th className="px-4 py-3.5 whitespace-nowrap w-20 text-center">Photo</th>
-                                <th className="px-6 py-3.5 whitespace-nowrap min-w-[200px]">Staff Member</th>
-                                <th className="px-5 py-3.5 whitespace-nowrap min-w-[140px]">Action</th>
-                                <th className="px-5 py-3.5 whitespace-nowrap min-w-[160px]">Status</th>
-                                <th className="px-6 py-3.5 whitespace-nowrap">Mood / Note</th>
+                                <th className="px-6 py-3.5 whitespace-nowrap min-w-[150px]">วันที่ · เวลา</th>
+                                <th className="px-4 py-3.5 whitespace-nowrap w-20 text-center">รูป</th>
+                                <th className="px-6 py-3.5 whitespace-nowrap min-w-[200px]">พนักงาน</th>
+                                <th className="px-5 py-3.5 whitespace-nowrap min-w-[140px]">รายการ</th>
+                                <th className="px-5 py-3.5 whitespace-nowrap min-w-[160px]">สถานะ</th>
+                                <th className="px-6 py-3.5 whitespace-nowrap">อารมณ์ · หมายเหตุ</th>
                                 <th className="px-5 py-3.5 whitespace-nowrap w-12 text-right"></th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-rams-rule-light bg-rams-panel">
+                        <tbody className="divide-y divide-rule bg-cream">
                             {filteredLogs.length === 0 ? (
                                 <tr>
-                                    <td colSpan="7" className="text-center py-16 text-rams-ink-muted font-mono text-xs">
+                                    <td colSpan="7" className="text-center py-16 text-neutral text-xs">
                                         ไม่พบบันทึกกิจกรรมตามเงื่อนไขที่เลือก
                                     </td>
                                 </tr>
@@ -1415,21 +1310,21 @@ export default function DashboardOverview({
                                     return (
                                         <tr
                                             key={log.id}
-                                            className={`group transition-all duration-100 ${
-                                                status.isOvernight
-                                                    ? 'bg-purple-50/40 hover:bg-purple-50/70 border-l-4 border-l-purple-500'
-                                                    : 'hover:bg-rams-bg/40'
-                                            }`}
+                                            className={`group transition-colors duration-150 duration-100 ${
+ status.isOvernight
+ ? 'bg-purple-50/40 hover:bg-purple-50/70 border-l-4 border-l-purple-500'
+ : 'hover:bg-paper-2'
+ }`}
                                         >
                                             {/* Date & Time */}
-                                            <td className="px-6 py-4 font-mono text-rams-ink text-xs whitespace-nowrap">
-                                                <div className="font-bold">{formatDate(log.timestamp)}</div>
-                                                <div className="text-[11px] text-rams-ink-muted font-semibold mt-0.5">
+                                            <td className="px-6 py-4 font-num text-charcoal text-xs whitespace-nowrap">
+                                                <div className="font-semibold">{formatDate(log.timestamp)}</div>
+                                                <div className="text-xs text-neutral font-semibold mt-0.5">
                                                     {formatTime(log.timestamp)}
                                                 </div>
                                                 {status.isOvernight && (
-                                                    <div className="text-[9px] font-mono text-purple-700 font-extrabold flex items-center gap-1 mt-1">
-                                                        <span>🌙 กะข้ามคืน ({formatDate(parseISO(status.shiftDate))})</span>
+                                                    <div className="text-xs font-num text-purple-700 font-semibold flex items-center gap-1 mt-1">
+                                                        <span>กะข้ามคืน ({formatDate(parseISO(status.shiftDate))})</span>
                                                     </div>
                                                 )}
                                             </td>
@@ -1449,12 +1344,12 @@ export default function DashboardOverview({
                                                             onError={(e) => {
                                                                 e.currentTarget.style.display = 'none';
                                                             }}
-                                                            className="w-10 h-10 rounded-sm object-cover border border-rams-rule-light group-hover/photo:border-rams-rule transition-all bg-rams-bg"
+                                                            className="w-10 h-10 object-cover border border-rule group-hover/photo:border-charcoal transition-colors duration-150 bg-cream"
                                                             referrerPolicy="no-referrer"
                                                         />
                                                     </button>
                                                 ) : (
-                                                    <span className="text-rams-ink-muted font-mono text-xs">-</span>
+                                                    <span className="text-neutral font-num text-xs">-</span>
                                                 )}
                                             </td>
 
@@ -1467,16 +1362,16 @@ export default function DashboardOverview({
                                                         textClassName="text-xs"
                                                     />
                                                     <div>
-                                                        <div className="font-bold text-rams-ink text-xs flex items-center gap-1.5">
+                                                        <div className="font-semibold text-charcoal text-xs flex items-center gap-1.5">
                                                             <span>{log.employees?.name}</span>
                                                             {log.employees?.nickname && (
-                                                                <span className="text-[10px] font-mono text-rams-orange font-bold">
+                                                                <span className="text-xs font-num text-plum font-semibold">
                                                                     ({log.employees.nickname})
                                                                 </span>
                                                             )}
                                                         </div>
-                                                        <div className="text-[10px] font-mono text-rams-ink-muted uppercase tracking-wider">
-                                                            {log.employees?.position || 'Staff'}
+                                                        <div className="text-xs text-neutral">
+                                                            {log.employees?.position || 'พนักงาน'}
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1487,11 +1382,11 @@ export default function DashboardOverview({
                                                 <button
                                                     type="button"
                                                     onClick={() => handleToggleLogAction(log)}
-                                                    className="cursor-pointer hover:opacity-80 active:scale-95 transition-all text-left inline-block"
-                                                    title="คลิกเพื่อสลับ Check In / Check Out"
+                                                    className="cursor-pointer hover:opacity-80  transition-colors duration-150 text-left inline-block"
+                                                    title="กดเพื่อสลับ เข้างาน / ออกงาน"
                                                 >
                                                     <Badge color={status.isOvernight ? 'purple' : log.action_type === 'check_in' ? 'blue' : log.action_type === 'absent' ? 'rose' : 'slate'}>
-                                                        {status.isOvernight ? 'Check Out (ข้ามคืน 🌙)' : log.action_type === 'check_in' ? 'Check In 🔄' : 'Check Out 🔄'}
+                                                        {status.isOvernight ? 'ออกงาน (ข้ามคืน)' : log.action_type === 'check_in' ? 'เข้างาน' : 'ออกงาน'}
                                                     </Badge>
                                                 </button>
                                             </td>
@@ -1502,18 +1397,18 @@ export default function DashboardOverview({
                                             </td>
 
                                             {/* Mood & Note */}
-                                            <td className="px-6 py-4 whitespace-nowrap font-mono text-[11px]">
+                                            <td className="px-6 py-4 whitespace-nowrap font-num text-xs">
                                                 {log.mood_status || log.mood_note ? (
                                                     <div className="space-y-0.5">
                                                         {log.mood_status && (
-                                                            <span className="font-bold text-rams-ink">{log.mood_status}</span>
+                                                            <span className="font-semibold text-charcoal">{log.mood_status}</span>
                                                         )}
                                                         {log.mood_note && (
-                                                            <p className="text-rams-ink-muted max-w-[240px] truncate">&quot;{log.mood_note}&quot;</p>
+                                                            <p className="text-neutral max-w-[240px] truncate">&quot;{log.mood_note}&quot;</p>
                                                         )}
                                                     </div>
                                                 ) : (
-                                                    <span className="text-rams-ink-muted">-</span>
+                                                    <span className="text-neutral">-</span>
                                                 )}
                                             </td>
 
@@ -1521,11 +1416,9 @@ export default function DashboardOverview({
                                             <td className="px-5 py-4 whitespace-nowrap text-right">
                                                 <button
                                                     onClick={(e) => { e.stopPropagation(); handleDeleteLog(log.id); }}
-                                                    className="w-7 h-7 flex items-center justify-center border border-rams-rule-light hover:border-rams-red hover:bg-rams-red/10 text-rams-ink-muted hover:text-rams-red transition-all cursor-pointer rounded-sm ml-auto"
+                                                    className="flex items-center justify-center border border-rule hover:border-error hover:bg-error/10 transition-colors duration-150 cursor-pointer ml-auto min-h-11 px-3 text-sm font-semibold underline-offset-4 hover:underline text-error"
                                                     title="Delete Log"
-                                                >
-                                                    <Icons.Trash size={12} />
-                                                </button>
+                                                >ลบ</button>
                                             </td>
                                         </tr>
                                     );
@@ -1537,20 +1430,20 @@ export default function DashboardOverview({
 
                 {/* Pagination Footer */}
                 {filteredLogs.length > activityLimit && (
-                    <div className="p-4 border-t border-rams-rule-light bg-rams-bg/20 flex flex-col sm:flex-row justify-between items-center gap-3 text-xs font-mono">
-                        <span className="text-rams-ink-muted text-[10px]">
+                    <div className="p-4 border-t border-rule bg-paper-2 flex flex-col sm:flex-row justify-between items-center gap-3 text-xs font-num">
+                        <span className="text-neutral text-xs">
                             แสดง {activityLimit} จาก {filteredLogs.length} รายการ
                         </span>
                         <div className="flex gap-2">
                             <button
                                 onClick={() => setActivityLimit(prev => prev + 30)}
-                                className="px-3 py-1.5 bg-rams-panel border border-rams-rule-light hover:border-rams-rule rounded-sm text-[10px] font-bold text-rams-ink uppercase transition-all cursor-pointer"
+                                className="px-3 py-1.5 bg-cream border border-rule hover:border-charcoal text-xs font-semibold text-charcoal transition-colors duration-150 cursor-pointer"
                             >
                                 แสดงเพิ่มอีก 30 รายการ
                             </button>
                             <button
                                 onClick={() => setActivityLimit(filteredLogs.length)}
-                                className="px-3 py-1.5 bg-rams-ink text-rams-panel border border-rams-rule rounded-sm text-[10px] font-bold uppercase transition-all cursor-pointer"
+                                className="px-3 py-1.5 bg-charcoal text-cream border border-charcoal text-xs font-semibold transition-colors duration-150 cursor-pointer"
                             >
                                 แสดงทั้งหมด ({filteredLogs.length})
                             </button>
@@ -1562,95 +1455,87 @@ export default function DashboardOverview({
             {/* --- LIGHTBOX MODAL FOR VERIFICATION PHOTO WITH RAMS TELEMETRY HUD --- */}
             {selectedPhoto && (
                 <div 
-                    className="fixed inset-0 z-[70] bg-rams-ink/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in"
+                    className="fixed inset-0 z-[70] bg-charcoal/80 flex items-center justify-center p-4 animate-fade-in"
                     onClick={() => setSelectedPhoto(null)}
                 >
                     <div
-                        className="bg-rams-panel border border-rams-rule rounded-sm max-w-lg w-full p-5 space-y-4 shadow-2xl"
+                        className="bg-cream border border-charcoal max-w-lg w-full p-5 space-y-4"
                         onClick={e => e.stopPropagation()}
                     >
                         {/* Modal Header */}
-                        <div className="flex justify-between items-center border-b border-rams-rule-light pb-2.5">
+                        <div className="flex justify-between items-center border-b border-rule pb-2.5">
                             <div className="flex items-center gap-2">
-                                <span className="w-2.5 h-2.5 rounded-full bg-rams-orange animate-pulse"></span>
-                                <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-rams-ink-muted">
-                                    IN THE HAUS · ATTENDANCE TELEMETRY
-                                </span>
+                                <span className="w-2.5 h-2.5 bg-plum"></span>
+                                <span className="text-xs font-semibold text-neutral">รูปลงเวลา</span>
                             </div>
                             <div className="flex items-center gap-2">
                                 {typeof selectedPhoto === 'object' && selectedPhoto?.id && (
-                                    <span className="text-[9px] font-mono font-bold text-rams-ink-muted bg-rams-bg px-2 py-0.5 border border-rams-rule-light rounded-xs">
+                                    <span className="text-xs font-num font-semibold text-neutral bg-cream px-2 py-0.5 border border-rule">
                                         #ATT-{selectedPhoto.id}
                                     </span>
                                 )}
                                 <button
                                     onClick={() => setSelectedPhoto(null)}
-                                    className="w-6 h-6 flex items-center justify-center border border-rams-rule-light bg-rams-bg text-rams-ink font-mono text-xs cursor-pointer hover:border-rams-rule"
-                                >
-                                    ✕
-                                </button>
+                                    className="flex items-center justify-center border border-rule bg-cream text-charcoal text-xs cursor-pointer hover:border-charcoal min-h-11 px-3 text-sm font-semibold underline-offset-4 hover:underline"
+                                >ปิด</button>
                             </div>
                         </div>
 
                         {/* Image Canvas Container */}
-                        <div className="flex items-center justify-center bg-rams-bg border border-rams-rule-light rounded-sm p-1.5 overflow-hidden">
+                        <div className="flex items-center justify-center bg-cream border border-rule p-1.5 overflow-hidden">
                             <img
                                 src={typeof selectedPhoto === 'object' ? selectedPhoto.photo_url : selectedPhoto}
                                 alt="Scan Verification"
-                                className="max-h-[52vh] w-auto max-w-full object-contain rounded-xs shadow-inner"
+                                className="max-h-[52vh] w-auto max-w-full object-contain"
                                 referrerPolicy="no-referrer"
                             />
                         </div>
 
                         {/* Dieter Rams Style Telemetry & Timestamp Audit Card */}
                         {typeof selectedPhoto === 'object' && (
-                            <div className="bg-rams-bg border border-rams-rule-light p-3.5 rounded-sm space-y-2.5 font-mono text-xs">
+                            <div className="bg-cream border border-rule p-3.5 space-y-2.5 font-num text-xs">
                                 {/* Row 1: Staff Identity & Punch Action */}
-                                <div className="flex items-center justify-between border-b border-rams-rule-light/70 pb-2">
+                                <div className="flex items-center justify-between border-b border-rule pb-2">
                                     <div className="flex items-center gap-2">
                                         <StaffAvatar
                                             employee={selectedPhoto.employees}
                                             className="w-6 h-6"
-                                            textClassName="text-[10px]"
+                                            textClassName="text-xs"
                                         />
                                         <div>
-                                            <span className="font-bold text-rams-ink text-xs">
+                                            <span className="font-semibold text-charcoal text-xs">
                                                 {selectedPhoto.employees?.name || 'พนักงาน'}
                                             </span>
                                             {selectedPhoto.employees?.nickname && (
-                                                <span className="text-[10px] text-rams-orange font-bold ml-1">
+                                                <span className="text-xs text-plum font-semibold ml-1">
                                                     ({selectedPhoto.employees.nickname})
                                                 </span>
                                             )}
                                         </div>
                                     </div>
-                                    <span className={`px-2 py-0.5 text-[9px] font-bold uppercase rounded-xs border ${
-                                        selectedPhoto.action_type === 'check_in'
-                                            ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                                            : 'bg-indigo-50 text-indigo-800 border-indigo-300'
-                                    }`}>
-                                        {selectedPhoto.action_type === 'check_in' ? '● CHECK-IN (เข้างาน)' : '■ CHECK-OUT (ออกงาน)'}
+                                    <span className={`px-2 py-0.5 text-xs font-semibold border ${
+ selectedPhoto.action_type === 'check_in'
+ ? 'bg-paper-2 text-plum border-plum'
+ : 'bg-paper-2 text-plum border-plum'
+ }`}>
+                                        {selectedPhoto.action_type === 'check_in' ? 'เข้างาน' : 'ออกงาน'}
                                     </span>
                                 </div>
 
                                 {/* Row 2: Precision Timestamp & Telemetry Grid */}
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10px] text-rams-ink">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-charcoal">
                                     <div>
-                                        <span className="text-[9px] text-rams-ink-muted uppercase block font-bold">
-                                            EXACT TIME (UTC+7 / ICT)
-                                        </span>
-                                        <span className="font-bold tracking-tight text-rams-ink">
+                                        <span className="text-xs text-neutral block font-semibold">เวลา (ไทย)</span>
+                                        <span className="font-semibold text-charcoal">
                                             {selectedPhoto.timestamp ? format(new Date(selectedPhoto.timestamp), 'yyyy-MM-dd · HH:mm:ss') : '-'}
                                         </span>
                                     </div>
                                     <div>
-                                        <span className="text-[9px] text-rams-ink-muted uppercase block font-bold">
-                                            METHOD & VERIFICATION
-                                        </span>
-                                        <span className="text-rams-ink font-semibold">
+                                        <span className="text-xs text-neutral block font-semibold">วิธียืนยัน</span>
+                                        <span className="text-charcoal font-semibold">
                                             {selectedPhoto.verification_method === 'QR_CODE' 
-                                                ? 'DYNAMIC IN-STORE QR' 
-                                                : `GPS GEOFENCE (${selectedPhoto.accuracy_meters ? `±${selectedPhoto.accuracy_meters}M` : 'VERIFIED'})`}
+                                                ? 'สแกน QR ในร้าน' 
+                                                : `GPS ในรัศมีร้าน${selectedPhoto.accuracy_meters ? ` (±${selectedPhoto.accuracy_meters} ม.)` : ''}`}
                                         </span>
                                     </div>
                                 </div>
@@ -1663,13 +1548,13 @@ export default function DashboardOverview({
                                 href={typeof selectedPhoto === 'object' ? selectedPhoto.photo_url : selectedPhoto}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-[10px] font-mono text-rams-ink-muted hover:text-rams-orange underline underline-offset-2"
+                                className="text-xs text-neutral hover:text-plum underline underline-offset-2"
                             >
-                                ดูรูปไฟล์เต็ม (RAW ASSET) ↗
+                                ดูรูปไฟล์เต็ม ↗
                             </a>
                             <button
                                 onClick={() => setSelectedPhoto(null)}
-                                className="px-5 py-2 bg-rams-ink text-rams-panel text-xs font-mono font-bold uppercase rounded-sm cursor-pointer hover:opacity-90 active:translate-y-[1px]"
+                                className="px-5 py-2 bg-charcoal text-cream text-xs font-semibold cursor-pointer hover:opacity-90"
                             >
                                 ปิด
                             </button>

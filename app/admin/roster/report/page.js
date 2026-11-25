@@ -36,14 +36,14 @@ function RosterPDFReportContent() {
     ];
 
     const PRESET_COLORS = [
-        { id: 'sky', bg: 'bg-rams-bg', text: 'text-rams-ink', border: 'border-rams-rule-light' },
-        { id: 'amber', bg: 'bg-rams-amber/10', text: 'text-rams-amber', border: 'border-rams-amber/30' },
-        { id: 'indigo', bg: 'bg-rams-ink text-rams-panel', text: 'text-rams-panel font-bold', border: 'border-rams-ink' },
-        { id: 'rose', bg: 'bg-rams-red/10', text: 'text-rams-red', border: 'border-rams-red/30' },
-        { id: 'emerald', bg: 'bg-rams-green/10', text: 'text-rams-green', border: 'border-rams-green/30' },
-        { id: 'violet', bg: 'bg-rams-orange/10', text: 'text-rams-orange', border: 'border-rams-orange/30' },
-        { id: 'slate', bg: 'bg-rams-panel', text: 'text-rams-ink-muted', border: 'border-rams-rule-light' },
-        { id: 'teal', bg: 'bg-rams-green/20', text: 'text-rams-green', border: 'border-rams-green/50' },
+        { id: 'sky', bg: 'bg-cream', text: 'text-charcoal', border: 'border-rule' },
+        { id: 'amber', bg: 'bg-plum/10', text: 'text-plum', border: 'border-plum/30' },
+        { id: 'indigo', bg: 'bg-charcoal text-cream', text: 'text-cream font-semibold', border: 'border-charcoal' },
+        { id: 'rose', bg: 'bg-error/10', text: 'text-error', border: 'border-error/30' },
+        { id: 'emerald', bg: 'bg-charcoal/10', text: 'text-charcoal', border: 'border-charcoal/30' },
+        { id: 'violet', bg: 'bg-plum/10', text: 'text-plum', border: 'border-plum/30' },
+        { id: 'slate', bg: 'bg-cream', text: 'text-neutral', border: 'border-rule' },
+        { id: 'teal', bg: 'bg-charcoal/20', text: 'text-charcoal', border: 'border-charcoal/50' },
     ];
     const getPresetColor = (colorId) => PRESET_COLORS.find(c => c.id === colorId) || PRESET_COLORS[0];
 
@@ -128,86 +128,86 @@ function RosterPDFReportContent() {
     }, [transactions, dates]);
 
     const getShiftColorClass = (s, shiftObj) => {
-        if (s.is_off) return 'bg-rams-red/10 border-rams-red/30 text-rams-red font-bold';
+        if (s.is_off) return 'bg-error/10 border-error/30 text-error font-semibold';
 
         const name = (shiftObj?.name || '').toLowerCase();
         const startClean = (s.custom_start_time || shiftObj?.start_time || '').slice(0, 5);
         const endClean = (s.custom_end_time || shiftObj?.end_time || '').slice(0, 5);
 
         if (name.includes('ควบ') || name.includes('double') || (startClean === '10:00' && endClean === '00:30')) {
-            return 'bg-rams-orange/10 border-rams-orange/30 text-rams-orange font-bold';
+            return 'bg-plum/10 border-plum/30 text-plum font-semibold';
         }
         if (name.includes('ค่ำ') || name.includes('ดึก') || name.includes('night') || (startClean === '16:30' && endClean === '00:30')) {
-            return 'bg-rams-ink text-rams-panel border-rams-ink font-bold';
+            return 'bg-charcoal text-cream border-charcoal font-semibold';
         }
         if (name.includes('inthehaus') || (startClean === '18:00' && endClean === '22:30')) {
-            return 'bg-rams-ink text-rams-panel border-rams-ink font-bold';
+            return 'bg-charcoal text-cream border-charcoal font-semibold';
         }
         if (name.includes('chef') || (startClean === '10:00' && endClean === '20:30')) {
-            return 'bg-rams-green/10 border-rams-green/30 text-rams-green font-bold';
+            return 'bg-charcoal/10 border-charcoal/30 text-charcoal font-semibold';
         }
         if (name.includes('ครัว') || (startClean === '12:30' && endClean === '23:30')) {
-            return 'bg-rams-orange/10 border-rams-orange/30 text-rams-orange font-bold';
+            return 'bg-plum/10 border-plum/30 text-plum font-semibold';
         }
         if (name.includes('เช้า') || name.includes('morning') || (startClean === '10:00' && endClean === '18:00')) {
-            return 'bg-rams-amber/10 border-rams-amber/30 text-rams-amber font-bold';
+            return 'bg-plum/10 border-plum/30 text-plum font-semibold';
         }
         
-        return 'bg-rams-panel border-rams-rule-light text-rams-ink';
+        return 'bg-cream border-rule text-charcoal';
     };
 
-    if (loading) return <div className="p-20 text-center font-bold tracking-widest font-mono text-rams-ink-muted">GENERATING ROSTER REPORT...</div>;
+    if (loading) return <div className="p-20 text-center font-semibold font-num text-neutral">GENERATING ROSTER REPORT...</div>;
 
     const printDateRangeStr = `${format(weekStart, 'dd/MM/yyyy')} - ${format(weekEnd, 'dd/MM/yyyy')}`;
 
     return (
-        <div className="min-h-screen bg-rams-bg text-rams-ink p-6 md:p-10 font-mono selection:bg-rams-ink/10">
+        <div className="min-h-screen bg-cream text-charcoal p-6 md:p-10 font-num">
             {/* Header with Logo */}
-            <div className="flex justify-between items-center border-b-2 border-rams-rule pb-6 mb-6">
+            <div className="flex justify-between items-center border-b-2 border-charcoal pb-6 mb-6">
                 <div className="flex items-center gap-4">
                     <img src="/logo.png" className="h-10 w-auto object-contain" alt="In The Haus Logo" onError={(e) => e.target.style.display = 'none'} />
                     <div>
-                        <h1 className="text-lg font-bold tracking-widest leading-none mb-1 text-rams-ink uppercase">IN THE HAUS</h1>
-                        <p className="text-[9px] font-bold tracking-[0.2em] uppercase text-rams-ink-muted">Weekly Work Schedule / ตารางงานรายสัปดาห์</p>
+                        <h1 className="text-lg font-semibold leading-none mb-1 text-charcoal">IN THE HAUS</h1>
+                        <p className="text-xs font-semibold text-neutral">Weekly Work Schedule / ตารางงานรายสัปดาห์</p>
                     </div>
                 </div>
                 <div className="text-right">
-                    <div className="text-lg font-bold tracking-tight text-rams-ink">{printDateRangeStr}</div>
-                    <div className="text-[8px] font-bold tracking-widest uppercase text-rams-ink-muted mt-0.5">Generated: {format(new Date(), 'dd/MM/yyyy HH:mm')}</div>
+                    <div className="text-lg font-semibold tracking-tight text-charcoal">{printDateRangeStr}</div>
+                    <div className="text-xs font-semibold text-neutral mt-0.5">Generated: {format(new Date(), 'dd/MM/yyyy HH:mm')}</div>
                 </div>
             </div>
 
             {/* Roster Grid Table */}
-            <div className="overflow-x-auto border border-rams-rule bg-rams-panel rounded-sm shadow-none">
+            <div className="overflow-x-auto border border-charcoal bg-cream">
                 <table className="w-full text-xs text-left border-collapse">
                     <thead>
-                        <tr className="bg-rams-bg/60 text-rams-ink border-b border-rams-rule">
-                            <th className="px-4 py-3 font-bold border-r border-rams-rule w-[180px]">พนักงาน / ตำแหน่ง</th>
+                        <tr className="bg-paper-2 text-charcoal border-b border-charcoal">
+                            <th className="px-4 py-3 font-semibold border-r border-charcoal w-[180px]">พนักงาน / ตำแหน่ง</th>
                             {dates.map((date, i) => (
-                                <th key={i} className="px-3 py-3 font-bold text-center border-r border-rams-rule-light min-w-[120px]">
-                                    <div className="text-[9px] text-rams-ink-muted uppercase tracking-widest">{daysTitle[i]}</div>
-                                    <div className="text-xs font-bold mt-0.5 text-rams-ink">{format(date, 'dd/MM')}</div>
-                                    <div className="text-[8px] font-bold text-rams-ink-muted uppercase mt-0.5">
+                                <th key={i} className="px-3 py-3 font-semibold text-center border-r border-rule min-w-[120px]">
+                                    <div className="text-xs text-neutral">{daysTitle[i]}</div>
+                                    <div className="text-xs font-semibold mt-0.5 text-charcoal">{format(date, 'dd/MM')}</div>
+                                    <div className="text-xs font-semibold text-neutral mt-0.5">
                                         ON DUTY: {dailyOnDutyStats[i]?.count || 0}
                                     </div>
                                 </th>
                             ))}
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-rams-rule-light">
+                    <tbody className="divide-y divide-rule">
                         {employees.map((emp, empIdx) => (
-                            <tr key={emp.id} className={`hover:bg-rams-bg/30 transition-colors ${empIdx % 2 === 1 ? 'bg-rams-bg/20' : 'bg-rams-panel'}`}>
-                                <td className="px-4 py-3 font-bold text-rams-ink border-r border-rams-rule align-middle">
-                                    <div className="text-xs font-bold">{emp.nickname || emp.name}</div>
-                                    <div className="text-[9px] text-rams-ink-muted font-semibold tracking-wider uppercase mt-0.5">{emp.position}</div>
+                            <tr key={emp.id} className={`hover:bg-paper-2 transition-colors ${empIdx % 2 === 1 ? 'bg-paper-2' : 'bg-cream'}`}>
+                                <td className="px-4 py-3 font-semibold text-charcoal border-r border-charcoal align-middle">
+                                    <div className="text-xs font-semibold">{emp.nickname || emp.name}</div>
+                                    <div className="text-xs text-neutral font-semibold mt-0.5">{emp.position}</div>
                                 </td>
                                 {dates.map((date, dateIdx) => {
                                     const slots = getCellSlots(emp.id, date);
                                     return (
-                                        <td key={dateIdx} className="px-2 py-2 border-r border-rams-rule-light align-top h-full min-h-[75px]">
+                                        <td key={dateIdx} className="px-2 py-2 border-r border-rule align-top h-full min-h-[75px]">
                                             <div className="space-y-1.5 flex flex-col h-full justify-start">
                                                 {slots.length === 0 ? (
-                                                    <span className="text-rams-ink-muted/40 text-xs italic m-auto block text-center font-normal">-</span>
+                                                    <span className="text-neutral/40 text-xs m-auto block text-center font-normal">-</span>
                                                 ) : (
                                                     slots.map((s, idx) => {
                                                         const shiftObj = shifts.find(sh => sh.id === s.shift_id);
@@ -232,25 +232,25 @@ function RosterPDFReportContent() {
                                                         return (
                                                             <div 
                                                                 key={idx} 
-                                                                className={`p-1.5 rounded-sm border ${colorClass} text-center shadow-none relative flex flex-col justify-center items-center ${
-                                                                    s.status === 'DRAFT' ? 'border-dashed border-2 opacity-80' : ''
-                                                                }`}
+                                                                className={`p-1.5 border ${colorClass} text-center relative flex flex-col justify-center items-center ${
+ s.status === 'DRAFT' ? 'border-dashed border-2 opacity-80' : ''
+ }`}
                                                             >
-                                                                <div className="font-bold text-[9px] uppercase tracking-wide">
+                                                                <div className="font-semibold text-xs">
                                                                     {cellLabel}
                                                                 </div>
                                                                 {!s.is_off && timeStr && (
-                                                                    <div className="text-[9px] font-bold text-rams-ink mt-0.5">
+                                                                    <div className="text-xs font-semibold text-charcoal mt-0.5">
                                                                         {timeStr}
                                                                     </div>
                                                                 )}
                                                                 {s.slot_type !== 'MAIN' && (
-                                                                    <div className="text-[8px] font-bold uppercase tracking-wider opacity-60 mt-0.5">
+                                                                    <div className="text-xs font-semibold opacity-60 mt-0.5">
                                                                         {s.slot_type}
                                                                     </div>
                                                                 )}
                                                                 {s.status === 'DRAFT' && (
-                                                                    <span className="text-[8px] font-semibold text-rams-ink-muted uppercase tracking-widest border border-rams-rule-light px-1 rounded-sm bg-rams-panel mt-1">
+                                                                    <span className="text-xs font-semibold text-neutral border border-rule px-1 bg-cream mt-1">
                                                                         Draft
                                                                     </span>
                                                                 )}
@@ -266,12 +266,12 @@ function RosterPDFReportContent() {
                         ))}
                     </tbody>
                     <tfoot>
-                        <tr className="border-t-2 border-rams-rule bg-rams-bg/60 font-mono">
-                            <td className="px-4 py-3 font-bold uppercase tracking-wider text-rams-ink border-r border-rams-rule text-xs">
+                        <tr className="border-t-2 border-charcoal bg-paper-2 font-num">
+                            <td className="px-4 py-3 font-semibold text-charcoal border-r border-charcoal text-xs">
                                 TOTAL ON DUTY (รวม)
                             </td>
                             {dates.map((date, i) => (
-                                <td key={`rep-total-${i}`} className="px-3 py-2.5 text-center text-xs font-bold text-rams-ink border-r border-rams-rule-light">
+                                <td key={`rep-total-${i}`} className="px-3 py-2.5 text-center text-xs font-semibold text-charcoal border-r border-rule">
                                     {dailyOnDutyStats[i]?.count || 0} คน
                                 </td>
                             ))}
@@ -281,18 +281,18 @@ function RosterPDFReportContent() {
             </div>
 
             {/* Verification & Notes Footer */}
-            <div className="mt-16 pt-8 border-t border-neutral-200">
+            <div className="mt-16 pt-8 border-t border-rule">
                 <div className="flex justify-between items-end flex-wrap gap-4">
                     <div className="max-w-sm">
-                        <p className="text-[9px] font-bold tracking-[0.2em] uppercase mb-2 text-neutral-400">Verification & Archives</p>
-                        <p className="text-[9px] leading-relaxed text-neutral-400">
+                        <p className="text-xs font-semibold mb-2 text-neutral">Verification & Archives</p>
+                        <p className="text-xs leading-relaxed text-neutral">
                             This document is an official work schedule generated by In The Haus. 
                             Any modifications must be approved by the management.
                         </p>
                     </div>
                     <div className="text-right">
-                        <p className="text-[10px] font-bold italic tracking-widest uppercase text-neutral-700">YUZU x IN THE HAUS</p>
-                        <p className="text-[9px] font-bold text-neutral-400 mt-1">ONHAUS SYSTEM © {new Date().getFullYear()} All Rights Reserved</p>
+                        <p className="text-xs font-semibold text-charcoal">YUZU x IN THE HAUS</p>
+                        <p className="text-xs font-semibold text-neutral mt-1">ONHAUS SYSTEM © {new Date().getFullYear()} All Rights Reserved</p>
                     </div>
                 </div>
             </div>
@@ -313,7 +313,7 @@ function RosterPDFReportContent() {
 
             <button 
                 onClick={() => window.print()}
-                className="fixed bottom-8 right-8 no-print bg-rams-ink border border-rams-ink text-rams-panel px-6 py-3.5 rounded-sm font-bold font-mono text-xs tracking-widest uppercase hover:bg-rams-panel hover:text-rams-ink transition-all cursor-pointer shadow-lg z-50 active:translate-y-[1px]"
+                className="fixed bottom-8 right-8 no-print bg-charcoal border border-charcoal text-cream px-6 py-3.5 font-semibold font-num text-xs hover:bg-cream hover:text-charcoal transition-colors duration-150 cursor-pointer z-50"
             >
                 Print to PDF / พิมพ์ตาราง
             </button>
@@ -323,7 +323,7 @@ function RosterPDFReportContent() {
 
 export default function RosterPDFReport() {
     return (
-        <Suspense fallback={<div className="p-20 text-center font-bold tracking-widest text-slate-400 uppercase font-mono">Loading Roster Engine...</div>}>
+        <Suspense fallback={<div className="p-20 text-center font-semibold text-neutral font-num">Loading Roster Engine...</div>}>
             <RosterPDFReportContent />
         </Suspense>
     );

@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from "react";
 import { supabase } from "../../lib/supabaseClient";
-import { Lock, Mail, Key, Eye, EyeOff, ShieldCheck, UserPlus, LogIn, AlertCircle, CheckCircle2, HelpCircle } from "lucide-react";
 
 export default function AdminLoginForm() {
     const [mode, setMode] = useState("login"); // "login" | "signup" | "forgot"
@@ -114,61 +113,55 @@ export default function AdminLoginForm() {
     };
 
     return (
-        <div className="min-h-screen bg-rams-bg flex items-center justify-center p-4 selection:bg-rams-ink/10">
-            <div className="w-full max-w-md bg-rams-panel border border-rams-rule rounded-sm p-6 sm:p-8 shadow-[0_4px_0_0_var(--color-rams-rule)]">
-                
+        <div className="brand-v2 min-h-screen flex items-center justify-center p-4">
+            <div className="w-full max-w-md bg-cream border border-charcoal">
+
                 {/* Header */}
-                <div className="text-center mb-6">
-                    <div className="w-12 h-12 bg-rams-amber border border-rams-rule rounded-sm mx-auto flex items-center justify-center mb-3 shadow-[0_2px_0_0_var(--color-rams-rule)]">
-                        <Lock className="w-6 h-6 text-rams-ink" />
-                    </div>
-                    <h1 className="text-xl font-mono font-bold tracking-wider text-rams-ink uppercase">
-                        Admin Portal
-                    </h1>
-                    <p className="text-[10px] font-mono text-rams-ink-muted uppercase tracking-widest mt-1">
-                        In The Haus HR & Operations • Supabase Auth
-                    </p>
+                <div className="bg-plum text-cream px-6 py-5 mb-6">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/logo-inbaan-wordmark-cream-96.png" alt="ในบ้าน" width={73} height={40} className="h-10 w-auto" />
+                    <h1 className="font-head text-2xl mt-2">เข้าสู่หลังบ้าน</h1>
+                    <p className="text-sm text-on-plum-2">สำหรับผู้จัดการร้าน</p>
                 </div>
+                <div className="px-6 pb-6 sm:px-8 sm:pb-8">
 
                 {/* Mode Selector Tabs */}
-                <div className="flex border border-rams-rule-light rounded-sm mb-6 p-0.5 bg-rams-bg text-xs font-mono font-bold">
+                <div className="flex border border-rule mb-6 p-0.5 bg-cream text-xs font-num font-semibold">
                     <button
                         type="button"
                         onClick={() => { setMode("login"); setErrorMessage(""); setSuccessMessage(""); }}
-                        className={`flex-1 py-2 flex items-center justify-center gap-1.5 transition-all rounded-sm cursor-pointer ${
-                            mode === "login"
-                                ? "bg-rams-panel text-rams-ink shadow-[0_1px_2px_rgba(0,0,0,0.05)] border border-rams-rule-light"
-                                : "text-rams-ink-muted hover:text-rams-ink"
-                        }`}
+                        className={`flex-1 py-2 flex items-center justify-center gap-1.5 transition-colors duration-150 cursor-pointer ${
+ mode === "login"
+ ? "bg-cream text-charcoal border border-rule"
+ : "text-neutral hover:text-charcoal"
+ }`}
                     >
-                        <LogIn size={13} /> เข้าสู่ระบบ
+                        เข้าสู่ระบบ
                     </button>
                     <button
                         type="button"
                         onClick={() => { setMode("signup"); setErrorMessage(""); setSuccessMessage(""); }}
-                        className={`flex-1 py-2 flex items-center justify-center gap-1.5 transition-all rounded-sm cursor-pointer ${
-                            mode === "signup"
-                                ? "bg-rams-panel text-rams-ink shadow-[0_1px_2px_rgba(0,0,0,0.05)] border border-rams-rule-light"
-                                : "text-rams-ink-muted hover:text-rams-ink"
-                        }`}
+                        className={`flex-1 py-2 flex items-center justify-center gap-1.5 transition-colors duration-150 cursor-pointer ${
+ mode === "signup"
+ ? "bg-cream text-charcoal border border-rule"
+ : "text-neutral hover:text-charcoal"
+ }`}
                     >
-                        <UserPlus size={13} /> สมัครแอดมินแรก
+                        สมัครแอดมินแรก
                     </button>
                 </div>
 
                 {/* Error Banner */}
                 {errorMessage && (
-                    <div className="mb-4 p-3 bg-red-50 border border-red-300 rounded-sm flex items-start gap-2.5 text-xs font-mono text-red-700">
-                        <AlertCircle size={15} className="shrink-0 mt-0.5 text-red-600" />
-                        <span className="leading-relaxed">{errorMessage}</span>
+                    <div className="mb-4 p-3 bg-paper-2 border border-error flex items-start gap-2.5 text-xs font-num text-error">
+                                                <span className="leading-relaxed">{errorMessage}</span>
                     </div>
                 )}
 
                 {/* Success Banner */}
                 {successMessage && (
-                    <div className="mb-4 p-3 bg-emerald-50 border border-emerald-300 rounded-sm flex items-start gap-2.5 text-xs font-mono text-emerald-800">
-                        <CheckCircle2 size={15} className="shrink-0 mt-0.5 text-emerald-600" />
-                        <span className="leading-relaxed">{successMessage}</span>
+                    <div className="mb-4 p-3 bg-paper-2 border border-plum flex items-start gap-2.5 text-xs font-num text-plum">
+                                                <span className="leading-relaxed">{successMessage}</span>
                     </div>
                 )}
 
@@ -176,12 +169,12 @@ export default function AdminLoginForm() {
                 {mode === "login" && (
                     <form onSubmit={handleLogin} className="space-y-4">
                         <div>
-                            <label className="text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest ml-1 flex items-center gap-1">
-                                <Mail size={11} /> Admin Email
+                            <label className="text-xs font-num font-semibold text-neutral ml-1 flex items-center gap-1">
+                                อีเมล
                             </label>
                             <input
                                 type="email"
-                                className="w-full p-3.5 bg-rams-bg border border-rams-rule-light rounded-sm mt-1 text-xs font-mono font-bold text-rams-ink outline-none focus:border-rams-rule transition-all"
+                                className="w-full p-3.5 bg-cream border border-rule mt-1 text-xs font-num font-semibold text-charcoal outline-none focus:border-charcoal transition-colors duration-150"
                                 placeholder="admin@inthehaus.com"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
@@ -192,13 +185,13 @@ export default function AdminLoginForm() {
 
                         <div>
                             <div className="flex justify-between items-center ml-1">
-                                <label className="text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest flex items-center gap-1">
-                                    <Key size={11} /> Password
+                                <label className="text-xs font-num font-semibold text-neutral flex items-center gap-1">
+                                    รหัสผ่าน
                                 </label>
                                 <button
                                     type="button"
                                     onClick={() => { setMode("forgot"); setErrorMessage(""); setSuccessMessage(""); }}
-                                    className="text-[9px] font-mono font-bold text-rams-orange hover:underline cursor-pointer"
+                                    className="text-xs font-num font-semibold text-plum hover:underline cursor-pointer"
                                 >
                                     ลืมรหัสผ่าน?
                                 </button>
@@ -206,7 +199,7 @@ export default function AdminLoginForm() {
                             <div className="relative mt-1">
                                 <input
                                     type={showPassword ? "text" : "password"}
-                                    className="w-full p-3.5 pr-10 bg-rams-bg border border-rams-rule-light rounded-sm text-xs font-mono font-bold text-rams-ink outline-none focus:border-rams-rule transition-all"
+                                    className="w-full p-3.5 pr-10 bg-cream border border-rule text-xs font-num font-semibold text-charcoal outline-none focus:border-charcoal transition-colors duration-150"
                                     placeholder="••••••••"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
@@ -215,9 +208,9 @@ export default function AdminLoginForm() {
                                 <button
                                     type="button"
                                     onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-rams-ink-muted hover:text-rams-ink p-1 cursor-pointer"
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral hover:text-charcoal p-1 cursor-pointer"
                                 >
-                                    {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                                    {showPassword ? "ซ่อน" : "แสดง"}
                                 </button>
                             </div>
                         </div>
@@ -225,16 +218,16 @@ export default function AdminLoginForm() {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full py-3.5 bg-rams-orange text-rams-panel border border-rams-rule rounded-sm font-mono font-bold uppercase tracking-wider hover:bg-rams-orange-active shadow-[0_2px_0_0_var(--color-rams-rule)] active:translate-y-[2px] active:shadow-none transition-all cursor-pointer mt-4 flex items-center justify-center gap-2 disabled:opacity-50"
+                            className="w-full py-3.5 bg-charcoal text-cream border border-charcoal font-semibold text-base min-h-12 hover:bg-charcoal-2 transition-colors duration-150 cursor-pointer mt-4 flex items-center justify-center gap-2 disabled:opacity-50"
                         >
                             {loading ? (
                                 <>
-                                    <div className="w-3.5 h-3.5 border-2 border-rams-panel border-t-transparent rounded-full animate-spin" />
+                                    
                                     <span>กำลังเข้าสู่ระบบ...</span>
                                 </>
                             ) : (
                                 <>
-                                    <ShieldCheck size={16} /> เข้าสู่ระบบ Admin Dashboard
+                                    เข้าสู่ระบบ
                                 </>
                             )}
                         </button>
@@ -244,17 +237,17 @@ export default function AdminLoginForm() {
                 {/* Form: SIGN UP */}
                 {mode === "signup" && (
                     <form onSubmit={handleSignUp} className="space-y-4">
-                        <div className="p-3 bg-amber-50 border border-amber-200 rounded-sm text-[10px] font-mono text-amber-900 leading-relaxed">
-                            💡 <strong>สำหรับติดตั้งแอดมินคนแรก:</strong> กรอกอีเมลและรหัสผ่านที่ต้องการใช้เป็น Admin เพื่อสร้างผู้ดูแลคนแรกผ่าน Supabase Auth
+                        <div className="p-3 bg-paper-2 border border-plum text-xs font-num text-plum leading-relaxed">
+                            <strong>สำหรับติดตั้งแอดมินคนแรก:</strong> กรอกอีเมลและรหัสผ่านที่ต้องการใช้เป็น Admin เพื่อสร้างผู้ดูแลคนแรกผ่าน Supabase Auth
                         </div>
 
                         <div>
-                            <label className="text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest ml-1 flex items-center gap-1">
-                                <Mail size={11} /> Admin Email
+                            <label className="text-xs font-num font-semibold text-neutral ml-1 flex items-center gap-1">
+                                อีเมล
                             </label>
                             <input
                                 type="email"
-                                className="w-full p-3.5 bg-rams-bg border border-rams-rule-light rounded-sm mt-1 text-xs font-mono font-bold text-rams-ink outline-none focus:border-rams-rule transition-all"
+                                className="w-full p-3.5 bg-cream border border-rule mt-1 text-xs font-num font-semibold text-charcoal outline-none focus:border-charcoal transition-colors duration-150"
                                 placeholder="your-email@inthehaus.com"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
@@ -263,13 +256,13 @@ export default function AdminLoginForm() {
                         </div>
 
                         <div>
-                            <label className="text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest ml-1 flex items-center gap-1">
-                                <Key size={11} /> Create Password (อย่างน้อย 6 ตัวอักษร)
+                            <label className="text-xs font-num font-semibold text-neutral ml-1 flex items-center gap-1">
+                                ตั้งรหัสผ่าน (อย่างน้อย 6 ตัวอักษร)
                             </label>
                             <div className="relative mt-1">
                                 <input
                                     type={showPassword ? "text" : "password"}
-                                    className="w-full p-3.5 pr-10 bg-rams-bg border border-rams-rule-light rounded-sm text-xs font-mono font-bold text-rams-ink outline-none focus:border-rams-rule transition-all"
+                                    className="w-full p-3.5 pr-10 bg-cream border border-rule text-xs font-num font-semibold text-charcoal outline-none focus:border-charcoal transition-colors duration-150"
                                     placeholder="อย่างน้อย 6 ตัวอักษร"
                                     value={password}
                                     minLength={6}
@@ -279,9 +272,9 @@ export default function AdminLoginForm() {
                                 <button
                                     type="button"
                                     onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-rams-ink-muted hover:text-rams-ink p-1 cursor-pointer"
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral hover:text-charcoal p-1 cursor-pointer"
                                 >
-                                    {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                                    {showPassword ? "ซ่อน" : "แสดง"}
                                 </button>
                             </div>
                         </div>
@@ -289,16 +282,16 @@ export default function AdminLoginForm() {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full py-3.5 bg-rams-ink text-rams-panel border border-rams-rule rounded-sm font-mono font-bold uppercase tracking-wider hover:bg-black shadow-[0_2px_0_0_var(--color-rams-rule)] active:translate-y-[2px] active:shadow-none transition-all cursor-pointer mt-4 flex items-center justify-center gap-2 disabled:opacity-50"
+                            className="w-full py-3.5 bg-charcoal text-cream border border-charcoal font-num font-semibold hover:bg-charcoal-2 transition-colors duration-150 cursor-pointer mt-4 flex items-center justify-center gap-2 disabled:opacity-50"
                         >
                             {loading ? (
                                 <>
-                                    <div className="w-3.5 h-3.5 border-2 border-rams-panel border-t-transparent rounded-full animate-spin" />
+                                    
                                     <span>กำลังสร้างบัญชี...</span>
                                 </>
                             ) : (
                                 <>
-                                    <UserPlus size={16} /> ยืนยันการสร้างบัญชี Admin
+                                    ยืนยันการสร้างบัญชี Admin
                                 </>
                             )}
                         </button>
@@ -308,17 +301,17 @@ export default function AdminLoginForm() {
                 {/* Form: FORGOT PASSWORD */}
                 {mode === "forgot" && (
                     <form onSubmit={handleResetPassword} className="space-y-4">
-                        <div className="p-3 bg-blue-50 border border-blue-200 rounded-sm text-[10px] font-mono text-blue-900 leading-relaxed">
+                        <div className="p-3 bg-paper-2 border border-plum text-xs font-num text-plum leading-relaxed">
                             ระบบจะส่งอีเมลพร้อมลิงก์สำหรับตั้งรหัสผ่านใหม่ไปยังอีเมลที่คุณระบุ
                         </div>
 
                         <div>
-                            <label className="text-[9px] font-mono font-bold text-rams-ink-muted uppercase tracking-widest ml-1 flex items-center gap-1">
-                                <Mail size={11} /> Admin Email
+                            <label className="text-xs font-num font-semibold text-neutral ml-1 flex items-center gap-1">
+                                อีเมล
                             </label>
                             <input
                                 type="email"
-                                className="w-full p-3.5 bg-rams-bg border border-rams-rule-light rounded-sm mt-1 text-xs font-mono font-bold text-rams-ink outline-none focus:border-rams-rule transition-all"
+                                className="w-full p-3.5 bg-cream border border-rule mt-1 text-xs font-num font-semibold text-charcoal outline-none focus:border-charcoal transition-colors duration-150"
                                 placeholder="admin@inthehaus.com"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
@@ -331,14 +324,14 @@ export default function AdminLoginForm() {
                             <button
                                 type="button"
                                 onClick={() => { setMode("login"); setErrorMessage(""); setSuccessMessage(""); }}
-                                className="w-1/3 py-3 bg-rams-bg text-rams-ink border border-rams-rule-light rounded-sm font-mono font-bold uppercase tracking-wider hover:border-rams-rule text-xs cursor-pointer"
+                                className="w-1/3 py-3 bg-cream text-charcoal border border-rule font-num font-semibold hover:border-charcoal text-xs cursor-pointer"
                             >
                                 ย้อนกลับ
                             </button>
                             <button
                                 type="submit"
                                 disabled={loading}
-                                className="w-2/3 py-3 bg-rams-orange text-rams-panel border border-rams-rule rounded-sm font-mono font-bold uppercase tracking-wider hover:bg-rams-orange-active shadow-[0_2px_0_0_var(--color-rams-rule)] active:translate-y-[2px] active:shadow-none transition-all cursor-pointer text-xs flex items-center justify-center gap-2 disabled:opacity-50"
+                                className="w-2/3 py-3 bg-charcoal text-cream border border-charcoal font-semibold text-base min-h-12 hover:bg-charcoal-2 transition-colors duration-150 cursor-pointer text-xs flex items-center justify-center gap-2 disabled:opacity-50"
                             >
                                 {loading ? "กำลังส่ง..." : "ส่งลิงก์รีเซ็ต"}
                             </button>
@@ -346,14 +339,7 @@ export default function AdminLoginForm() {
                     </form>
                 )}
 
-                {/* Security Footer */}
-                <div className="mt-8 pt-4 border-t border-rams-rule-light text-center">
-                    <div className="flex items-center justify-center gap-1.5 text-[9px] font-mono text-rams-ink-muted uppercase tracking-wider">
-                        <ShieldCheck size={12} className="text-emerald-600" />
-                        <span>Secured with Supabase Auth & JWT</span>
-                    </div>
                 </div>
-
             </div>
         </div>
     );

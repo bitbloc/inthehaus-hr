@@ -1,36 +1,4 @@
-import {
-    Sun,
-    Moon,
-    Check,
-    X,
-    User,
-    Clock,
-    Banknote,
-    FileText,
-    Bell,
-    Settings,
-    Briefcase,
-    Calendar,
-    Users,
-    ArrowRightLeft,
-    Search,
-    Filter,
-    MoreHorizontal,
-    ChevronDown,
-    ChevronUp,
-    LogOut,
-    LogIn,
-    AlertCircle,
-    CheckCircle2,
-    Trash,
-    Sparkles,
-    Lock,
-    Coffee,
-    Plus,
-    Hash,
-    RotateCw,
-    ClipboardList
-} from "lucide-react";
+import { Sun, Moon, Check, X, User, Clock, Banknote, FileText, Bell, Settings, Briefcase, Calendar, Users, ArrowRightLeft, Search, Filter, MoreHorizontal, ChevronDown, ChevronUp, LogOut, LogIn, AlertCircle, CheckCircle2, Trash, Sparkles, Lock, Coffee, Plus, Hash, RotateCw, ClipboardList } from 'lucide-react';
 
 // Re-export specific icons to keep the main code clean and consistent
 const iconMap = {
