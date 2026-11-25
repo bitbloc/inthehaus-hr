@@ -384,6 +384,34 @@ export default function AdminRosterPage() {
         return sessions[targetDateStr] || { checkIn: null, checkOut: null };
     };
 
+    // Every in/out session that started on this date, plus the gaps between them
+    // (staff check out when they step out mid-day, then check in again).
+    const getDaySessions = (empId, date) => {
+        const target = format(date, 'yyyy-MM-dd');
+        const logs = (attendanceLogs || []).filter(l => l.employee_id === empId).sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+        const outs = logs.filter(l => l.action_type === 'check_out');
+        const claimed = new Set();
+        const sessions = [];
+        logs.filter(l => l.action_type === 'check_in').forEach(inLog => {
+            const inTime = new Date(inLog.timestamp);
+            const maxOut = inTime.getTime() + 20 * 60 * 60 * 1000;
+            const out = outs.find(o => !claimed.has(o.id ?? o.timestamp) && new Date(o.timestamp) > inTime && new Date(o.timestamp).getTime() <= maxOut);
+            if (out) claimed.add(out.id ?? out.timestamp);
+            if (format(inTime, 'yyyy-MM-dd') === target) sessions.push({ in: inTime, out: out ? new Date(out.timestamp) : null });
+        });
+        const gaps = [];
+        for (let k = 1; k < sessions.length; k++) {
+            const prev = sessions[k - 1], cur = sessions[k];
+            if (prev.out && cur.in > prev.out) gaps.push({ from: prev.out, to: cur.in, mins: Math.round((cur.in - prev.out) / 60000) });
+        }
+        const workedMins = sessions.reduce((sum, x) => sum + (x.out ? Math.round((x.out - x.in) / 60000) : 0), 0);
+        return { sessions, gaps, workedMins };
+    };
+    const fmtMins = (mins) => {
+        const h = Math.floor(mins / 60), m = mins % 60;
+        return h > 0 ? `${h} ชม.${m ? ` ${m} น.` : ''}` : `${m} น.`;
+    };
+
     const getCellAttendanceStatus = (empId, date, slots, empObj = null) => {
         const emp = empObj || (employees || []).find(e => e.id === empId);
         const isOwner = Boolean(emp && ((emp.position || '').toLowerCase().includes('owner') || (emp.position || '').toLowerCase().includes('ceo')));
@@ -952,8 +980,86 @@ export default function AdminRosterPage() {
         setQuickPick({ emp, date, top, left });
     };
 
+    // --- Copy shifts from the previous day ---
+    const shiftTimes = (t) => {
+        const sh = shifts.find(x => x.id === t.shift_id);
+        return {
+            start: (t.custom_start_time || sh?.start_time || '').slice(0, 5),
+            end: (t.custom_end_time || sh?.end_time || '').slice(0, 5),
+            name: plainText(sh?.name || ''),
+        };
+    };
+    const slotSummary = (t) => {
+        if (t.is_off) return 'หยุด';
+        const { start, end, name } = shiftTimes(t);
+        return [name, start && end ? `${start}–${end}` : ''].filter(Boolean).join(' ') || 'ยังไม่ระบุเวลา';
+    };
+    // Rows to copy for one person: skip OFF days that came from an approved leave, and rows with no time
+    const copyRowsFor = (empId, fromStr, toStr) => transactions
+        .filter(t => t.employee_id === empId && t.date === fromStr)
+        .filter(t => !(t.is_off && approvedLeaveKeys.has(`${empId}|${fromStr}`)))
+        .filter(t => t.is_off || (shiftTimes(t).start && shiftTimes(t).end))
+        .map(t => {
+            const { start, end } = shiftTimes(t);
+            return {
+                employee_id: empId, date: toStr, slot_type: t.slot_type || 'MAIN',
+                shift_id: t.is_off ? null : (t.shift_id || null),
+                custom_start_time: t.is_off ? null : start, custom_end_time: t.is_off ? null : end,
+                is_off: !!t.is_off, status: t.status || 'PUBLISHED',
+            };
+        });
+
+    const copyDayFrom = async (i) => {
+        if (i === 0) return;
+        const fromStr = format(dates[i - 1], 'yyyy-MM-dd');
+        const toStr = format(dates[i], 'yyyy-MM-dd');
+        const candidates = employees.filter(e => !isSuspended(e)).map(e => ({ e, rows: copyRowsFor(e.id, fromStr, toStr) })).filter(x => x.rows.length > 0);
+        const plans = candidates.filter(x => getCellSlots(x.e.id, dates[i]).length === 0);
+        const skipped = candidates.length - plans.length;
+        if (plans.length === 0) {
+            showToast(skipped > 0 ? `วัน${daysTitle[i]}มีกะครบแล้ว ไม่ได้คัดลอก` : `วัน${daysTitle[i - 1]}ยังไม่มีกะให้คัดลอก`, 'info');
+            return;
+        }
+        if (!confirm(`คัดลอกกะวัน${daysTitle[i - 1]} ไปวัน${daysTitle[i]} ให้ ${plans.length} คน?${skipped > 0 ? `\n(ข้าม ${skipped} คนที่มีกะวัน${daysTitle[i]}อยู่แล้ว)` : ''}`)) return;
+        setSaving(true);
+        try {
+            for (const x of plans) await postSaveCell(x.e.id, toStr, x.rows);
+            await fetchData();
+            showToast(`คัดลอกกะวัน${daysTitle[i - 1]} ไปวัน${daysTitle[i]} แล้ว ${plans.length} คน`, 'success');
+        } catch (e) {
+            await fetchData();
+            showToast('คัดลอกไม่สำเร็จ: ' + (e.message || e), 'error');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const copyCellFromPrevDay = async (emp, date) => {
+        setQuickPick(null);
+        const toStr = format(date, 'yyyy-MM-dd');
+        const fromStr = format(addDays(date, -1), 'yyyy-MM-dd');
+        const rows = copyRowsFor(emp.id, fromStr, toStr);
+        if (rows.length === 0) return;
+        setSaving(true);
+        try {
+            await postSaveCell(emp.id, toStr, rows);
+            await fetchData();
+            showToast(`${emp.nickname || emp.name} · ${format(date, 'd MMM', { locale: th })}: เหมือนวันก่อน`, 'success');
+        } catch (e) {
+            showToast(e.message || 'บันทึกไม่สำเร็จ', 'error');
+        } finally {
+            setSaving(false);
+        }
+    };
+
     const saveCell = async () => {
         if (!editingCell) return;
+        // A working shift must have a time, otherwise it shows up as an empty "กะพิเศษ"
+        const missing = editingCell.slots.findIndex(sl => !sl.is_off && (!sl.custom_start_time || !sl.custom_end_time));
+        if (missing >= 0) {
+            showToast(`${editingCell.slots.length > 1 ? `กะที่ ${missing + 1}: ` : ''}เลือกกะ หรือใส่เวลาเริ่ม–เลิกก่อนบันทึก (หรือเลือก "หยุด")`, 'error');
+            return;
+        }
         setSaving(true);
         const dateStr = format(editingCell.date, 'yyyy-MM-dd');
         const empId = editingCell.employee.id;
@@ -1689,6 +1795,17 @@ export default function AdminRosterPage() {
                                                     <div className={`text-sm font-semibold ${isToday ? 'text-cream' : 'text-charcoal'}`}>{daysTitle[i]}</div>
                                                     <div className={`font-num text-base ${isToday ? 'text-cream' : 'text-charcoal'}`}>{format(date, 'dd/MM')}</div>
                                                     <div className={`text-xs ${isToday ? 'text-dark-muted' : 'text-neutral'}`}>เข้างาน <span className="font-num">{dailyOnDutyStats[i]?.count || 0}</span> คน</div>
+                                                    {i > 0 && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => copyDayFrom(i)}
+                                                            disabled={saving}
+                                                            className={`mt-1 min-h-8 px-2 text-xs font-normal underline underline-offset-4 disabled:opacity-50 ${isToday ? 'text-cream' : 'text-plum'}`}
+                                                            title={`คัดลอกกะทุกคนจากวัน${daysTitle[i - 1]} มาใส่ช่องที่ยังว่าง`}
+                                                        >
+                                                            เหมือนวัน{daysTitle[i - 1]}
+                                                        </button>
+                                                    )}
                                                 </th>
                                             );
                                         })}
@@ -1731,10 +1848,10 @@ export default function AdminRosterPage() {
                                                         <td key={i} className={`p-1.5 border-l border-rule align-top ${empSuspended ? 'bg-paper-2' : ''}`}>
                                                             <button
                                                                 type="button"
-                                                                onClick={(e) => (slots.length === 0 && empLeaves.length === 0 && !attendanceStatus)
+                                                                onClick={(e) => slots.length === 0
                                                                     ? openQuickPick(emp, date, e.currentTarget)
                                                                     : openCellModal(emp, date)}
-                                                                aria-haspopup={slots.length === 0 && empLeaves.length === 0 && !attendanceStatus ? 'menu' : 'dialog'}
+                                                                aria-haspopup={slots.length === 0 ? 'menu' : 'dialog'}
                                                                 aria-label={`แก้กะ ${emp.nickname || emp.name} ${daysTitle[i]} ${format(date, 'dd/MM')}`}
                                                                 className={`group w-full min-h-[76px] p-1.5 flex flex-col gap-1 text-left transition-colors duration-150 border ${
  hasDiscrepancy ? 'border-transparent bg-plum/5 hover:bg-plum/10' : 'border-transparent hover:border-charcoal hover:bg-paper-2'
@@ -1751,6 +1868,18 @@ export default function AdminRosterPage() {
                                                                         {attendanceStatus.label}
                                                                     </span>
                                                                 )}
+                                                                {(() => {
+                                                                    const day = getDaySessions(emp.id, date);
+                                                                    if (day.gaps.length === 0) return null;
+                                                                    return (
+                                                                        <span className="block px-1.5 py-0.5 text-xs text-plum border-l-2 border-plum">
+                                                                            {day.gaps.map((g, gi) => (
+                                                                                <span key={gi} className="block">ออกระหว่างวัน <span className="font-num">{format(g.from, 'HH:mm')}–{format(g.to, 'HH:mm')}</span> ({fmtMins(g.mins)})</span>
+                                                                            ))}
+                                                                            <span className="block text-subtle">ทำงานจริง {fmtMins(day.workedMins)}</span>
+                                                                        </span>
+                                                                    );
+                                                                })()}
 
                                                                 {empLeaves.map((l, idx) => (
                                                                     <span
@@ -1790,14 +1919,16 @@ export default function AdminRosterPage() {
                                                                         : null;
 
                                                                     const approvedLeave = empLeaves.find(l => l.status === 'approved');
+                                                                    const incomplete = !s.is_off && !timeStr;
                                                                     const bgColor = s.is_off
                                                                         ? 'bg-paper-2 border-rule text-subtle'
+                                                                        : incomplete ? 'bg-cream border-plum text-plum'
                                                                         : (matchedPreset
                                                                             ? `${getPresetColor(matchedPreset.color).bg} ${getPresetColor(matchedPreset.color).border} ${getPresetColor(matchedPreset.color).text}`
                                                                             : getShiftColorClass(s, shiftObj || matchedDbShift));
                                                                     const cellLabel = s.is_off
                                                                         ? (approvedLeave ? `หยุด · ${leaveTypeTh(approvedLeave.leave_type)}` : 'หยุด')
-                                                                        : plainText(shiftObj ? shiftObj.name : (matchedPreset ? matchedPreset.name : (matchedDbShift?.name || (timeStr ? `กะ ${timeStr}` : 'กะพิเศษ'))));
+                                                                        : plainText(shiftObj ? shiftObj.name : (matchedPreset ? matchedPreset.name : (matchedDbShift?.name || (timeStr ? `กะ ${timeStr}` : 'ยังไม่ระบุเวลา'))));
 
                                                                     return (
                                                                         <span key={idx} className={`block px-1.5 py-1 border ${bgColor} ${s.status === 'DRAFT' ? '!border-dashed' : ''}`}>
@@ -2371,6 +2502,14 @@ export default function AdminRosterPage() {
                     { key: 'custom', title: 'กะที่สร้างเอง', match: p => p.category === 'custom' || p.isCustom },
                 ];
                 const { emp, date } = quickPick;
+                const prevStr = format(addDays(date, -1), 'yyyy-MM-dd');
+                const prevRows = transactions.filter(t => t.employee_id === emp.id && t.date === prevStr);
+                const copyable = copyRowsFor(emp.id, prevStr, format(date, 'yyyy-MM-dd'));
+                const prevDayName = daysTitle[(addDays(date, -1).getDay() + 6) % 7];
+                const actual = getAttendanceOnDate(emp.id, date);
+                const actualStart = actual.checkIn ? format(actual.checkIn, 'HH:mm') : '';
+                const actualEnd = actual.checkOut ? format(actual.checkOut, 'HH:mm') : '';
+                const dayLeaves = leaveRequests.filter(l => l.employee_id === emp.id && l.leave_date === format(date, 'yyyy-MM-dd') && l.status !== 'rejected');
                 const itemCls = 'w-full min-h-12 px-4 py-2 text-left flex items-baseline justify-between gap-3 hover:bg-paper-2 focus-visible:bg-paper-2 transition-colors duration-150';
                 const firstKey = groups.find(g => visiblePresets.some(g.match))?.key;
                 return (
@@ -2387,6 +2526,21 @@ export default function AdminRosterPage() {
                                 <p className="text-base font-semibold text-charcoal">{emp.nickname || emp.name}</p>
                                 <p className="text-sm text-neutral">{format(date, 'EEEEที่ d MMM', { locale: th })}</p>
                             </div>
+                            {dayLeaves.length > 0 && (
+                                <p className="px-4 py-2 border-b border-rule text-sm text-plum">มีใบลาวันนี้ ({dayLeaves[0].status === 'approved' ? 'อนุมัติแล้ว' : 'รออนุมัติ'}) · จัดการใน &ldquo;ปรับละเอียด…&rdquo;</p>
+                            )}
+                            {actualStart && actualEnd && (
+                                <button type="button" role="menuitem" disabled={saving} onClick={() => quickSave(emp, date, { name: 'ตามเวลาที่มาจริง', start: actualStart, end: actualEnd })} className="w-full min-h-12 px-4 py-2 text-left border-b border-charcoal hover:bg-paper-2 focus-visible:bg-paper-2 transition-colors duration-150">
+                                    <span className="block text-base font-semibold text-plum">ใส่ตามเวลาที่มาจริง</span>
+                                    <span className="block font-num text-sm text-subtle">{actualStart}–{actualEnd}</span>
+                                </button>
+                            )}
+                            {copyable.length > 0 && (
+                                <button type="button" role="menuitem" disabled={saving} onClick={() => copyCellFromPrevDay(emp, date)} className="w-full min-h-12 px-4 py-2 text-left border-b border-charcoal hover:bg-paper-2 focus-visible:bg-paper-2 transition-colors duration-150">
+                                    <span className="block text-base font-semibold text-plum">เหมือนวัน{prevDayName}</span>
+                                    <span className="block text-sm text-subtle">{prevRows.filter(t => copyable.some(c => c.slot_type === (t.slot_type || 'MAIN'))).map(slotSummary).join(' + ')}</span>
+                                </button>
+                            )}
                             {groups.map(g => {
                                 const list = visiblePresets.filter(g.match);
                                 if (list.length === 0) return null;

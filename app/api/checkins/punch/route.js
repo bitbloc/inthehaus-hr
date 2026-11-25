@@ -274,6 +274,22 @@ export async function POST(request) {
           shiftInfo = null;
         }
       }
+
+      // Back from a mid-day errand: a check-in after a check-out earlier today is a return,
+      // not a late arrival. Staff check out when they step out so the gap shows in the system.
+      if (lastLog && lastLog.action_type === 'check_out') {
+        const lastOut = new Date(lastLog.timestamp);
+        const sameBkkDay = lastOut.toLocaleDateString('sv-SE', { timeZone: 'Asia/Bangkok' }) === todayDateStr;
+        const awayMins = Math.floor((serverNow - lastOut) / 60000);
+        if (sameBkkDay && awayMins >= 0 && awayMins < 12 * 60) {
+          const h = Math.floor(awayMins / 60);
+          const m = awayMins % 60;
+          statusCategory = 'RETURN';
+          isLate = false;
+          lateMinutes = 0;
+          statusLabel = `กลับเข้างาน (ออกไป ${h > 0 ? `${h} ชม. ` : ''}${m} น.)`;
+        }
+      }
     } else {
       // Check-out
       statusCategory = 'CHECKED_OUT';
