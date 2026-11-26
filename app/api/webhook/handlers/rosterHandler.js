@@ -826,7 +826,7 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
       return true;
     } catch (err) {
       console.error('Auto Roster confirm card error in LINE command:', err);
-      await client.replyMessage(event.replyToken, { type: 'text', text: `เกิดข้อผิดพลาดในการเตรียมจัดตารางอัตโนมัติ: ${err.message}` });
+      await client.replyMessage(event.replyToken, { type: 'text', text: 'เตรียมจัดตารางอัตโนมัติไม่สำเร็จ ลองใหม่อีกครั้งครับ' });
       return true;
     }
   }
@@ -923,7 +923,8 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
       .order('leave_date', { ascending: true });
 
     if (error) {
-      await client.replyMessage(event.replyToken, { type: 'text', text: 'Error fetching data: ' + error.message });
+      console.error('Roster fetch error:', error);
+      await client.replyMessage(event.replyToken, { type: 'text', text: 'ดึงข้อมูลไม่สำเร็จ ลองใหม่อีกครั้งครับ' });
       return true;
     }
 
@@ -989,7 +990,8 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
       .limit(5);
 
     if (error) {
-      await client.replyMessage(event.replyToken, { type: 'text', text: 'Error fetching data: ' + error.message });
+      console.error('Roster fetch error:', error);
+      await client.replyMessage(event.replyToken, { type: 'text', text: 'ดึงข้อมูลไม่สำเร็จ ลองใหม่อีกครั้งครับ' });
       return true;
     }
 
@@ -1210,7 +1212,7 @@ export async function handleRosterPostback(event, client, action, queryParams, u
       return true;
     } catch (e) {
       console.error("Confirm Roster Error:", e);
-      await client.replyMessage(event.replyToken, { type: 'text', text: `เเม๊! เกิดข้อผิดพลาด: ${e.message}` });
+      await client.replyMessage(event.replyToken, { type: 'text', text: 'ส่งคำขอปรับตารางไม่สำเร็จ ลองใหม่อีกครั้งครับ' });
       return true;
     }
   }
@@ -1292,7 +1294,8 @@ export async function handleRosterPostback(event, client, action, queryParams, u
       .in('id', pendingLeaves.map(l => l.id));
 
     if (updateErr) {
-      await client.replyMessage(event.replyToken, { type: 'text', text: `เแม๊! เกิดข้อผิดพลาดในการอัปเดตสถานะ: ${updateErr.message}` });
+      console.error('Leave status update error:', updateErr);
+      await client.replyMessage(event.replyToken, { type: 'text', text: 'อัปเดตสถานะการลาไม่สำเร็จ ลองใหม่อีกครั้งครับ' });
       return true;
     }
 

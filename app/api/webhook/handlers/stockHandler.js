@@ -115,7 +115,7 @@ export async function handleStockResponseTags(response, request, query = "") {
       }
     } catch (e) {
       console.error("Stock Action Error:", e);
-      return { type: 'text', text: `เกิดข้อผิดพลาดในการดึงข้อมูลจากระบบสต็อกครับ บอสสามารถตรวจสอบระบบหรือแจ้งทีมงานผู้ดูแลระบบได้ครับ\nError: ${e.message}` };
+      return { type: 'text', text: 'ดึงข้อมูลจากระบบสต็อกไม่สำเร็จ ลองใหม่อีกครั้งครับ' };
     }
   }
 
@@ -194,7 +194,7 @@ export async function handleStockPostback(event, client, action, queryParams, us
       return { handled: true };
     } catch (err) {
       console.error("Stock Postback Error:", err);
-      await client.replyMessage(event.replyToken, { type: 'text', text: `⚠️ ว้าย! เกิดข้อผิดพลาดจากฝั่ง API สินค้าค่ะ:\n${err.message}` });
+      await client.replyMessage(event.replyToken, { type: 'text', text: 'ทำรายการสต็อกไม่สำเร็จ ลองใหม่อีกครั้งครับ' });
       return { handled: true };
     }
   }
@@ -215,7 +215,7 @@ export async function handleStockPostback(event, client, action, queryParams, us
       return { handled: true };
     } catch (err) {
       console.error("Check Exact Stock Postback Error:", err);
-      await client.replyMessage(event.replyToken, { type: 'text', text: `⚠️ เกิดข้อผิดพลาดในการดึงข้อมูลสินค้าค่ะ: ${err.message}` });
+      await client.replyMessage(event.replyToken, { type: 'text', text: 'ดึงข้อมูลสินค้าไม่สำเร็จ ลองใหม่อีกครั้งครับ' });
       return { handled: true };
     }
   }

@@ -280,7 +280,8 @@ export async function POST(request) {
                 .order('timestamp', { ascending: true });
 
               if (error) {
-                await client.replyMessage(event.replyToken, { type: 'text', text: 'Error fetching data: ' + error.message });
+                console.error('Attendance summary fetch error:', error);
+                await client.replyMessage(event.replyToken, { type: 'text', text: 'ดึงสรุปการเข้างานไม่สำเร็จ ลองใหม่อีกครั้งครับ' });
                 handledLocally = true;
                 return;
               }

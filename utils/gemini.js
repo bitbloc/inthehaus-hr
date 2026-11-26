@@ -222,7 +222,7 @@ ${configs.staff_roster || ''}
         return text ? text.replace(/<br\s*\/?>/gi, '\n') : '';
     } catch (error) {
         console.error("Gemini Technical Error:", error);
-        return `ขออภัยครับ เกิดข้อผิดพลาดทางเทคนิคนิดหน่อยนะครับ (${error.message || 'unknown error'}) รบกวนลองใหม่อีกครั้งนะครับ`;
+        return 'ขออภัยครับ ยูซุตอบไม่สำเร็จ ลองใหม่อีกครั้งนะครับ';
     }
 }
 

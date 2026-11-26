@@ -451,7 +451,8 @@ export async function handleChatPostback(event, client, action, queryParams, use
     if (!error) {
       await client.replyMessage(event.replyToken, { type: 'text', text: '✅ บันทึกความรู้ดังกล่าวเข้าสู่ระบบคลังความรู้หลักของร้านเรียบร้อยแล้วครับบอส' });
     } else {
-       await client.replyMessage(event.replyToken, { type: 'text', text: 'ไม่สามารถบันทึกข้อมูลเข้าระบบคลังความรู้หลักได้เนื่องจาก: ' + error.message });
+       console.error('Insight verify error:', error);
+       await client.replyMessage(event.replyToken, { type: 'text', text: 'บันทึกเข้าคลังความรู้ไม่สำเร็จ ลองใหม่อีกครั้งครับ' });
     }
     return true;
   }
