@@ -1,7 +1,7 @@
 import { NextResponse, after } from 'next/server';
 import { Client } from '@line/bot-sdk';
 import { getSchemaWeather, formatWeatherMessage, formatWeatherFlex } from '../../../utils/weather';
-import { getGeminiResponse, classifyAndAnalyzeImage, transcribeAudio } from '../../../utils/gemini';
+import { classifyAndAnalyzeImage, transcribeAudio } from '../../../utils/gemini';
 import { claudeEnabled } from '../../../utils/claude-genai';
 import { getIngredientPrices } from '../../../utils/price';
 import { saveMessage, cleanupOldHistory, getEmployeeByLineId, getYuzuConfigs, checkIsBoss } from '../../../utils/memory';
@@ -885,23 +885,16 @@ export async function POST(request) {
           }
 
           // --- Handle Location Messages ---
+          // No AI call and no reply: there is no location-based check-in flow, so a shared
+          // location is only logged to the chat history.
           else if (event.message.type === 'location') {
-            console.log("Yuzu Location: Received");
             const { latitude, longitude, address } = event.message;
-            const query = `ฉันอยู่ที่นี่: ${address || 'ตำแหน่งปัจจุบัน'} (${latitude}, ${longitude}) ช่วยหาปั๊มน้ำมันที่ใกล้ที่สุดและน้ำมันยังไม่หมดจาก Dashboard หรือข้อมูลล่าสุดให้หน่อยค่ะ`;
-            
             try {
-              const context = `[Location] Lat: ${latitude}, Lng: ${longitude}, Address: ${address}\n[Home] Shop "In The Haus" is at (17.390083, 104.792944)\n[Source] https://script.google.com/macros/s/AKfycbyJ5WFOFmjwVJWoIUer6dwxHdeSShDvUfSWU0NNfsIH8Ek9WguCAzJG9QSbK5g77MH6/exec`;
-              const response = await getGeminiResponse(query, context, [], userId);
-              
-              await saveMessage(groupId, userId, 'user', `[Location Message] ${address || 'Coordinates'}`, 'location');
-              await saveMessage(groupId, null, 'model', response, 'text');
-              
-              handledLocally = true;
-              await client.replyMessage(event.replyToken, { type: 'text', text: response });
+              await saveMessage(groupId, userId, 'user', `[Location Message] ${address || 'Coordinates'} (${latitude}, ${longitude})`, 'location');
             } catch (locationError) {
               console.error("Location Processing Error:", locationError);
             }
+            handledLocally = true;
           }
         } 
         
