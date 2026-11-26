@@ -64,12 +64,43 @@ function systemText(systemInstruction) {
     return parts.map((p) => (typeof p === "string" ? p : p?.text || "")).filter(Boolean).join("\n\n");
 }
 
+// Gemini responseSchema (OpenAPI subset, upper-case types) -> the JSON Schema
+// subset Claude structured outputs accept (lower-case types,
+// additionalProperties:false on objects, no numeric/length constraints).
+export function geminiSchemaToJsonSchema(s) {
+    if (!s || typeof s !== "object") return s;
+    const type = String(s.type || "").toLowerCase();
+    const out = {};
+    if (s.description) out.description = s.description;
+    if (Array.isArray(s.enum)) out.enum = s.enum;
+    if (type === "object") {
+        out.type = "object";
+        out.properties = Object.fromEntries(
+            Object.entries(s.properties || {}).map(([k, v]) => [k, geminiSchemaToJsonSchema(v)]),
+        );
+        if (Array.isArray(s.required)) out.required = s.required;
+        out.additionalProperties = false;
+    } else if (type === "array") {
+        out.type = "array";
+        if (s.items) out.items = geminiSchemaToJsonSchema(s.items);
+    } else if (type) {
+        out.type = type;
+    }
+    if (s.nullable && out.type) return { anyOf: [out, { type: "null" }] };
+    return out;
+}
+
+function schemaOf(generationConfig) {
+    const gen = generationConfig || {};
+    return gen.responseSchema || gen.response_schema || null;
+}
+
 function jsonInstruction(generationConfig) {
     const gen = generationConfig || {};
     if (!/json/i.test(String(gen.responseMimeType || gen.response_mime_type || ""))) return "";
-    const schema = gen.responseSchema || gen.response_schema;
-    return "Return only the JSON object: no markdown fences, no text before or after it." +
-        (schema ? `\nThe JSON must follow this schema:\n${JSON.stringify(schema)}` : "");
+    // With a schema, structured outputs enforce the shape; no prompt text needed.
+    if (schemaOf(gen)) return "";
+    return "Return only the JSON object: no markdown fences, no text before or after it.";
 }
 
 function geminiShapedResult(text, model) {
@@ -105,13 +136,31 @@ class ClaudeModel {
             ? {}
             : { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" };
 
-        const response = await this.client.beta.messages.create({
+        const schema = schemaOf(gen);
+        const outputConfig = schema
+            ? { output_config: { format: { type: "json_schema", schema: geminiSchemaToJsonSchema(schema) } } }
+            : {};
+
+        const params = {
             model: this.model,
             max_tokens: maxTokens,
             ...(system ? { system } : {}),
             messages,
             ...fallbackParams,
-        });
+        };
+        let response;
+        try {
+            response = await this.client.beta.messages.create({ ...params, ...outputConfig });
+        } catch (err) {
+            // Schema rejected: retry once as plain JSON-by-instruction so the feature keeps working.
+            if (!schema || !(err instanceof Anthropic.BadRequestError)) throw err;
+            console.warn("[Claude] structured output rejected, retrying without schema:", err.message);
+            response = await this.client.beta.messages.create({
+                ...params,
+                system: [params.system, "Return only the JSON object: no markdown fences, no text before or after it."]
+                    .filter(Boolean).join("\n\n"),
+            });
+        }
         if (response.stop_reason === "refusal") {
             throw new Error(`Claude declined (${response.stop_details?.category ?? "unknown"})`);
         }
