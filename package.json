@@ -11,6 +11,7 @@
     "hallmark:fix": "hallmark fix"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.14.0",
     "@google/generative-ai": "^0.24.1",
     "@line/bot-sdk": "^10.5.0",
     "@line/liff": "^2.32.0",

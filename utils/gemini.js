@@ -247,7 +247,8 @@ export function sanitizeAmount(amount) {
  */
 export async function classifyAndAnalyzeImage(imageBase64, mimeType = "image/jpeg", context = "", bossRole = null, positionInstruction = "", employeeName = "") {
     try {
-        const instance = getGenAI();
+        // High-volume image reading (slips): the fast model when running on Claude.
+        const instance = getGenAI({ fast: true });
         if (!instance) return { isFood: false, analysis: "AI Instance error", shortDescription: "" };
         
         const model = instance.getGenerativeModel({ model: GEMINI_MODELS.FLASH });

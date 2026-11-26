@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { ClaudeGenAI, claudeEnabled } from "./claude-genai.js";
 
 /**
  * Centralized Gemini Model Registry
@@ -18,11 +19,19 @@ export const GEMINI_MODELS = {
 };
 
 let genAIInstance = null;
+const claudeInstances = {};
 
 /**
- * Robust getter for Gemini instance to ensure API Key is loaded
+ * Robust getter for Gemini instance to ensure API Key is loaded.
+ * Gemini project suspended (2026-11-26): returns the Claude adapter while
+ * ANTHROPIC_API_KEY is set. { fast: true } picks the high-volume model.
  */
-export function getGenAI() {
+export function getGenAI({ fast = false } = {}) {
+    if (claudeEnabled()) {
+        const key = fast ? "fast" : "accurate";
+        if (!claudeInstances[key]) claudeInstances[key] = new ClaudeGenAI({ fast });
+        return claudeInstances[key];
+    }
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
         console.error("CRITICAL: GEMINI_API_KEY environment variable is missing.");
