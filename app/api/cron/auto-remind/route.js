@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '../../../../lib/supabaseClient';
 import { Client } from '@/utils/lineClient';
+import { BRAND } from '@/utils/brand';
 
 const GROUP_IDS = [
   'C1210c7a0601b5a675060e312efe10bff'
@@ -14,23 +15,21 @@ const client = new Client({
 export const dynamic = 'force-dynamic';
 
 function buildFlexMessage(type = 'checklist') {
-  // Dieter Rams + Thai Modern Clean Aesthetic (Zero-Icon / Pure Typography)
-  let badgeText = '17:30 ROUND';
-  let badgeColor = '#C85A32';
-  let titleText = 'เช็คลิสต์ร้าน & ส่งมอบกะ';
+  // Brand v2: plum header, cream body, Thai-first type, no icons.
+  let badgeText = 'รอบ 17:30';
+  let titleText = 'เช็คลิสต์ร้านและส่งมอบกะ';
   let subtitleText = 'รอบตรวจสอบความเรียบร้อยช่วงบ่าย-เย็น ส่งมอบงานระหว่างกะ และเตรียมพร้อมรอบค่ำ';
   let altText = 'CHECKLIST PROTOCOL: บันทึกเช็คลิสต์และตรวจความเรียบร้อยร้าน';
   let taskItems = [
     'ตรวจเช็คความพร้อมสเตชั่น บาร์ และครัว',
-    'ตรวจนับสต็อกวัตถุดิบ & เบเกอรี่ช่วงบ่าย',
-    'นับเงินสดในลิ้นชัก POS & ส่งมอบกะ',
+    'ตรวจนับสต็อกวัตถุดิบและเบเกอรี่ช่วงบ่าย',
+    'นับเงินสดในลิ้นชัก POS และส่งมอบกะ',
     'ปรับไฟ บรรยากาศร้าน และเตรียมรับรอบค่ำ'
   ];
 
   if (type === 'morning') {
-    badgeText = '10:00 OPENING';
-    badgeColor = '#C85A32';
-    titleText = 'เตรียมเปิดร้าน & ตรวจสต็อก';
+    badgeText = 'เปิดร้าน 10:00';
+    titleText = 'เตรียมเปิดร้านและตรวจสต็อก';
     subtitleText = 'บันทึกเวลาเข้างาน เช็คความพร้อมหน้าร้าน และตรวจสต็อกก่อนเปิดบริการ 11:00 น.';
     altText = 'OPENING PROTOCOL: ลงเวลาเข้างานและตรวจสต็อก';
     taskItems = [
@@ -40,9 +39,8 @@ function buildFlexMessage(type = 'checklist') {
       'ทำความสะอาดและจัดเตรียมสเตชั่นพร้อมเปิด 11:00 น.'
     ];
   } else if (type === 'evening' || type === 'closing') {
-    badgeText = '20:45 CLOSING';
-    badgeColor = '#C85A32';
-    titleText = 'เตรียมปิดร้าน & สรุปกะ';
+    badgeText = 'ปิดร้าน 20:45';
+    titleText = 'เตรียมปิดร้านและสรุปกะ';
     subtitleText = 'สิ้นสุดการรับออเดอร์ครัว 20:45 น. เคลียร์บิล สรุปยอดเงิน และตรวจปิดร้าน 21:30 น.';
     altText = 'CLOSING PROTOCOL: บันทึกเช็คลิสต์ปิดร้านและสรุปกะ';
     taskItems = [
@@ -60,88 +58,47 @@ function buildFlexMessage(type = 'checklist') {
       type: 'bubble',
       size: 'mega',
       styles: {
-        body: { backgroundColor: '#FBF9F5' },
-        footer: { backgroundColor: '#FBF9F5', separator: true, separatorColor: '#E6E1D6' }
+        body: { backgroundColor: BRAND.cream },
+        footer: { backgroundColor: BRAND.cream, separator: true, separatorColor: BRAND.rule }
+      },
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: BRAND.plum,
+        paddingAll: '20px',
+        contents: [
+          { type: 'text', text: titleText, size: 'xl', weight: 'bold', color: BRAND.cream, wrap: true },
+          { type: 'text', text: `ภารกิจประจำวัน, ${badgeText}`, size: 'xs', color: BRAND.onPlum2, margin: 'sm', wrap: true }
+        ]
       },
       body: {
         type: 'box',
         layout: 'vertical',
         paddingAll: '20px',
         contents: [
-          // Header / Eyebrow (Dieter Rams functional grotesque)
-          {
-            type: 'box',
-            layout: 'horizontal',
-            alignItems: 'center',
-            contents: [
-              {
-                type: 'text',
-                text: 'DAILY MISSION // PROTOCOL',
-                size: 'xxs',
-                color: '#78736A',
-                weight: 'bold',
-                flex: 1
-              },
-              {
-                type: 'box',
-                layout: 'horizontal',
-                backgroundColor: '#F4F1EA',
-                cornerRadius: 'xs',
-                paddingStart: 'sm',
-                paddingEnd: 'sm',
-                paddingTop: 'xs',
-                paddingBottom: 'xs',
-                contents: [
-                  {
-                    type: 'text',
-                    text: badgeText,
-                    size: 'xxs',
-                    weight: 'bold',
-                    color: badgeColor
-                  }
-                ]
-              }
-            ]
-          },
-          // Main Title
-          {
-            type: 'text',
-            text: titleText,
-            size: 'xl',
-            weight: 'bold',
-            color: '#1E1B18',
-            margin: 'md'
-          },
-          // Brief Description
+          // Brief description
           {
             type: 'text',
             text: subtitleText,
-            size: 'xs',
-            color: '#78736A',
-            wrap: true,
-            margin: 'xs'
+            size: 'sm',
+            color: BRAND.muted,
+            wrap: true
           },
-          // Divider
-          {
-            type: 'separator',
-            color: '#E6E1D6',
-            margin: 'md'
-          },
-          // Store Hours & Cutoff (Thai Modern Paper-2 Container)
+          // Store hours and cutoff (paper-2 panel)
           {
             type: 'box',
             layout: 'vertical',
-            backgroundColor: '#F4F1EA',
+            backgroundColor: BRAND.paper2,
             cornerRadius: 'sm',
             paddingAll: '12px',
-            margin: 'md',
+            margin: 'lg',
             contents: [
               {
                 type: 'box',
                 layout: 'horizontal',
                 contents: [
-                  { type: 'text', text: 'เวลาเปิด-ปิดร้าน', size: 'xs', color: '#78736A', flex: 5 },
-                  { type: 'text', text: '11:00 - 21:30 น.', size: 'xs', weight: 'bold', color: '#1E1B18', align: 'end', flex: 5 }
+                  { type: 'text', text: 'เวลาเปิด-ปิดร้าน', size: 'xs', color: BRAND.neutral, flex: 5 },
+                  { type: 'text', text: '11:00 - 21:30 น.', size: 'xs', weight: 'bold', color: BRAND.charcoal, align: 'end', flex: 5 }
                 ]
               },
               {
@@ -149,25 +106,25 @@ function buildFlexMessage(type = 'checklist') {
                 layout: 'horizontal',
                 margin: 'xs',
                 contents: [
-                  { type: 'text', text: 'ปิดรับออเดอร์ครัว', size: 'xs', color: '#78736A', flex: 5 },
-                  { type: 'text', text: '20:45 น. (Last Order)', size: 'xs', weight: 'bold', color: '#C85A32', align: 'end', flex: 5 }
+                  { type: 'text', text: 'ปิดรับออเดอร์ครัว', size: 'xs', color: BRAND.neutral, flex: 5 },
+                  { type: 'text', text: '20:45 น. (Last order)', size: 'xs', weight: 'bold', color: BRAND.plum, align: 'end', flex: 5 }
                 ]
               }
             ]
           },
-          // Protocol Task List (Clean typographic dash - Zero-Icon)
+          // Task list (typographic dash, no icons)
           {
             type: 'box',
             layout: 'vertical',
-            margin: 'md',
+            margin: 'lg',
             spacing: 'xs',
             contents: taskItems.map((task) => ({
               type: 'box',
               layout: 'horizontal',
               spacing: 'sm',
               contents: [
-                { type: 'text', text: '—', size: 'xs', color: '#78736A', flex: 0 },
-                { type: 'text', text: task, size: 'xs', color: '#1E1B18', flex: 1, wrap: true }
+                { type: 'text', text: '—', size: 'xs', color: BRAND.neutral, flex: 0 },
+                { type: 'text', text: task, size: 'xs', color: BRAND.charcoal, flex: 1, wrap: true }
               ]
             }))
           }
@@ -179,19 +136,17 @@ function buildFlexMessage(type = 'checklist') {
         paddingAll: '16px',
         spacing: 'sm',
         contents: [
-          // Primary Action Button (Pure Typography - No Icon)
           {
             type: 'button',
             action: {
               type: 'uri',
-              label: 'บันทึกแบบฟอร์ม CHECKLIST',
+              label: 'บันทึกเช็คลิสต์',
               uri: 'https://forms.gle/8agnXqC7ZSojmqra6'
             },
             style: 'primary',
-            color: '#1E1B18',
+            color: BRAND.charcoal,
             height: 'sm'
           },
-          // Secondary Action Pair (Pure Typography - No Icon)
           {
             type: 'box',
             layout: 'horizontal',
@@ -204,7 +159,8 @@ function buildFlexMessage(type = 'checklist') {
                   label: 'ตรวจสต็อก',
                   uri: 'https://haustable.vercel.app/staff/stock'
                 },
-                style: 'secondary',
+                style: 'primary',
+                color: BRAND.plum,
                 height: 'sm',
                 flex: 1
               },
@@ -215,21 +171,12 @@ function buildFlexMessage(type = 'checklist') {
                   label: 'ลงเวลาเข้า-ออก',
                   uri: 'https://inthehaus-hr.vercel.app/checkin'
                 },
-                style: 'secondary',
+                style: 'primary',
+                color: BRAND.plum,
                 height: 'sm',
                 flex: 1
               }
             ]
-          },
-          // Micro Brand Attribution
-          {
-            type: 'text',
-            text: 'ONHAUS SYSTEM // DIETER RAMS PROTOCOL',
-            size: 'xxs',
-            color: '#A09B90',
-            weight: 'bold',
-            align: 'center',
-            margin: 'sm'
           }
         ]
       }
