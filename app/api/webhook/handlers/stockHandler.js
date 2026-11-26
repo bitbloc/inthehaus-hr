@@ -1,6 +1,7 @@
 import { lowStockFlex, allStockFlex, historyFlex, selectionFlex, singleItemFlex, searchResultFlex, confirmFlex, auditFormFlex } from './stockFlex.js';
 import { format, addHours } from 'date-fns';
 import { getEmployeeByLineId } from '../../../../utils/memory';
+import { buildPayloadPostbackData, readPostbackPayload, payloadKey, PAYLOAD_TOO_LONG_TEXT } from '../../../../utils/postbackPayload';
 
 const processedPostbacks = new Set();
 
@@ -109,7 +110,8 @@ export async function handleStockResponseTags(response, request, query = "") {
          if (actionData.action === 'UPDATE_ITEM') confirmMsg = `ยืนยันการอัปเดตข้อมูล [${actionData.itemName}] Reorder: ${actionData.reorder_point}`;
          if (actionData.action === 'CREATE_ITEM') confirmMsg = `ยืนยันการสร้างรายการสินค้าใหม่: [${actionData.itemName}]`;
          
-         return confirmFlex(confirmMsg, actionData);
+         const postbackData = await buildPayloadPostbackData('confirm_stock', actionData);
+         return postbackData ? confirmFlex(confirmMsg, postbackData) : { type: 'text', text: PAYLOAD_TOO_LONG_TEXT };
       }
     } catch (e) {
       console.error("Stock Action Error:", e);
@@ -140,7 +142,11 @@ export async function handleStockPostback(event, client, action, queryParams, us
   }
 
   if (action === 'confirm_stock') {
-    const payloadRaw = queryParams.get('payload');
+    const payloadRaw = payloadKey(queryParams);
+    if (!payloadRaw) {
+      await client.replyMessage(event.replyToken, { type: 'text', text: 'ไม่พบข้อมูลรายการนี้แล้วครับ รบกวนส่งคำขอใหม่อีกครั้งครับ' });
+      return { handled: true };
+    }
     if (processedPostbacks.has(payloadRaw)) {
       return { handled: true, duplicate: true };
     }
@@ -148,7 +154,11 @@ export async function handleStockPostback(event, client, action, queryParams, us
     setTimeout(() => processedPostbacks.delete(payloadRaw), 60000); // Clear after 60s
 
     try {
-      const payload = JSON.parse(Buffer.from(payloadRaw, 'base64').toString());
+      const payload = await readPostbackPayload(queryParams);
+      if (!payload) {
+        await client.replyMessage(event.replyToken, { type: 'text', text: 'ไม่พบข้อมูลรายการนี้แล้วครับ รบกวนส่งคำขอใหม่อีกครั้งครับ' });
+        return { handled: true };
+      }
       const { fetchStockItems, addStockTransaction, updateStockItem, createStockItem } = await import('../../../../utils/stock_api');
       const empName = await getEmployeeByLineId(userId).then(e => e?.nickname || e?.name || "LINE User") || "LINE User";
       

@@ -5,7 +5,6 @@ import { getSchemaWeather, formatWeatherMessage, getCompactWeather } from '../..
 import { getAccurateNews } from '../../../../utils/news';
 import { saveMessage, getChatHistory, getDailyContent, saveLearnedFact, getEmployeeByLineId, getAllEmployeesData, getYuzuConfigs, checkIsBoss } from '../../../../utils/memory';
 import { supabase } from '../../../../lib/supabaseClient';
-import { getServiceClient } from '../../../../lib/supabaseServer';
 
 export async function handleChatCommand(event, client, text, rawText, userId, groupId, request) {
   if (text.startsWith('yuzu') || text.startsWith('ยูซุ')) {
@@ -340,63 +339,22 @@ ${dailyLogs || 'ไม่มีความเคลื่อนไหว'}
           else if (actionData.type === 'CHANGE') summaryText = `ขอปรับกะงาน: ${actionData.employee_name}\nวันที่: ${actionData.date}\nรายละเอียด: ${actionData.details?.note || '-'}`;
           else if (actionData.type === 'AUTO_GENERATE') {
             if (isBossUser) {
-              const { startOfWeek, addDays } = await import('date-fns');
-              const { autoGenerateWeeklyRoster } = await import('../../../../utils/roster_auto_learner');
-              const bkkNow = addHours(new Date(), 7);
-              const targetMon = startOfWeek(addDays(bkkNow, 7), { weekStartsOn: 1 });
-              const targetSun = addDays(targetMon, 6);
-              const genResult = await autoGenerateWeeklyRoster({
-                startDate: targetMon,
-                endDate: targetSun,
-                overwrite: true,
-                applyLeaves: true,
-                syncTemplate: true,
-                client: getServiceClient()
-              });
-              summaryText = `🤖 จัดตารางสัปดาห์หน้าอัตโนมัติสำเร็จ ${genResult.totalSlots} กะ (นำเข้าใบลา ${genResult.leavesApplied?.length || 0} รายการ) บันทึกเป็นสถานะ Draft เรียบร้อยครับ`;
+              // Only describe here; generation runs on the confirm postback.
+              const { nextRosterWeek, autoGenerateSummaryText } = await import('./rosterHandler');
+              const { targetMon, targetSun } = nextRosterWeek();
+              actionData.start_date = format(targetMon, 'yyyy-MM-dd');
+              summaryText = autoGenerateSummaryText(targetMon, targetSun);
             } else {
               summaryText = "คำสั่งจัดตารางงานอัตโนมัติ (สงวนสิทธิ์เฉพาะบอส)";
             }
           }
 
-          const confirmFlex = {
-            type: 'bubble',
-            styles: {
-              header: { backgroundColor: '#f3f3f3' },
-              body: { backgroundColor: '#f3f3f3' },
-              footer: { backgroundColor: '#ebebeb' }
-            },
-            header: {
-              type: 'box',
-              layout: 'vertical',
-              paddingAll: '20px',
-              contents: [
-                { type: 'text', text: 'ROSTER CHANGE PROPOSAL', color: '#1c1c1c', weight: 'bold', size: 'sm' },
-                { type: 'text', text: `CLASSIFICATION: ${isBossUser ? 'DIRECTIVE (BOSS)' : 'PROPOSAL'}`, color: '#1c1c1c', weight: 'bold', size: 'xxs', margin: 'xs' }
-              ]
-            },
-            body: {
-              type: 'box',
-              layout: 'vertical',
-              paddingAll: '20px',
-              contents: [
-                { type: 'text', text: summaryText, wrap: true, size: 'sm', color: '#1c1c1c' },
-                { type: 'text', text: isBossUser ? 'PLEASE REVIEW THE PROPOSAL DETAILS BEFORE EXECUTING UPDATE.' : 'PLEASE CONFIRM THAT THE INFORMATION ABOVE IS ACCURATE TO SUBMIT FOR REVIEW.', margin: 'md', size: 'xxs', color: '#888888', wrap: true }
-              ]
-            },
-            footer: {
-              type: 'box',
-              layout: 'horizontal',
-              paddingAll: '15px',
-              spacing: 'sm',
-              contents: [
-                { type: 'button', style: 'primary', color: '#1c1c1c', action: { type: 'postback', label: isBossUser ? 'EXECUTE UPDATE' : 'CONFIRM SUBMISSION', data: `action=confirm_roster&payload=${Buffer.from(JSON.stringify(actionData)).toString('base64')}` } },
-                { type: 'button', style: 'secondary', action: { type: 'postback', label: 'CANCEL', data: 'action=cancel_roster' } }
-              ]
-            }
-          };
-
-          replyMessages.push({ type: 'flex', altText: isBossUser ? '👑 บอสสั่งแก้ตาราง' : '📝 ยืนยันข้อมูลตารางงาน', contents: confirmFlex });
+          const { buildRosterConfirmMessage } = await import('./rosterHandler');
+          const { buildPayloadPostbackData, PAYLOAD_TOO_LONG_TEXT } = await import('../../../../utils/postbackPayload');
+          const postbackData = await buildPayloadPostbackData('confirm_roster', actionData, userId);
+          replyMessages.push(postbackData
+            ? buildRosterConfirmMessage(summaryText, isBossUser, postbackData)
+            : { type: 'text', text: PAYLOAD_TOO_LONG_TEXT });
         }
       } catch (e) {
         console.error("Roster Action Error in chatHandler:", e);

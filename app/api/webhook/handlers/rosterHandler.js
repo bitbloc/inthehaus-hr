@@ -2,10 +2,66 @@ import { format, addHours, startOfTomorrow, parseISO, startOfWeek, addDays } fro
 import { getEffectiveRoster } from '../../../../utils/roster';
 import { getEmployeeByLineId, checkIsBoss } from '../../../../utils/memory';
 import { getServiceClient } from '../../../../lib/supabaseServer';
+import { buildPayloadPostbackData, readPostbackPayload, PAYLOAD_TOO_LONG_TEXT } from '../../../../utils/postbackPayload';
 
 // LINE webhook has no user session: use the service-role client (falls back to anon until
 // SUPABASE_SERVICE_ROLE_KEY is set) so roster writes keep working once anon writes are revoked.
 const supabase = getServiceClient();
+
+/** Monday-Sunday of next week (Bangkok), the range AUTO_GENERATE fills. */
+export function nextRosterWeek(startDateStr) {
+  const targetMon = startDateStr
+    ? parseISO(startDateStr)
+    : startOfWeek(addDays(addHours(new Date(), 7), 7), { weekStartsOn: 1 });
+  return { targetMon, targetSun: addDays(targetMon, 6) };
+}
+
+export function autoGenerateSummaryText(targetMon, targetSun) {
+  return `🤖 จัดตารางสัปดาห์หน้าอัตโนมัติ (${format(targetMon, 'dd/MM')} - ${format(targetSun, 'dd/MM')})
+ยูซุจะสร้างกะงานใหม่ทับตารางเดิมของสัปดาห์นั้น นำเข้าใบลาที่อนุมัติแล้ว และบันทึกเป็นแบบร่าง (Draft)
+กดยืนยันเพื่อสร้างครับ`;
+}
+
+/** Confirm card for a roster action; the button carries `postbackData` (see utils/postbackPayload). */
+export function buildRosterConfirmMessage(summaryText, isBossUser, postbackData) {
+  const confirmFlex = {
+    type: 'bubble',
+    styles: {
+      header: { backgroundColor: '#f3f3f3' },
+      body: { backgroundColor: '#f3f3f3' },
+      footer: { backgroundColor: '#ebebeb' }
+    },
+    header: {
+      type: 'box',
+      layout: 'vertical',
+      paddingAll: '20px',
+      contents: [
+        { type: 'text', text: 'ROSTER CHANGE PROPOSAL', color: '#1c1c1c', weight: 'bold', size: 'sm' },
+        { type: 'text', text: `CLASSIFICATION: ${isBossUser ? 'DIRECTIVE (BOSS)' : 'PROPOSAL'}`, color: '#1c1c1c', weight: 'bold', size: 'xxs', margin: 'xs' }
+      ]
+    },
+    body: {
+      type: 'box',
+      layout: 'vertical',
+      paddingAll: '20px',
+      contents: [
+        { type: 'text', text: summaryText || '-', wrap: true, size: 'sm', color: '#1c1c1c' },
+        { type: 'text', text: isBossUser ? 'PLEASE REVIEW THE PROPOSAL DETAILS BEFORE EXECUTING UPDATE.' : 'PLEASE CONFIRM THAT THE INFORMATION ABOVE IS ACCURATE TO SUBMIT FOR REVIEW.', margin: 'md', size: 'xxs', color: '#888888', wrap: true }
+      ]
+    },
+    footer: {
+      type: 'box',
+      layout: 'horizontal',
+      paddingAll: '15px',
+      spacing: 'sm',
+      contents: [
+        { type: 'button', style: 'primary', color: '#1c1c1c', action: { type: 'postback', label: isBossUser ? 'EXECUTE UPDATE' : 'CONFIRM SUBMISSION', data: postbackData } },
+        { type: 'button', style: 'secondary', action: { type: 'postback', label: 'CANCEL', data: 'action=cancel_roster' } }
+      ]
+    }
+  };
+  return { type: 'flex', altText: isBossUser ? '👑 บอสสั่งแก้ตาราง' : '📝 ยืนยันข้อมูลตารางงาน', contents: confirmFlex };
+}
 
 function getShiftColorHex(shiftName, isOff, isCustomOrExtra) {
   if (isOff) return '#dc2626'; // Red
@@ -759,109 +815,18 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
       return true;
     }
 
+    // Overwrites next week's roster, so ask first; the confirm_roster postback generates it.
     try {
-      const today = addHours(new Date(), 7);
-      const nextWeekMon = startOfWeek(addDays(today, 7), { weekStartsOn: 1 });
-      const nextWeekSun = addDays(nextWeekMon, 6);
-      
-      const { autoGenerateWeeklyRoster } = await import('../../../../utils/roster_auto_learner');
-      const genResult = await autoGenerateWeeklyRoster({
-        startDate: nextWeekMon,
-        endDate: nextWeekSun,
-        overwrite: true,
-        applyLeaves: true,
-        syncTemplate: true,
-        client: supabase
-      });
-
-      const startFmt = format(nextWeekMon, 'dd/MM/yyyy');
-      const endFmt = format(nextWeekSun, 'dd/MM/yyyy');
-
-      const flexMessage = {
-        type: 'flex',
-        altText: `🤖 จัดตารางสัปดาห์หน้าอัตโนมัติ (${startFmt} - ${endFmt})`,
-        contents: {
-          type: 'bubble',
-          styles: {
-            header: { backgroundColor: '#181818' },
-            body: { backgroundColor: '#f9f9f9' },
-            footer: { backgroundColor: '#f0f0f0' }
-          },
-          header: {
-            type: 'box',
-            layout: 'vertical',
-            paddingAll: '20px',
-            contents: [
-              { type: 'text', text: '🤖 AUTO ROSTER GENERATED', weight: 'bold', color: '#ffffff', size: 'sm' },
-              { type: 'text', text: `ช่วงวันที่: ${startFmt} - ${endFmt}`, color: '#aaaaaa', size: 'xs', margin: 'xs' }
-            ]
-          },
-          body: {
-            type: 'box',
-            layout: 'vertical',
-            paddingAll: '20px',
-            spacing: 'sm',
-            contents: [
-              { type: 'text', text: '✨ ยูซุจัดตารางงานสัปดาห์หน้าอัตโนมัติให้แล้วครับบอส!', weight: 'bold', size: 'xs', color: '#1a1a1a' },
-              { type: 'separator', margin: 'sm' },
-              {
-                type: 'box', layout: 'horizontal', margin: 'sm',
-                contents: [
-                  { type: 'text', text: 'กะงานทั้งหมด', size: 'xs', color: '#666666', flex: 2 },
-                  { type: 'text', text: `${genResult.totalSlots} กะ (ปฏิบัติงาน ${genResult.workingSlots})`, size: 'xs', weight: 'bold', align: 'end', flex: 3 }
-                ]
-              },
-              {
-                type: 'box', layout: 'horizontal',
-                contents: [
-                  { type: 'text', text: 'ซิงค์ใบลาอนุมัติ', size: 'xs', color: '#666666', flex: 2 },
-                  { type: 'text', text: `${genResult.leavesApplied.length} รายการ`, size: 'xs', weight: 'bold', align: 'end', color: '#ea580c', flex: 3 }
-                ]
-              },
-              {
-                type: 'box', layout: 'horizontal',
-                contents: [
-                  { type: 'text', text: 'สถานะปัจจุบัน', size: 'xs', color: '#666666', flex: 2 },
-                  { type: 'text', text: 'DRAFT (แบบร่าง)', size: 'xs', weight: 'bold', align: 'end', color: '#b45309', flex: 3 }
-                ]
-              },
-              {
-                type: 'text',
-                text: 'บอสไม่ต้องนั่งคีย์เองทั้งหมดครับ แค่เปิดหน้าเว็บตรวจทานและปรับแก้บางจุดในสัปดาห์นี้ แล้วกดประกาศได้เลยครับ!',
-                size: 'xxs',
-                color: '#888888',
-                wrap: true,
-                margin: 'md'
-              }
-            ]
-          },
-          footer: {
-            type: 'box',
-            layout: 'vertical',
-            paddingAll: '15px',
-            spacing: 'sm',
-            contents: [
-              {
-                type: 'button',
-                style: 'primary',
-                color: '#181818',
-                height: 'sm',
-                action: {
-                  type: 'uri',
-                  label: '🔍 ตรวจและปรับแก้บนเว็บ',
-                  uri: 'https://inthehaus-hr.vercel.app/admin/roster'
-                }
-              }
-            ]
-          }
-        }
-      };
-
-      await client.replyMessage(event.replyToken, flexMessage);
+      const { targetMon, targetSun } = nextRosterWeek();
+      const payload = { type: 'AUTO_GENERATE', start_date: format(targetMon, 'yyyy-MM-dd') };
+      const postbackData = await buildPayloadPostbackData('confirm_roster', payload, userId);
+      await client.replyMessage(event.replyToken, postbackData
+        ? buildRosterConfirmMessage(autoGenerateSummaryText(targetMon, targetSun), true, postbackData)
+        : { type: 'text', text: PAYLOAD_TOO_LONG_TEXT });
       return true;
     } catch (err) {
-      console.error('Auto Roster Error in LINE command:', err);
-      await client.replyMessage(event.replyToken, { type: 'text', text: `เกิดข้อผิดพลาดในการจัดตารางอัตโนมัติ: ${err.message}` });
+      console.error('Auto Roster confirm card error in LINE command:', err);
+      await client.replyMessage(event.replyToken, { type: 'text', text: `เกิดข้อผิดพลาดในการเตรียมจัดตารางอัตโนมัติ: ${err.message}` });
       return true;
     }
   }
@@ -1089,7 +1054,11 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
 export async function handleRosterPostback(event, client, action, queryParams, userId, groupId) {
   if (action === 'confirm_roster') {
     try {
-      const payload = JSON.parse(Buffer.from(queryParams.get('payload'), 'base64').toString());
+      const payload = await readPostbackPayload(queryParams);
+      if (!payload) {
+        await client.replyMessage(event.replyToken, { type: 'text', text: 'ไม่พบข้อมูลคำขอนี้แล้วครับ รบกวนส่งคำขอใหม่อีกครั้งครับ' });
+        return true;
+      }
       const isBoss = await checkIsBoss(userId);
 
       if (payload.type === 'AUTO_GENERATE') {
@@ -1097,11 +1066,9 @@ export async function handleRosterPostback(event, client, action, queryParams, u
           await client.replyMessage(event.replyToken, { type: 'text', text: 'ขออภัยครับ การดำเนินการนี้สงวนสิทธิ์เฉพาะผู้บริหาร (บอส) เท่านั้นครับ' });
           return true;
         }
-        const { startOfWeek, addDays } = await import('date-fns');
         const { autoGenerateWeeklyRoster } = await import('../../../../utils/roster_auto_learner');
-        const bkkNow = addHours(new Date(), 7);
-        const targetMon = startOfWeek(addDays(bkkNow, 7), { weekStartsOn: 1 });
-        const targetSun = addDays(targetMon, 6);
+        // Use the week shown on the card (start_date), not whatever "next week" is at tap time.
+        const { targetMon, targetSun } = nextRosterWeek(payload.start_date);
         const genResult = await autoGenerateWeeklyRoster({
           startDate: targetMon,
           endDate: targetSun,
@@ -1123,6 +1090,14 @@ export async function handleRosterPostback(event, client, action, queryParams, u
       if (isBoss && payload.employee_name) {
         const { data: targetEmp } = await supabase.from('employees').select('id, nickname').ilike('nickname', `%${payload.employee_name}%`).limit(1).maybeSingle();
         targetEmpId = targetEmp?.id;
+      }
+
+      // A boss acts on someone else's row: never fall back to the boss's own row.
+      const bossSwapWithoutShift = isBoss && payload.type === 'SWAP' &&
+        !payload.details?.shift_id && !payload.details?.start_time && !payload.details?.end_time;
+      if (isBoss && (!targetEmpId || bossSwapWithoutShift)) {
+        await client.replyMessage(event.replyToken, { type: 'text', text: 'ยูซุระบุพนักงานหรือกะที่จะเปลี่ยนจากคำขอนี้ไม่ได้ครับ รบกวนส่งคำขอใหม่อีกครั้ง พร้อมชื่อพนักงาน วันที่ และกะที่ต้องการครับ' });
+        return true;
       }
 
       if (!targetEmpId) {
