@@ -13,6 +13,7 @@
 // image generation, audio transcription. Those calls throw a clear error.
 
 import Anthropic from "@anthropic-ai/sdk";
+import { reportAiUsage } from "./aiUsageReport";
 
 export const CLAUDE_ACCURATE_MODEL = "claude-opus-5-5";
 export const CLAUDE_FAST_MODEL = "claude-haiku-5-5";
@@ -236,6 +237,15 @@ export class ClaudeGenAI {
         this.model = fast
             ? process.env.CLAUDE_FAST_MODEL || CLAUDE_FAST_MODEL
             : process.env.CLAUDE_MODEL || CLAUDE_ACCURATE_MODEL;
+        // Every answered call (each tool round included) is billed: report its tokens
+        // for the estimated AI bill in Haustable's back office.
+        const create = this.client.beta.messages.create.bind(this.client.beta.messages);
+        const feature = fast ? "fast" : "main";
+        this.client.beta.messages.create = async (params, options) => {
+            const response = await create(params, options);
+            await reportAiUsage({ feature, model: response?.model || params?.model, usage: response?.usage });
+            return response;
+        };
     }
 
     // The Gemini model name is ignored: the job picks the Claude model (see top).
