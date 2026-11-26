@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabase } from '../../../../lib/supabaseClient';
 import { verifyShopToken, verifyNfcStationToken } from '../shop-token/route';
 import { format, addHours } from 'date-fns';
+import { LATE_GRACE_MINUTES } from '../../../../utils/attendance';
 
 // Shop Coordinates (In The Haus Nakhon Phanom)
 const SHOP_LAT = 17.39009845004315;
@@ -257,7 +258,7 @@ export async function POST(request) {
             isOff: false
           };
 
-          if (diff > 15) {
+          if (diff > LATE_GRACE_MINUTES) {
             statusCategory = 'LATE';
             isLate = true;
             lateMinutes = diff;

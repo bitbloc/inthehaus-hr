@@ -3,6 +3,7 @@ import { Client } from '@line/bot-sdk';
 import { getSchemaWeather, formatWeatherMessage, formatWeatherFlex } from '../../../utils/weather';
 import { classifyAndAnalyzeImage, transcribeAudio } from '../../../utils/gemini';
 import { claudeEnabled } from '../../../utils/claude-genai';
+import { LATE_GRACE_MINUTES, minutesAfter } from '../../../utils/attendance';
 import { getIngredientPrices } from '../../../utils/price';
 import { saveMessage, cleanupOldHistory, getEmployeeByLineId, getYuzuConfigs, checkIsBoss } from '../../../utils/memory';
 import { handleRosterCommand, handleRosterPostback } from './handlers/rosterHandler';
@@ -348,12 +349,8 @@ export async function POST(request) {
                 const scheduledStart = getScheduledStart(s.empId);
                 if (s.in && scheduledStart) {
                   const inTimeStr = safeThaiTime(s.in);
-                  const [schH, schM] = scheduledStart.split(':').map(Number);
-                  const [inH, inM] = inTimeStr.split(':').map(Number);
-                  const schMinutes = schH * 60 + schM;
-                  const inMinutes = inH * 60 + inM;
-                  const diffMin = inMinutes - schMinutes;
-                  if (diffMin > 15) {
+                  const diffMin = minutesAfter(inTimeStr, scheduledStart);
+                  if (diffMin > LATE_GRACE_MINUTES) {
                     statusText = `สาย +${diffMin} นาที`;
                     statusColor = '#ff4b00';
                   } else if (diffMin < -5) {

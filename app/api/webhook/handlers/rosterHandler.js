@@ -1,5 +1,6 @@
 import { format, addHours, startOfTomorrow, parseISO, startOfWeek, addDays } from 'date-fns';
 import { getEffectiveRoster } from '../../../../utils/roster';
+import { LATE_GRACE_MINUTES, minutesAfter } from '../../../../utils/attendance';
 import { getEmployeeByLineId, checkIsBoss } from '../../../../utils/memory';
 import { getServiceClient } from '../../../../lib/supabaseServer';
 import { buildPayloadPostbackData, readPostbackPayload, PAYLOAD_TOO_LONG_TEXT } from '../../../../utils/postbackPayload';
@@ -885,7 +886,7 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
           statusColor = '#2e7d32';
           actualTimeStr = format(addHours(new Date(emp.attendance.check_in), 7), "HH:mm");
           
-          if (shiftStart && actualTimeStr > shiftStart) {
+          if (shiftStart && minutesAfter(actualTimeStr, shiftStart) > LATE_GRACE_MINUTES) {
             statusColor = '#c62828';
             statusTag = 'LATE'; 
           }
