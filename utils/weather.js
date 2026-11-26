@@ -1,3 +1,5 @@
+import { BRAND } from './brand';
+
 const SHOP_LAT = 17.390110564180162;
 const SHOP_LONG = 104.79292673153263;
 
@@ -373,11 +375,21 @@ export function formatWeatherMessage(weather) {
 🐾 คำแนะนำจาก Yuzu: ${weather.employeeAdvice}`;
 }
 
+// Card text stays typographic: weather emoji are icons, so they are dropped here.
+const plainText = (t) => String(t ?? '')
+    .replace(/[\p{Extended_Pictographic}️‍]/gu, '')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim() || '-';
+
 export function formatWeatherFlex(weather) {
     if (!weather) return null;
 
     const isRainy = weather.hasRain;
-    const statusColor = isRainy ? "#c62828" : "#2e7d32"; // Red for rain, Green for clear/nominal
+    // Rain is a thing to plan for, not an error: plum, not red; clear sky stays quiet.
+    const statusColor = isRainy ? BRAND.plum : BRAND.muted;
+    const label = (t) => ({ type: "text", text: t, size: "xs", color: BRAND.neutral, flex: 2 });
+    const value = (t, o = {}) => ({ type: "text", text: plainText(t), size: "xs", color: BRAND.charcoal, align: "end", weight: "bold", flex: 3, wrap: true, ...o });
+    const row = (l, v, o) => ({ type: "box", layout: "horizontal", contents: [label(l), value(v, o)] });
 
     return {
         type: "flex",
@@ -386,29 +398,17 @@ export function formatWeatherFlex(weather) {
             type: "bubble",
             size: "mega",
             styles: {
-                header: { backgroundColor: "#f3f3f3" },
-                body: { backgroundColor: "#f3f3f3" }
+                header: { backgroundColor: BRAND.plum },
+                body: { backgroundColor: BRAND.cream }
             },
             header: {
                 type: "box",
                 layout: "vertical",
+                backgroundColor: BRAND.plum,
                 paddingAll: "20px",
                 contents: [
-                    {
-                        type: "text",
-                        text: "WEATHER REPORT // ENVIRONMENT",
-                        weight: "bold",
-                        color: "#1c1c1c",
-                        size: "sm"
-                    },
-                    {
-                        type: "text",
-                        text: "STATION: IN THE HAUS NAKHON PHANOM",
-                        color: "#888888",
-                        size: "xxs",
-                        weight: "bold",
-                        margin: "xs"
-                    }
+                    { type: "text", text: "สภาพอากาศวันนี้", weight: "bold", color: BRAND.cream, size: "md" },
+                    { type: "text", text: "หน้าร้าน นครพนม", color: BRAND.onPlum2, size: "xs", margin: "xs" }
                 ]
             },
             body: {
@@ -417,7 +417,6 @@ export function formatWeatherFlex(weather) {
                 paddingAll: "20px",
                 spacing: "md",
                 contents: [
-                    // Main Temp display
                     {
                         type: "box",
                         layout: "horizontal",
@@ -427,29 +426,9 @@ export function formatWeatherFlex(weather) {
                                 layout: "vertical",
                                 flex: 3,
                                 contents: [
-                                    {
-                                        type: "text",
-                                        text: "CURRENT TEMPERATURE",
-                                        size: "xxs",
-                                        color: "#666666",
-                                        weight: "bold"
-                                    },
-                                    {
-                                        type: "text",
-                                        text: `${weather.current.temp}°C`,
-                                        size: "xxl",
-                                        weight: "bold",
-                                        color: "#1c1c1c",
-                                        margin: "sm"
-                                    },
-                                    {
-                                        type: "text",
-                                        text: weather.current.condition.toUpperCase(),
-                                        size: "xs",
-                                        color: statusColor,
-                                        weight: "bold",
-                                        margin: "xs"
-                                    }
+                                    { type: "text", text: "อุณหภูมิตอนนี้", size: "xs", color: BRAND.neutral },
+                                    { type: "text", text: `${weather.current.temp}°C`, size: "xxl", weight: "bold", color: BRAND.charcoal, margin: "sm" },
+                                    { type: "text", text: plainText(weather.current.condition), size: "sm", color: statusColor, weight: "bold", margin: "xs", wrap: true }
                                 ]
                             },
                             {
@@ -458,136 +437,30 @@ export function formatWeatherFlex(weather) {
                                 flex: 3,
                                 spacing: "md",
                                 contents: [
-                                    {
-                                        type: "box",
-                                        layout: "horizontal",
-                                        contents: [
-                                            {
-                                                type: "text",
-                                                text: "HUMIDITY",
-                                                size: "xs",
-                                                color: "#666666",
-                                                flex: 1
-                                            },
-                                            {
-                                                type: "text",
-                                                text: `${weather.current.humidity}%`,
-                                                size: "xs",
-                                                color: "#1c1c1c",
-                                                align: "end",
-                                                weight: "bold",
-                                                flex: 1
-                                            }
-                                        ]
-                                    },
-                                    {
-                                        type: "box",
-                                        layout: "horizontal",
-                                        contents: [
-                                            {
-                                                type: "text",
-                                                text: "WIND SPEED",
-                                                size: "xs",
-                                                color: "#666666",
-                                                flex: 1
-                                            },
-                                            {
-                                                type: "text",
-                                                text: `${weather.current.wind} M/S`,
-                                                size: "xs",
-                                                color: "#1c1c1c",
-                                                align: "end",
-                                                weight: "bold",
-                                                flex: 1
-                                            }
-                                        ]
-                                    }
+                                    row("ความชื้น", `${weather.current.humidity}%`),
+                                    row("ลม", `${weather.current.wind} m/s`)
                                 ]
                             }
                         ]
                     },
-                    {
-                        type: "separator",
-                        color: "#cccccc"
-                    },
-                    // Grid info
+                    { type: "separator", color: BRAND.rule },
                     {
                         type: "box",
                         layout: "vertical",
                         spacing: "sm",
                         contents: [
-                            {
-                                type: "box",
-                                layout: "horizontal",
-                                contents: [
-                                    {
-                                        type: "text",
-                                        text: "COMPARISON (YESTERDAY)",
-                                        size: "xs",
-                                        color: "#666666",
-                                        flex: 2
-                                    },
-                                    {
-                                        type: "text",
-                                        text: weather.tempDiffText.toUpperCase(),
-                                        size: "xs",
-                                        color: "#1c1c1c",
-                                        align: "end",
-                                        weight: "bold",
-                                        flex: 3
-                                    }
-                                ]
-                            },
-                            {
-                                type: "box",
-                                layout: "horizontal",
-                                contents: [
-                                    {
-                                        type: "text",
-                                        text: "PRECIPITATION FORECAST",
-                                        size: "xs",
-                                        color: "#666666",
-                                        flex: 2
-                                    },
-                                    {
-                                        type: "text",
-                                        text: weather.hasRain ? weather.rainBlocks.join('\n') : "NO PRECIPITATION EXPECTED",
-                                        size: "xs",
-                                        color: statusColor,
-                                        align: "end",
-                                        weight: "bold",
-                                        flex: 3,
-                                        wrap: true
-                                    }
-                                ]
-                            }
+                            row("เทียบเมื่อวาน", weather.tempDiffText),
+                            row("ฝน", weather.hasRain ? weather.rainBlocks.map(plainText).join('\n') : "ไม่มีฝน", { color: statusColor })
                         ]
                     },
-                    {
-                        type: "separator",
-                        color: "#cccccc"
-                    },
-                    // Yuzu Tip Section
+                    { type: "separator", color: BRAND.rule },
                     {
                         type: "box",
                         layout: "vertical",
                         spacing: "xs",
                         contents: [
-                            {
-                                type: "text",
-                                text: "SYSTEM OPERATIONS ADVICE",
-                                weight: "bold",
-                                size: "xxs",
-                                color: "#888888"
-                            },
-                            {
-                                type: "text",
-                                text: weather.employeeAdvice,
-                                size: "xs",
-                                color: "#333333",
-                                wrap: true,
-                                margin: "xs"
-                            }
+                            { type: "text", text: "ยูซุแนะนำ", weight: "bold", size: "xs", color: BRAND.neutral },
+                            { type: "text", text: plainText(weather.employeeAdvice), size: "sm", color: BRAND.charcoal, wrap: true, margin: "xs" }
                         ]
                     }
                 ]
@@ -638,20 +511,20 @@ export async function getWeatherGrindPrediction(lat = SHOP_LAT, lon = SHOP_LONG)
         let riskTitle = `สภาพอากาศสมดุล ⚖️ (อุณหภูมิ ${temp}°C / ความชื้น ${humidity}%)`;
         let riskDescription = `ความชื้น ${humidity}% อยู่ในเกณฑ์สมดุล ปัจจัยสภาพแวดล้อมไม่ทำให้ความเร็วการสกัดกาแฟเปลี่ยนแปลงอย่างมีนัยสำคัญ`;
         let grindAction = "สกัดตามมาตรฐานปกติ (Dose 18-20g, Yield 36-40ml, Time 25-30s)";
-        let statusColor = "#2e7d32";
+        let statusColor = BRAND.muted;
 
         if (humidity >= 70) {
             driftRisk = "HIGH_HUMIDITY";
             riskTitle = `ความชื้นสัมพัทธ์สูง (${humidity}%) 🌧️`;
             riskDescription = `ผงกาแฟจะดูดซับความชื้นในอากาศและพองตัว สร้างแรงต้านในด้ามชงสูงขึ้น ส่งผลให้ช็อตเสี่ยงไหลชะลอลง (Over-extraction Risk)`;
             grindAction = "แนะนำปรับเบอร์บดให้หยาบขึ้น (Coarser) 0.5 - 1 คลิก เพื่อรักษาสปีดการไหล";
-            statusColor = "#ef6c00";
+            statusColor = BRAND.plum;
         } else if (humidity <= 42) {
             driftRisk = "LOW_HUMIDITY";
             riskTitle = `ความชื้นสัมพัทธ์ต่ำ (${humidity}%) ☀️`;
             riskDescription = `อากาศแห้ง ผงกาแฟคายความชื้นไว เสี่ยงเกิด Channeling และช็อตกาแฟจะไหลเร็วกว่าปกติ (Under-extraction Risk)`;
             grindAction = "แนะนำปรับเบอร์บดให้รายละเอียดขึ้น (Fine) 0.5 - 1 คลิก เพื่อเพิ่มแรงต้านการไหล";
-            statusColor = "#3b82f6";
+            statusColor = BRAND.plum;
         }
 
         if (temp >= 35) {

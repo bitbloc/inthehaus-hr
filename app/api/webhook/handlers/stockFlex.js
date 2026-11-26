@@ -1,6 +1,6 @@
 // Stock Flex messages for Yuzu, in brand v2 (owner request 2026-11-26).
 //
-// Colours mirror .agents/AGENTS.md §2 of haustable (Flex only takes hex):
+// Colours come from utils/brand.js (brand v2, Flex only takes hex):
 // plum header with cream text, charcoal ink on cream, one charcoal primary
 // button, plum secondary. No green/orange; red only for errors. Thai first.
 //
@@ -8,18 +8,7 @@
 // ported from haustable src/utils/stockCount.js formatPackQty / shortUnit,
 // instead of raw pack decimals ("1.9167 CRATE").
 
-export const BRAND = {
-  plum: "#41032A",
-  plum2: "#571C3E",
-  onPlum2: "#D0B5C1",
-  charcoal: "#1A1A1A",
-  cream: "#F6F2EA",
-  paper2: "#ECE4E7",
-  rule: "#D4CBCF",
-  neutral: "#635B5F",
-  muted: "#524A4E",
-  errorRed: "#B42318",
-};
+import { BRAND } from '@/utils/brand';
 
 const SHORT_UNITS = {
   g: "ก.", kg: "กก.", ml: "มล.", l: "ล.", unit: "ชิ้น", bottle: "ขวด", pack: "แพ็ค", bag: "ถุง",
@@ -124,7 +113,7 @@ function itemRow(item, { showMin = false } = {}) {
         flex: 4,
         contents: [
           text(itemQty(item), { align: "end", weight: "bold", color: low ? BRAND.plum : BRAND.charcoal }),
-          ...(low ? [text(showMin ? `ต้องสั่ง · ขั้นต่ำ ${itemQty(item, item.reorder_point || 0)}` : "ต้องสั่ง", { align: "end", size: "xs", color: BRAND.plum })] : []),
+          ...(low ? [text(showMin ? `ต้องสั่ง, ขั้นต่ำ ${itemQty(item, item.reorder_point || 0)}` : "ต้องสั่ง", { align: "end", size: "xs", color: BRAND.plum })] : []),
         ],
       },
     ],
@@ -167,7 +156,7 @@ export function searchResultFlex(query, items) {
     `ผลค้นหา "${query}" ${items.length} รายการ`,
     bubble({
       title: "ผลค้นหาสต็อก",
-      subtitle: `"${query}" · ${items.length} รายการ`,
+      subtitle: `"${query}", ${items.length} รายการ`,
       body: [...shown.map((i) => itemRow(i)), ...moreRow(shown.length, items.length)],
     }),
   );
