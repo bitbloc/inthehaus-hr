@@ -15,6 +15,7 @@ import { verifySlipWithEasySlip, reconcileSlipVerification } from '../../../util
 import { handleChatCommand, handleChatPostback } from './handlers/chatHandler';
 import { isEspressoShotReport, handleEspressoShotAnalysis } from './handlers/espressoHandler';
 import sharp from 'sharp';
+import { looksLikePaymentSlip } from '../../../utils/slipGate';
 
 export const maxDuration = 60;
 
@@ -494,9 +495,11 @@ export async function POST(request) {
               }
 
               // Owner decision 2026-11-26: AI only for important work. Photos without a
-              // payment QR (food, the shop, cats, cards) are logged silently, no AI call.
+              // payment QR (food, the shop, cats, cards) are logged silently. A slip shot on
+              // a phone screen has no readable QR either, so a cheap fast-model check lets
+              // those through to the slip reader below (owner report 2026-11-26).
               // Set YUZU_VISION_ALL_IMAGES=true in Vercel to read every photo again.
-              if (process.env.YUZU_VISION_ALL_IMAGES !== 'true') {
+              if (process.env.YUZU_VISION_ALL_IMAGES !== 'true' && !(await looksLikePaymentSlip(base64))) {
                 await saveMessage(groupId, userId, 'user', '[รูปภาพ]', 'image_description');
                 handledLocally = true;
                 return;
