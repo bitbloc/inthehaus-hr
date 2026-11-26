@@ -924,7 +924,7 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
             { type: 'text', text: statusTag, flex: 2, size: 'xs', weight: 'bold', color: statusColor },
             { type: 'text', text: `${emp.nickname || emp.name}`.toUpperCase(), flex: 3, size: 'xs', weight: 'bold', color: '#1c1c1c' },
             { type: 'text', text: (emp.shift?.name || 'Custom').toUpperCase(), flex: 2, size: 'xxs', color: '#666666', align: 'center' },
-            { type: 'text', text: actualTimeStr ? `${actualTimeStr} (${shiftStart})` : `${shiftStart}-${shiftEnd}`, flex: 3, size: 'xs', align: 'end', color: (statusTag === 'LATE') ? '#c62828' : (emp.isOverride ? '#3b82f6' : '#1c1c1c') }
+            { type: 'text', text: emp.is_off ? 'หยุด' : actualTimeStr ? `${actualTimeStr} (${shiftStart || '-'})` : (shiftStart && shiftEnd ? `${shiftStart}-${shiftEnd}` : '-'), flex: 3, size: 'xs', align: 'end', color: (statusTag === 'LATE') ? '#c62828' : (emp.isOverride ? '#3b82f6' : '#1c1c1c') }
           ]
         });
       });
