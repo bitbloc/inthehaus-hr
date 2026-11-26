@@ -67,7 +67,7 @@ export const isLowStock = (item) => Number(item?.current_quantity) <= Number(ite
 
 // ---------- layout helpers ----------
 
-const text = (t, o = {}) => ({ type: "text", text: String(t ?? ""), wrap: true, color: BRAND.charcoal, size: "sm", ...o });
+const text = (t, o = {}) => ({ type: "text", text: String(t ?? "") || "-", wrap: true, color: BRAND.charcoal, size: "sm", ...o });
 const sep = (margin = "md") => ({ type: "separator", margin, color: BRAND.rule });
 
 function header(title, subtitle) {

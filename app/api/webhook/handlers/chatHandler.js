@@ -394,10 +394,10 @@ ${dailyLogs || 'ไม่มีความเคลื่อนไหว'}
               paddingAll: '20px',
               spacing: 'md',
               contents: [
-                { type: 'text', text: savedFact.content, wrap: true, size: 'xs', color: '#1c1c1c' },
+                { type: 'text', text: savedFact.content || '-', wrap: true, size: 'xs', color: '#1c1c1c' },
                 { type: 'box', layout: 'vertical', spacing: 'xs', contents: [
                   { type: 'text', text: 'KEYWORDS', size: 'xxs', color: '#888888', weight: 'bold' },
-                  { type: 'text', text: (savedFact.metadata?.keywords || []).map(kw => `[${kw.toUpperCase()}]`).join(' '), size: 'xxs', color: '#3b82f6', wrap: true }
+                  { type: 'text', text: (savedFact.metadata?.keywords || []).filter(Boolean).map(kw => `[${String(kw).toUpperCase()}]`).join(' ') || '-', size: 'xxs', color: '#3b82f6', wrap: true }
                 ]}
               ]
             },
