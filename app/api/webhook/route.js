@@ -614,6 +614,15 @@ export async function POST(request) {
                 }
               }
 
+              // Owner decision 2026-11-26: AI only for important work. Photos without a
+              // payment QR (food, the shop, cats, cards) are logged silently, no AI call.
+              // Set YUZU_VISION_ALL_IMAGES=true in Vercel to read every photo again.
+              if (process.env.YUZU_VISION_ALL_IMAGES !== 'true') {
+                await saveMessage(groupId, userId, 'user', '[รูปภาพ]', 'image_description');
+                handledLocally = true;
+                return;
+              }
+
               const configs = await getYuzuConfigs();
               const isBoss = await checkIsBoss(userId);
 
