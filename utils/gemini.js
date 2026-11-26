@@ -5,7 +5,8 @@ import { YUZU_TOOLS, YUZU_TOOL_HANDLERS } from './yuzuTools.js';
 
 export async function getGeminiResponse(query, context = "", history = [], userId = "") {
     const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
+    // On Claude the Gemini key is not needed.
+    if (!apiKey && !claudeEnabled()) {
         console.error("CRITICAL: GEMINI_API_KEY is missing.");
         return "ขออภัยครับ ยูซุหากุญแจ API ไม่เจอ (GEMINI_API_KEY) รบกวนตรวจสอบใน Vercel Settings นะครับ";
     }
@@ -733,6 +734,8 @@ export async function generateImage(prompt) {
  * Transcribe Audio and Extract Tasks
  */
 export async function transcribeAudio(base64Audio, mimeType = "audio/m4a") {
+    // Claude cannot hear audio; an empty transcript means "do not reply".
+    if (claudeEnabled()) return { transcript: null, tasks: [], hasTasks: false };
     try {
         const instance = getGenAI();
         const model = instance.getGenerativeModel({ model: GEMINI_MODELS.FLASH });

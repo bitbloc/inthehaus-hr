@@ -2,6 +2,7 @@ import { NextResponse, after } from 'next/server';
 import { Client } from '@line/bot-sdk';
 import { getSchemaWeather, formatWeatherMessage, formatWeatherFlex } from '../../../utils/weather';
 import { getGeminiResponse, classifyAndAnalyzeImage, transcribeAudio } from '../../../utils/gemini';
+import { claudeEnabled } from '../../../utils/claude-genai';
 import { getIngredientPrices } from '../../../utils/price';
 import { saveMessage, cleanupOldHistory, getEmployeeByLineId, getYuzuConfigs, checkIsBoss } from '../../../utils/memory';
 import { handleRosterCommand, handleRosterPostback } from './handlers/rosterHandler';
@@ -434,6 +435,10 @@ export async function POST(request) {
           } 
           
           // --- Handle Audio Messages ---
+          else if (event.message.type === 'audio' && claudeEnabled()) {
+            // Claude cannot transcribe audio: log the voice note silently, no AI call, no reply.
+            await saveMessage(groupId, userId, 'user', '[ข้อความเสียง]', 'text');
+          }
           else if (event.message.type === 'audio') {
             console.log("Yuzu Audio: Voice Message Received");
             try {
