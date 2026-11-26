@@ -94,8 +94,7 @@ async function checkDuplicateSlip({ result, cleanRef, parsedAmount, dateStr, cle
         }
       }
     }
-
-    return null;
+    // No match in our DB: fall through so EasySlip's network-duplicate flag is still checked.
   }
 
   if (result.source === 'easyslip' && result.isDuplicate) {
@@ -231,9 +230,32 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
     return true;
   }
 
-  // Deterministic Public URL generation + Instant DB Insert
+  // Upload the compressed image first, so the row never points at a file that is not there.
   const fileName = `slip_${Date.now()}_${mappedDbUserId}.jpg`;
-  const { data: { publicUrl: slipUrl } } = supabase.storage.from('yuzu-slips').getPublicUrl(fileName);
+  let slipUrl = null;
+  if (buffer && Buffer.isBuffer(buffer)) {
+    try {
+      const compressedBuffer = await sharp(buffer)
+        .resize({ width: 1280, height: 1280, fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: 80, progressive: true })
+        .toBuffer();
+
+      const { error: uploadError } = await supabase.storage
+        .from('yuzu-slips')
+        .upload(fileName, compressedBuffer, { contentType: 'image/jpeg' });
+
+      if (uploadError) {
+        console.error("[Slip Storage Upload Error] saving slip without image:", uploadError);
+      } else {
+        slipUrl = supabase.storage.from('yuzu-slips').getPublicUrl(fileName).data.publicUrl;
+        console.log(`[Slip Storage] Uploaded compressed slip (${Math.round(compressedBuffer.length / 1024)} KB): ${fileName}`);
+      }
+    } catch (uploadErr) {
+      console.error("[Slip Upload Error] saving slip without image:", uploadErr?.message || uploadErr);
+    }
+  } else {
+    console.warn("[Slip Upload] No image buffer, saving slip without image");
+  }
 
   const slipRow = {
     group_id: groupId,
@@ -261,30 +283,6 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
       await client.replyMessage(event.replyToken, { type: 'text', text: `เกิดข้อผิดพลาดในการบันทึกข้อมูลสลิปเข้าระบบครับ (Error: ${insertError.message || insertError.code || 'Unknown DB Error'})` });
     }
     return true;
-  }
-
-  // Background Image Compression (sharp) & Upload
-  if (buffer && Buffer.isBuffer(buffer)) {
-    (async () => {
-      try {
-        const compressedBuffer = await sharp(buffer)
-          .resize({ width: 1280, height: 1280, fit: 'inside', withoutEnlargement: true })
-          .jpeg({ quality: 80, progressive: true })
-          .toBuffer();
-
-        const { error: uploadError } = await supabase.storage
-          .from('yuzu-slips')
-          .upload(fileName, compressedBuffer, { contentType: 'image/jpeg' });
-
-        if (uploadError) {
-          console.error("[Slip Storage Upload Error]:", uploadError);
-        } else {
-          console.log(`[Slip Storage] Successfully uploaded compressed slip (${Math.round(compressedBuffer.length / 1024)} KB): ${fileName}`);
-        }
-      } catch (bgUploadErr) {
-        console.error("[Slip Background Upload Error]:", bgUploadErr?.message || bgUploadErr);
-      }
-    })();
   }
 
   // Server runs in UTC; shift to Bangkok before formatting the fallback time
