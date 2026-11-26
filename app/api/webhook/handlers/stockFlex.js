@@ -67,7 +67,7 @@ export const isLowStock = (item) => Number(item?.current_quantity) <= Number(ite
 
 // ---------- layout helpers ----------
 
-const text = (t, o = {}) => ({ type: "text", text: String(t ?? ""), wrap: true, color: BRAND.charcoal, size: "sm", ...o });
+const text = (t, o = {}) => ({ type: "text", text: String(t ?? "") || "-", wrap: true, color: BRAND.charcoal, size: "sm", ...o });
 const sep = (margin = "md") => ({ type: "separator", margin, color: BRAND.rule });
 
 function header(title, subtitle) {
@@ -260,7 +260,8 @@ export function historyFlex(history, title) {
   );
 }
 
-export function confirmFlex(message, payloadData) {
+// postbackData comes from utils/postbackPayload (payload_id=..., never raw JSON).
+export function confirmFlex(message, postbackData) {
   return flex(
     "ยืนยันการปรับสต็อก",
     bubble({
@@ -268,7 +269,7 @@ export function confirmFlex(message, payloadData) {
       subtitle: "ยังไม่บันทึก จนกว่าจะกดยืนยัน",
       body: [text(message, { weight: "bold" }), text("ตรวจชื่อสินค้าและจำนวนก่อนกดยืนยัน", { size: "xs", color: BRAND.neutral, margin: "md" })],
       footer: [
-        primaryButton("ยืนยัน", { type: "postback", data: `action=confirm_stock&payload=${Buffer.from(JSON.stringify(payloadData)).toString("base64")}` }),
+        primaryButton("ยืนยัน", { type: "postback", data: postbackData }),
         outlineButton("ยกเลิก", { type: "postback", data: "action=cancel_stock" }),
       ],
     }),

@@ -101,21 +101,21 @@ export async function POST(req) {
                                 {
                                     type: 'box', layout: 'vertical', margin: 'md', spacing: 'sm',
                                     contents: [
-                                        { type: 'text', text: `Date: ${reqData.target_date}`, size: 'sm', weight: 'bold' },
-                                        { type: 'text', text: `Shift: ${reqData.shift?.name} (${reqData.shift?.start_time}-${reqData.shift?.end_time})`, size: 'xs', color: '#aaaaaa' },
+                                        { type: 'text', text: `Date: ${reqData.target_date || 'ไม่ระบุ'}`, size: 'sm', weight: 'bold' },
+                                        { type: 'text', text: `Shift: ${reqData.shift?.name || 'ไม่ระบุ'} (${reqData.shift?.start_time?.slice(0, 5) || '-'}-${reqData.shift?.end_time?.slice(0, 5) || '-'})`, size: 'xs', color: '#aaaaaa' },
                                         { type: 'separator', margin: 'sm' },
                                         {
                                             type: 'box', layout: 'horizontal', margin: 'sm',
                                             contents: [
                                                 { type: 'text', text: 'FROM:', size: 'xs', color: '#aaaaaa', flex: 1 },
-                                                { type: 'text', text: reqData.requester?.name, size: 'xs', weight: 'bold', flex: 3 }
+                                                { type: 'text', text: reqData.requester?.name || 'ไม่ระบุ', size: 'xs', weight: 'bold', flex: 3 }
                                             ]
                                         },
                                         {
                                             type: 'box', layout: 'horizontal',
                                             contents: [
                                                 { type: 'text', text: 'TO:', size: 'xs', color: '#aaaaaa', flex: 1 },
-                                                { type: 'text', text: reqData.peer?.name, size: 'xs', weight: 'bold', color: '#007bff', flex: 3 }
+                                                { type: 'text', text: reqData.peer?.name || 'ไม่ระบุ', size: 'xs', weight: 'bold', color: '#007bff', flex: 3 }
                                             ]
                                         }
                                     ]

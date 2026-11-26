@@ -9,6 +9,14 @@ import { getEffectiveRoster } from "./roster.js";
 
 const MAX_ITEMS = 15;
 
+/** ISO timestamp -> Bangkok "HH:mm" (null when missing or invalid). */
+export function bangkokHHmm(value) {
+    if (!value) return null;
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return null;
+    return d.toLocaleTimeString("en-GB", { timeZone: "Asia/Bangkok", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+}
+
 function bangkokToday() {
     return format(addHours(new Date(), 7), "yyyy-MM-dd");
 }
@@ -91,8 +99,8 @@ export const YUZU_TOOL_HANDLERS = {
                 shift: r.shift?.name || "",
                 start: r.shift?.start_time || "",
                 end: r.shift?.end_time || "",
-                checked_in: r.attendance?.check_in || null,
-                checked_out: r.attendance?.check_out || null,
+                checked_in: bangkokHHmm(r.attendance?.check_in),
+                checked_out: bangkokHHmm(r.attendance?.check_out),
             })),
         };
     },
