@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '../../../../lib/supabaseServer';
 import { Client } from '@/utils/lineClient';
+import { BRAND } from '@/utils/brand';
 
 // Shared Group ID (Consider moving to env or DB config in future)
 // ✅ Group IDs (กลุ่มหลัก และ กลุ่มแผนกอื่น)
@@ -91,33 +92,35 @@ export async function POST(req) {
                     type: 'flex',
                     altText: '🔄 อนุมัติการสลับกะ (Shift Swap Approved)',
                     contents: {
-                        type: 'bubble', // Using 'bubble' container
+                        type: 'bubble',
+                        header: {
+                            type: 'box', layout: 'vertical', backgroundColor: BRAND.plum, paddingAll: '16px',
+                            contents: [
+                                { type: 'text', text: 'อนุมัติการสลับกะแล้ว', weight: 'bold', size: 'md', color: BRAND.cream, wrap: true },
+                                { type: 'text', text: 'Shift swap', size: 'xs', color: BRAND.onPlum2, margin: 'xs' }
+                            ]
+                        },
                         body: {
                             type: 'box',
                             layout: 'vertical',
+                            backgroundColor: BRAND.cream,
+                            spacing: 'sm',
                             contents: [
-                                { type: 'text', text: '🔄 Shift Swap Approved', weight: 'bold', size: 'md', color: '#1DB446' },
-                                { type: 'separator', margin: 'md' },
+                                { type: 'text', text: `วันที่ ${reqData.target_date || 'ไม่ระบุ'}`, size: 'sm', weight: 'bold', color: BRAND.charcoal },
+                                { type: 'text', text: `กะ ${reqData.shift?.name || 'ไม่ระบุ'} (${reqData.shift?.start_time?.slice(0, 5) || '-'}-${reqData.shift?.end_time?.slice(0, 5) || '-'})`, size: 'xs', color: BRAND.neutral, wrap: true },
+                                { type: 'separator', margin: 'sm', color: BRAND.rule },
                                 {
-                                    type: 'box', layout: 'vertical', margin: 'md', spacing: 'sm',
+                                    type: 'box', layout: 'horizontal', margin: 'sm',
                                     contents: [
-                                        { type: 'text', text: `Date: ${reqData.target_date || 'ไม่ระบุ'}`, size: 'sm', weight: 'bold' },
-                                        { type: 'text', text: `Shift: ${reqData.shift?.name || 'ไม่ระบุ'} (${reqData.shift?.start_time?.slice(0, 5) || '-'}-${reqData.shift?.end_time?.slice(0, 5) || '-'})`, size: 'xs', color: '#aaaaaa' },
-                                        { type: 'separator', margin: 'sm' },
-                                        {
-                                            type: 'box', layout: 'horizontal', margin: 'sm',
-                                            contents: [
-                                                { type: 'text', text: 'FROM:', size: 'xs', color: '#aaaaaa', flex: 1 },
-                                                { type: 'text', text: reqData.requester?.name || 'ไม่ระบุ', size: 'xs', weight: 'bold', flex: 3 }
-                                            ]
-                                        },
-                                        {
-                                            type: 'box', layout: 'horizontal',
-                                            contents: [
-                                                { type: 'text', text: 'TO:', size: 'xs', color: '#aaaaaa', flex: 1 },
-                                                { type: 'text', text: reqData.peer?.name || 'ไม่ระบุ', size: 'xs', weight: 'bold', color: '#007bff', flex: 3 }
-                                            ]
-                                        }
+                                        { type: 'text', text: 'จาก', size: 'xs', color: BRAND.neutral, flex: 1 },
+                                        { type: 'text', text: reqData.requester?.name || 'ไม่ระบุ', size: 'xs', weight: 'bold', color: BRAND.charcoal, flex: 3, wrap: true }
+                                    ]
+                                },
+                                {
+                                    type: 'box', layout: 'horizontal',
+                                    contents: [
+                                        { type: 'text', text: 'ให้', size: 'xs', color: BRAND.neutral, flex: 1 },
+                                        { type: 'text', text: reqData.peer?.name || 'ไม่ระบุ', size: 'xs', weight: 'bold', color: BRAND.plum, flex: 3, wrap: true }
                                     ]
                                 }
                             ]

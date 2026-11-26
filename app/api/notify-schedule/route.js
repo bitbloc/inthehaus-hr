@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireAdmin } from '../../../lib/supabaseServer';
 import { supabase } from '../../../lib/supabaseClient';
 import { Client } from '@/utils/lineClient';
+import { BRAND } from '@/utils/brand';
 import { format, startOfWeek, endOfWeek, addDays, parseISO } from 'date-fns';
 
 // ✅ Group IDs (กลุ่มหลัก และ กลุ่มแผนกอื่น)
@@ -14,21 +15,6 @@ const client = new Client({
   channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN,
   channelSecret: process.env.CHANNEL_SECRET,
 });
-
-function getShiftColorHex(shiftName) {
-  const name = (shiftName || '').toLowerCase();
-  
-  if (name.includes('ควบ') || name.includes('double')) {
-    return '#e11d48'; // Rose
-  }
-  if (name.includes('ค่ำ') || name.includes('ดึก') || name.includes('night') || name.includes('evening')) {
-    return '#4f46e5'; // Indigo
-  }
-  if (name.includes('เช้า') || name.includes('morning')) {
-    return '#d97706'; // Amber
-  }
-  return '#ca8a04'; // Yellow
-}
 
 export async function POST(request) {
   // Admin-only route: verify the Supabase Auth session sent by adminFetch().
@@ -128,9 +114,6 @@ export async function POST(request) {
     const contents = [];
     const startFmt = format(weekStart, 'dd/MM/yyyy');
     const endFmt = format(weekEnd, 'dd/MM/yyyy');
-    contents.push({ type: 'text', text: '📅 ตารางงานประจำสัปดาห์', weight: 'bold', size: 'xl', color: '#1DB446', align: 'center' });
-    contents.push({ type: 'text', text: `ระหว่างวันที่: ${startFmt} - ${endFmt}`, size: 'sm', color: '#666666', align: 'center', margin: 'xs' });
-    contents.push({ type: 'separator', margin: 'md' });
 
     weekDates.forEach(date => {
       const dateStr = format(date, 'yyyy-MM-dd');
@@ -159,37 +142,46 @@ export async function POST(request) {
         contents.push({
           type: 'box', layout: 'horizontal', margin: 'lg',
           contents: [
-            { type: 'text', text: `${dayName} ${dateLabel}`, weight: 'bold', size: 'sm', color: '#333333', flex: 2 },
-            { type: 'text', text: `${staffList.length} คน`, size: 'xs', color: '#555555', align: 'end', flex: 1 }
+            { type: 'text', text: `${dayName} ${dateLabel}`, weight: 'bold', size: 'sm', color: BRAND.charcoal, flex: 2 },
+            { type: 'text', text: `${staffList.length} คน`, size: 'xs', color: BRAND.neutral, align: 'end', flex: 1 }
           ]
         });
         staffList.forEach(staff => {
-          const shiftColor = getShiftColorHex(staff.shift);
           contents.push({
             type: 'box', layout: 'horizontal', margin: 'xs',
             contents: [
-              { type: 'text', text: `• ${staff.name}`, size: 'xs', color: '#333333', flex: 3 },
-              { type: 'text', text: staff.time || '', size: 'xs', color: shiftColor, align: 'end', flex: 2, weight: 'bold' }
+              { type: 'text', text: `• ${staff.name}`, size: 'xs', color: BRAND.charcoal, flex: 3 },
+              { type: 'text', text: staff.time || '-', size: 'xs', color: BRAND.plum, align: 'end', flex: 2, weight: 'bold' }
             ]
           });
         });
-        contents.push({ type: 'separator', margin: 'sm' });
+        contents.push({ type: 'separator', margin: 'sm', color: BRAND.rule });
       } else {
         contents.push({
           type: 'box', layout: 'horizontal', margin: 'lg',
           contents: [
-            { type: 'text', text: `${dayName} ${dateLabel}`, weight: 'bold', size: 'sm', color: '#333333', flex: 2 },
-            { type: 'text', text: `ไม่มีคนเข้ากะ`, size: 'xs', color: '#555555', align: 'end', flex: 1 }
+            { type: 'text', text: `${dayName} ${dateLabel}`, weight: 'bold', size: 'sm', color: BRAND.charcoal, flex: 2 },
+            { type: 'text', text: `ไม่มีคนเข้ากะ`, size: 'xs', color: BRAND.neutral, align: 'end', flex: 1 }
           ]
         });
-        contents.push({ type: 'separator', margin: 'sm' });
+        contents.push({ type: 'separator', margin: 'sm', color: BRAND.rule });
       }
     });
 
     const message = {
       type: 'flex',
       altText: `📅 ประกาศตารางงาน (${startFmt} - ${endFmt})`,
-      contents: { type: 'bubble', body: { type: 'box', layout: 'vertical', contents: contents } }
+      contents: {
+        type: 'bubble',
+        header: {
+          type: 'box', layout: 'vertical', backgroundColor: BRAND.plum, paddingAll: '20px',
+          contents: [
+            { type: 'text', text: 'ตารางงานประจำสัปดาห์', weight: 'bold', size: 'lg', color: BRAND.cream, wrap: true },
+            { type: 'text', text: `${startFmt} - ${endFmt}`, size: 'xs', color: BRAND.onPlum2, margin: 'xs' }
+          ]
+        },
+        body: { type: 'box', layout: 'vertical', backgroundColor: BRAND.cream, contents: contents }
+      }
     };
 
     await Promise.all(

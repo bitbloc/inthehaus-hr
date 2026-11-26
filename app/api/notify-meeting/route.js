@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { requireAdmin } from '../../../lib/supabaseServer';
 import { Client } from '@/utils/lineClient';
 import { supabase } from '../../../lib/supabaseClient';
-import { BRAND, plain } from '../webhook/handlers/slipFlex.js';
+import { BRAND } from '@/utils/brand';
+import { plain } from '../webhook/handlers/slipFlex.js';
 
 /* POST /api/notify-meeting  { noteId }
  * Tells the staff LINE groups that a new meeting note was posted.
@@ -49,8 +50,8 @@ function buildMeetingNoteFlex(note) {
         backgroundColor: BRAND.plum,
         paddingAll: '16px',
         contents: [
-          { type: 'text', text: 'MEETING NOTES · ในบ้าน', size: 'xs', color: BRAND.onPlum2 },
-          { type: 'text', text: 'บันทึกการประชุมใหม่', size: 'lg', weight: 'bold', color: BRAND.cream, margin: 'sm' },
+          { type: 'text', text: 'บันทึกการประชุมใหม่', size: 'lg', weight: 'bold', color: BRAND.cream },
+          { type: 'text', text: 'Meeting notes', size: 'xs', color: BRAND.onPlum2, margin: 'xs' },
         ],
       },
       body: {

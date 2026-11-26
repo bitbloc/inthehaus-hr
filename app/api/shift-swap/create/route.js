@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import { Client } from '@/utils/lineClient';
+import { BRAND } from '@/utils/brand';
 
 // Initialize Supabase (Use service key if available for RLS bypass, or standard client)
 // For internal API, using standard client might handle auth automatically if passed headers, 
@@ -65,22 +66,20 @@ export async function POST(req) {
                     altText: '🔄 มีคำขอเปลี่ยนกะใหม่ (Shift Swap)',
                     contents: {
                         type: 'bubble',
-                        body: {
-                            type: 'box', layout: 'vertical',
+                        header: {
+                            type: 'box', layout: 'vertical', backgroundColor: BRAND.plum, paddingAll: '16px',
                             contents: [
-                                { type: 'text', text: '🔄 New Swap Request', weight: 'bold', size: 'lg', color: '#1f2937' },
-                                { type: 'separator', margin: 'md' },
-                                {
-                                    type: 'box', layout: 'vertical', margin: 'md', spacing: 'sm',
-                                    contents: [
-                                        { type: 'text', text: `👤 ${details.requester?.name} (${details.requester?.position})`, size: 'sm', wrap: true },
-                                        { type: 'text', text: `📅 ${details.target_date}`, size: 'sm' },
-                                        { type: 'text', text: `⏰ ${details.shift?.name} (${details.shift?.start_time?.slice(0, 5)} - ${details.shift?.end_time?.slice(0, 5)})`, size: 'xs', color: '#6b7280' },
-                                        { type: 'text', text: `📝 ${details.notes || '-'}`, size: 'xs', color: '#9ca3af', wrap: true }
-                                    ]
-                                },
-                                { type: 'separator', margin: 'md' },
-                                { type: 'text', text: details.type === 'GIVE_AWAY' ? '🎁 แจกเวร' : '🔀 แลกเวร', align: 'center', margin: 'md', weight: 'bold', color: '#3b82f6' }
+                                { type: 'text', text: 'คำขอเปลี่ยนกะใหม่', weight: 'bold', size: 'lg', color: BRAND.cream, wrap: true },
+                                { type: 'text', text: details.type === 'GIVE_AWAY' ? 'แจกเวร' : 'แลกเวร', size: 'xs', color: BRAND.onPlum2, margin: 'xs' }
+                            ]
+                        },
+                        body: {
+                            type: 'box', layout: 'vertical', backgroundColor: BRAND.cream, spacing: 'sm',
+                            contents: [
+                                { type: 'text', text: `${details.requester?.name || '-'}${details.requester?.position ? `, ${details.requester.position}` : ''}`, size: 'sm', weight: 'bold', color: BRAND.charcoal, wrap: true },
+                                { type: 'text', text: `วันที่ ${details.target_date || '-'}`, size: 'sm', color: BRAND.charcoal },
+                                { type: 'text', text: `กะ ${details.shift?.name || '-'} (${details.shift?.start_time?.slice(0, 5) || '-'} - ${details.shift?.end_time?.slice(0, 5) || '-'})`, size: 'xs', color: BRAND.neutral, wrap: true },
+                                { type: 'text', text: `หมายเหตุ ${details.notes || '-'}`, size: 'xs', color: BRAND.muted, wrap: true }
                             ]
                         }
                     }
