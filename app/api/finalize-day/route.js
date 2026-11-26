@@ -5,7 +5,7 @@ import { format } from 'date-fns';
 import { BRAND } from '@/utils/brand';
 
 // Card text carries no emoji icons (brand v2).
-const plainText = (t) => String(t || '').replace(/[p{Extended_Pictographic}️‍]/gu, '').replace(/s{2,}/g, ' ').trim();
+const plainText = (t) => String(t || '').replace(/[\p{Extended_Pictographic}️‍]/gu, '').replace(/\s{2,}/g, ' ').trim();
 
 // ✅ Group IDs (กลุ่มหลัก และ กลุ่มแผนกอื่น)
 const GROUP_IDS = [
