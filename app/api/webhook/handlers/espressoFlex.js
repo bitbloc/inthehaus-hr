@@ -5,7 +5,7 @@
  * LINE Flex sizes: xs 13px · sm 14px · md 16px · lg 19px · xl 22px. */
 
 import { BRAND, plain } from './slipFlex.js';
-import { ESPRESSO_SPEC, STATUS_TH, isOff, specText, num, shotVerdict } from '../../../../utils/espressoSpec.js';
+import { ESPRESSO_SPEC, STATUS_TH, isOff, specText, num, shotVerdict, judge } from '../../../../utils/espressoSpec.js';
 
 const text = (t, opts = {}) => {
     const s = plain(t);
@@ -16,7 +16,8 @@ const rule = (margin = 'lg') => ({ type: 'separator', margin, color: BRAND.rule 
 /** One measurement: label + standard on the left, value and status on the right. */
 function measureRow(key, part, unitOverride) {
     const spec = ESPRESSO_SPEC[key];
-    const status = part?.status || 'NOT_SPECIFIED';
+    // Judge the number against the shown standard; the AI's status is only a fallback when there is no number.
+    const status = judge(key, part?.value, part?.status);
     const value = status === 'NOT_SPECIFIED' || !(Number(part?.value) > 0) ? null : num(part.value);
     const off = isOff(status);
     const unit = unitOverride || spec.unit;
@@ -63,10 +64,10 @@ const section = (title, body, { bg, bodyColor = BRAND.charcoal, margin = 'xl' } 
 export function buildEspressoFlex({ name, analysis, weather, trend, timeText }) {
     const a = analysis || {};
     const verdict = shotVerdict({
-        dose: a.dose?.status,
-        yieldStatus: a.yield?.status,
-        firstDrop: a.firstDrop?.status,
-        totalTime: a.totalTime?.status,
+        dose: judge('dose', a.dose?.value, a.dose?.status),
+        yieldStatus: judge('yield', a.yield?.value, a.yield?.status),
+        firstDrop: judge('firstDrop', a.firstDrop?.value, a.firstDrop?.status),
+        totalTime: judge('totalTime', a.totalTime?.value, a.totalTime?.status),
     });
     const yieldUnit = /^g/i.test(a.yield?.unit || '') ? 'g' : 'ml';
 
