@@ -1,5 +1,5 @@
 import { NextResponse, after } from 'next/server';
-import { Client } from '@line/bot-sdk';
+import { Client } from '@/utils/lineClient';
 import { getSchemaWeather, formatWeatherMessage, formatWeatherFlex } from '../../../utils/weather';
 import { classifyAndAnalyzeImage, transcribeAudio } from '../../../utils/gemini';
 import { claudeEnabled } from '../../../utils/claude-genai';

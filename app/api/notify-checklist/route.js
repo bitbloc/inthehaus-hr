@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { Client } from '@line/bot-sdk';
+import { Client } from '@/utils/lineClient';
 
 const GROUP_IDS = [
   'C1210c7a0601b5a675060e312efe10bff'

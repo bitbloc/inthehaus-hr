@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
-import { Client } from '@line/bot-sdk';
+import { Client } from '@/utils/lineClient';
 
 // Initialize Supabase (Use service key if available for RLS bypass, or standard client)
 // For internal API, using standard client might handle auth automatically if passed headers, 

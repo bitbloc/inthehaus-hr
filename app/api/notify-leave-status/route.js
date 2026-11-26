@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '../../../lib/supabaseServer';
-import { Client } from '@line/bot-sdk';
+import { Client } from '@/utils/lineClient';
 
 // ✅ Group IDs (กลุ่มหลัก และ กลุ่มแผนกอื่น)
 const GROUP_IDS = [

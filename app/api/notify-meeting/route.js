@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '../../../lib/supabaseServer';
-import { Client } from '@line/bot-sdk';
+import { Client } from '@/utils/lineClient';
 import { supabase } from '../../../lib/supabaseClient';
 import { BRAND, plain } from '../webhook/handlers/slipFlex.js';
 

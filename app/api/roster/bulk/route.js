@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '../../../../lib/supabaseServer';
-import { Client } from '@line/bot-sdk';
+import { Client } from '@/utils/lineClient';
 import { format, parseISO } from 'date-fns';
 import { generateStCalendarFlex } from '../../webhook/handlers/rosterHandler';
 import { autoGenerateWeeklyRoster } from '../../../../utils/roster_auto_learner';

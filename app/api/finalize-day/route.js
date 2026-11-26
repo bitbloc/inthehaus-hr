@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '../../../lib/supabaseClient';
-import { Client } from '@line/bot-sdk';
+import { Client } from '@/utils/lineClient';
 import { format } from 'date-fns';
 
 // ✅ Group IDs (กลุ่มหลัก และ กลุ่มแผนกอื่น)
