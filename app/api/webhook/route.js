@@ -83,7 +83,7 @@ function appendBrandingToFlex(msg) {
                 type: 'text',
                 text: 'ONHAUS SYSTEM ©',
                 size: 'xxs',
-                color: '#aaaaaa',
+                color: '#635B5F', // brand v2 neutral (was #aaaaaa, too faint on cream)
                 align: 'center',
                 weight: 'bold',
                 margin: 'md'
@@ -100,7 +100,7 @@ function appendBrandingToFlex(msg) {
                 type: 'text',
                 text: 'ONHAUS SYSTEM ©',
                 size: 'xxs',
-                color: '#aaaaaa',
+                color: '#635B5F', // brand v2 neutral (was #aaaaaa, too faint on cream)
                 align: 'center',
                 weight: 'bold'
               });
@@ -117,7 +117,7 @@ function appendBrandingToFlex(msg) {
               type: 'text',
               text: 'ONHAUS SYSTEM ©',
               size: 'xxs',
-              color: '#aaaaaa',
+              color: '#635B5F', // brand v2 neutral (was #aaaaaa, too faint on cream)
               align: 'center',
               weight: 'bold'
             }
@@ -134,7 +134,7 @@ function appendBrandingToFlex(msg) {
             type: 'text',
             text: 'ONHAUS SYSTEM ©',
             size: 'xxs',
-            color: '#aaaaaa',
+            color: '#635B5F', // brand v2 neutral (was #aaaaaa, too faint on cream)
             align: 'center',
             weight: 'bold'
           }
@@ -399,7 +399,7 @@ export async function POST(request) {
               }
 
               if (count === 0) {
-                contents.push({ type: 'text', text: 'ยังไม่มีการลงเวลาวันนี้', margin: 'md', size: 'sm', color: '#aaaaaa', align: 'center' });
+                contents.push({ type: 'text', text: 'ยังไม่มีการลงเวลาวันนี้', margin: 'md', size: 'sm', color: '#635B5F', // brand v2 neutral (was #aaaaaa, too faint on cream) align: 'center' });
               }
 
               await client.replyMessage(event.replyToken, {
