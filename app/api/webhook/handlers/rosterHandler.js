@@ -1266,7 +1266,7 @@ export async function handleRosterPostback(event, client, action, queryParams, u
     const requestId = queryParams.get('id');
     if (await checkIsBoss(userId)) {
        await supabase.from('roster_requests').update({ status: 'REJECTED', manager_id: (await getEmployeeByLineId(userId))?.id }).eq('id', requestId);
-       await client.replyMessage(event.replyToken, { type: 'text', text: '❌ ปฏิเสธคำขอเรียบร้อยค่ะ' });
+       await client.replyMessage(event.replyToken, { type: 'text', text: '❌ ปฏิเสธคำขอเรียบร้อยครับ' });
     }
     return true;
   }

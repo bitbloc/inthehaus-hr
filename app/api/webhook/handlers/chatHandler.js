@@ -165,7 +165,7 @@ export async function handleChatCommand(event, client, text, rawText, userId, gr
          contextContent += `(จบรายชื่อพนักงาน)\n\n`;
       }
       
-      const reportPrompt = `ช่วยสรุปรายงานพฤติกรรมและการทำงานของพนักงานจากข้อมูลที่มีหน่อยค่ะ ยึดตามรายชื่อพนักงานที่มีในระบบต่อไปนี้:\n${contextContent}\nและนี่คือประวัติการแชท/ทำงานของวันนี้:\n${dailyLogs || "(วันนี้ยังไม่มีประวัติการแชทให้วิเคราะห์)"}\n\nโปรดเน้นวิเคราะห์แต่ละคนตามรายชื่อที่มี และรายงานความพร้อมให้เจ้านายฟัง (ถ้าประวัติแชทว่างก็บอกสถานะของรายชื่อบุคคลไปก่อน)`;
+      const reportPrompt = `ช่วยสรุปรายงานพฤติกรรมและการทำงานของพนักงานจากข้อมูลที่มีหน่อยครับ ยึดตามรายชื่อพนักงานที่มีในระบบต่อไปนี้:\n${contextContent}\nและนี่คือประวัติการแชท/ทำงานของวันนี้:\n${dailyLogs || "(วันนี้ยังไม่มีประวัติการแชทให้วิเคราะห์)"}\n\nโปรดเน้นวิเคราะห์แต่ละคนตามรายชื่อที่มี และรายงานความพร้อมให้เจ้านายฟัง (ถ้าประวัติแชทว่างก็บอกสถานะของรายชื่อบุคคลไปก่อน)`;
       const reportResponse = await getGeminiResponse(reportPrompt, "", [], userId);
       await client.replyMessage(event.replyToken, { type: 'text', text: reportResponse });
       return true;
@@ -412,7 +412,7 @@ ${dailyLogs || 'ไม่มีความเคลื่อนไหว'}
               ]
             }
           };
-          replyMessages.push({ type: 'flex', altText: '💡 ยูซุพบความรู้ใหม่ที่ต้องอนุมัติค่ะ!', contents: insightFlex });
+          replyMessages.push({ type: 'flex', altText: '💡 ยูซุพบความรู้ใหม่ที่ต้องอนุมัติครับ', contents: insightFlex });
         }
       } catch (e) {
         console.error("Error parsing Yuzu Learning block:", e);
