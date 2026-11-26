@@ -1,7 +1,12 @@
 const STOCK_API_BASE_URL = "https://lxfavbzmebqqsffgyyph.supabase.co/functions/v1/stock-api";
-const STOCK_API_KEY = process.env.STOCK_API_KEY || "1500323553";
+// Key comes only from the environment (Vercel: STOCK_API_KEY). The old
+// hard-coded fallback was public in this repo and was rotated on 2026-11-26.
+const STOCK_API_KEY = process.env.STOCK_API_KEY || "";
 
 const getHeaders = () => {
+  if (!STOCK_API_KEY) {
+    throw new Error("STOCK_API_KEY is not set");
+  }
   const headers = {
     "Content-Type": "application/json",
     "X-Internal-API-Key": STOCK_API_KEY
