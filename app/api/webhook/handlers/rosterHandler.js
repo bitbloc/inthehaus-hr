@@ -800,6 +800,17 @@ export async function generateStCalendarFlex(start) {
   return flexMsg;
 }
 
+// The daily roster card answers only an explicit request ("ตารางงาน", "เช็คตาราง พรุ่งนี้",
+// "yuzu ขอตารางงานวันนี้", "roster"), not a sentence that happens to contain the word.
+const ROSTER_KEYWORDS = ['เช็คตารางงาน', 'เช็คตาราง', 'ตารางงาน', 'roster', 'ใครเข้ากะ'];
+const ROSTER_TAIL = /^(วันนี้|พรุ่งนี้|today|tomorrow|หน่อย|บ้าง|ครับ|คับ|ค่ะ|คะ|นะ|จ้า|[\s?!.])*$/;
+
+export function isRosterQuery(text) {
+  const cmd = text.trim().replace(/^@?(yuzu|ยูซุ)\s*/, '').replace(/^(ขอ|ดู)\s*/, '');
+  const keyword = ROSTER_KEYWORDS.find(k => cmd.startsWith(k));
+  return !!keyword && ROSTER_TAIL.test(cmd.slice(keyword.length));
+}
+
 export async function handleRosterCommand(event, client, text, rawText, userId) {
   const isAutoGenCommand = text.includes('จัดตารางสัปดาห์หน้า') || 
                            text.includes('สร้างตารางสัปดาห์หน้า') || 
@@ -846,7 +857,7 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
     return true;
   }
 
-  if (text.includes('เช็คตาราง') || text.includes('roster') || text.includes('ตารางงาน') || text.includes('ใครเข้ากะ')) {
+  if (isRosterQuery(text)) {
     const targetDate = text.includes('พรุ่งนี้') ? startOfTomorrow() : addHours(new Date(), 7);
     const dateStr = format(targetDate, 'dd/MM/yyyy');
     const roster = await getEffectiveRoster(targetDate);
