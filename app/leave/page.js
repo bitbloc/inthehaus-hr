@@ -220,7 +220,8 @@ export default function LeaveRequest() {
             action: "leave_request",
             time: `${dateRangeStr} (${totalDays} วัน)`,
             locationStatus: typeLabel,
-            statusDetail: `${formData.reason} | คนแทน: ${replacementName}`,
+            // The reason stays in the DB only: this card is posted to the staff groups.
+            statusDetail: replacementName,
             leaveId: leaveIds
           }),
           headers: { "Content-Type": "application/json" }

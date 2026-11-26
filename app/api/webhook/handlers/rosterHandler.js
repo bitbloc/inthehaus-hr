@@ -235,7 +235,7 @@ function getCellColorsAndLabels(empShift, isOff, leaveRequest) {
   };
 }
 
-function formatLeaveRequestBubble(l, isHistory = false) {
+function formatLeaveRequestBubble(l, isHistory = false, showReason = false) {
   const empName = l.employees?.nickname || l.employees?.name || 'พนักงาน';
   const empPosition = l.employees?.position || 'ทั่วไป';
   const dateStr = l.leave_date ? format(parseISO(l.leave_date), 'dd/MM/yyyy') : '-';
@@ -335,7 +335,8 @@ function formatLeaveRequestBubble(l, isHistory = false) {
             { type: 'text', text: replacementName, color: '#1c1c1c', size: 'xs', flex: 5, wrap: true, align: 'end' }
           ]
         },
-        {
+        // The reason is private: shown only in a 1:1 chat, never on a group card.
+        ...(showReason ? [{
           type: 'box',
           layout: 'vertical',
           margin: 'md',
@@ -343,7 +344,7 @@ function formatLeaveRequestBubble(l, isHistory = false) {
             { type: 'text', text: 'REASON FOR ABSENCE', color: '#666666', size: 'xxs', weight: 'bold' },
             { type: 'text', text: reasonText, color: '#333333', size: 'xs', wrap: true, margin: 'xs' }
           ]
-        }
+        }] : [])
       ]
     }
   };
@@ -940,7 +941,7 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
     }
 
     if (leaves && leaves.length > 0) {
-      const bubbles = leaves.map(l => formatLeaveRequestBubble(l, false));
+      const bubbles = leaves.map(l => formatLeaveRequestBubble(l, false, event.source?.type === 'user'));
       const flexMsg = {
         type: 'flex',
         altText: '📋 รายการรออนุมัติลางาน',
@@ -1007,7 +1008,7 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
     }
 
     if (leaves && leaves.length > 0) {
-      const bubbles = leaves.map(l => formatLeaveRequestBubble(l, true));
+      const bubbles = leaves.map(l => formatLeaveRequestBubble(l, true, event.source?.type === 'user'));
       const flexMsg = {
         type: 'flex',
         altText: '📋 ประวัติการลาหยุดล่าสุด',
@@ -1467,15 +1468,6 @@ export async function handleRosterPostback(event, client, action, queryParams, u
               contents: [
                 { type: 'text', text: 'REPLACEMENT', color: '#666666', size: 'xs', flex: 2 },
                 { type: 'text', text: replacementName, color: '#1c1c1c', size: 'xs', flex: 4, wrap: true, align: 'end' }
-              ]
-            },
-            {
-              type: 'box',
-              layout: 'vertical',
-              margin: 'md',
-              contents: [
-                { type: 'text', text: 'REASON FOR ABSENCE', color: '#666666', size: 'xxs', weight: 'bold' },
-                { type: 'text', text: sampleReq.reason || '-', color: '#333333', size: 'xs', wrap: true, margin: 'xs' }
               ]
             }
           ]

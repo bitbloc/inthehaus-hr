@@ -19,7 +19,8 @@ export async function POST(request) {
   if (auth.response) return auth.response;
   try {
     // รับข้อมูลจากหน้า Admin
-    const { name, date, type, reason, status, replacementName } = await request.json();
+    // The leave reason is not read: this card goes to the staff groups, and the reason stays in the DB.
+    const { name, date, type, status, replacementName } = await request.json();
 
     const isApproved = status === 'approved';
     const color = isApproved ? '#06c755' : '#ff334b'; // เขียว หรือ แดง
@@ -78,13 +79,6 @@ export async function POST(request) {
                   contents: [
                     { type: 'text', text: 'คนแทน:', color: '#aaaaaa', size: 'sm', flex: 2 },
                     { type: 'text', text: replacementName || '-', color: '#666666', size: 'sm', flex: 4, wrap: true }
-                  ]
-                },
-                {
-                  type: 'box', layout: 'baseline',
-                  contents: [
-                    { type: 'text', text: 'เหตุผล:', color: '#aaaaaa', size: 'sm', flex: 2 },
-                    { type: 'text', text: reason || '-', color: '#666666', size: 'sm', flex: 4, wrap: true }
                   ]
                 }
               ]
