@@ -120,7 +120,7 @@ class ClaudeModel {
         this.generationConfig = params.generationConfig;
     }
 
-    async _call(contents, generationConfig, extraSystem) {
+    async _call(contents, generationConfig, extraSystem, toolOpts = null) {
         const system = [systemText(this.systemInstruction), systemText(extraSystem), jsonInstruction(generationConfig || this.generationConfig)]
             .filter(Boolean)
             .join("\n\n");
@@ -148,6 +148,9 @@ class ClaudeModel {
             messages,
             ...fallbackParams,
         };
+        if (toolOpts?.tools?.length) {
+            return this._toolLoop(params, toolOpts);
+        }
         let response;
         try {
             response = await this.client.beta.messages.create({ ...params, ...outputConfig });
@@ -169,17 +172,53 @@ class ClaudeModel {
         return geminiShapedResult(text, response.model || this.model);
     }
 
+    // Manual tool-use loop: run every tool_use block in the reply, send all
+    // results back in one user message, repeat until Claude answers in text.
+    // The assistant content is appended unchanged (thinking blocks included).
+    async _toolLoop(params, { tools, handlers, maxRounds = 5 }) {
+        const messages = [...params.messages];
+        for (let round = 0; round < maxRounds; round++) {
+            const response = await this.client.beta.messages.create({ ...params, messages, tools });
+            if (response.stop_reason === "refusal") {
+                throw new Error(`Claude declined (${response.stop_details?.category ?? "unknown"})`);
+            }
+            const toolUses = (response.content || []).filter((b) => b.type === "tool_use");
+            if (response.stop_reason !== "tool_use" || toolUses.length === 0) {
+                const text = (response.content || []).filter((b) => b.type === "text").map((b) => b.text).join("");
+                if (!text) throw new Error(`Claude returned no text (stop_reason: ${response.stop_reason})`);
+                return geminiShapedResult(text, response.model || this.model);
+            }
+            messages.push({ role: "assistant", content: response.content });
+            const results = await Promise.all(toolUses.map(async (tu) => {
+                const handler = handlers[tu.name];
+                try {
+                    if (!handler) throw new Error(`unknown tool ${tu.name}`);
+                    const out = await handler(tu.input || {});
+                    console.log(`[Yuzu tool] ${tu.name}`, JSON.stringify(tu.input));
+                    return { type: "tool_result", tool_use_id: tu.id, content: JSON.stringify(out).slice(0, 20000) };
+                } catch (err) {
+                    console.warn(`[Yuzu tool] ${tu.name} failed:`, err?.message);
+                    return { type: "tool_result", tool_use_id: tu.id, is_error: true, content: String(err?.message || err) };
+                }
+            }));
+            messages.push({ role: "user", content: results });
+        }
+        throw new Error("Claude: too many tool rounds");
+    }
+
     async generateContent(input) {
         const req = normaliseRequest(input);
         return this._call(req.contents, req.generationConfig, req.systemInstruction);
     }
 
-    startChat({ history = [], generationConfig } = {}) {
+    // claudeTools / claudeToolHandlers: Claude-only options (pass them only when claudeEnabled()).
+    startChat({ history = [], generationConfig, claudeTools, claudeToolHandlers } = {}) {
         const turns = history.map((h) => ({ role: h.role, blocks: partsToBlocks(h.parts || []) }));
+        const toolOpts = claudeTools?.length ? { tools: claudeTools, handlers: claudeToolHandlers || {} } : null;
         return {
             sendMessage: async (message) => {
                 const userTurn = { role: "user", blocks: partsToBlocks(message) };
-                const result = await this._call([...turns, userTurn], generationConfig);
+                const result = await this._call([...turns, userTurn], generationConfig, null, toolOpts);
                 turns.push(userTurn, { role: "model", blocks: [{ type: "text", text: result.response.text() }] });
                 return result;
             },

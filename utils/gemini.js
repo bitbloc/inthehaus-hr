@@ -1,5 +1,7 @@
 import { searchKnowledge } from './rag.js';
 import { getGenAI, GEMINI_MODELS } from './gemini-client.js';
+import { claudeEnabled } from './claude-genai.js';
+import { YUZU_TOOLS, YUZU_TOOL_HANDLERS } from './yuzuTools.js';
 
 export async function getGeminiResponse(query, context = "", history = [], userId = "") {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -207,7 +209,10 @@ ${configs.staff_roster || ''}
         });
 
         const cleanedHistory = cleanHistoryForGemini(history);
-        const chat = model.startChat({ history: cleanedHistory });
+        // On Claude, Yuzu can look up live stock, roster and leave (read-only tools).
+        const chat = model.startChat(claudeEnabled()
+            ? { history: cleanedHistory, claudeTools: YUZU_TOOLS, claudeToolHandlers: YUZU_TOOL_HANDLERS }
+            : { history: cleanedHistory });
         const finalPrompt = context ? `[CRITICAL_CONTEXT_DATA]\n${context}\n[/CRITICAL_CONTEXT_DATA]\n\n[LATEST_KNOWLEDGE_FACTS]\n${ragContext}\n[/LATEST_KNOWLEDGE_FACTS]\n\nQuery: ${query}` : `[LATEST_KNOWLEDGE_FACTS]\n${ragContext}\n[/LATEST_KNOWLEDGE_FACTS]\n\nQuery: ${query}`;
 
         const result = await chat.sendMessage(finalPrompt);
