@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { addStockTransaction, fetchStockItems } from '../../../../utils/stock_api';
-import { Client } from '@line/bot-sdk';
+import { Client } from '@/utils/lineClient';
 
 const client = new Client({
   channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN,

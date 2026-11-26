@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { Client } from '@line/bot-sdk';
+import { Client } from '@/utils/lineClient';
+import { BRAND } from '@/utils/brand';
 
 const GROUP_IDS = [
   'C1210c7a0601b5a675060e312efe10bff'
@@ -37,103 +38,60 @@ export async function POST(request) {
       ? `เช็คครบถ้วน (${itemsCount} รายการ)`
       : statusDetail;
 
-    // Dieter Rams + Thai Modern Clean Aesthetic (No Image / Zero-Icon)
+    // Brand v2: plum header, cream body, Thai-first type, no icons.
     const messageContents = {
       type: 'bubble',
       size: 'mega',
       styles: {
-        body: { backgroundColor: '#FBF9F5' },
-        footer: { backgroundColor: '#FBF9F5', separator: true, separatorColor: '#E6E1D6' }
+        body: { backgroundColor: BRAND.cream },
+        footer: { backgroundColor: BRAND.cream, separator: true, separatorColor: BRAND.rule }
+      },
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: BRAND.plum,
+        paddingAll: '20px',
+        contents: [
+          { type: 'text', text: shiftName || 'ตรวจสอบร้าน', size: 'xl', weight: 'bold', color: BRAND.cream, wrap: true },
+          { type: 'text', text: 'ได้รับเช็คลิสต์แล้ว', size: 'xs', color: BRAND.onPlum2, margin: 'sm' }
+        ]
       },
       body: {
         type: 'box',
         layout: 'vertical',
         paddingAll: '20px',
         contents: [
-          // Header / Eyebrow
-          {
-            type: 'box',
-            layout: 'horizontal',
-            alignItems: 'center',
-            contents: [
-              {
-                type: 'text',
-                text: 'SYSTEM // REPORT',
-                size: 'xxs',
-                color: '#78736A',
-                weight: 'bold',
-                flex: 1
-              },
-              {
-                type: 'box',
-                layout: 'horizontal',
-                backgroundColor: '#F4F1EA',
-                cornerRadius: 'xs',
-                paddingStart: 'sm',
-                paddingEnd: 'sm',
-                paddingTop: 'xs',
-                paddingBottom: 'xs',
-                contents: [
-                  {
-                    type: 'text',
-                    text: 'CHECKLIST RECEIVED',
-                    size: 'xxs',
-                    weight: 'bold',
-                    color: '#4A6B3D'
-                  }
-                ]
-              }
-            ]
-          },
-          // Main Title (Shift Name)
-          {
-            type: 'text',
-            text: shiftName,
-            size: 'xl',
-            weight: 'bold',
-            color: '#1E1B18',
-            margin: 'md',
-            wrap: true
-          },
-          // Subtitle Confirmation
           {
             type: 'text',
             text: 'ระบบได้รับบันทึกข้อมูลการตรวจสอบร้านเรียบร้อยแล้ว',
-            size: 'xs',
-            color: '#78736A',
-            wrap: true,
-            margin: 'xs'
+            size: 'sm',
+            color: BRAND.muted,
+            wrap: true
           },
-          // Divider
-          {
-            type: 'separator',
-            color: '#E6E1D6',
-            margin: 'md'
-          },
-          // Details Grid (Elevated Card)
+          // Details panel (paper-2)
           {
             type: 'box',
             layout: 'vertical',
-            backgroundColor: '#F4F1EA',
+            backgroundColor: BRAND.paper2,
             cornerRadius: 'sm',
             paddingAll: '12px',
-            margin: 'md',
+            margin: 'lg',
             spacing: 'xs',
             contents: [
               {
                 type: 'box',
                 layout: 'horizontal',
                 contents: [
-                  { type: 'text', text: 'พนักงานผู้ส่ง', size: 'xs', color: '#78736A', flex: 4 },
-                  { type: 'text', text: staffName, size: 'xs', weight: 'bold', color: '#1E1B18', align: 'end', flex: 6, wrap: true }
+                  { type: 'text', text: 'พนักงานผู้ส่ง', size: 'xs', color: BRAND.neutral, flex: 4 },
+                  { type: 'text', text: staffName || '-', size: 'xs', weight: 'bold', color: BRAND.charcoal, align: 'end', flex: 6, wrap: true }
                 ]
               },
               {
                 type: 'box',
                 layout: 'horizontal',
                 contents: [
-                  { type: 'text', text: 'สถานะตรวจสอบ', size: 'xs', color: '#78736A', flex: 4 },
-                  { type: 'text', text: checklistStatus, size: 'xs', weight: 'bold', color: '#1E1B18', align: 'end', flex: 6, wrap: true }
+                  { type: 'text', text: 'สถานะตรวจสอบ', size: 'xs', color: BRAND.neutral, flex: 4 },
+                  { type: 'text', text: checklistStatus || '-', size: 'xs', weight: 'bold', color: BRAND.plum, align: 'end', flex: 6, wrap: true }
                 ]
               },
               ...(cashAmount ? [
@@ -141,8 +99,8 @@ export async function POST(request) {
                   type: 'box',
                   layout: 'horizontal',
                   contents: [
-                    { type: 'text', text: 'เงินสดในลิ้นชัก', size: 'xs', color: '#78736A', flex: 4 },
-                    { type: 'text', text: `฿ ${Number(cashAmount).toLocaleString('th-TH')}`, size: 'xs', weight: 'bold', color: '#C85A32', align: 'end', flex: 6 }
+                    { type: 'text', text: 'เงินสดในลิ้นชัก', size: 'xs', color: BRAND.neutral, flex: 4 },
+                    { type: 'text', text: `฿ ${Number(cashAmount).toLocaleString('th-TH')}`, size: 'xs', weight: 'bold', color: BRAND.charcoal, align: 'end', flex: 6 }
                   ]
                 }
               ] : []),
@@ -150,8 +108,8 @@ export async function POST(request) {
                 type: 'box',
                 layout: 'horizontal',
                 contents: [
-                  { type: 'text', text: 'เวลาบันทึก', size: 'xs', color: '#78736A', flex: 4 },
-                  { type: 'text', text: formattedTime, size: 'xs', color: '#78736A', align: 'end', flex: 6 }
+                  { type: 'text', text: 'เวลาบันทึก', size: 'xs', color: BRAND.neutral, flex: 4 },
+                  { type: 'text', text: formattedTime || '-', size: 'xs', color: BRAND.muted, align: 'end', flex: 6 }
                 ]
               }
             ]
@@ -164,27 +122,16 @@ export async function POST(request) {
         paddingAll: '16px',
         spacing: 'sm',
         contents: [
-          // Primary Action Link to Operations Portal
           {
             type: 'button',
             action: {
               type: 'uri',
-              label: 'IN THE HAUS · Operations Portal',
+              label: 'เปิดหน้าเช็คลิสต์',
               uri: 'https://inthehaus-hr.vercel.app/checklist'
             },
             style: 'primary',
-            color: '#1E1B18',
+            color: BRAND.charcoal,
             height: 'sm'
-          },
-          // Footnote
-          {
-            type: 'text',
-            text: 'ONHAUS SYSTEM // DIETER RAMS PROTOCOL',
-            size: 'xxs',
-            color: '#A09B90',
-            weight: 'bold',
-            align: 'center',
-            margin: 'sm'
           }
         ]
       }

@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '../../../lib/supabaseServer';
 import { supabase } from '../../../lib/supabaseClient';
-import { Client } from '@line/bot-sdk';
+import { Client } from '@/utils/lineClient';
+import { BRAND } from '@/utils/brand';
 
 // ✅ Group IDs (กลุ่มหลัก และ กลุ่มแผนกอื่น)
 const GROUP_IDS = [
@@ -48,9 +49,9 @@ export async function POST(request) {
 
       if (actualMinutes > shiftLimitMinutes) {
         lateCount++;
-        names.push({ text: `🔴 ${log.employees?.name} (สาย ${timeString})`, sub: `กะ: ${shiftName}`, color: '#ff5555' });
+        names.push({ text: `${log.employees?.name || '-'} (สาย ${timeString})`, sub: `กะ ${shiftName || '-'}`, late: true });
       } else {
-        names.push({ text: `🟢 ${log.employees?.name} (ปกติ ${timeString})`, sub: `กะ: ${shiftName}`, color: '#555555' });
+        names.push({ text: `${log.employees?.name || '-'} (ตรงเวลา ${timeString})`, sub: `กะ ${shiftName || '-'}`, late: false });
       }
     });
 
@@ -60,24 +61,24 @@ export async function POST(request) {
       contents: {
         type: 'bubble',
         header: {
-          type: 'box', layout: 'vertical',
+          type: 'box', layout: 'vertical', backgroundColor: BRAND.plum, paddingAll: '20px',
           contents: [
-            { type: 'text', text: 'Daily Report 📊', weight: 'bold', size: 'xl', color: '#1DB446' },
-            { type: 'text', text: `วันที่ ${new Date().toLocaleDateString('th-TH')}`, size: 'xs', color: '#aaaaaa' }
+            { type: 'text', text: 'สรุปการลงเวลาประจำวัน', weight: 'bold', size: 'lg', color: BRAND.cream, wrap: true },
+            { type: 'text', text: `วันที่ ${new Date().toLocaleDateString('th-TH')}`, size: 'xs', color: BRAND.onPlum2, margin: 'xs' }
           ]
         },
         body: {
-          type: 'box', layout: 'vertical',
+          type: 'box', layout: 'vertical', backgroundColor: BRAND.cream, paddingAll: '20px',
           contents: [
-            { type: 'box', layout: 'horizontal', contents: [{ type: 'text', text: 'มาทำงาน', size: 'sm', color: '#555555', flex: 1 }, { type: 'text', text: `${total} คน`, size: 'sm', weight: 'bold', align: 'end', flex: 1 }] },
-            { type: 'box', layout: 'horizontal', contents: [{ type: 'text', text: 'มาสาย', size: 'sm', color: '#ff5555', flex: 1 }, { type: 'text', text: `${lateCount} คน`, size: 'sm', weight: 'bold', align: 'end', flex: 1 }], margin: 'md' },
-            { type: 'separator', margin: 'lg' },
-            { type: 'text', text: 'รายชื่อ:', margin: 'lg', weight: 'bold', size: 'sm' },
+            { type: 'box', layout: 'horizontal', contents: [{ type: 'text', text: 'มาทำงาน', size: 'sm', color: BRAND.neutral, flex: 1 }, { type: 'text', text: `${total} คน`, size: 'sm', weight: 'bold', color: BRAND.charcoal, align: 'end', flex: 1 }] },
+            { type: 'box', layout: 'horizontal', contents: [{ type: 'text', text: 'มาสาย', size: 'sm', color: lateCount > 0 ? BRAND.errorRed : BRAND.neutral, flex: 1 }, { type: 'text', text: `${lateCount} คน`, size: 'sm', weight: 'bold', color: lateCount > 0 ? BRAND.errorRed : BRAND.charcoal, align: 'end', flex: 1 }], margin: 'md' },
+            { type: 'separator', margin: 'lg', color: BRAND.rule },
+            { type: 'text', text: 'รายชื่อ', margin: 'lg', weight: 'bold', size: 'sm', color: BRAND.charcoal },
             ...names.map(item => ({
               type: 'box', layout: 'vertical', margin: 'sm',
               contents: [
-                { type: 'text', text: item.text, size: 'xs', color: item.color, weight: item.color === '#ff5555' ? 'bold' : 'regular' },
-                { type: 'text', text: item.sub, size: 'xxs', color: '#aaaaaa', margin: 'xs', offsetStart: '18px' }
+                { type: 'text', text: item.text, size: 'xs', color: item.late ? BRAND.errorRed : BRAND.charcoal, weight: item.late ? 'bold' : 'regular', wrap: true },
+                { type: 'text', text: item.sub, size: 'xxs', color: BRAND.neutral, margin: 'xs' }
               ]
             }))
           ]

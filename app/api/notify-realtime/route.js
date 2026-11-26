@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { Client } from '@line/bot-sdk';
+import { Client } from '@/utils/lineClient';
+import { BRAND } from '@/utils/brand';
 
 // ✅ Group IDs (กลุ่มหลัก และ กลุ่มแผนกอื่น)
 const GROUP_IDS = [
@@ -18,27 +19,23 @@ export async function POST(request) {
 
     // --- กำหนดค่าตามประเภท Action ---
     let title = "";
-    let color = "";
     let labelTime = "เวลา:";
     let labelStatus = "สถานะ:";
     let labelLocation = "พิกัด:";
 
     if (action === 'check_in') {
-      title = '🟢 ลงเวลาเข้างาน';
-      color = '#10b981'; // เขียว
+      title = 'ลงเวลาเข้างาน';
     } else if (action === 'check_out') {
-      title = '🔴 ลงเวลาออกงาน';
-      color = '#ef4444'; // แดง
+      title = 'ลงเวลาออกงาน';
     } else if (action === 'leave_request') {
-      title = '📝 แจ้งขอลาหยุด';
-      color = '#f59e0b'; // ส้ม
+      title = 'แจ้งขอลาหยุด';
       labelTime = "วันที่:";
       labelStatus = "คนแทน:";
       labelLocation = "ประเภท:";
     }
 
     const isLateOrEarly = statusDetail?.includes('สาย') || statusDetail?.includes('ออกก่อน');
-    const statusTextColor = isLateOrEarly ? '#f59e0b' : '#6b7280';
+    const statusTextColor = isLateOrEarly ? BRAND.errorRed : BRAND.charcoal; // late / left early is a real problem
 
     // Clean ข้อความพิกัด
     const cleanLocation = locationStatus?.replace('✅ ', '').replace('❌ ', '') || '-';
@@ -46,8 +43,8 @@ export async function POST(request) {
     // ✅ เตรียมส่วนแสดงรูปภาพ (Image Component)
     // ใช้รูป Placeholder พื้นหลังสีสว่าง ถ้าไม่มีรูปจริง เพื่อไม่ให้ Layout พัง
     const defaultPlaceholder = action === 'leave_request'
-      ? 'https://placehold.co/150x150/f59e0b/ffffff.png?text=Leave'
-      : 'https://placehold.co/150x150/f8f9fa/cccccc.png?text=No+Img';
+      ? 'https://placehold.co/150x150/E3D9DE/635B5F.png?text=Leave'
+      : 'https://placehold.co/150x150/E3D9DE/635B5F.png?text=No+Img';
     const imageUrl = photoUrl || defaultPlaceholder;
 
     const message = {
@@ -56,20 +53,21 @@ export async function POST(request) {
       contents: {
         type: 'bubble',
         size: 'kilo',
+        header: {
+          type: 'box',
+          layout: 'vertical',
+          backgroundColor: BRAND.plum,
+          paddingAll: '16px',
+          contents: [
+            { type: 'text', text: title || 'แจ้งเตือน', weight: 'bold', size: 'md', color: BRAND.cream, wrap: true },
+            { type: 'text', text: position || 'พนักงาน', size: 'xs', color: BRAND.onPlum2, margin: 'xs', wrap: true }
+          ]
+        },
         body: {
           type: 'box',
           layout: 'vertical',
+          backgroundColor: BRAND.cream,
           contents: [
-            // 1. หัวข้อ (Action Bar)
-            {
-              type: 'box',
-              layout: 'horizontal',
-              contents: [
-                { type: 'text', text: title, weight: 'bold', size: 'sm', color: color, flex: 0 },
-                { type: 'text', text: position || 'Staff', size: 'xs', color: '#9ca3af', align: 'end', gravity: 'center' }
-              ]
-            },
-            { type: 'separator', margin: 'md' },
 
             // 2. เนื้อหาหลัก (Layout แนวนอน: รูปซ้าย - ข้อความขวา)
             {
@@ -98,7 +96,7 @@ export async function POST(request) {
                   flex: 5,
                   contents: [
                     // ชื่อพนักงาน
-                    { type: 'text', text: name, weight: 'bold', size: 'md', color: '#1f2937', wrap: true, margin: 'none' },
+                    { type: 'text', text: name || '-', weight: 'bold', size: 'md', color: BRAND.charcoal, wrap: true, margin: 'none' },
 
                     // รายละเอียดย่อย (เวลา, สถานะ, พิกัด)
                     {
@@ -110,22 +108,22 @@ export async function POST(request) {
                         {
                           type: 'box', layout: 'baseline', spacing: 'sm',
                           contents: [
-                            { type: 'text', text: labelTime, color: '#aaaaaa', size: 'xxs', flex: 2 },
-                            { type: 'text', text: time, color: '#4b5563', size: 'xs', flex: 4, weight: 'bold' }
+                            { type: 'text', text: labelTime, color: BRAND.neutral, size: 'xs', flex: 2 },
+                            { type: 'text', text: time || '-', color: BRAND.charcoal, size: 'xs', flex: 4, weight: 'bold' }
                           ]
                         },
                         {
                           type: 'box', layout: 'baseline', spacing: 'sm',
                           contents: [
-                            { type: 'text', text: labelStatus, color: '#aaaaaa', size: 'xxs', flex: 2 },
+                            { type: 'text', text: labelStatus, color: BRAND.neutral, size: 'xs', flex: 2 },
                             { type: 'text', text: statusDetail || '-', color: statusTextColor, size: 'xs', flex: 4, wrap: true }
                           ]
                         },
                         {
                           type: 'box', layout: 'baseline', spacing: 'sm',
                           contents: [
-                            { type: 'text', text: labelLocation, color: '#aaaaaa', size: 'xxs', flex: 2 },
-                            { type: 'text', text: cleanLocation, color: '#9ca3af', size: 'xxs', flex: 4, wrap: true }
+                            { type: 'text', text: labelLocation, color: BRAND.neutral, size: 'xs', flex: 2 },
+                            { type: 'text', text: cleanLocation, color: BRAND.muted, size: 'xs', flex: 4, wrap: true }
                           ]
                         }
                       ]
@@ -136,7 +134,7 @@ export async function POST(request) {
             }
           ]
         },
-        styles: { footer: { separator: true } }
+        styles: { footer: { separator: true, separatorColor: BRAND.rule } }
       }
     };
 
@@ -145,24 +143,25 @@ export async function POST(request) {
         type: 'box',
         layout: 'horizontal',
         spacing: 'sm',
+        backgroundColor: BRAND.cream,
         contents: [
           {
             type: 'button',
             style: 'primary',
-            color: '#06c755',
+            color: BRAND.charcoal,
             action: {
               type: 'postback',
-              label: '✅ อนุมัติ',
+              label: 'อนุมัติ',
               data: `action=approve_leave&id=${leaveId}`
             }
           },
           {
             type: 'button',
             style: 'secondary',
-            color: '#ef4444',
+            color: BRAND.paper2,
             action: {
               type: 'postback',
-              label: '❌ ปฏิเสธ',
+              label: 'ไม่อนุมัติ',
               data: `action=reject_leave&id=${leaveId}`
             }
           }
