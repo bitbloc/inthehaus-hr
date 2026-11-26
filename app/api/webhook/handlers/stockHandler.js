@@ -45,7 +45,7 @@ export async function handleStockResponseTags(response, request, query = "") {
       } else if (actionData.action === 'CHECK_ALL') {
          const allItems = await fetchStockItems();
          if (allItems.length === 0) {
-            return { type: 'text', text: 'ยังไม่มีสินค้าในระบบค่ะ' };
+            return { type: 'text', text: 'ยังไม่มีสินค้าในระบบครับ' };
          } else {
             return allStockFlex(allItems);
          }
@@ -115,7 +115,7 @@ export async function handleStockResponseTags(response, request, query = "") {
       }
     } catch (e) {
       console.error("Stock Action Error:", e);
-      return { type: 'text', text: `เกิดข้อผิดพลาดในการดึงข้อมูลจากระบบสต็อกครับ บอสสามารถตรวจสอบระบบหรือแจ้งทีมงานผู้ดูแลระบบได้ครับ\nError: ${e.message}` };
+      return { type: 'text', text: 'ดึงข้อมูลจากระบบสต็อกไม่สำเร็จ ลองใหม่อีกครั้งครับ' };
     }
   }
 
@@ -177,14 +177,14 @@ export async function handleStockPostback(event, client, action, queryParams, us
          const item = exactMatch || (searchItems.length === 1 ? searchItems[0] : null);
          
          if (!item) {
-           const optionsText = searchItems.length > 0 ? ` เล็งตัวไหนไว้คะ: ${searchItems.slice(0,3).map(i => i.name).join(', ')}?` : "";
+           const optionsText = searchItems.length > 0 ? ` ใช่ตัวไหนครับ: ${searchItems.slice(0,3).map(i => i.name).join(', ')}` : "";
            await client.replyMessage(event.replyToken, { type: 'text', text: `❌ ไม่พบรายการสินค้า "${payload.itemName}" ที่ตรงกันในระบบครับ${optionsText} รบกวนตรวจสอบตัวสะกดชื่อสินค้าอีกครั้งครับ` });
            return { handled: true };
          }
 
          if (payload.action === 'UPDATE_ITEM') {
            await updateStockItem(item.id, { reorder_point: payload.reorder_point });
-           await client.replyMessage(event.replyToken, { type: 'text', text: `✅ อัปเดตข้อมูลของ [${item.name}] สำเร็จแล้วค๊า!` });
+           await client.replyMessage(event.replyToken, { type: 'text', text: `✅ อัปเดตข้อมูลของ [${item.name}] สำเร็จแล้วครับ` });
          } else if (payload.action === 'RESTOCK' || payload.action === 'DEDUCT') {
            const tType = payload.action === 'RESTOCK' ? 'in' : 'out';
            await addStockTransaction(item.id, tType, payload.quantity, empName, payload.note || `ปรับผ่านแชท Yuzu`);
@@ -194,7 +194,7 @@ export async function handleStockPostback(event, client, action, queryParams, us
       return { handled: true };
     } catch (err) {
       console.error("Stock Postback Error:", err);
-      await client.replyMessage(event.replyToken, { type: 'text', text: `⚠️ ว้าย! เกิดข้อผิดพลาดจากฝั่ง API สินค้าค่ะ:\n${err.message}` });
+      await client.replyMessage(event.replyToken, { type: 'text', text: 'ทำรายการสต็อกไม่สำเร็จ ลองใหม่อีกครั้งครับ' });
       return { handled: true };
     }
   }
@@ -215,7 +215,7 @@ export async function handleStockPostback(event, client, action, queryParams, us
       return { handled: true };
     } catch (err) {
       console.error("Check Exact Stock Postback Error:", err);
-      await client.replyMessage(event.replyToken, { type: 'text', text: `⚠️ เกิดข้อผิดพลาดในการดึงข้อมูลสินค้าค่ะ: ${err.message}` });
+      await client.replyMessage(event.replyToken, { type: 'text', text: 'ดึงข้อมูลสินค้าไม่สำเร็จ ลองใหม่อีกครั้งครับ' });
       return { handled: true };
     }
   }

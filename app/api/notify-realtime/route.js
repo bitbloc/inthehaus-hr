@@ -33,7 +33,7 @@ export async function POST(request) {
       title = '📝 แจ้งขอลาหยุด';
       color = '#f59e0b'; // ส้ม
       labelTime = "วันที่:";
-      labelStatus = "เหตุผล:";
+      labelStatus = "คนแทน:";
       labelLocation = "ประเภท:";
     }
 

@@ -296,7 +296,7 @@ export async function getAccurateNews(categories = ['latest', 'thailand', 'nakho
                 });
             } else {
                 if (res.category === 'nakhon-phanom') {
-                    context += "- (สแกนข่าวหน้าเว็บไม่พบคะ โปรดส่องกลุ่ม [นครพนม Nakhonphanom Talk of the Town] หรือเพจ [สวท.นครพนม] แทนนะคะ)\n";
+                    context += "- (สแกนข่าวหน้าเว็บไม่พบครับ โปรดส่องกลุ่ม [นครพนม Nakhonphanom Talk of the Town] หรือเพจ [สวท.นครพนม] แทนนะครับ)\n";
                 } else {
                     context += "- (ไม่พบข่าวล่าสุดในหน้าเว็บนี้)\n";
                 }
@@ -306,6 +306,6 @@ export async function getAccurateNews(categories = ['latest', 'thailand', 'nakho
         return context;
     } catch (globalErr) {
         console.error("Global News Fetcher Error:", globalErr);
-        return "\n[ข่าวล่าสุดจากหน้าเว็บ] ขออภัยค่ะ ตอนนี้ยูซุส่องข่าวหน้าเว็บไม่ได้ชั่วคราวค่ะ\n";
+        return "\n[ข่าวล่าสุดจากหน้าเว็บ] ขออภัยครับ ตอนนี้ยูซุส่องข่าวหน้าเว็บไม่ได้ชั่วคราวครับ\n";
     }
 }

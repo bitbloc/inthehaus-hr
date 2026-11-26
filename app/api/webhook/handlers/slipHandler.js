@@ -280,7 +280,7 @@ export async function handleSlipImage(event, client, buffer, userId, groupId, re
     if (insertError.code === '23505') {
       await client.replyMessage(event.replyToken, { type: 'text', text: `สลิปใบนี้ (อ้างอิง: ${cleanRef || 'ไม่ทราบ'}) ได้ถูกบันทึกเข้าระบบเรียบร้อยแล้วครับ ระบบปฏิเสธการบันทึกซ้ำซ้อน` });
     } else {
-      await client.replyMessage(event.replyToken, { type: 'text', text: `เกิดข้อผิดพลาดในการบันทึกข้อมูลสลิปเข้าระบบครับ (Error: ${insertError.message || insertError.code || 'Unknown DB Error'})` });
+      await client.replyMessage(event.replyToken, { type: 'text', text: 'บันทึกสลิปเข้าระบบไม่สำเร็จ ลองส่งใหม่อีกครั้งครับ' });
     }
     return true;
   }

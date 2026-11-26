@@ -1,5 +1,6 @@
 import { format, addHours, startOfTomorrow, parseISO, startOfWeek, addDays } from 'date-fns';
 import { getEffectiveRoster } from '../../../../utils/roster';
+import { LATE_GRACE_MINUTES, minutesAfter } from '../../../../utils/attendance';
 import { getEmployeeByLineId, checkIsBoss } from '../../../../utils/memory';
 import { getServiceClient } from '../../../../lib/supabaseServer';
 import { buildPayloadPostbackData, readPostbackPayload, PAYLOAD_TOO_LONG_TEXT } from '../../../../utils/postbackPayload';
@@ -235,7 +236,7 @@ function getCellColorsAndLabels(empShift, isOff, leaveRequest) {
   };
 }
 
-function formatLeaveRequestBubble(l, isHistory = false) {
+function formatLeaveRequestBubble(l, isHistory = false, showReason = false) {
   const empName = l.employees?.nickname || l.employees?.name || 'พนักงาน';
   const empPosition = l.employees?.position || 'ทั่วไป';
   const dateStr = l.leave_date ? format(parseISO(l.leave_date), 'dd/MM/yyyy') : '-';
@@ -335,7 +336,8 @@ function formatLeaveRequestBubble(l, isHistory = false) {
             { type: 'text', text: replacementName, color: '#1c1c1c', size: 'xs', flex: 5, wrap: true, align: 'end' }
           ]
         },
-        {
+        // The reason is private: shown only in a 1:1 chat, never on a group card.
+        ...(showReason ? [{
           type: 'box',
           layout: 'vertical',
           margin: 'md',
@@ -343,7 +345,7 @@ function formatLeaveRequestBubble(l, isHistory = false) {
             { type: 'text', text: 'REASON FOR ABSENCE', color: '#666666', size: 'xxs', weight: 'bold' },
             { type: 'text', text: reasonText, color: '#333333', size: 'xs', wrap: true, margin: 'xs' }
           ]
-        }
+        }] : [])
       ]
     }
   };
@@ -800,6 +802,17 @@ export async function generateStCalendarFlex(start) {
   return flexMsg;
 }
 
+// The daily roster card answers only an explicit request ("ตารางงาน", "เช็คตาราง พรุ่งนี้",
+// "yuzu ขอตารางงานวันนี้", "roster"), not a sentence that happens to contain the word.
+const ROSTER_KEYWORDS = ['เช็คตารางงาน', 'เช็คตาราง', 'ตารางงาน', 'roster', 'ใครเข้ากะ'];
+const ROSTER_TAIL = /^(วันนี้|พรุ่งนี้|today|tomorrow|หน่อย|บ้าง|ครับ|คับ|ค่ะ|คะ|นะ|จ้า|[\s?!.])*$/;
+
+export function isRosterQuery(text) {
+  const cmd = text.trim().replace(/^@?(yuzu|ยูซุ)\s*/, '').replace(/^(ขอ|ดู)\s*/, '');
+  const keyword = ROSTER_KEYWORDS.find(k => cmd.startsWith(k));
+  return !!keyword && ROSTER_TAIL.test(cmd.slice(keyword.length));
+}
+
 export async function handleRosterCommand(event, client, text, rawText, userId) {
   const isAutoGenCommand = text.includes('จัดตารางสัปดาห์หน้า') || 
                            text.includes('สร้างตารางสัปดาห์หน้า') || 
@@ -826,7 +839,7 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
       return true;
     } catch (err) {
       console.error('Auto Roster confirm card error in LINE command:', err);
-      await client.replyMessage(event.replyToken, { type: 'text', text: `เกิดข้อผิดพลาดในการเตรียมจัดตารางอัตโนมัติ: ${err.message}` });
+      await client.replyMessage(event.replyToken, { type: 'text', text: 'เตรียมจัดตารางอัตโนมัติไม่สำเร็จ ลองใหม่อีกครั้งครับ' });
       return true;
     }
   }
@@ -846,7 +859,7 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
     return true;
   }
 
-  if (text.includes('เช็คตาราง') || text.includes('roster') || text.includes('ตารางงาน') || text.includes('ใครเข้ากะ')) {
+  if (isRosterQuery(text)) {
     const targetDate = text.includes('พรุ่งนี้') ? startOfTomorrow() : addHours(new Date(), 7);
     const dateStr = format(targetDate, 'dd/MM/yyyy');
     const roster = await getEffectiveRoster(targetDate);
@@ -873,7 +886,7 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
           statusColor = '#2e7d32';
           actualTimeStr = format(addHours(new Date(emp.attendance.check_in), 7), "HH:mm");
           
-          if (shiftStart && actualTimeStr > shiftStart) {
+          if (shiftStart && minutesAfter(actualTimeStr, shiftStart) > LATE_GRACE_MINUTES) {
             statusColor = '#c62828';
             statusTag = 'LATE'; 
           }
@@ -923,12 +936,13 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
       .order('leave_date', { ascending: true });
 
     if (error) {
-      await client.replyMessage(event.replyToken, { type: 'text', text: 'Error fetching data: ' + error.message });
+      console.error('Roster fetch error:', error);
+      await client.replyMessage(event.replyToken, { type: 'text', text: 'ดึงข้อมูลไม่สำเร็จ ลองใหม่อีกครั้งครับ' });
       return true;
     }
 
     if (leaves && leaves.length > 0) {
-      const bubbles = leaves.map(l => formatLeaveRequestBubble(l, false));
+      const bubbles = leaves.map(l => formatLeaveRequestBubble(l, false, event.source?.type === 'user'));
       const flexMsg = {
         type: 'flex',
         altText: '📋 รายการรออนุมัติลางาน',
@@ -989,12 +1003,13 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
       .limit(5);
 
     if (error) {
-      await client.replyMessage(event.replyToken, { type: 'text', text: 'Error fetching data: ' + error.message });
+      console.error('Roster fetch error:', error);
+      await client.replyMessage(event.replyToken, { type: 'text', text: 'ดึงข้อมูลไม่สำเร็จ ลองใหม่อีกครั้งครับ' });
       return true;
     }
 
     if (leaves && leaves.length > 0) {
-      const bubbles = leaves.map(l => formatLeaveRequestBubble(l, true));
+      const bubbles = leaves.map(l => formatLeaveRequestBubble(l, true, event.source?.type === 'user'));
       const flexMsg = {
         type: 'flex',
         altText: '📋 ประวัติการลาหยุดล่าสุด',
@@ -1210,7 +1225,7 @@ export async function handleRosterPostback(event, client, action, queryParams, u
       return true;
     } catch (e) {
       console.error("Confirm Roster Error:", e);
-      await client.replyMessage(event.replyToken, { type: 'text', text: `เเม๊! เกิดข้อผิดพลาด: ${e.message}` });
+      await client.replyMessage(event.replyToken, { type: 'text', text: 'ส่งคำขอปรับตารางไม่สำเร็จ ลองใหม่อีกครั้งครับ' });
       return true;
     }
   }
@@ -1251,7 +1266,7 @@ export async function handleRosterPostback(event, client, action, queryParams, u
     const requestId = queryParams.get('id');
     if (await checkIsBoss(userId)) {
        await supabase.from('roster_requests').update({ status: 'REJECTED', manager_id: (await getEmployeeByLineId(userId))?.id }).eq('id', requestId);
-       await client.replyMessage(event.replyToken, { type: 'text', text: '❌ ปฏิเสธคำขอเรียบร้อยค่ะ' });
+       await client.replyMessage(event.replyToken, { type: 'text', text: '❌ ปฏิเสธคำขอเรียบร้อยครับ' });
     }
     return true;
   }
@@ -1292,7 +1307,8 @@ export async function handleRosterPostback(event, client, action, queryParams, u
       .in('id', pendingLeaves.map(l => l.id));
 
     if (updateErr) {
-      await client.replyMessage(event.replyToken, { type: 'text', text: `เแม๊! เกิดข้อผิดพลาดในการอัปเดตสถานะ: ${updateErr.message}` });
+      console.error('Leave status update error:', updateErr);
+      await client.replyMessage(event.replyToken, { type: 'text', text: 'อัปเดตสถานะการลาไม่สำเร็จ ลองใหม่อีกครั้งครับ' });
       return true;
     }
 
@@ -1453,15 +1469,6 @@ export async function handleRosterPostback(event, client, action, queryParams, u
               contents: [
                 { type: 'text', text: 'REPLACEMENT', color: '#666666', size: 'xs', flex: 2 },
                 { type: 'text', text: replacementName, color: '#1c1c1c', size: 'xs', flex: 4, wrap: true, align: 'end' }
-              ]
-            },
-            {
-              type: 'box',
-              layout: 'vertical',
-              margin: 'md',
-              contents: [
-                { type: 'text', text: 'REASON FOR ABSENCE', color: '#666666', size: 'xxs', weight: 'bold' },
-                { type: 'text', text: sampleReq.reason || '-', color: '#333333', size: 'xs', wrap: true, margin: 'xs' }
               ]
             }
           ]
