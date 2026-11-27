@@ -13,6 +13,11 @@ const inputCls = "w-full min-h-11 px-3 bg-cream border border-rule text-base tex
 const labelCls = "block text-sm font-semibold text-neutral mb-1";
 const TYPE_TH = { scale: "ให้คะแนน 1–5", multi: "เลือกได้หลายข้อ", text: "เขียนตอบ" };
 
+function surveyLabel(s) {
+    const when = s.for_period ? `ใช้เดือน ${monthLabel(s.for_period)}` : "ชุดหลัก (เดือนที่ไม่มีชุดเฉพาะ)";
+    return `${s.title} · ${when}${s.is_active ? "" : " · ปิดอยู่"}`;
+}
+
 const fmtDate = (iso) =>
     iso ? new Date(iso).toLocaleDateString("th-TH", { day: "numeric", month: "short", timeZone: "Asia/Bangkok" }) : "-";
 const lastSkipDay = (iso) => (iso ? fmtDate(new Date(new Date(iso).getTime() - 1).toISOString()) : "-");
@@ -43,6 +48,26 @@ export default function KpiManager() {
     const [reload, setReload] = useState(0);
     const data = useKpiMonth(month, reload);
     const [message, setMessage] = useState(null);
+    const [editId, setEditId] = useState(null);
+    const editing = (data.surveys || []).find((s) => s.id === editId) || data.survey;
+
+    const addSurvey = async () => {
+        const [y, m] = thisMonth().split("-").map(Number);
+        const next = new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 7);
+        const taken = (data.surveys || []).some((s) => s.for_period === next);
+        const { data: row, error } = await supabase
+            .from("kpi_surveys")
+            .insert({ title: "ชุดคำถามใหม่", intro: "", questions: [], skip_days: 3, is_active: false, for_period: taken ? null : next })
+            .select("id")
+            .single();
+        if (error) {
+            setMessage({ type: "error", text: `สร้างชุดใหม่ไม่สำเร็จ: ${error.message}` });
+            return;
+        }
+        setEditId(row.id);
+        setReload((n) => n + 1);
+        setMessage({ type: "success", text: "สร้างชุดใหม่แล้ว (ยังปิดอยู่) ใส่คำถาม เลือกเดือน แล้วติ๊ก เปิดใช้" });
+    };
 
     // Personal link for staff without a phone (valid this month only).
     const makeLink = async (s) => {
@@ -140,11 +165,28 @@ export default function KpiManager() {
                 )}
             </section>
 
+            {/* Question sets: pick one to edit, or add a set for a coming month */}
+            {(data.surveys || []).length > 0 && (
+                <section className="bg-cream border border-rule p-5 flex flex-wrap items-end gap-3">
+                    <div className="flex-1 min-w-[240px]">
+                        <label className={labelCls}>ชุดคำถามที่จะแก้</label>
+                        <select className={inputCls} value={editing?.id || ""} onChange={(e) => setEditId(e.target.value)}>
+                            {data.surveys.map((s) => (
+                                <option key={s.id} value={s.id}>{surveyLabel(s)}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <button type="button" onClick={addSurvey} className="min-h-11 px-4 border border-charcoal text-base font-semibold text-charcoal hover:bg-paper-2">
+                        สร้างชุดใหม่
+                    </button>
+                </section>
+            )}
+
             {/* Question editor (remounts when the saved survey changes) */}
-            {data.survey && (
+            {editing && (
                 <SurveyEditor
-                    key={`${data.survey.id}-${data.survey.updated_at}`}
-                    survey={data.survey}
+                    key={`${editing.id}-${editing.updated_at}`}
+                    survey={editing}
                     onMessage={setMessage}
                     onSaved={() => setReload((n) => n + 1)}
                 />
@@ -199,18 +241,24 @@ function SurveyEditor({ survey, onMessage, onSaved }) {
                 intro: (draft.intro || "").trim(),
                 skip_days: Math.max(0, Math.min(31, Number(draft.skip_days) || 0)),
                 is_active: Boolean(draft.is_active),
+                for_period: draft.for_period || null,
                 questions,
                 updated_at: new Date().toISOString(),
             })
             .eq("id", draft.id);
         setSaving(false);
-        onMessage(error ? { type: "error", text: `บันทึกไม่สำเร็จ: ${error.message}` } : { type: "success", text: "บันทึกคำถามแล้ว พนักงานจะเห็นคำถามใหม่ทันที" });
+        const clash = error && /uq_kpi_surveys_active_period|duplicate key/i.test(error.message);
+        onMessage(
+            error
+                ? { type: "error", text: clash ? "เดือนนี้มีชุดคำถามที่เปิดใช้อยู่แล้ว ปิดชุดเดิมก่อน หรือเลือกเดือนอื่น" : `บันทึกไม่สำเร็จ: ${error.message}` }
+                : { type: "success", text: draft.for_period ? `บันทึกแล้ว ชุดนี้ใช้ในเดือน ${monthLabel(draft.for_period)}` : "บันทึกแล้ว ใช้ในเดือนที่ไม่มีชุดเฉพาะ" }
+        );
         if (!error) onSaved();
     };
 
     return (
                 <section className="bg-cream border border-rule p-5 space-y-4">
-                    <h3 className="text-base font-semibold text-charcoal">แก้คำถาม</h3>
+                    <h3 className="text-base font-semibold text-charcoal">แก้คำถาม · {draft.title}</h3>
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div className="md:col-span-2">
                             <label className={labelCls}>ชื่อแบบวัดผล</label>
@@ -226,6 +274,20 @@ function SurveyEditor({ survey, onMessage, onSaved }) {
                                 <input type="checkbox" checked={Boolean(draft.is_active)} onChange={(e) => setDraft({ ...draft, is_active: e.target.checked })} className="w-4 h-4" />
                                 เปิดใช้ (ถามพนักงาน)
                             </label>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div className="md:col-span-2">
+                            <label className={labelCls}>ใช้กับเดือน</label>
+                            <div className="flex gap-2">
+                                <input type="month" className={`${inputCls} font-num`} value={draft.for_period || ""} onChange={(e) => setDraft({ ...draft, for_period: e.target.value || null })} />
+                                {draft.for_period && (
+                                    <button type="button" onClick={() => setDraft({ ...draft, for_period: null })} className="min-h-11 px-3 border border-rule text-sm whitespace-nowrap">ทุกเดือน</button>
+                                )}
+                            </div>
+                            <p className="text-sm text-neutral mt-1">
+                                {draft.for_period ? `ถามเฉพาะเดือน ${monthLabel(draft.for_period)} เปลี่ยนให้อัตโนมัติเมื่อถึงเดือน` : "ชุดหลัก ใช้ในเดือนที่ไม่มีชุดเฉพาะ"}
+                            </p>
                         </div>
                     </div>
                     <div>
