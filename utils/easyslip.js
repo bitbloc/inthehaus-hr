@@ -657,7 +657,7 @@ export async function reconcileSlipVerification({ easySlipResult, visionResult }
       approved: true,
       isSlip: true,
       source: 'easyslip',
-      verificationBadge: '✓ ตรวจสอบกับธนาคารแล้ว (100%)',
+      verificationBadge: '✓ ตรวจสอบกับธนาคารแล้ว',
       verificationTier: 'BANK_VERIFIED',
       amount: activeEasySlip.amount,
       transactionRef: activeEasySlip.transactionRef,

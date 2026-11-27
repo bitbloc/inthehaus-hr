@@ -1,8 +1,10 @@
 import { NextResponse, after } from 'next/server';
-import { Client } from '@line/bot-sdk';
+import { Client } from '@/utils/lineClient';
+import { BRAND } from '@/utils/brand';
 import { getSchemaWeather, formatWeatherMessage, formatWeatherFlex } from '../../../utils/weather';
-import { getGeminiResponse, classifyAndAnalyzeImage, transcribeAudio } from '../../../utils/gemini';
+import { classifyAndAnalyzeImage, transcribeAudio } from '../../../utils/gemini';
 import { claudeEnabled } from '../../../utils/claude-genai';
+import { LATE_GRACE_MINUTES, minutesAfter } from '../../../utils/attendance';
 import { getIngredientPrices } from '../../../utils/price';
 import { saveMessage, cleanupOldHistory, getEmployeeByLineId, getYuzuConfigs, checkIsBoss } from '../../../utils/memory';
 import { handleRosterCommand, handleRosterPostback } from './handlers/rosterHandler';
@@ -13,6 +15,7 @@ import { verifySlipWithEasySlip, reconcileSlipVerification } from '../../../util
 import { handleChatCommand, handleChatPostback } from './handlers/chatHandler';
 import { isEspressoShotReport, handleEspressoShotAnalysis } from './handlers/espressoHandler';
 import sharp from 'sharp';
+import { looksLikePaymentSlip } from '../../../utils/slipGate';
 
 export const maxDuration = 60;
 
@@ -39,143 +42,8 @@ function cleanUpOldProcessedEvents() {
   }
 }
 
-function appendBrandingToFlex(msg) {
-  if (!msg) return msg;
-
-  if (Array.isArray(msg)) {
-    return msg.map(m => appendBrandingToFlex(m));
-  }
-
-  if (msg.type !== 'flex' || !msg.contents) {
-    return msg;
-  }
-
-  const newMsg = JSON.parse(JSON.stringify(msg));
-  
-  const addFooterToBubble = (bubble) => {
-    if (!bubble || bubble.type !== 'bubble') return;
-
-    if (bubble.footer) {
-      if (bubble.footer.contents && Array.isArray(bubble.footer.contents)) {
-        const hasBranding = bubble.footer.contents.some(
-          c => c.type === 'text' && c.text && c.text.includes('ONHAUS SYSTEM')
-        );
-        if (!hasBranding) {
-          const hasButtons = bubble.footer.contents.some(c => c.type === 'button');
-          if (hasButtons) {
-            const originalLayout = bubble.footer.layout || 'horizontal';
-            const originalSpacing = bubble.footer.spacing || 'sm';
-            const originalPadding = bubble.footer.paddingAll;
-            
-            const buttonsBox = {
-              type: 'box',
-              layout: originalLayout,
-              spacing: originalSpacing,
-              contents: [...bubble.footer.contents]
-            };
-
-            bubble.footer.layout = 'vertical';
-            if (bubble.footer.spacing) delete bubble.footer.spacing;
-            if (!bubble.footer.paddingAll) bubble.footer.paddingAll = '15px';
-            
-            bubble.footer.contents = [
-              buttonsBox,
-              {
-                type: 'text',
-                text: 'ONHAUS SYSTEM ©',
-                size: 'xxs',
-                color: '#635B5F',
-                align: 'center',
-                weight: 'bold',
-                margin: 'md'
-              }
-            ];
-          } else {
-            const textElement = bubble.footer.contents.find(c => c.type === 'text');
-            if (textElement) {
-              if (textElement.text && !textElement.text.includes('ONHAUS SYSTEM')) {
-                textElement.text = `${textElement.text.toUpperCase()} // ONHAUS SYSTEM ©`;
-              }
-            } else {
-              bubble.footer.contents.push({
-                type: 'text',
-                text: 'ONHAUS SYSTEM ©',
-                size: 'xxs',
-                color: '#635B5F',
-                align: 'center',
-                weight: 'bold'
-              });
-            }
-          }
-        }
-      } else {
-        bubble.footer = {
-          type: 'box',
-          layout: 'vertical',
-          paddingAll: '15px',
-          contents: [
-            {
-              type: 'text',
-              text: 'ONHAUS SYSTEM ©',
-              size: 'xxs',
-              color: '#635B5F',
-              align: 'center',
-              weight: 'bold'
-            }
-          ]
-        };
-      }
-    } else {
-      bubble.footer = {
-        type: 'box',
-        layout: 'vertical',
-        paddingAll: '15px',
-        contents: [
-          {
-            type: 'text',
-            text: 'ONHAUS SYSTEM ©',
-            size: 'xxs',
-            color: '#635B5F',
-            align: 'center',
-            weight: 'bold'
-          }
-        ]
-      };
-    }
-
-    if (!bubble.styles) bubble.styles = {};
-    if (!bubble.styles.footer) {
-      const bodyBg = bubble.styles.body?.backgroundColor || '#FAF9F6';
-      bubble.styles.footer = { backgroundColor: bodyBg };
-      const isDark = bodyBg.startsWith('#1') || bodyBg.startsWith('#2') || bodyBg.startsWith('#0');
-      const copyrightText = bubble.footer.contents.find(c => c.type === 'text' && c.text && c.text.includes('ONHAUS SYSTEM'));
-      if (copyrightText) {
-        copyrightText.color = isDark ? '#666666' : '#A3A3A3';
-      }
-    }
-  };
-
-  if (newMsg.contents.type === 'bubble') {
-    addFooterToBubble(newMsg.contents);
-  } else if (newMsg.contents.type === 'carousel' && Array.isArray(newMsg.contents.contents)) {
-    newMsg.contents.contents.forEach(b => addFooterToBubble(b));
-  }
-
-  return newMsg;
-}
-
-const originalReplyMessage = client.replyMessage.bind(client);
-const originalPushMessage = client.pushMessage.bind(client);
-
-client.replyMessage = (replyToken, messages, notificationDisabled) => {
-  const brandedMessages = appendBrandingToFlex(messages);
-  return originalReplyMessage(replyToken, brandedMessages, notificationDisabled);
-};
-
-client.pushMessage = (to, messages, notificationDisabled) => {
-  const brandedMessages = appendBrandingToFlex(messages);
-  return originalPushMessage(to, brandedMessages, notificationDisabled);
-};
+// The old "ONHAUS SYSTEM" footer injector is gone: the shop logo in each Flex
+// header (utils/lineClient) carries the brand, so cards keep their own footers.
 
 export async function GET() {
   return NextResponse.json({ status: "active", message: "pong" });
@@ -280,7 +148,8 @@ export async function POST(request) {
                 .order('timestamp', { ascending: true });
 
               if (error) {
-                await client.replyMessage(event.replyToken, { type: 'text', text: 'Error fetching data: ' + error.message });
+                console.error('Attendance summary fetch error:', error);
+                await client.replyMessage(event.replyToken, { type: 'text', text: 'ดึงสรุปการเข้างานไม่สำเร็จ ลองใหม่อีกครั้งครับ' });
                 handledLocally = true;
                 return;
               }
@@ -323,11 +192,7 @@ export async function POST(request) {
               const safeThaiTime = (date) => format(addHours(date, 7), 'HH:mm');
               const todayStr = format(addHours(new Date(), 7), 'dd/MM/yyyy');
               
-              const contents = [
-                { type: 'text', text: `📊 สรุปการเข้างาน`, weight: 'bold', size: 'lg', color: '#1DB446' },
-                { type: 'text', text: todayStr, size: 'xs', color: '#555555', margin: 'sm' },
-                { type: 'separator', margin: 'md' }
-              ];
+              const contents = [];
 
               let count = 0;
               for (const s of summaryList) {
@@ -338,29 +203,25 @@ export async function POST(request) {
                 if (s.in) {
                   const diff = differenceInMinutes(s.out || new Date(), s.in);
                   durationStr = `${Math.floor(diff / 60)}h ${diff % 60}m`;
-                  if (!s.out) durationStr = 'กำลังทำงาน ⏳';
+                  if (!s.out) durationStr = 'กำลังทำงาน';
                 }
 
                 // Calculate late/on-time status
                 let statusText = '';
-                let statusColor = '#999999';
+                let statusColor = BRAND.neutral;
                 const scheduledStart = getScheduledStart(s.empId);
                 if (s.in && scheduledStart) {
                   const inTimeStr = safeThaiTime(s.in);
-                  const [schH, schM] = scheduledStart.split(':').map(Number);
-                  const [inH, inM] = inTimeStr.split(':').map(Number);
-                  const schMinutes = schH * 60 + schM;
-                  const inMinutes = inH * 60 + inM;
-                  const diffMin = inMinutes - schMinutes;
-                  if (diffMin > 15) {
+                  const diffMin = minutesAfter(inTimeStr, scheduledStart);
+                  if (diffMin > LATE_GRACE_MINUTES) {
                     statusText = `สาย +${diffMin} นาที`;
-                    statusColor = '#ff4b00';
+                    statusColor = BRAND.errorRed; // late is a real problem: red
                   } else if (diffMin < -5) {
                     statusText = `มาเร็ว ${Math.abs(diffMin)} นาที`;
-                    statusColor = '#007bff';
+                    statusColor = BRAND.muted;
                   } else {
-                    statusText = `✓ ตรงเวลา`;
-                    statusColor = '#1DB446';
+                    statusText = `ตรงเวลา`;
+                    statusColor = BRAND.plum;
                   }
                 }
 
@@ -368,16 +229,16 @@ export async function POST(request) {
                   {
                     type: 'box', layout: 'horizontal',
                     contents: [
-                      { type: 'text', text: `👤 ${s.name}`, weight: 'bold', size: 'sm', color: '#333333', flex: 3 },
-                      { type: 'text', text: s.position, size: 'xs', color: '#555555', align: 'end', flex: 2 }
+                      { type: 'text', text: s.name || '-', weight: 'bold', size: 'sm', color: BRAND.charcoal, flex: 3, wrap: true },
+                      { type: 'text', text: s.position || '-', size: 'xs', color: BRAND.neutral, align: 'end', flex: 2 }
                     ]
                   },
                   {
                     type: 'box', layout: 'horizontal',
                     contents: [
-                      { type: 'text', text: `เข้า: ${inTime}`, size: 'xs', color: '#1DB446', flex: 1 },
-                      { type: 'text', text: `ออก: ${outTime}`, size: 'xs', color: '#ff4b00', flex: 1 },
-                      { type: 'text', text: durationStr, size: 'xs', color: (durationStr.includes('กำลัง') ? '#007bff' : '#333333'), align: 'end', flex: 1, weight: 'bold' }
+                      { type: 'text', text: `เข้า ${inTime}`, size: 'xs', color: BRAND.muted, flex: 1 },
+                      { type: 'text', text: `ออก ${outTime}`, size: 'xs', color: BRAND.muted, flex: 1 },
+                      { type: 'text', text: durationStr, size: 'xs', color: (durationStr.includes('กำลัง') ? BRAND.plum : BRAND.charcoal), align: 'end', flex: 1, weight: 'bold' }
                     ]
                   }
                 ];
@@ -387,7 +248,7 @@ export async function POST(request) {
                     type: 'box', layout: 'horizontal', margin: 'xs',
                     contents: [
                       { type: 'text', text: statusText, size: 'xs', weight: 'bold', color: statusColor, flex: 2 },
-                      ...(scheduledStart ? [{ type: 'text', text: `(กะ ${scheduledStart})`, size: 'xxs', color: '#888888', align: 'end', flex: 1 }] : [])
+                      ...(scheduledStart ? [{ type: 'text', text: `(กะ ${scheduledStart})`, size: 'xxs', color: BRAND.neutral, align: 'end', flex: 1 }] : [])
                     ]
                   });
                 }
@@ -396,17 +257,28 @@ export async function POST(request) {
                   type: 'box', layout: 'vertical', margin: 'md', spacing: 'sm',
                   contents: rowContents
                 });
-                contents.push({ type: 'separator', margin: 'sm' });
+                contents.push({ type: 'separator', margin: 'md', color: BRAND.rule });
               }
 
               if (count === 0) {
-                contents.push({ type: 'text', text: 'ยังไม่มีการลงเวลาวันนี้', margin: 'md', size: 'sm', color: '#635B5F', align: 'center' });
+                contents.push({ type: 'text', text: 'ยังไม่มีการลงเวลาวันนี้', margin: 'md', size: 'sm', color: BRAND.neutral, align: 'center' });
               }
 
               await client.replyMessage(event.replyToken, {
                 type: 'flex',
                 altText: `สรุปการเข้างาน ${todayStr}`,
-                contents: { type: 'bubble', body: { type: 'box', layout: 'vertical', contents: contents } }
+                contents: {
+                  type: 'bubble',
+                  styles: { header: { backgroundColor: BRAND.plum }, body: { backgroundColor: BRAND.cream } },
+                  header: {
+                    type: 'box', layout: 'vertical', backgroundColor: BRAND.plum, paddingAll: '16px',
+                    contents: [
+                      { type: 'text', text: 'สรุปการเข้างาน', weight: 'bold', size: 'lg', color: BRAND.cream },
+                      { type: 'text', text: todayStr, size: 'xs', color: BRAND.onPlum2, margin: 'xs' }
+                    ]
+                  },
+                  body: { type: 'box', layout: 'vertical', paddingAll: '16px', contents: contents.length && contents[contents.length - 1].type === 'separator' ? contents.slice(0, -1) : contents }
+                }
               });
               handledLocally = true;
             } 
@@ -481,8 +353,8 @@ export async function POST(request) {
                     spacing: 'sm',
                     margin: 'xs',
                     contents: [
-                      { type: 'text', text: `[ ]`, size: 'xs', color: '#16a34a', weight: 'bold', flex: 1 },
-                      { type: 'text', text: `${i + 1}. ${tText}`, size: 'xs', color: '#1f2937', wrap: true, flex: 9 }
+                      { type: 'text', text: `${i + 1}.`, size: 'sm', color: BRAND.plum, weight: 'bold', flex: 1 },
+                      { type: 'text', text: String(tText || '-'), size: 'sm', color: BRAND.charcoal, wrap: true, flex: 9 }
                     ]
                   }));
 
@@ -493,26 +365,28 @@ export async function POST(request) {
                       type: 'bubble',
                       size: 'mega',
                       styles: {
-                        header: { backgroundColor: '#f0fdf4' },
-                        body: { backgroundColor: '#ffffff' }
+                        header: { backgroundColor: BRAND.plum },
+                        body: { backgroundColor: BRAND.cream }
                       },
                       header: {
                         type: 'box',
                         layout: 'vertical',
+                        backgroundColor: BRAND.plum,
+                        paddingAll: '16px',
                         contents: [
                           {
                             type: 'text',
-                            text: '🎙️ AUTO-TASK INGESTION (VOICE NOTE)',
-                            color: '#15803d',
+                            text: `บันทึกงานจากข้อความเสียง ${result.tasks.length} รายการ`,
+                            color: BRAND.cream,
                             weight: 'bold',
-                            size: 'xs'
+                            size: 'md',
+                            wrap: true
                           },
                           {
                             type: 'text',
-                            text: `สกัดงานจากเสียงสำเร็จ ${result.tasks.length} รายการ`,
-                            color: '#166534',
-                            weight: 'bold',
-                            size: 'md',
+                            text: `บันทึกโดย พี่${senderName}`,
+                            color: BRAND.onPlum2,
+                            size: 'xs',
                             margin: 'xs'
                           }
                         ]
@@ -520,32 +394,33 @@ export async function POST(request) {
                       body: {
                         type: 'box',
                         layout: 'vertical',
+                        paddingAll: '16px',
                         spacing: 'sm',
                         contents: [
+                          { type: 'text', text: 'ข้อความเสียง', size: 'xs', color: BRAND.neutral },
                           {
                             type: 'text',
-                            text: `ข้อความเสียง: "${result.transcript}"`,
-                            size: 'xxs',
-                            color: '#6b7280',
-                            style: 'italic',
+                            text: `"${result.transcript || '-'}"`,
+                            size: 'xs',
+                            color: BRAND.muted,
                             wrap: true
                           },
-                          { type: 'separator', margin: 'sm', color: '#e5e7eb' },
+                          { type: 'separator', margin: 'md', color: BRAND.rule },
                           {
                             type: 'text',
-                            text: `📋 รายการงานที่บันทึกเข้าระบบ (โดย: พี่${senderName}):`,
-                            size: 'xs',
+                            text: 'รายการงานที่บันทึก',
+                            size: 'sm',
                             weight: 'bold',
-                            color: '#111827',
-                            margin: 'sm'
+                            color: BRAND.charcoal,
+                            margin: 'md'
                           },
                           ...taskBubbleContents,
-                          { type: 'separator', margin: 'md', color: '#e5e7eb' },
+                          { type: 'separator', margin: 'md', color: BRAND.rule },
                           {
                             type: 'text',
-                            text: '✨ บันทึกลงระบบ staff_tasks เรียบร้อยแล้ว ทีมงานสามารถเข้าตรวจสอบและเช็คลิสต์ในระบบได้ทันทีครับ',
-                            size: 'xxs',
-                            color: '#059669',
+                            text: 'บันทึกเข้ารายการงานของทีมแล้ว เปิดดูและเช็คในระบบได้ทันทีครับ',
+                            size: 'xs',
+                            color: BRAND.neutral,
                             wrap: true,
                             margin: 'xs'
                           }
@@ -620,9 +495,11 @@ export async function POST(request) {
               }
 
               // Owner decision 2026-11-26: AI only for important work. Photos without a
-              // payment QR (food, the shop, cats, cards) are logged silently, no AI call.
+              // payment QR (food, the shop, cats, cards) are logged silently. A slip shot on
+              // a phone screen has no readable QR either, so a cheap fast-model check lets
+              // those through to the slip reader below (owner report 2026-11-26).
               // Set YUZU_VISION_ALL_IMAGES=true in Vercel to read every photo again.
-              if (process.env.YUZU_VISION_ALL_IMAGES !== 'true') {
+              if (process.env.YUZU_VISION_ALL_IMAGES !== 'true' && !(await looksLikePaymentSlip(base64))) {
                 await saveMessage(groupId, userId, 'user', '[รูปภาพ]', 'image_description');
                 handledLocally = true;
                 return;
@@ -885,23 +762,16 @@ export async function POST(request) {
           }
 
           // --- Handle Location Messages ---
+          // No AI call and no reply: there is no location-based check-in flow, so a shared
+          // location is only logged to the chat history.
           else if (event.message.type === 'location') {
-            console.log("Yuzu Location: Received");
             const { latitude, longitude, address } = event.message;
-            const query = `ฉันอยู่ที่นี่: ${address || 'ตำแหน่งปัจจุบัน'} (${latitude}, ${longitude}) ช่วยหาปั๊มน้ำมันที่ใกล้ที่สุดและน้ำมันยังไม่หมดจาก Dashboard หรือข้อมูลล่าสุดให้หน่อยค่ะ`;
-            
             try {
-              const context = `[Location] Lat: ${latitude}, Lng: ${longitude}, Address: ${address}\n[Home] Shop "In The Haus" is at (17.390083, 104.792944)\n[Source] https://script.google.com/macros/s/AKfycbyJ5WFOFmjwVJWoIUer6dwxHdeSShDvUfSWU0NNfsIH8Ek9WguCAzJG9QSbK5g77MH6/exec`;
-              const response = await getGeminiResponse(query, context, [], userId);
-              
-              await saveMessage(groupId, userId, 'user', `[Location Message] ${address || 'Coordinates'}`, 'location');
-              await saveMessage(groupId, null, 'model', response, 'text');
-              
-              handledLocally = true;
-              await client.replyMessage(event.replyToken, { type: 'text', text: response });
+              await saveMessage(groupId, userId, 'user', `[Location Message] ${address || 'Coordinates'} (${latitude}, ${longitude})`, 'location');
             } catch (locationError) {
               console.error("Location Processing Error:", locationError);
             }
+            handledLocally = true;
           }
         } 
         

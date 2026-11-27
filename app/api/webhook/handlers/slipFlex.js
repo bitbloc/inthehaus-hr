@@ -5,17 +5,10 @@
  * LINE Flex sizes: xs 13px · sm 14px · md 16px · lg 19px · xl 22px · 3xl 35px.
  * Hallmark · pre-emit critique: P5 H5 E5 S5 R5 V5 */
 
-export const BRAND = {
-  plum: '#41032A',
-  onPlum2: '#D0B5C1',
-  charcoal: '#1A1A1A',
-  cream: '#F6F2EA',
-  paper2: '#ECE4E7',
-  rule: '#D4CBCF',
-  neutral: '#635B5F',
-  muted: '#524A4E',
-  error: '#B42318',
-};
+import { BRAND } from '@/utils/brand';
+
+// Re-exported for the cards that already import it from here.
+export { BRAND };
 
 /** Strip emoji / pictographs so card text stays typographic. */
 export const plain = (s) =>
@@ -41,7 +34,7 @@ const row = (label, value, { color = BRAND.charcoal, bold = false, size = 'md' }
   ],
 });
 
-/** Solid-colour header band: small Latin tag, then the Thai title. */
+/** Solid-colour header band: small Thai tag, then the title. */
 const header = ({ bg, tag, title, sub }) => ({
   type: 'box',
   layout: 'vertical',
@@ -83,7 +76,7 @@ export function buildSlipSuccessFlex({
     type: 'flex',
     altText: `บันทึกยอดโอน ${baht(amount)} บาทแล้ว`,
     contents: bubble(
-      header({ bg: BRAND.plum, tag: 'ในบ้าน · IN THE HAUS', title: 'บันทึกยอดโอนแล้ว' }),
+      header({ bg: BRAND.plum, tag: 'ตรวจสลิป', title: 'บันทึกยอดโอนแล้ว' }),
       [
         text('ยอดเงิน', { size: 'sm', color: BRAND.neutral }),
         {
@@ -127,7 +120,7 @@ export function buildDuplicateFlex({ amount, isNetworkDuplicate, ref, originalSe
     type: 'flex',
     altText: `สลิปซ้ำ ไม่บันทึก: ยอด ${baht(amount)} บาท`,
     contents: bubble(
-      header({ bg: BRAND.error, tag: 'DUPLICATE SLIP', title: 'สลิปซ้ำ ไม่บันทึก' }),
+      header({ bg: BRAND.errorRed, tag: 'ตรวจสลิป', title: 'สลิปซ้ำ ไม่บันทึก' }),
       [
         text(
           isNetworkDuplicate
@@ -141,7 +134,7 @@ export function buildDuplicateFlex({ amount, isNetworkDuplicate, ref, originalSe
         ...(originalSender ? [row('ผู้โอนเดิม', originalSender)] : []),
         row('บันทึกครั้งแรก', firstSavedAt, { size: 'sm' }),
         row('ผู้บันทึกเดิม', originalOperator, { bold: true }),
-        note(`ส่งซ้ำโดย พี่${resender}`, ['ยูซุไม่ให้ใช้สลิปเดิมซ้ำ เพื่อให้ยอดเงินของร้านถูกต้องครับ'], { titleColor: BRAND.error }),
+        note(`ส่งซ้ำโดย พี่${resender}`, ['ยูซุไม่ให้ใช้สลิปเดิมซ้ำ เพื่อให้ยอดเงินของร้านถูกต้องครับ'], { titleColor: BRAND.errorRed }),
       ]
     ),
   };
@@ -157,13 +150,13 @@ export function buildFakeSlipFlex({
     altText: `สลิปต้องสงสัย: ${plain(alertTitle)}`,
     contents: bubble(
       header({
-        bg: BRAND.error,
-        tag: 'SECURITY ALERT · ONHAUS',
+        bg: BRAND.errorRed,
+        tag: 'แจ้งเตือนความปลอดภัย',
         title: plain(alertTitle),
         sub: isWrongReceiver ? 'ไม่บันทึก: บัญชีผู้รับไม่ใช่บัญชีร้าน' : 'ไม่บันทึก: ข้อมูลไม่ผ่านการตรวจความปลอดภัย',
       }),
       [
-        text('สาเหตุ', { size: 'sm', weight: 'bold', color: BRAND.error }),
+        text('สาเหตุ', { size: 'sm', weight: 'bold', color: BRAND.errorRed }),
         text(plain(fakeReason), { size: 'md', color: BRAND.charcoal, margin: 'xs' }),
         ...checks.map(plain).filter(Boolean).map((l) => text(l, { size: 'sm', color: BRAND.muted, margin: 'sm' })),
 
@@ -173,7 +166,7 @@ export function buildFakeSlipFlex({
         ...(bankVerifiedAmount ? [row('ยอดจริงใน QR', `${baht(bankVerifiedAmount)} บาท`, { bold: true })] : []),
         ...(bank ? [row('ธนาคารที่อ้าง', bank)] : []),
         ...(customerSender ? [row('ผู้โอนในสลิป', customerSender)] : []),
-        ...(receiver ? [row('ผู้รับในสลิป', receiver, { bold: true, color: isWrongReceiver ? BRAND.error : BRAND.charcoal })] : []),
+        ...(receiver ? [row('ผู้รับในสลิป', receiver, { bold: true, color: isWrongReceiver ? BRAND.errorRed : BRAND.charcoal })] : []),
         row('ผู้ส่งภาพ', `พี่${submitter}`, { bold: true }),
 
         note('ทีมหน้าร้านทำอย่างไร', [

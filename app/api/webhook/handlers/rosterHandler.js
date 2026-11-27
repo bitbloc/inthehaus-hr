@@ -1,8 +1,10 @@
 import { format, addHours, startOfTomorrow, parseISO, startOfWeek, addDays } from 'date-fns';
 import { getEffectiveRoster } from '../../../../utils/roster';
+import { LATE_GRACE_MINUTES, minutesAfter } from '../../../../utils/attendance';
 import { getEmployeeByLineId, checkIsBoss } from '../../../../utils/memory';
 import { getServiceClient } from '../../../../lib/supabaseServer';
 import { buildPayloadPostbackData, readPostbackPayload, PAYLOAD_TOO_LONG_TEXT } from '../../../../utils/postbackPayload';
+import { BRAND } from '@/utils/brand';
 
 // LINE webhook has no user session: use the service-role client (falls back to anon until
 // SUPABASE_SERVICE_ROLE_KEY is set) so roster writes keep working once anon writes are revoked.
@@ -17,7 +19,7 @@ export function nextRosterWeek(startDateStr) {
 }
 
 export function autoGenerateSummaryText(targetMon, targetSun) {
-  return `🤖 จัดตารางสัปดาห์หน้าอัตโนมัติ (${format(targetMon, 'dd/MM')} - ${format(targetSun, 'dd/MM')})
+  return `จัดตารางสัปดาห์หน้าอัตโนมัติ (${format(targetMon, 'dd/MM')} - ${format(targetSun, 'dd/MM')})
 ยูซุจะสร้างกะงานใหม่ทับตารางเดิมของสัปดาห์นั้น นำเข้าใบลาที่อนุมัติแล้ว และบันทึกเป็นแบบร่าง (Draft)
 กดยืนยันเพื่อสร้างครับ`;
 }
@@ -27,17 +29,17 @@ export function buildRosterConfirmMessage(summaryText, isBossUser, postbackData)
   const confirmFlex = {
     type: 'bubble',
     styles: {
-      header: { backgroundColor: '#f3f3f3' },
-      body: { backgroundColor: '#f3f3f3' },
-      footer: { backgroundColor: '#ebebeb' }
+      body: { backgroundColor: BRAND.cream },
+      footer: { backgroundColor: BRAND.cream }
     },
     header: {
       type: 'box',
       layout: 'vertical',
       paddingAll: '20px',
+      backgroundColor: BRAND.plum,
       contents: [
-        { type: 'text', text: 'ROSTER CHANGE PROPOSAL', color: '#1c1c1c', weight: 'bold', size: 'sm' },
-        { type: 'text', text: `CLASSIFICATION: ${isBossUser ? 'DIRECTIVE (BOSS)' : 'PROPOSAL'}`, color: '#1c1c1c', weight: 'bold', size: 'xxs', margin: 'xs' }
+        { type: 'text', text: 'ยืนยันการแก้ตารางงาน', color: BRAND.cream, weight: 'bold', size: 'md', wrap: true },
+        { type: 'text', text: isBossUser ? 'คำสั่งจากบอส' : 'คำขอรอบอสอนุมัติ', color: BRAND.onPlum2, size: 'xs', margin: 'xs' }
       ]
     },
     body: {
@@ -45,8 +47,8 @@ export function buildRosterConfirmMessage(summaryText, isBossUser, postbackData)
       layout: 'vertical',
       paddingAll: '20px',
       contents: [
-        { type: 'text', text: summaryText || '-', wrap: true, size: 'sm', color: '#1c1c1c' },
-        { type: 'text', text: isBossUser ? 'PLEASE REVIEW THE PROPOSAL DETAILS BEFORE EXECUTING UPDATE.' : 'PLEASE CONFIRM THAT THE INFORMATION ABOVE IS ACCURATE TO SUBMIT FOR REVIEW.', margin: 'md', size: 'xxs', color: '#888888', wrap: true }
+        { type: 'text', text: summaryText || '-', wrap: true, size: 'sm', color: BRAND.charcoal },
+        { type: 'text', text: isBossUser ? 'ตรวจรายละเอียดก่อนกดยืนยันครับ' : 'ตรวจว่าข้อมูลถูกต้อง แล้วกดส่งให้บอสพิจารณาครับ', margin: 'md', size: 'xs', color: BRAND.neutral, wrap: true }
       ]
     },
     footer: {
@@ -55,78 +57,39 @@ export function buildRosterConfirmMessage(summaryText, isBossUser, postbackData)
       paddingAll: '15px',
       spacing: 'sm',
       contents: [
-        { type: 'button', style: 'primary', color: '#1c1c1c', action: { type: 'postback', label: isBossUser ? 'EXECUTE UPDATE' : 'CONFIRM SUBMISSION', data: postbackData } },
-        { type: 'button', style: 'secondary', action: { type: 'postback', label: 'CANCEL', data: 'action=cancel_roster' } }
+        { type: 'button', style: 'primary', color: BRAND.charcoal, action: { type: 'postback', label: isBossUser ? 'ยืนยันแก้ตาราง' : 'ยืนยันส่งคำขอ', data: postbackData } },
+        { type: 'button', style: 'secondary', color: BRAND.paper2, action: { type: 'postback', label: 'ยกเลิก', data: 'action=cancel_roster' } }
       ]
     }
   };
   return { type: 'flex', altText: isBossUser ? '👑 บอสสั่งแก้ตาราง' : '📝 ยืนยันข้อมูลตารางงาน', contents: confirmFlex };
 }
 
-function getShiftColorHex(shiftName, isOff, isCustomOrExtra) {
-  if (isOff) return '#dc2626'; // Red
-  
-  const name = (shiftName || '').toLowerCase();
-  
-  // If it's custom/extra but matches one of our presets, it's not generic custom
-  const isPreset = name.includes('ผู้ช่วยครัว') || name.includes('chef') || name.includes('inthehaus') || name.includes('กลางกะ');
-  const actualCustomOrExtra = isCustomOrExtra && !isPreset;
-
-  if (actualCustomOrExtra) return '#0284c7'; // Sky/Teal
-  
-  if (name.includes('ควบ') || name.includes('double')) {
-    return '#e11d48'; // Rose
-  }
-  if (name.includes('ค่ำ') || name.includes('ดึก') || name.includes('night') || name.includes('evening') || name.includes('กลาง')) {
-    return '#4f46e5'; // Indigo
-  }
-  if (name.includes('เช้า') || name.includes('morning')) {
-    return '#d97706'; // Amber
-  }
-  if (name.includes('chef')) {
-    return '#15803d'; // Green
-  }
-  if (name.includes('inthehaus')) {
-    return '#ea580c'; // Orange
-  }
-  if (name.includes('ผู้ช่วยครัว')) {
-    return '#9c4221'; // Brown/Orange
-  }
-  return '#ca8a04'; // Yellow
-}
-
+// Roster calendar cell colours, brand v2: plum marks a working shift, a plum fill marks
+// the heavy double shift, cream with charcoal or neutral text marks leave and days off.
+// Each shift keeps its own short label, so colour does not have to tell them apart.
 function getCellColorsAndLabels(empShift, isOff, leaveRequest) {
+  const work = { bg: BRAND.paper2, borderColor: BRAND.rule, textColor: BRAND.plum };
+
   if (leaveRequest) {
     let label = 'ลา';
     let time1 = 'ลาหยุด';
-    let bg = '#FFF7ED';
-    let text = '#EA580C';
-    let border = '#FFEDD5';
 
     if (leaveRequest.leave_type === 'vacation') {
-      label = '🏖️พัก';
+      label = 'พัก';
       time1 = 'พักร้อน';
-      bg = '#E0F2FE';
-      text = '#0369A1';
-      border = '#BAE6FD';
     } else if (leaveRequest.leave_type === 'sick') {
-      label = '😷ป่วย';
+      label = 'ป่วย';
       time1 = 'ลาป่วย';
-      bg = '#FEF3C7';
-      text = '#B45309';
-      border = '#FDE68A';
     } else if (leaveRequest.leave_type === 'business') {
-      label = '💼กิจ';
+      label = 'กิจ';
       time1 = 'ลากิจ';
-      bg = '#FFF7ED';
-      text = '#EA580C';
-      border = '#FFEDD5';
     }
 
     return {
-      bg,
-      borderColor: border,
-      textColor: text,
+      bg: BRAND.cream,
+      borderColor: BRAND.rule,
+      textColor: BRAND.charcoal,
       label,
       timeLine1: time1,
       timeLine2: ''
@@ -135,9 +98,9 @@ function getCellColorsAndLabels(empShift, isOff, leaveRequest) {
 
   if (isOff || !empShift || empShift.name === 'OFF') {
     return {
-      bg: '#F4F4F5',
-      borderColor: '#E4E4E7',
-      textColor: '#71717A',
+      bg: BRAND.cream,
+      borderColor: BRAND.rule,
+      textColor: BRAND.neutral,
       label: 'OFF',
       timeLine1: 'หยุด',
       timeLine2: ''
@@ -150,74 +113,25 @@ function getCellColorsAndLabels(empShift, isOff, leaveRequest) {
 
   // Check presets
   if (name.includes('เช้า') || (start === '10:00' && end === '18:00')) {
-    return {
-      bg: '#FEF3C7',
-      borderColor: '#FDE68A',
-      textColor: '#B45309',
-      label: 'เช้า',
-      timeLine1: start,
-      timeLine2: end
-    };
+    return { ...work, label: 'เช้า', timeLine1: start, timeLine2: end };
   }
   if (name.includes('ค่ำ') || name.includes('ดึก') || (start === '16:30' && end === '00:30')) {
-    return {
-      bg: '#EEF2FF',
-      borderColor: '#E0E7FF',
-      textColor: '#4F46E5',
-      label: 'ค่ำ',
-      timeLine1: start,
-      timeLine2: end
-    };
+    return { ...work, label: 'ค่ำ', timeLine1: start, timeLine2: end };
   }
   if (name.includes('ควบ') || (start === '10:00' && end === '00:30')) {
-    return {
-      bg: '#FEE2E2',
-      borderColor: '#FECACA',
-      textColor: '#DC2626',
-      label: 'ควบ',
-      timeLine1: start,
-      timeLine2: end
-    };
+    return { bg: BRAND.plum, borderColor: BRAND.plum, textColor: BRAND.cream, label: 'ควบ', timeLine1: start, timeLine2: end };
   }
   if (name.toLowerCase().includes('haus') || (start === '18:00' && end === '22:30')) {
-    return {
-      bg: '#FFF7ED',
-      borderColor: '#FFEDD5',
-      textColor: '#EA580C',
-      label: 'HAUS',
-      timeLine1: start,
-      timeLine2: end
-    };
+    return { ...work, label: 'HAUS', timeLine1: start, timeLine2: end };
   }
   if (name.toLowerCase().includes('chef') || (start === '10:00' && end === '20:30')) {
-    return {
-      bg: '#ECFDF5',
-      borderColor: '#D1FAE5',
-      textColor: '#047857',
-      label: 'CHEF',
-      timeLine1: start,
-      timeLine2: end
-    };
+    return { ...work, label: 'CHEF', timeLine1: start, timeLine2: end };
   }
   if (name.includes('ผู้ช่วยครัว') || (start === '12:30' && end === '23:30')) {
-    return {
-      bg: '#FFFBEB',
-      borderColor: '#FEF3C7',
-      textColor: '#9C4221',
-      label: 'ครัว',
-      timeLine1: start,
-      timeLine2: end
-    };
+    return { ...work, label: 'ครัว', timeLine1: start, timeLine2: end };
   }
   if (name.includes('กลาง') || (start === '12:00' && end === '20:00') || (start === '12:00' && end === '21:00') || (start === '11:00' && end === '20:00')) {
-    return {
-      bg: '#F1F5F9',
-      borderColor: '#E2E8F0',
-      textColor: '#475569',
-      label: 'กลาง',
-      timeLine1: start,
-      timeLine2: end
-    };
+    return { ...work, label: 'กลาง', timeLine1: start, timeLine2: end };
   }
 
   // Smart fallback for custom presets and custom times (e.g. 12-21 instead of Custom S)
@@ -226,20 +140,20 @@ function getCellColorsAndLabels(empShift, isOff, leaveRequest) {
     : (name.toLowerCase().startsWith('custom') ? 'กะ' : name.slice(0, 6));
 
   return {
-    bg: '#E0F2FE',
-    borderColor: '#BAE6FD',
-    textColor: '#0369A1',
-    label: customLabel,
+    bg: BRAND.paper2,
+    borderColor: BRAND.rule,
+    textColor: BRAND.charcoal,
+    label: customLabel || 'กะ',
     timeLine1: start,
     timeLine2: end
   };
 }
 
-function formatLeaveRequestBubble(l, isHistory = false) {
+function formatLeaveRequestBubble(l, isHistory = false, showReason = false) {
   const empName = l.employees?.nickname || l.employees?.name || 'พนักงาน';
   const empPosition = l.employees?.position || 'ทั่วไป';
   const dateStr = l.leave_date ? format(parseISO(l.leave_date), 'dd/MM/yyyy') : '-';
-  
+
   let typeText = 'ลาหยุด';
   if (l.leave_type === 'sick') typeText = 'ลาป่วย';
   else if (l.leave_type === 'business') typeText = 'ลากิจ';
@@ -249,58 +163,79 @@ function formatLeaveRequestBubble(l, isHistory = false) {
   const replacementName = repEmp ? `${repEmp.name} (${repEmp.nickname || "-"})` : '-';
   const reasonText = l.reason || '-';
 
-  // Status style config
-  let statusLabel = 'PENDING';
-  let statusColor = '#ef6c00';
+  // Status label on the plum header: pending plum-2, approved cream, rejected red
+  let statusLabel = 'รออนุมัติ';
+  let statusBg = BRAND.plum2;
+  let statusText = BRAND.cream;
   if (l.status === 'approved') {
-    statusLabel = 'APPROVED';
-    statusColor = '#2e7d32';
+    statusLabel = 'อนุมัติแล้ว';
+    statusBg = BRAND.cream;
+    statusText = BRAND.plum;
   } else if (l.status === 'rejected') {
-    statusLabel = 'REJECTED';
-    statusColor = '#c62828';
+    statusLabel = 'ไม่อนุมัติ';
+    statusBg = BRAND.errorRed;
+    statusText = BRAND.cream;
   }
+
+  const row = (label, value, extra = {}) => ({
+    type: 'box',
+    layout: 'horizontal',
+    contents: [
+      { type: 'text', text: label, color: BRAND.neutral, size: 'sm', flex: 3 },
+      { type: 'text', text: value || '-', color: BRAND.charcoal, size: 'sm', flex: 5, align: 'end', wrap: true, ...extra }
+    ]
+  });
 
   const bubble = {
     type: 'bubble',
     size: 'mega',
     styles: {
-      header: { backgroundColor: '#f3f3f3' },
-      body: { backgroundColor: '#f3f3f3' },
-      footer: { backgroundColor: '#ebebeb' }
+      body: { backgroundColor: BRAND.cream },
+      footer: { backgroundColor: BRAND.cream }
     },
     header: {
       type: 'box',
       layout: 'vertical',
       paddingAll: '20px',
+      backgroundColor: BRAND.plum,
       contents: [
+        {
+          type: 'text',
+          text: isHistory ? 'ประวัติการลา' : 'คำขอลา',
+          weight: 'bold',
+          size: 'md',
+          color: BRAND.cream
+        },
         {
           type: 'box',
           layout: 'horizontal',
+          margin: 'sm',
+          spacing: 'sm',
           contents: [
             {
               type: 'text',
-              text: isHistory ? 'LEAVE REGISTRY RECORD' : 'LEAVE REGISTRY REQUEST',
-              weight: 'bold',
-              size: 'sm',
-              color: '#1c1c1c',
-              flex: 1
+              text: `${empName}, ${empPosition}`,
+              color: BRAND.onPlum2,
+              size: 'xs',
+              flex: 1,
+              gravity: 'center',
+              wrap: true
             },
             {
-              type: 'text',
-              text: statusLabel,
-              color: statusColor,
-              weight: 'bold',
-              size: 'xs',
-              align: 'end'
+              type: 'box',
+              layout: 'vertical',
+              flex: 0,
+              backgroundColor: statusBg,
+              cornerRadius: '4px',
+              paddingStart: '8px',
+              paddingEnd: '8px',
+              paddingTop: '2px',
+              paddingBottom: '2px',
+              contents: [
+                { type: 'text', text: statusLabel, color: statusText, weight: 'bold', size: 'xxs' }
+              ]
             }
           ]
-        },
-        {
-          type: 'text',
-          text: `APPLICANT: ${empName.toUpperCase()} // ${empPosition.toUpperCase()}`,
-          color: '#666666',
-          size: 'xxs',
-          margin: 'xs'
         }
       ]
     },
@@ -310,40 +245,22 @@ function formatLeaveRequestBubble(l, isHistory = false) {
       paddingAll: '20px',
       spacing: 'sm',
       contents: [
-        { type: 'separator', color: '#cccccc' },
-        {
-          type: 'box',
-          layout: 'horizontal',
-          contents: [
-            { type: 'text', text: 'DATE', color: '#666666', size: 'xs', flex: 3 },
-            { type: 'text', text: dateStr, color: '#1c1c1c', size: 'xs', flex: 5, weight: 'bold', align: 'end' }
-          ]
-        },
-        {
-          type: 'box',
-          layout: 'horizontal',
-          contents: [
-            { type: 'text', text: 'CLASSIFICATION', color: '#666666', size: 'xs', flex: 3 },
-            { type: 'text', text: typeText, color: '#1c1c1c', size: 'xs', flex: 5, align: 'end' }
-          ]
-        },
-        {
-          type: 'box',
-          layout: 'horizontal',
-          contents: [
-            { type: 'text', text: 'REPLACEMENT', color: '#666666', size: 'xs', flex: 3 },
-            { type: 'text', text: replacementName, color: '#1c1c1c', size: 'xs', flex: 5, wrap: true, align: 'end' }
-          ]
-        },
-        {
+        row('วันที่ลา', dateStr, { weight: 'bold' }),
+        row('ประเภท', typeText),
+        row('คนแทน', replacementName),
+        // The reason is private: shown only in a 1:1 chat, never on a group card.
+        ...(showReason ? [{
           type: 'box',
           layout: 'vertical',
           margin: 'md',
+          paddingAll: '12px',
+          cornerRadius: '6px',
+          backgroundColor: BRAND.paper2,
           contents: [
-            { type: 'text', text: 'REASON FOR ABSENCE', color: '#666666', size: 'xxs', weight: 'bold' },
-            { type: 'text', text: reasonText, color: '#333333', size: 'xs', wrap: true, margin: 'xs' }
+            { type: 'text', text: 'เหตุผลที่ลา', color: BRAND.neutral, size: 'xs', weight: 'bold' },
+            { type: 'text', text: reasonText, color: BRAND.charcoal, size: 'sm', wrap: true, margin: 'xs' }
           ]
-        }
+        }] : [])
       ]
     }
   };
@@ -359,19 +276,20 @@ function formatLeaveRequestBubble(l, isHistory = false) {
         {
           type: 'button',
           style: 'primary',
-          color: '#1c1c1c',
+          color: BRAND.charcoal,
           action: {
             type: 'postback',
-            label: 'APPROVE',
+            label: 'อนุมัติ',
             data: `action=approve_leave&id=${l.id}`
           }
         },
         {
           type: 'button',
           style: 'secondary',
+          color: BRAND.paper2,
           action: {
             type: 'postback',
-            label: 'REJECT',
+            label: 'ไม่อนุมัติ',
             data: `action=reject_leave&id=${l.id}`
           }
         }
@@ -537,7 +455,7 @@ export async function generateStCalendarFlex(start) {
               flex: 2,
               size: '10px',
               weight: 'bold',
-              color: '#666666',
+              color: BRAND.neutral,
               wrap: true,
               align: 'start',
               gravity: 'center'
@@ -559,7 +477,7 @@ export async function generateStCalendarFlex(start) {
                       text: `${dh.day}\n${dh.date}`,
                       size: '9px',
                       weight: 'bold',
-                      color: '#666666',
+                      color: BRAND.neutral,
                       wrap: true,
                       align: 'center',
                       gravity: 'center',
@@ -578,11 +496,11 @@ export async function generateStCalendarFlex(start) {
               alignItems: 'center',
               spacing: 'xs',
               borderWidth: 'none',
-              borderColor: '#e2e8f0'
+              borderColor: BRAND.rule
           },
           {
               type: 'separator',
-              color: '#e2e8f0'
+              color: BRAND.rule
           }
       ];
 
@@ -594,7 +512,7 @@ export async function generateStCalendarFlex(start) {
                   flex: 2,
                   size: '10px',
                   weight: 'bold',
-                  color: '#1A202C',
+                  color: BRAND.charcoal,
                   wrap: true,
                   align: 'start',
                   gravity: 'center',
@@ -647,7 +565,7 @@ export async function generateStCalendarFlex(start) {
           });
           rows.push({
               type: 'separator',
-              color: '#f1f5f9'
+              color: BRAND.rule
           });
       });
 
@@ -659,31 +577,29 @@ export async function generateStCalendarFlex(start) {
       let offGroupContents = null;
       if (offGroup && offGroup.length > 0) {
           const summaryItems = [
-              { type: 'separator', color: '#e2e8f0', margin: 'md' },
+              { type: 'separator', color: BRAND.rule, margin: 'md' },
               {
                   type: 'text',
-                  text: '🏖️ พนักงานพักงาน / ลาหยุด / พักร้อน สัปดาห์นี้',
+                  text: 'พักงาน ลาหยุด หรือพักร้อนสัปดาห์นี้',
                   weight: 'bold',
                   size: '10px',
-                  color: '#475569',
-                  margin: 'sm'
+                  color: BRAND.muted,
+                  margin: 'sm',
+                  wrap: true
               }
           ];
 
           offGroup.forEach(emp => {
               const empLeaves = (weekLeaves || []).filter(l => l.employee_id === emp.id);
-              let statusText = 'หยุดตลอดสัปดาห์ (OFF)';
-              let statusColor = '#64748B'; // slate
-              let icon = '⚪';
+              let statusText = 'หยุดทั้งสัปดาห์';
+              let statusColor = BRAND.neutral;
 
               if (emp.employment_status === 'Suspended') {
-                  statusText = '🛑 พักงาน (Suspended)';
-                  statusColor = '#DC2626'; // red
-                  icon = '🛑';
+                  statusText = 'พักงาน';
+                  statusColor = BRAND.charcoal;
               } else if (emp.employment_status === 'Vacation') {
-                  statusText = '🏖️ พักร้อน (Vacation)';
-                  statusColor = '#0284C7'; // sky
-                  icon = '🏖️';
+                  statusText = 'พักร้อน';
+                  statusColor = BRAND.plum;
               } else if (empLeaves.length > 0) {
                   const types = Array.from(new Set(empLeaves.map(l => {
                       if (l.leave_type === 'vacation') return 'พักร้อน';
@@ -691,21 +607,20 @@ export async function generateStCalendarFlex(start) {
                       if (l.leave_type === 'business') return 'ลากิจ';
                       return 'ลาหยุด';
                   }))).join(', ');
-                  
+
                   const datesSorted = empLeaves.map(l => l.leave_date).sort();
                   const firstDate = format(parseISO(datesSorted[0]), 'dd/MM');
                   const lastDate = format(parseISO(datesSorted[datesSorted.length - 1]), 'dd/MM');
                   const dateRangeStr = datesSorted.length > 1 ? `${firstDate} - ${lastDate}` : firstDate;
-                  
+
                   statusText = `ลา (${types}) ${dateRangeStr}`;
-                  statusColor = '#D97706'; // amber
-                  icon = '📝';
+                  statusColor = BRAND.plum;
               }
 
               summaryItems.push({
                   type: 'box',
                   layout: 'horizontal',
-                  backgroundColor: '#F8FAFC',
+                  backgroundColor: BRAND.paper2,
                   cornerRadius: 'sm',
                   paddingTop: '4px',
                   paddingBottom: '4px',
@@ -716,11 +631,12 @@ export async function generateStCalendarFlex(start) {
                   contents: [
                       {
                           type: 'text',
-                          text: `${icon} ${emp.nickname || emp.name} (${(emp.position || 'ทั่วไป').toUpperCase()})`,
+                          text: `${emp.nickname || emp.name} (${emp.position || 'ทั่วไป'})`,
                           size: '10px',
                           weight: 'bold',
-                          color: '#1E293B',
-                          flex: 4
+                          color: BRAND.charcoal,
+                          flex: 4,
+                          wrap: true
                       },
                       {
                           type: 'text',
@@ -729,7 +645,8 @@ export async function generateStCalendarFlex(start) {
                           weight: 'bold',
                           color: statusColor,
                           align: 'end',
-                          flex: 5
+                          flex: 5,
+                          wrap: true
                       }
                   ]
               });
@@ -745,13 +662,6 @@ export async function generateStCalendarFlex(start) {
 
       const bodyContents = [
           {
-              type: 'text',
-              text: isNextWeek ? '📅 ตารางงานสัปดาห์หน้า' : '📅 ตารางงานสัปดาห์นี้',
-              weight: 'bold',
-              size: 'md',
-              color: '#1A202C'
-          },
-          {
               type: 'box',
               layout: 'vertical',
               contents: rows,
@@ -766,6 +676,31 @@ export async function generateStCalendarFlex(start) {
       return {
           type: 'bubble',
           size: 'mega',
+          styles: {
+              body: { backgroundColor: BRAND.cream }
+          },
+          header: {
+              type: 'box',
+              layout: 'vertical',
+              paddingAll: '16px',
+              backgroundColor: BRAND.plum,
+              contents: [
+                  {
+                      type: 'text',
+                      text: isNextWeek ? 'ตารางงานสัปดาห์หน้า' : 'ตารางงานสัปดาห์นี้',
+                      weight: 'bold',
+                      size: 'md',
+                      color: BRAND.cream
+                  },
+                  {
+                      type: 'text',
+                      text: `${daysHeader[0].date} - ${daysHeader[daysHeader.length - 1].date}`,
+                      size: 'xs',
+                      color: BRAND.onPlum2,
+                      margin: 'xs'
+                  }
+              ]
+          },
           body: {
               type: 'box',
               layout: 'vertical',
@@ -800,6 +735,17 @@ export async function generateStCalendarFlex(start) {
   return flexMsg;
 }
 
+// The daily roster card answers only an explicit request ("ตารางงาน", "เช็คตาราง พรุ่งนี้",
+// "yuzu ขอตารางงานวันนี้", "roster"), not a sentence that happens to contain the word.
+const ROSTER_KEYWORDS = ['เช็คตารางงาน', 'เช็คตาราง', 'ตารางงาน', 'roster', 'ใครเข้ากะ'];
+const ROSTER_TAIL = /^(วันนี้|พรุ่งนี้|today|tomorrow|หน่อย|บ้าง|ครับ|คับ|ค่ะ|คะ|นะ|จ้า|[\s?!.])*$/;
+
+export function isRosterQuery(text) {
+  const cmd = text.trim().replace(/^@?(yuzu|ยูซุ)\s*/, '').replace(/^(ขอ|ดู)\s*/, '');
+  const keyword = ROSTER_KEYWORDS.find(k => cmd.startsWith(k));
+  return !!keyword && ROSTER_TAIL.test(cmd.slice(keyword.length));
+}
+
 export async function handleRosterCommand(event, client, text, rawText, userId) {
   const isAutoGenCommand = text.includes('จัดตารางสัปดาห์หน้า') || 
                            text.includes('สร้างตารางสัปดาห์หน้า') || 
@@ -826,7 +772,7 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
       return true;
     } catch (err) {
       console.error('Auto Roster confirm card error in LINE command:', err);
-      await client.replyMessage(event.replyToken, { type: 'text', text: `เกิดข้อผิดพลาดในการเตรียมจัดตารางอัตโนมัติ: ${err.message}` });
+      await client.replyMessage(event.replyToken, { type: 'text', text: 'เตรียมจัดตารางอัตโนมัติไม่สำเร็จ ลองใหม่อีกครั้งครับ' });
       return true;
     }
   }
@@ -846,7 +792,7 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
     return true;
   }
 
-  if (text.includes('เช็คตาราง') || text.includes('roster') || text.includes('ตารางงาน') || text.includes('ใครเข้ากะ')) {
+  if (isRosterQuery(text)) {
     const targetDate = text.includes('พรุ่งนี้') ? startOfTomorrow() : addHours(new Date(), 7);
     const dateStr = format(targetDate, 'dd/MM/yyyy');
     const roster = await getEffectiveRoster(targetDate);
@@ -854,42 +800,40 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
     if (roster.length === 0) {
       await client.replyMessage(event.replyToken, { type: 'text', text: `📅 ตารางงานวันที่ ${dateStr}\n\nยังไม่มีรายงานการลงเวลาเข้างานของทีมงานในระบบครับ` });
     } else {
-      const contents = [
-        { type: 'text', text: 'DAILY ATTENDANCE REGISTRY', weight: 'bold', size: 'sm', color: '#1c1c1c' },
-        { type: 'text', text: `DATE: ${dateStr}`, size: 'xxs', color: '#666666', weight: 'bold', margin: 'xs' },
-        { type: 'separator', margin: 'md', color: '#cccccc' }
-      ];
-      
-      roster.forEach(emp => {
+      const contents = [];
+      const STATUS_LABEL = { PENDING: 'ยังไม่เข้า', IN: 'เข้าแล้ว', LATE: 'สาย', OUT: 'ออกแล้ว' };
+
+      roster.forEach((emp, idx) => {
         const shiftStart = emp.shift?.start_time?.slice(0,5);
         const shiftEnd = emp.shift?.end_time?.slice(0,5);
-        
+
         let statusTag = 'PENDING';
-        let statusColor = '#ef6c00';
+        let statusColor = BRAND.neutral;
         let actualTimeStr = "";
 
         if (emp.attendance?.check_in) {
           statusTag = 'IN';
-          statusColor = '#2e7d32';
+          statusColor = BRAND.plum;
           actualTimeStr = format(addHours(new Date(emp.attendance.check_in), 7), "HH:mm");
-          
-          if (shiftStart && actualTimeStr > shiftStart) {
-            statusColor = '#c62828';
-            statusTag = 'LATE'; 
+
+          if (shiftStart && minutesAfter(actualTimeStr, shiftStart) > LATE_GRACE_MINUTES) {
+            statusColor = BRAND.errorRed;
+            statusTag = 'LATE';
           }
         }
         if (emp.attendance?.check_out) {
           statusTag = 'OUT';
-          statusColor = '#666666';
+          statusColor = BRAND.neutral;
         }
 
+        if (idx > 0) contents.push({ type: 'separator', margin: 'md', color: BRAND.rule });
         contents.push({
           type: 'box', layout: 'horizontal', margin: 'md',
           contents: [
-            { type: 'text', text: statusTag, flex: 2, size: 'xs', weight: 'bold', color: statusColor },
-            { type: 'text', text: `${emp.nickname || emp.name}`.toUpperCase(), flex: 3, size: 'xs', weight: 'bold', color: '#1c1c1c' },
-            { type: 'text', text: (emp.shift?.name || 'Custom').toUpperCase(), flex: 2, size: 'xxs', color: '#666666', align: 'center' },
-            { type: 'text', text: emp.is_off ? 'หยุด' : actualTimeStr ? `${actualTimeStr} (${shiftStart || '-'})` : (shiftStart && shiftEnd ? `${shiftStart}-${shiftEnd}` : '-'), flex: 3, size: 'xs', align: 'end', color: (statusTag === 'LATE') ? '#c62828' : (emp.isOverride ? '#3b82f6' : '#1c1c1c') }
+            { type: 'text', text: STATUS_LABEL[statusTag], flex: 2, size: 'xs', weight: 'bold', color: statusColor },
+            { type: 'text', text: `${emp.nickname || emp.name || '-'}`, flex: 3, size: 'xs', weight: 'bold', color: BRAND.charcoal, wrap: true },
+            { type: 'text', text: emp.shift?.name || 'Custom', flex: 2, size: 'xxs', color: BRAND.neutral, align: 'center', wrap: true },
+            { type: 'text', text: emp.is_off ? 'หยุด' : actualTimeStr ? `${actualTimeStr} (${shiftStart || '-'})` : (shiftStart && shiftEnd ? `${shiftStart}-${shiftEnd}` : '-'), flex: 3, size: 'xs', align: 'end', color: (statusTag === 'LATE') ? BRAND.errorRed : (emp.isOverride ? BRAND.plum : BRAND.charcoal) }
           ]
         });
       });
@@ -900,8 +844,17 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
         contents: {
           type: 'bubble',
           styles: {
-            header: { backgroundColor: '#f3f3f3' },
-            body: { backgroundColor: '#f3f3f3' }
+            body: { backgroundColor: BRAND.cream }
+          },
+          header: {
+            type: 'box',
+            layout: 'vertical',
+            paddingAll: '20px',
+            backgroundColor: BRAND.plum,
+            contents: [
+              { type: 'text', text: 'เข้างานวันนี้', weight: 'bold', size: 'md', color: BRAND.cream },
+              { type: 'text', text: `วันที่ ${dateStr}`, size: 'xs', color: BRAND.onPlum2, margin: 'xs' }
+            ]
           },
           body: {
             type: 'box',
@@ -923,12 +876,13 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
       .order('leave_date', { ascending: true });
 
     if (error) {
-      await client.replyMessage(event.replyToken, { type: 'text', text: 'Error fetching data: ' + error.message });
+      console.error('Roster fetch error:', error);
+      await client.replyMessage(event.replyToken, { type: 'text', text: 'ดึงข้อมูลไม่สำเร็จ ลองใหม่อีกครั้งครับ' });
       return true;
     }
 
     if (leaves && leaves.length > 0) {
-      const bubbles = leaves.map(l => formatLeaveRequestBubble(l, false));
+      const bubbles = leaves.map(l => formatLeaveRequestBubble(l, false, event.source?.type === 'user'));
       const flexMsg = {
         type: 'flex',
         altText: '📋 รายการรออนุมัติลางาน',
@@ -939,33 +893,36 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
       const noPendingBubble = {
         type: 'bubble',
         size: 'mega',
+        styles: { body: { backgroundColor: BRAND.cream } },
+        header: {
+          type: 'box',
+          layout: 'vertical',
+          paddingAll: '20px',
+          backgroundColor: BRAND.plum,
+          contents: [
+            { type: 'text', text: 'คำขอลารออนุมัติ', weight: 'bold', size: 'md', color: BRAND.cream }
+          ]
+        },
         body: {
           type: 'box',
           layout: 'vertical',
           paddingAll: '20px',
           contents: [
             {
-              type: 'text',
-              text: '📋 รายการรออนุมัติลางาน',
-              weight: 'bold',
-              size: 'md',
-              color: '#9ca3af'
-            },
-            {
               type: 'box',
               layout: 'vertical',
-              margin: 'lg',
               paddingAll: '15px',
-              backgroundColor: '#f0fdf4',
+              backgroundColor: BRAND.paper2,
               cornerRadius: 'md',
               contents: [
                 {
                   type: 'text',
-                  text: '✅ ไม่มีรายการขอลาหยุดที่รออนุมัติ',
-                  color: '#15803d',
+                  text: 'ไม่มีคำขอลาที่รออนุมัติครับ',
+                  color: BRAND.plum,
                   weight: 'bold',
                   size: 'sm',
-                  align: 'center'
+                  align: 'center',
+                  wrap: true
                 }
               ]
             }
@@ -989,12 +946,13 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
       .limit(5);
 
     if (error) {
-      await client.replyMessage(event.replyToken, { type: 'text', text: 'Error fetching data: ' + error.message });
+      console.error('Roster fetch error:', error);
+      await client.replyMessage(event.replyToken, { type: 'text', text: 'ดึงข้อมูลไม่สำเร็จ ลองใหม่อีกครั้งครับ' });
       return true;
     }
 
     if (leaves && leaves.length > 0) {
-      const bubbles = leaves.map(l => formatLeaveRequestBubble(l, true));
+      const bubbles = leaves.map(l => formatLeaveRequestBubble(l, true, event.source?.type === 'user'));
       const flexMsg = {
         type: 'flex',
         altText: '📋 ประวัติการลาหยุดล่าสุด',
@@ -1005,33 +963,36 @@ export async function handleRosterCommand(event, client, text, rawText, userId) 
       const noHistoryBubble = {
         type: 'bubble',
         size: 'mega',
+        styles: { body: { backgroundColor: BRAND.cream } },
+        header: {
+          type: 'box',
+          layout: 'vertical',
+          paddingAll: '20px',
+          backgroundColor: BRAND.plum,
+          contents: [
+            { type: 'text', text: 'ประวัติการลาล่าสุด', weight: 'bold', size: 'md', color: BRAND.cream }
+          ]
+        },
         body: {
           type: 'box',
           layout: 'vertical',
           paddingAll: '20px',
           contents: [
             {
-              type: 'text',
-              text: '📋 ประวัติการลาหยุดล่าสุด',
-              weight: 'bold',
-              size: 'md',
-              color: '#9ca3af'
-            },
-            {
               type: 'box',
               layout: 'vertical',
-              margin: 'lg',
               paddingAll: '15px',
-              backgroundColor: '#f8fafc',
+              backgroundColor: BRAND.paper2,
               cornerRadius: 'md',
               contents: [
                 {
                   type: 'text',
-                  text: '❌ ยังไม่มีประวัติการขอลาหยุดในระบบ',
-                  color: '#64748b',
+                  text: 'ยังไม่มีประวัติการลาในระบบครับ',
+                  color: BRAND.neutral,
                   weight: 'bold',
                   size: 'sm',
-                  align: 'center'
+                  align: 'center',
+                  wrap: true
                 }
               ]
             }
@@ -1145,17 +1106,17 @@ export async function handleRosterPostback(event, client, action, queryParams, u
         const approvalFlex = {
           type: 'bubble',
           styles: {
-            header: { backgroundColor: '#f3f3f3' },
-            body: { backgroundColor: '#f3f3f3' },
-            footer: { backgroundColor: '#ebebeb' }
+            body: { backgroundColor: BRAND.cream },
+            footer: { backgroundColor: BRAND.cream }
           },
           header: {
             type: 'box',
             layout: 'vertical',
             paddingAll: '20px',
+            backgroundColor: BRAND.plum,
             contents: [
-              { type: 'text', text: 'ROSTER MODIFICATION REQUEST', color: '#1c1c1c', weight: 'bold', size: 'sm' },
-              { type: 'text', text: 'STATUS: PENDING MANAGER APPROVAL', color: '#ef6c00', size: 'xxs', weight: 'bold', margin: 'xs' }
+              { type: 'text', text: 'คำขอปรับตารางงาน', color: BRAND.cream, weight: 'bold', size: 'md' },
+              { type: 'text', text: 'รอบอสอนุมัติ', color: BRAND.onPlum2, size: 'xs', margin: 'xs' }
             ]
           },
           body: {
@@ -1168,26 +1129,26 @@ export async function handleRosterPostback(event, client, action, queryParams, u
                 type: 'box',
                 layout: 'horizontal',
                 contents: [
-                  { type: 'text', text: 'REQUESTER', size: 'xs', color: '#666666', flex: 1 },
-                  { type: 'text', text: targetNickname.toUpperCase(), size: 'xs', color: '#1c1c1c', align: 'end', flex: 2 }
+                  { type: 'text', text: 'ผู้ขอ', size: 'sm', color: BRAND.neutral, flex: 1 },
+                  { type: 'text', text: targetNickname || '-', size: 'sm', color: BRAND.charcoal, align: 'end', flex: 2, wrap: true }
                 ]
               },
               {
                 type: 'box',
                 layout: 'horizontal',
                 contents: [
-                  { type: 'text', text: 'TARGET DATE', size: 'xs', color: '#666666', flex: 1 },
-                  { type: 'text', text: payload.date, size: 'xs', color: '#1c1c1c', align: 'end', flex: 2 }
+                  { type: 'text', text: 'วันที่', size: 'sm', color: BRAND.neutral, flex: 1 },
+                  { type: 'text', text: payload.date || '-', size: 'sm', color: BRAND.charcoal, align: 'end', flex: 2 }
                 ]
               },
-              { type: 'separator', margin: 'md', color: '#cccccc' },
+              { type: 'separator', margin: 'md', color: BRAND.rule },
               {
                 type: 'box',
                 layout: 'vertical',
                 margin: 'md',
                 contents: [
-                  { type: 'text', text: 'MODIFICATION DETAILS', color: '#666666', size: 'xxs', weight: 'bold' },
-                  { type: 'text', text: payload.reason || payload.details?.note || '-', size: 'xs', color: '#1c1c1c', wrap: true, margin: 'xs' }
+                  { type: 'text', text: 'รายละเอียดที่ขอเปลี่ยน', color: BRAND.neutral, size: 'xs', weight: 'bold' },
+                  { type: 'text', text: payload.reason || payload.details?.note || '-', size: 'sm', color: BRAND.charcoal, wrap: true, margin: 'xs' }
                 ]
               }
             ]
@@ -1198,8 +1159,8 @@ export async function handleRosterPostback(event, client, action, queryParams, u
             paddingAll: '15px',
             spacing: 'sm',
             contents: [
-              { type: 'button', style: 'primary', color: '#1c1c1c', action: { type: 'postback', label: 'APPROVE', data: `action=approve_roster&id=${request.id}` } },
-              { type: 'button', style: 'secondary', action: { type: 'postback', label: 'REJECT', data: `action=reject_roster&id=${request.id}` } }
+              { type: 'button', style: 'primary', color: BRAND.charcoal, action: { type: 'postback', label: 'อนุมัติ', data: `action=approve_roster&id=${request.id}` } },
+              { type: 'button', style: 'secondary', color: BRAND.paper2, action: { type: 'postback', label: 'ไม่อนุมัติ', data: `action=reject_roster&id=${request.id}` } }
             ]
           }
         };
@@ -1210,7 +1171,7 @@ export async function handleRosterPostback(event, client, action, queryParams, u
       return true;
     } catch (e) {
       console.error("Confirm Roster Error:", e);
-      await client.replyMessage(event.replyToken, { type: 'text', text: `เเม๊! เกิดข้อผิดพลาด: ${e.message}` });
+      await client.replyMessage(event.replyToken, { type: 'text', text: 'ส่งคำขอปรับตารางไม่สำเร็จ ลองใหม่อีกครั้งครับ' });
       return true;
     }
   }
@@ -1251,7 +1212,7 @@ export async function handleRosterPostback(event, client, action, queryParams, u
     const requestId = queryParams.get('id');
     if (await checkIsBoss(userId)) {
        await supabase.from('roster_requests').update({ status: 'REJECTED', manager_id: (await getEmployeeByLineId(userId))?.id }).eq('id', requestId);
-       await client.replyMessage(event.replyToken, { type: 'text', text: '❌ ปฏิเสธคำขอเรียบร้อยค่ะ' });
+       await client.replyMessage(event.replyToken, { type: 'text', text: '❌ ปฏิเสธคำขอเรียบร้อยครับ' });
     }
     return true;
   }
@@ -1292,7 +1253,8 @@ export async function handleRosterPostback(event, client, action, queryParams, u
       .in('id', pendingLeaves.map(l => l.id));
 
     if (updateErr) {
-      await client.replyMessage(event.replyToken, { type: 'text', text: `เแม๊! เกิดข้อผิดพลาดในการอัปเดตสถานะ: ${updateErr.message}` });
+      console.error('Leave status update error:', updateErr);
+      await client.replyMessage(event.replyToken, { type: 'text', text: 'อัปเดตสถานะการลาไม่สำเร็จ ลองใหม่อีกครั้งครับ' });
       return true;
     }
 
@@ -1389,14 +1351,24 @@ export async function handleRosterPostback(event, client, action, queryParams, u
     const sampleReq = pendingLeaves[0];
     const name = sampleReq.employees?.nickname || sampleReq.employees?.name || 'พนักงาน';
     const isApproved = newStatus === 'approved';
-    const title = isApproved ? 'LEAVE REGISTRY APPROVED' : 'LEAVE REGISTRY REJECTED';
-    const statusColor = isApproved ? '#2e7d32' : '#c62828';
+    const title = isApproved ? 'อนุมัติการลาแล้ว' : 'ไม่อนุมัติการลา';
+    // approved: plum header; rejected: red header (a rejection is the one state that needs attention)
+    const headerBg = isApproved ? BRAND.plum : BRAND.errorRed;
     const typeText = sampleReq.leave_type === 'sick' ? 'ลาป่วย' : sampleReq.leave_type === 'business' ? 'ลากิจ' : 'พักร้อน';
-    
+
     // เรียงวันที่ทั้งหมดที่อนุมัติ/ปฏิเสธ
     const datesStr = pendingLeaves.map(l => l.leave_date).join(', ');
     const repEmp = sampleReq.replacement_employee;
     const replacementName = repEmp ? `${repEmp.name} (${repEmp.nickname || "-"})` : "-";
+
+    const row = (label, value, extra = {}) => ({
+      type: 'box',
+      layout: 'horizontal',
+      contents: [
+        { type: 'text', text: label, color: BRAND.neutral, size: 'sm', flex: 2 },
+        { type: 'text', text: value || '-', color: BRAND.charcoal, size: 'sm', flex: 4, wrap: true, align: 'end', ...extra }
+      ]
+    });
 
     const message = {
       type: 'flex',
@@ -1405,15 +1377,15 @@ export async function handleRosterPostback(event, client, action, queryParams, u
         type: 'bubble',
         size: 'kilo',
         styles: {
-          header: { backgroundColor: '#f3f3f3' },
-          body: { backgroundColor: '#f3f3f3' }
+          body: { backgroundColor: BRAND.cream }
         },
         header: {
           type: 'box',
           layout: 'vertical',
           paddingAll: '20px',
+          backgroundColor: headerBg,
           contents: [
-            { type: 'text', text: title, weight: 'bold', size: 'sm', color: statusColor }
+            { type: 'text', text: title, weight: 'bold', size: 'md', color: BRAND.cream }
           ]
         },
         body: {
@@ -1422,48 +1394,10 @@ export async function handleRosterPostback(event, client, action, queryParams, u
           paddingAll: '20px',
           spacing: 'sm',
           contents: [
-            { type: 'separator', color: '#cccccc' },
-            {
-              type: 'box',
-              layout: 'horizontal',
-              contents: [
-                { type: 'text', text: 'STAFF', color: '#666666', size: 'xs', flex: 2 },
-                { type: 'text', text: name.toUpperCase(), weight: 'bold', color: '#1c1c1c', size: 'xs', flex: 4, align: 'end' }
-              ]
-            },
-            {
-              type: 'box',
-              layout: 'horizontal',
-              contents: [
-                { type: 'text', text: 'DATES', color: '#666666', size: 'xs', flex: 2 },
-                { type: 'text', text: datesStr, color: '#1c1c1c', size: 'xs', flex: 4, wrap: true, align: 'end' }
-              ]
-            },
-            {
-              type: 'box',
-              layout: 'horizontal',
-              contents: [
-                { type: 'text', text: 'CLASSIFICATION', color: '#666666', size: 'xs', flex: 2 },
-                { type: 'text', text: typeText, color: '#1c1c1c', size: 'xs', flex: 4, align: 'end' }
-              ]
-            },
-            {
-              type: 'box',
-              layout: 'horizontal',
-              contents: [
-                { type: 'text', text: 'REPLACEMENT', color: '#666666', size: 'xs', flex: 2 },
-                { type: 'text', text: replacementName, color: '#1c1c1c', size: 'xs', flex: 4, wrap: true, align: 'end' }
-              ]
-            },
-            {
-              type: 'box',
-              layout: 'vertical',
-              margin: 'md',
-              contents: [
-                { type: 'text', text: 'REASON FOR ABSENCE', color: '#666666', size: 'xxs', weight: 'bold' },
-                { type: 'text', text: sampleReq.reason || '-', color: '#333333', size: 'xs', wrap: true, margin: 'xs' }
-              ]
-            }
+            row('พนักงาน', name, { weight: 'bold' }),
+            row('วันที่', datesStr),
+            row('ประเภท', typeText),
+            row('คนแทน', replacementName)
           ]
         }
       }

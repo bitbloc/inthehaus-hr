@@ -74,13 +74,13 @@ export async function getOilPrice() {
         dashMsg += `⛽ **91:** ปกติ ${stats.gas91 || '??'} แห่ง (แนะนำ: PTT นครพนมปิโตรเลียม สาขา 1)\n`;
         dashMsg += `⛽ **95:** ปกติ ${stats.gas95 || '??'} แห่ง (แนะนำ: PTT นครพนมปิโตรเลียม สาขา 1)\n`;
         dashMsg += `⛽ **E20:** ปกติ ${stats.e20 || '??'} แห่ง (แนะนำ: PTT นาทราย, PTT บ้านผึ้ง)\n`;
-        dashMsg += `⚠️ *หมายเหตุ: ปั๊ม ปตท. ท้ายเมือง (หจก.พนมบริการ) ของหมดนะคะ*\n`;
+        dashMsg += `⚠️ *หมายเหตุ: ปั๊ม ปตท. ท้ายเมือง (หจก.พนมบริการ) ของหมดนะครับ*\n`;
         dashMsg += `\n📍 ค้นหาปั๊ม/เช็คเรียลไทม์ที่นี่: ${dashboardUrl}`;
 
         return priceMsg + dashMsg;
     } catch (error) {
         console.error('Error fetching oil data:', error);
-        return 'ไม่สามารถดึงข้อมูลน้ำมันได้ค่ะ เช็คที่เว็บนี้นะคะ: https://script.google.com/macros/s/AKfycbyC8vSspmwSUc83QJpdaADrkr3b-mtI2d6qt7QAF2eP8IogWFKe1lXpfLCxEoK6tENVsQ/exec';
+        return 'ไม่สามารถดึงข้อมูลน้ำมันได้ครับ เช็คที่เว็บนี้นะครับ: https://script.google.com/macros/s/AKfycbyC8vSspmwSUc83QJpdaADrkr3b-mtI2d6qt7QAF2eP8IogWFKe1lXpfLCxEoK6tENVsQ/exec';
     }
 }
 

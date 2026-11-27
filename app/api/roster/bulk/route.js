@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '../../../../lib/supabaseServer';
-import { Client } from '@line/bot-sdk';
+import { Client } from '@/utils/lineClient';
+import { BRAND } from '@/utils/brand';
 import { format, parseISO } from 'date-fns';
 import { generateStCalendarFlex } from '../../webhook/handlers/rosterHandler';
 import { autoGenerateWeeklyRoster } from '../../../../utils/roster_auto_learner';
@@ -134,14 +135,18 @@ export async function POST(request) {
           altText: `📢 อัปเดตตารางงานใหม่! (${startFmt} - ${endFmt})`,
           contents: {
             type: 'bubble',
-            body: {
-              type: 'box', layout: 'vertical',
+            header: {
+              type: 'box', layout: 'vertical', backgroundColor: BRAND.plum, paddingAll: '20px',
               contents: [
-                { type: 'text', text: '📢 อัปเดตตารางงานใหม่!', weight: 'bold', size: 'xl', color: '#1DB446' },
-                { type: 'text', text: `ระหว่างวันที่: ${startFmt} - ${endFmt}`, size: 'sm', color: '#666666', margin: 'md' },
-                { type: 'separator', margin: 'md' },
-                { type: 'text', text: 'ผู้บริหารได้ทำการเผยแพร่ (Publish) ตารางงานของสัปดาห์นี้เรียบร้อยแล้วครับ', size: 'sm', wrap: true, margin: 'md' },
-                { type: 'text', text: 'ทีมงานทุกคนสามารถตรวจสอบตารางงานของตนเองได้โดยพิมพ์คำว่า "ตารางทั้งสัปดาห์" หรือ "ตารางงาน" ในห้องแชทได้เลยครับ', size: 'sm', wrap: true, margin: 'md' }
+                { type: 'text', text: 'อัปเดตตารางงานใหม่', weight: 'bold', size: 'lg', color: BRAND.cream, wrap: true },
+                { type: 'text', text: `${startFmt} - ${endFmt}`, size: 'xs', color: BRAND.onPlum2, margin: 'xs' }
+              ]
+            },
+            body: {
+              type: 'box', layout: 'vertical', backgroundColor: BRAND.cream,
+              contents: [
+                { type: 'text', text: 'ผู้บริหารเผยแพร่ตารางงานของสัปดาห์นี้เรียบร้อยแล้วครับ', size: 'sm', color: BRAND.charcoal, wrap: true },
+                { type: 'text', text: 'ทุกคนเช็คตารางของตัวเองได้ โดยพิมพ์ "ตารางทั้งสัปดาห์" หรือ "ตารางงาน" ในห้องแชทได้เลยครับ', size: 'sm', color: BRAND.muted, wrap: true, margin: 'md' }
               ]
             }
           }

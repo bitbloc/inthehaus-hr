@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '../../../lib/supabaseClient';
-import { Client } from '@line/bot-sdk';
+import { Client } from '@/utils/lineClient';
+import { BRAND } from '@/utils/brand';
 import { format } from 'date-fns';
 
 // ✅ Group IDs (กลุ่มหลัก และ กลุ่มแผนกอื่น)
@@ -125,31 +126,34 @@ export async function POST(request) {
         header: {
           type: 'box',
           layout: 'vertical',
-          backgroundColor: '#ef4444',
+          backgroundColor: BRAND.plum,
+          paddingAll: '20px',
           contents: [
-            { type: 'text', text: '⚠️ ยังไม่ลงเวลาเข้างาน', color: '#ffffff', weight: 'bold', size: 'lg' },
-            { type: 'text', text: `ประจำวัน${dateString}`, color: '#ffffff', size: 'xs', margin: 'sm' }
+            { type: 'text', text: 'ยังไม่ลงเวลาเข้างาน', color: BRAND.cream, weight: 'bold', size: 'lg', wrap: true },
+            { type: 'text', text: `ประจำวัน${dateString}`, color: BRAND.onPlum2, size: 'xs', margin: 'xs', wrap: true }
           ]
         },
         body: {
           type: 'box',
           layout: 'vertical',
+          backgroundColor: BRAND.cream,
+          paddingAll: '20px',
           contents: [
             {
               type: 'text',
-              text: `ขาดจำนวน: ${absentList.length} คน`,
+              text: `ขาด ${absentList.length} คน`,
               weight: 'bold',
               size: 'md',
-              color: '#333333'
+              color: BRAND.errorRed
             },
-            { type: 'separator', margin: 'md' },
+            { type: 'separator', margin: 'md', color: BRAND.rule },
             {
               type: 'text',
-              text: namesText,
+              text: namesText || '-',
               wrap: true,
               margin: 'md',
               size: 'sm',
-              color: '#555555',
+              color: BRAND.charcoal,
               lineSpacing: '4px'
             }
           ]
@@ -157,8 +161,9 @@ export async function POST(request) {
         footer: {
           type: 'box',
           layout: 'vertical',
+          backgroundColor: BRAND.cream,
           contents: [
-            { type: 'text', text: 'In The Haus HR System (Realtime Auto)', size: 'xxs', color: '#aaaaaa', align: 'center' }
+            { type: 'text', text: 'Yuzu ในบ้าน', size: 'xxs', color: BRAND.neutral, align: 'center' }
           ]
         }
       }

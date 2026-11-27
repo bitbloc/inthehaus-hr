@@ -4,7 +4,8 @@
  * a slow shot is a thing to fix, not an error. No icons or emoji.
  * LINE Flex sizes: xs 13px · sm 14px · md 16px · lg 19px · xl 22px. */
 
-import { BRAND, plain } from './slipFlex.js';
+import { BRAND } from '@/utils/brand';
+import { plain } from './slipFlex.js';
 import { ESPRESSO_SPEC, STATUS_TH, isOff, specText, num, shotVerdict, judge } from '../../../../utils/espressoSpec.js';
 
 const text = (t, opts = {}) => {
@@ -73,7 +74,7 @@ export function buildEspressoFlex({ name, analysis, weather, trend, timeText }) 
 
     let grind = null;
     if (a.grindAdjustment && plain(a.grindAdjustment)) {
-        const dir = a.isGrindAdjustmentCorrect === true ? ' · ปรับถูกทาง' : a.isGrindAdjustmentCorrect === false ? ' · ควรปรับอีกทาง' : '';
+        const dir = a.isGrindAdjustmentCorrect === true ? ', ปรับถูกทาง' : a.isGrindAdjustmentCorrect === false ? ', ควรปรับอีกทาง' : '';
         grind = { body: `${plain(a.grindAdjustment)}${dir}`, wrong: a.isGrindAdjustmentCorrect === false };
     }
 
@@ -91,7 +92,7 @@ export function buildEspressoFlex({ name, analysis, weather, trend, timeText }) 
     if (grind) body.push(section('การปรับบด', grind.body, { bodyColor: grind.wrong ? BRAND.plum : BRAND.charcoal, margin: 'lg' }));
     if (plain(a.recommendation)) body.push(section('ยูซุแนะนำ', a.recommendation, { bg: BRAND.paper2 }));
     if (weather?.hasData) {
-        body.push(section(`อากาศตอนนี้ ${num(weather.temp) ?? '-'}°C · ชื้น ${num(weather.humidity) ?? '-'}%`, String(weather.grindAction || '').replace(/\s*\([A-Za-z ]+\)/g, ''), { margin: 'lg' }));
+        body.push(section(`อากาศตอนนี้ ${num(weather.temp) ?? '-'}°C, ชื้น ${num(weather.humidity) ?? '-'}%`, String(weather.grindAction || '').replace(/\s*\([A-Za-z ]+\)/g, ''), { margin: 'lg' }));
     }
     if (plain(trend)) body.push(section('แนวโน้มวันนี้', trend, { margin: 'lg' }));
 
@@ -107,7 +108,7 @@ export function buildEspressoFlex({ name, analysis, weather, trend, timeText }) 
                 backgroundColor: BRAND.plum,
                 paddingAll: '16px',
                 contents: [
-                    text(`ESPRESSO · ช็อตทดสอบ${timeText ? ` · ${timeText}` : ''}`, { size: 'xs', color: BRAND.onPlum2 }),
+                    text(`ช็อตทดสอบเอสเปรสโซ${timeText ? ` ${timeText}` : ''}`, { size: 'xs', color: BRAND.onPlum2 }),
                     text(verdict.text, { size: 'xl', weight: 'bold', color: BRAND.cream, margin: 'sm' }),
                     text(`บาริสต้า ${name}`, { size: 'sm', color: BRAND.onPlum2, margin: 'xs' }),
                 ],
@@ -125,7 +126,7 @@ export function buildEspressoFlex({ name, analysis, weather, trend, timeText }) 
                 layout: 'vertical',
                 backgroundColor: BRAND.cream,
                 paddingAll: '12px',
-                contents: [rule('none'), text('ยูซุ · ผู้ช่วยบาริสต้า ในบ้าน', { size: 'xs', color: BRAND.neutral, align: 'center', margin: 'md' })],
+                contents: [rule('none'), text('Yuzu ในบ้าน', { size: 'xs', color: BRAND.neutral, align: 'center', margin: 'md' })],
             },
         },
     };

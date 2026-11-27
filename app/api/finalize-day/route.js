@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '../../../lib/supabaseClient';
-import { Client } from '@line/bot-sdk';
+import { Client } from '@/utils/lineClient';
 import { format } from 'date-fns';
+import { BRAND } from '@/utils/brand';
+
+// Card text carries no emoji icons (brand v2).
+const plainText = (t) => String(t || '').replace(/[\p{Extended_Pictographic}️‍]/gu, '').replace(/\s{2,}/g, ' ').trim();
 
 // ✅ Group IDs (กลุ่มหลัก และ กลุ่มแผนกอื่น)
 const GROUP_IDS = [
@@ -100,7 +104,7 @@ export async function POST(request) {
           isOwner,
           checkIn: null,
           checkOut: null,
-          shift: scheduled?.shiftName || (isOwner ? '👑 Owner' : 'กะพิเศษ'),
+          shift: scheduled?.shiftName || (isOwner ? 'เจ้าของร้าน' : 'กะพิเศษ'),
           shiftStart: scheduled?.startTime,
           shiftEnd: scheduled?.endTime,
           isOff: scheduled?.isOff || false
@@ -142,11 +146,11 @@ export async function POST(request) {
       }
 
       let status = 'ปกติ';
-      let color = '#22c55e'; // Green
+      let color = BRAND.plum; // normal
 
       if (emp.isOwner) {
-        status = '👑 Owner';
-        color = '#d97706'; // Amber / Gold
+        status = 'เจ้าของ';
+        color = BRAND.charcoal;
       } else {
         // Late Check: เทียบกับเวลาเริ่มของกะจริงในวันนั้น
         if (emp.checkIn && emp.shiftStart) {
@@ -159,14 +163,14 @@ export async function POST(request) {
           if (checkInMinutes > shiftStartMinutes + 5) {
             const lateMins = checkInMinutes - shiftStartMinutes;
             status = `สาย ${lateMins}น.`;
-            color = '#ef4444'; // Red
+            color = BRAND.errorRed; // late
           }
         }
 
         // Check Incomplete
         if (!emp.checkOut) {
           status = 'ยังไม่ลงออก';
-          color = '#f59e0b'; // Amber
+          color = BRAND.plum2; // pending check-out
         }
       }
 
@@ -187,34 +191,36 @@ export async function POST(request) {
       contents: {
         type: 'bubble',
         size: 'mega',
+        styles: {
+          body: { backgroundColor: BRAND.cream },
+          footer: { backgroundColor: BRAND.cream }
+        },
         header: {
-          type: 'box', layout: 'vertical', paddingAll: 'lg', backgroundColor: '#F9FAFB',
+          type: 'box', layout: 'vertical', paddingAll: 'lg', backgroundColor: BRAND.plum,
           contents: [
-            { type: 'text', text: 'Daily Summary', weight: 'bold', size: 'sm', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '1px' },
-            { type: 'text', text: 'Finalize Day 🏁', weight: 'bold', size: '3xl', color: '#111827', margin: 'sm' },
-            { type: 'text', text: new Date(startOfDayUTC.getTime() + bangkokOffset).toLocaleDateString('th-TH', { timeZone: 'UTC', dateStyle: 'full' }), size: 'xs', color: '#9CA3AF', margin: 'xs' }
+            { type: 'text', text: 'สรุปลงเวลาประจำวัน', weight: 'bold', size: 'xl', color: BRAND.cream, wrap: true },
+            { type: 'text', text: new Date(startOfDayUTC.getTime() + bangkokOffset).toLocaleDateString('th-TH', { timeZone: 'UTC', dateStyle: 'full' }), size: 'xs', color: BRAND.onPlum2, margin: 'sm', wrap: true }
           ]
         },
         body: {
           type: 'box', layout: 'vertical', paddingAll: 'lg',
           contents: [
-            // Weather Quote
+            // Weather note
             {
-              type: 'box', layout: 'horizontal', backgroundColor: '#EFF6FF', cornerRadius: 'md', paddingAll: 'md', margin: 'md',
+              type: 'box', layout: 'vertical', backgroundColor: BRAND.paper2, cornerRadius: 'md', paddingAll: 'md',
               contents: [
-                { type: 'text', text: weatherIcon, size: 'xxl', flex: 1, align: 'center', gravity: 'center' },
-                { type: 'text', text: weatherQuote, size: 'xs', color: '#1E40AF', flex: 5, wrap: true, gravity: 'center' }
+                { type: 'text', text: plainText(weatherQuote) || '-', size: 'xs', color: BRAND.muted, wrap: true }
               ]
             },
             // Stats
             {
               type: 'box', layout: 'horizontal', margin: 'lg',
               contents: [
-                { type: 'text', text: 'พนักงานวันนี้', size: 'sm', color: '#6B7280', flex: 5 },
-                { type: 'text', text: `${presentCount} คน`, size: 'sm', color: '#111827', weight: 'bold', align: 'end', flex: 3 }
+                { type: 'text', text: 'พนักงานวันนี้', size: 'sm', color: BRAND.neutral, flex: 5 },
+                { type: 'text', text: `${presentCount} คน`, size: 'sm', color: BRAND.charcoal, weight: 'bold', align: 'end', flex: 3 }
               ]
             },
-            { type: 'separator', margin: 'lg', color: '#E5E7EB' },
+            { type: 'separator', margin: 'lg', color: BRAND.rule },
             // List
             {
               type: 'box', layout: 'vertical', margin: 'lg', spacing: 'md',
@@ -222,17 +228,22 @@ export async function POST(request) {
                 type: 'box', layout: 'vertical',
                 contents: [
                   {
-                    type: 'box', layout: 'horizontal',
+                    type: 'box', layout: 'horizontal', alignItems: 'center',
                     contents: [
-                      { type: 'text', text: line.name, size: 'sm', weight: 'bold', color: '#374151', flex: 4 },
-                      { type: 'text', text: line.time, size: 'sm', color: '#111827', align: 'end', flex: 3 },
-                      { type: 'text', text: line.status, size: 'xs', color: '#FFFFFF', align: 'center', weight: 'bold', backgroundColor: line.color, paddingAll: '2px', cornerRadius: 'sm', offsetBottom: '1px', flex: 2 }
+                      { type: 'text', text: line.name || '-', size: 'sm', weight: 'bold', color: BRAND.charcoal, flex: 4, wrap: true },
+                      { type: 'text', text: line.time || '-', size: 'sm', color: BRAND.charcoal, align: 'end', flex: 3 },
+                      {
+                        type: 'box', layout: 'vertical', flex: 2, margin: 'sm', backgroundColor: line.color, cornerRadius: 'sm', paddingAll: '2px',
+                        contents: [
+                          { type: 'text', text: line.status || '-', size: 'xs', color: BRAND.cream, align: 'center', weight: 'bold' }
+                        ]
+                      }
                     ]
                   },
-                  line.duration ? {
-                    type: 'text', text: `⏱️ ${line.shiftName} | รวม: ${line.duration}`, size: 'xxs', color: '#9CA3AF', margin: 'xs', offsetStart: '2px'
-                  } : {
-                    type: 'text', text: `⏱️ ${line.shiftName}`, size: 'xxs', color: '#9CA3AF', margin: 'xs', offsetStart: '2px'
+                  {
+                    type: 'text',
+                    text: line.duration ? `${plainText(line.shiftName) || '-'}, รวม ${line.duration}` : (plainText(line.shiftName) || '-'),
+                    size: 'xxs', color: BRAND.neutral, margin: 'xs'
                   }
                 ]
               }))
@@ -241,7 +252,7 @@ export async function POST(request) {
         },
         footer: {
           type: 'box', layout: 'vertical', contents: [
-            { type: 'text', text: 'In The Haus HR & Realtime System', size: 'xxs', color: '#D1D5DB', align: 'center' }
+            { type: 'text', text: 'Yuzu ในบ้าน', size: 'xxs', color: BRAND.neutral, align: 'center' }
           ]
         }
       }

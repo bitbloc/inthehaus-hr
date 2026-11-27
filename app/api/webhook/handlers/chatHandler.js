@@ -5,6 +5,8 @@ import { getSchemaWeather, formatWeatherMessage, getCompactWeather } from '../..
 import { getAccurateNews } from '../../../../utils/news';
 import { saveMessage, getChatHistory, getDailyContent, saveLearnedFact, getEmployeeByLineId, getAllEmployeesData, getYuzuConfigs, checkIsBoss } from '../../../../utils/memory';
 import { supabase } from '../../../../lib/supabaseClient';
+import { BRAND } from '@/utils/brand';
+import { plain } from './slipFlex.js';
 
 export async function handleChatCommand(event, client, text, rawText, userId, groupId, request) {
   if (text.startsWith('yuzu') || text.startsWith('ยูซุ')) {
@@ -165,7 +167,7 @@ export async function handleChatCommand(event, client, text, rawText, userId, gr
          contextContent += `(จบรายชื่อพนักงาน)\n\n`;
       }
       
-      const reportPrompt = `ช่วยสรุปรายงานพฤติกรรมและการทำงานของพนักงานจากข้อมูลที่มีหน่อยค่ะ ยึดตามรายชื่อพนักงานที่มีในระบบต่อไปนี้:\n${contextContent}\nและนี่คือประวัติการแชท/ทำงานของวันนี้:\n${dailyLogs || "(วันนี้ยังไม่มีประวัติการแชทให้วิเคราะห์)"}\n\nโปรดเน้นวิเคราะห์แต่ละคนตามรายชื่อที่มี และรายงานความพร้อมให้เจ้านายฟัง (ถ้าประวัติแชทว่างก็บอกสถานะของรายชื่อบุคคลไปก่อน)`;
+      const reportPrompt = `ช่วยสรุปรายงานพฤติกรรมและการทำงานของพนักงานจากข้อมูลที่มีหน่อยครับ ยึดตามรายชื่อพนักงานที่มีในระบบต่อไปนี้:\n${contextContent}\nและนี่คือประวัติการแชท/ทำงานของวันนี้:\n${dailyLogs || "(วันนี้ยังไม่มีประวัติการแชทให้วิเคราะห์)"}\n\nโปรดเน้นวิเคราะห์แต่ละคนตามรายชื่อที่มี และรายงานความพร้อมให้เจ้านายฟัง (ถ้าประวัติแชทว่างก็บอกสถานะของรายชื่อบุคคลไปก่อน)`;
       const reportResponse = await getGeminiResponse(reportPrompt, "", [], userId);
       await client.replyMessage(event.replyToken, { type: 'text', text: reportResponse });
       return true;
@@ -375,44 +377,45 @@ ${dailyLogs || 'ไม่มีความเคลื่อนไหว'}
             type: 'bubble',
             size: 'kilo',
             styles: {
-              header: { backgroundColor: '#f3f3f3' },
-              body: { backgroundColor: '#f3f3f3' },
-              footer: { backgroundColor: '#ebebeb' }
+              header: { backgroundColor: BRAND.plum },
+              body: { backgroundColor: BRAND.cream },
+              footer: { backgroundColor: BRAND.cream, separator: true, separatorColor: BRAND.rule }
             },
             header: {
               type: 'box',
               layout: 'vertical',
-              paddingAll: '20px',
+              backgroundColor: BRAND.plum,
+              paddingAll: '16px',
               contents: [
-                { type: 'text', text: 'KNOWLEDGE PROTOCOL DETECTED', color: '#1c1c1c', weight: 'bold', size: 'sm' },
-                { type: 'text', text: 'STATUS: PENDING MANAGER REVIEW', color: '#ef6c00', size: 'xxs', weight: 'bold', margin: 'xs' }
+                { type: 'text', text: 'ยูซุพบความรู้ใหม่', color: BRAND.cream, weight: 'bold', size: 'md' },
+                { type: 'text', text: 'รอผู้จัดการอนุมัติ', color: BRAND.onPlum2, size: 'xs', margin: 'xs' }
               ]
             },
             body: {
               type: 'box',
               layout: 'vertical',
-              paddingAll: '20px',
+              paddingAll: '16px',
               spacing: 'md',
               contents: [
-                { type: 'text', text: savedFact.content || '-', wrap: true, size: 'xs', color: '#1c1c1c' },
+                { type: 'text', text: plain(savedFact.content) || '-', wrap: true, size: 'sm', color: BRAND.charcoal },
                 { type: 'box', layout: 'vertical', spacing: 'xs', contents: [
-                  { type: 'text', text: 'KEYWORDS', size: 'xxs', color: '#888888', weight: 'bold' },
-                  { type: 'text', text: (savedFact.metadata?.keywords || []).filter(Boolean).map(kw => `[${String(kw).toUpperCase()}]`).join(' ') || '-', size: 'xxs', color: '#3b82f6', wrap: true }
+                  { type: 'text', text: 'คำค้น', size: 'xs', color: BRAND.neutral },
+                  { type: 'text', text: (savedFact.metadata?.keywords || []).map(kw => plain(kw)).filter(Boolean).join(', ') || '-', size: 'xs', color: BRAND.muted, wrap: true }
                 ]}
               ]
             },
             footer: {
               type: 'box',
               layout: 'horizontal',
-              paddingAll: '15px',
+              paddingAll: '12px',
               spacing: 'sm',
               contents: [
-                { type: 'button', style: 'primary', color: '#1c1c1c', action: { type: 'postback', label: 'APPROVE', data: `action=approve_insight&id=${savedFact.id}` } },
-                { type: 'button', style: 'secondary', action: { type: 'postback', label: 'DISMISS', data: `action=reject_insight&id=${savedFact.id}` } }
+                { type: 'button', style: 'primary', color: BRAND.charcoal, height: 'sm', action: { type: 'postback', label: 'อนุมัติ', data: `action=approve_insight&id=${savedFact.id}` } },
+                { type: 'button', style: 'link', color: BRAND.plum, height: 'sm', action: { type: 'postback', label: 'ไม่เก็บ', data: `action=reject_insight&id=${savedFact.id}` } }
               ]
             }
           };
-          replyMessages.push({ type: 'flex', altText: '💡 ยูซุพบความรู้ใหม่ที่ต้องอนุมัติค่ะ!', contents: insightFlex });
+          replyMessages.push({ type: 'flex', altText: '💡 ยูซุพบความรู้ใหม่ที่ต้องอนุมัติครับ', contents: insightFlex });
         }
       } catch (e) {
         console.error("Error parsing Yuzu Learning block:", e);
@@ -451,7 +454,8 @@ export async function handleChatPostback(event, client, action, queryParams, use
     if (!error) {
       await client.replyMessage(event.replyToken, { type: 'text', text: '✅ บันทึกความรู้ดังกล่าวเข้าสู่ระบบคลังความรู้หลักของร้านเรียบร้อยแล้วครับบอส' });
     } else {
-       await client.replyMessage(event.replyToken, { type: 'text', text: 'ไม่สามารถบันทึกข้อมูลเข้าระบบคลังความรู้หลักได้เนื่องจาก: ' + error.message });
+       console.error('Insight verify error:', error);
+       await client.replyMessage(event.replyToken, { type: 'text', text: 'บันทึกเข้าคลังความรู้ไม่สำเร็จ ลองใหม่อีกครั้งครับ' });
     }
     return true;
   }
@@ -492,150 +496,68 @@ function parseFlexResponse(response) {
   };
 }
 
+// Card body text: emoji dropped (no icons in cards), line breaks kept.
+const cardText = (t) => String(t ?? '')
+  .replace(/[\p{Extended_Pictographic}️‍]/gu, '')
+  .replace(/[ \t]{2,}/g, ' ')
+  .replace(/\n{3,}/g, '\n\n')
+  .trim();
+
+// Daily news and cost summary: plum header, cream body, Thai-first section titles.
 function formatNewsFlex(data, rawFallbackText) {
   const isStructured = data && (data.news || data.costs || data.industry);
+  const header = {
+    type: "box",
+    layout: "vertical",
+    backgroundColor: BRAND.plum,
+    paddingAll: "16px",
+    contents: [
+      { type: "text", text: plain(data?.title) || "สรุปข่าวประจำวัน", weight: "bold", color: BRAND.cream, size: "md", wrap: true },
+      { type: "text", text: plain(data?.subtitle) || "ข่าว ต้นทุน และคำแนะนำจากยูซุ", color: BRAND.onPlum2, size: "xs", margin: "xs", wrap: true }
+    ]
+  };
+  const bubble = (bodyContents) => ({
+    type: "bubble",
+    size: "mega",
+    styles: {
+      header: { backgroundColor: BRAND.plum },
+      body: { backgroundColor: BRAND.cream }
+    },
+    header,
+    body: { type: "box", layout: "vertical", paddingAll: "16px", spacing: "md", contents: bodyContents }
+  });
 
   if (isStructured) {
-    const contents = {
-      type: "bubble",
-      size: "mega",
-      styles: {
-        header: { backgroundColor: "#181818" },
-        body: { backgroundColor: "#181818" }
-      },
-      header: {
-        type: "box",
-        layout: "vertical",
-        paddingAll: "20px",
-        contents: [
-          {
-            type: "text",
-            text: "DAILY INTELLIGENCE REPORT // OPERATIONS",
-            weight: "bold",
-            color: "#ffffff",
-            size: "sm"
-          },
-          {
-            type: "text",
-            text: "DATA SOURCE: IN THE HAUS INTEL SERVICE",
-            color: "#888888",
-            size: "xxs",
-            weight: "bold",
-            margin: "xs"
-          }
-        ]
-      },
-      body: {
-        type: "box",
-        layout: "vertical",
-        paddingAll: "20px",
-        spacing: "md",
-        contents: []
-      }
-    };
-
-    if (data.news) {
-      contents.body.contents.push({
+    const sections = [
+      ["ข่าวที่ควรรู้", data.news],
+      ["แนวโน้มธุรกิจ", data.industry],
+      ["ต้นทุนร้าน", data.costs],
+      ["ยูซุแนะนำ", data.advice]
+    ].filter(([, body]) => plain(body));
+    const bodyContents = [];
+    sections.forEach(([title, body], i) => {
+      if (i > 0) bodyContents.push({ type: "separator", color: BRAND.rule });
+      bodyContents.push({
         type: "box",
         layout: "vertical",
         spacing: "xs",
         contents: [
-          { type: "text", text: "01 NEWS FEED", weight: "bold", size: "xs", color: "#ffffff" },
-          { type: "text", text: data.news, size: "xs", color: "#c5c5c5", wrap: true }
+          { type: "text", text: title, weight: "bold", size: "sm", color: BRAND.plum },
+          { type: "text", text: cardText(body), size: "sm", color: BRAND.charcoal, wrap: true }
         ]
       });
-    }
-
-    if (data.industry) {
-      if (contents.body.contents.length > 0) {
-        contents.body.contents.push({ type: "separator", color: "#333333" });
-      }
-      contents.body.contents.push({
-        type: "box",
-        layout: "vertical",
-        spacing: "xs",
-        contents: [
-          { type: "text", text: "02 INDUSTRY TRENDS", weight: "bold", size: "xs", color: "#ffffff" },
-          { type: "text", text: data.industry, size: "xs", color: "#c5c5c5", wrap: true }
-        ]
-      });
-    }
-
-    if (data.costs) {
-      if (contents.body.contents.length > 0) {
-        contents.body.contents.push({ type: "separator", color: "#333333" });
-      }
-      contents.body.contents.push({
-        type: "box",
-        layout: "vertical",
-        spacing: "xs",
-        contents: [
-          { type: "text", text: "03 OPERATING COSTS", weight: "bold", size: "xs", color: "#ffffff" },
-          { type: "text", text: data.costs, size: "xs", color: "#c5c5c5", wrap: true }
-        ]
-      });
-    }
-
-    if (data.advice) {
-      if (contents.body.contents.length > 0) {
-        contents.body.contents.push({ type: "separator", color: "#333333" });
-      }
-      contents.body.contents.push({
-        type: "box",
-        layout: "vertical",
-        spacing: "xs",
-        contents: [
-          { type: "text", text: "04 STRATEGIC ADVICE", weight: "bold", size: "xs", color: "#ffffff" },
-          { type: "text", text: data.advice, size: "xs", color: "#c5c5c5", wrap: true }
-        ]
-      });
-    }
-
+    });
     return {
       type: "flex",
       altText: `สรุปข่าวสาร & ต้นทุนโดย Yuzu`,
-      contents: contents
-    };
-  } else {
-    return {
-      type: "flex",
-      altText: `สรุปข่าวสาร & ต้นทุนโดย Yuzu`,
-      contents: {
-        type: "bubble",
-        size: "mega",
-        styles: {
-          header: { backgroundColor: "#181818" },
-          body: { backgroundColor: "#181818" }
-        },
-        header: {
-          type: "box",
-          layout: "vertical",
-          paddingAll: "20px",
-          contents: [
-            {
-              type: "text",
-              text: "DAILY INTELLIGENCE REPORT // OPERATIONS",
-              weight: "bold",
-              color: "#ffffff",
-              size: "sm"
-            }
-          ]
-        },
-        body: {
-          type: "box",
-          layout: "vertical",
-          paddingAll: "20px",
-          contents: [
-            {
-              type: "text",
-              text: rawFallbackText,
-              size: "xs",
-              color: "#c5c5c5",
-              wrap: true
-            }
-          ]
-        }
-      }
+      contents: bubble(bodyContents)
     };
   }
+  return {
+    type: "flex",
+    altText: `สรุปข่าวสาร & ต้นทุนโดย Yuzu`,
+    contents: bubble([
+      { type: "text", text: cardText(rawFallbackText) || "-", size: "sm", color: BRAND.charcoal, wrap: true }
+    ])
+  };
 }
