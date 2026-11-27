@@ -21,7 +21,7 @@ const mean = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : nu
 const fmt = (n) => (n === null || n === undefined ? "-" : n.toFixed(1));
 
 export function useKpiMonth(month, reloadKey = 0) {
-    const [state, setState] = useState({ loading: true, error: "", survey: null, responses: [], prev: [], progress: [], employees: [] });
+    const [state, setState] = useState({ loading: true, error: "", surveys: [], survey: null, responses: [], prev: [], progress: [], employees: [] });
 
     useEffect(() => {
         let alive = true;
@@ -40,8 +40,14 @@ export function useKpiMonth(month, reloadKey = 0) {
             const list = surveys.data || [];
             // The survey used this month, else the active one.
             const usedId = all.find((r) => r.period === month)?.survey_id;
-            const survey = list.find((s) => s.id === usedId) || list.find((s) => s.is_active) || list[0] || null;
+            const survey =
+                list.find((s) => s.id === usedId) ||
+                list.find((s) => s.is_active && s.for_period === month) ||
+                list.find((s) => s.is_active && !s.for_period) ||
+                list.find((s) => s.for_period === month) ||
+                list[0] || null;
             setState({
+                surveys: list,
                 loading: false,
                 error: err ? `โหลดข้อมูลไม่สำเร็จ: ${err.message} (รัน migration 20261127_team_kpi.sql แล้วหรือยัง?)` : "",
                 survey,
