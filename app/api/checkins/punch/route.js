@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabase } from '../../../../lib/supabaseClient';
 import { verifyShopToken, verifyNfcStationToken } from '../shop-token/route';
 import { format, addHours } from 'date-fns';
+import { getKpiState } from '../../../../lib/kpi';
 
 // Shop Coordinates (In The Haus Nakhon Phanom)
 const SHOP_LAT = 17.39009845004315;
@@ -156,6 +157,19 @@ export async function POST(request) {
         const hours = Math.floor(totalMinutes / 60);
         const minutes = totalMinutes % 60;
         duration = { hours, minutes, totalMinutes };
+      }
+    }
+
+    // 3b. Monthly team KPI: after the skip window, check-in waits until it is done.
+    // Check-out is never blocked. getKpiState fails open on any error.
+    if (action === 'check_in') {
+      const kpi = await getKpiState(supabase, employee, { touch: true, now: serverNow });
+      if (kpi.required && kpi.overdue) {
+        return NextResponse.json({
+          success: false,
+          code: 'KPI_REQUIRED',
+          error: 'เลยกำหนดข้ามแล้ว ต้องทำแบบวัดผลประจำเดือนก่อนลงเวลาเข้างาน'
+        }, { status: 409 });
       }
     }
 

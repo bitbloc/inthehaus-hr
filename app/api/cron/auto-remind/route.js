@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '../../../../lib/supabaseClient';
 import { Client } from '@line/bot-sdk';
+import { buildKpiReminderText } from '../../../../lib/kpi';
 
 const GROUP_IDS = [
   'C1210c7a0601b5a675060e312efe10bff'
@@ -309,11 +310,14 @@ export async function GET(request) {
     }
 
     const message = buildFlexMessage(targetType);
+    // Monthly team survey: list who has not answered yet (none → nothing extra).
+    const kpiText = await buildKpiReminderText(supabase);
+    const messages = kpiText ? [message, { type: 'text', text: kpiText.slice(0, 4900) }] : [message];
 
     const results = await Promise.all(
       GROUP_IDS.map(async (groupId) => {
         try {
-          await client.pushMessage(groupId, [message]);
+          await client.pushMessage(groupId, messages);
           return { groupId, success: true };
         } catch (e) {
           console.error(`Failed to push to group ${groupId}:`, e.message);

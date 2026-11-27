@@ -22,6 +22,7 @@ import DashboardOverview from "./_components/DashboardOverview";
 import IndividualHistoryManager from "./_components/IndividualHistoryManager";
 import NfcStationManager from "./_components/NfcStationManager";
 import MeetingNotesManager from "./_components/MeetingNotesManager";
+import KpiManager from "./_components/KpiManager";
 import { useAdminAuth } from "./AdminAuthContext";
 import { adminFetch } from "../../lib/adminFetch";
 
@@ -1127,6 +1128,7 @@ export default function AdminDashboard() {
         {
             title: "ร้าน",
             items: [
+                { id: 'kpi', label: 'แบบวัดผล' },
                 { id: 'nfc_stations', label: 'จุดแตะ NFC' },
                 { id: 'applications', label: 'รับสมัครงาน' },
             ]
@@ -2372,6 +2374,11 @@ export default function AdminDashboard() {
                     {/* --- MEETING NOTES (PDF) --- */}
                     {activeTab === 'meetings' && (
                         <MeetingNotesManager />
+                    )}
+
+                    {/* --- MONTHLY TEAM SURVEY --- */}
+                    {activeTab === 'kpi' && (
+                        <KpiManager />
                     )}
 
                     {/* --- NFC STATIONS MANAGER --- */}
