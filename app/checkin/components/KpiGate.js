@@ -2,7 +2,8 @@
 /* Monthly team KPI survey (Brand v2). Full-screen, like the camera sheet.
  *   mode "gate"      : shown before the check-in / check-out photo. First a short
  *                      prompt (do it now / skip), then the form.
- *   mode "voluntary" : opened from the "ทำ KPI" card when staff have a free moment.
+ *   mode "voluntary" : opened from the "ทำเลย" card when staff have a free moment,
+ *                      or from a personal link (/kpi?t=...) for staff without a phone.
  * Text only, no icons or emoji. */
 
 import { useMemo, useState } from "react";
@@ -30,7 +31,7 @@ function isAnswered(q, answers) {
   return Boolean(v);
 }
 
-export default function KpiGate({ kpi, userId, mode = "gate", intent = "check_in", onDone, onSkip, onClose }) {
+export default function KpiGate({ kpi, userId, token, mode = "gate", intent = "check_in", onDone, onSkip, onClose }) {
   const [step, setStep] = useState(mode === "gate" ? "prompt" : "form");
   const [answers, setAnswers] = useState({});
   const [busy, setBusy] = useState(false);
@@ -70,7 +71,7 @@ export default function KpiGate({ kpi, userId, mode = "gate", intent = "check_in
       const res = await fetch("/api/kpi", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, action: "skip", intent }),
+        body: JSON.stringify({ userId, token, action: "skip", intent }),
       });
       const json = await res.json().catch(() => ({}));
       if (json.code === "KPI_REQUIRED") {
@@ -98,7 +99,7 @@ export default function KpiGate({ kpi, userId, mode = "gate", intent = "check_in
       const res = await fetch("/api/kpi", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, action: "submit", answers }),
+        body: JSON.stringify({ userId, token, action: "submit", answers }),
       });
       const json = await res.json().catch(() => ({}));
       if (!json.success) {

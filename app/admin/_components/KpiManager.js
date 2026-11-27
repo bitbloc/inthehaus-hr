@@ -5,6 +5,7 @@
 import React, { useState } from "react";
 import { supabase } from "../../../lib/supabaseClient";
 import { useAdminAuth } from "../AdminAuthContext";
+import { adminFetch } from "../../../lib/adminFetch";
 import { useKpiMonth } from "./reports/KpiMonth";
 import { thisMonth, monthLabel } from "./reports/monthTools";
 
@@ -43,6 +44,24 @@ export default function KpiManager() {
     const data = useKpiMonth(month, reload);
     const [message, setMessage] = useState(null);
 
+    // Personal link for staff without a phone (valid this month only).
+    const makeLink = async (s) => {
+        try {
+            const res = await adminFetch("/api/kpi/link", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ employeeId: s.id }),
+            });
+            const json = await res.json();
+            if (!json.success) throw new Error(json.error || "สร้างลิงก์ไม่สำเร็จ");
+            let copied = false;
+            try { await navigator.clipboard.writeText(json.url); copied = true; } catch {}
+            setMessage({ type: "success", text: `${copied ? "คัดลอกลิงก์ของ" : "ลิงก์ของ"} ${s.display} แล้ว ส่งให้เขาเปิดในเครื่องไหนก็ได้ (ใช้ได้ถึงสิ้นเดือนนี้)`, url: json.url });
+        } catch (e) {
+            setMessage({ type: "error", text: e.message });
+        }
+    };
+
     const extend = async (p) => {
         const base = Math.max(new Date(p.deadline_at).getTime(), Date.now());
         const { error } = await supabase
@@ -69,7 +88,10 @@ export default function KpiManager() {
 
             {message && (
                 <div className={`p-3 border text-sm font-semibold flex items-center justify-between ${message.type === "success" ? "bg-charcoal/10 border-charcoal text-charcoal" : "bg-error/10 border-error text-error"}`}>
-                    <span>{message.text}</span>
+                    <span className="min-w-0">
+                        {message.text}
+                        {message.url && <input readOnly value={message.url} onFocus={(e) => e.target.select()} className="block w-full mt-2 min-h-10 px-2 bg-cream border border-rule font-num text-xs font-normal" />}
+                    </span>
                     <button onClick={() => setMessage(null)} className="ml-4 cursor-pointer">ปิด</button>
                 </div>
             )}
@@ -99,7 +121,12 @@ export default function KpiManager() {
                                 <tr key={s.id} className="border-b border-rule last:border-0 align-top">
                                     <td className="px-5 py-3 text-charcoal">{s.display}</td>
                                     <td className="px-3 py-3"><StatusCell s={s} /></td>
-                                    <td className="px-5 py-3 text-right">
+                                    <td className="px-5 py-3 text-right whitespace-nowrap space-x-2">
+                                        {!s.response && month === thisMonth() && (
+                                            <button onClick={() => makeLink(s)} title="สำหรับคนที่ไม่มีโทรศัพท์ เปิดได้ทุกเครื่อง" className="min-h-10 px-3 border border-charcoal text-sm font-semibold text-charcoal hover:bg-paper-2">
+                                                คัดลอกลิงก์
+                                            </button>
+                                        )}
                                         {!s.response && s.progress && month === thisMonth() && (
                                             <button onClick={() => extend(s.progress)} className="min-h-10 px-3 border border-charcoal text-sm font-semibold text-charcoal hover:bg-paper-2">
                                                 ขยายเวลา +1 วัน
