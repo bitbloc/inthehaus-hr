@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getServiceClient } from '../../../lib/supabaseServer';
-import { getKpiState, validateAnswers } from '../../../lib/kpi';
+import { getKpiState, validateAnswers, verifyKpiLink } from '../../../lib/kpi';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,6 +13,20 @@ async function findEmployee(db, userId) {
         .or(`line_user_id.eq.${userId},line_bot_id.eq.${userId}`)
         .maybeSingle();
     return data || null;
+}
+
+/** Personal link (/kpi?t=...) for staff without a phone. */
+async function findEmployeeByLink(db, token) {
+    const v = verifyKpiLink(token);
+    if (!v) return { error: 'ลิงก์ไม่ถูกต้อง ขอลิงก์ใหม่จากเจ้าของร้าน' };
+    if (v.expired) return { error: 'ลิงก์นี้หมดอายุแล้ว (ใช้ได้เฉพาะเดือนที่สร้าง) ขอลิงก์ใหม่จากเจ้าของร้าน' };
+    const { data } = await db
+        .from('employees')
+        .select('id, name, nickname, position, is_active')
+        .eq('id', v.employeeId)
+        .maybeSingle();
+    if (!data || data.is_active === false) return { error: 'ไม่พบข้อมูลพนักงาน' };
+    return { employee: data };
 }
 
 function publicState(state) {
@@ -34,19 +48,26 @@ function publicState(state) {
 }
 
 /**
- * GET /api/kpi?userId=<LINE userId>[&peek=1]
+ * GET /api/kpi?userId=<LINE userId>[&peek=1]   or   ?t=<personal link token>
  * Called when staff press the check-in / check-out button. The first call in a
  * month (without peek) starts that person's skip window.
  */
 export async function GET(request) {
     const db = getServiceClient();
     const params = new URL(request.url).searchParams;
-    const userId = (params.get('userId') || '').trim();
-    const employee = await findEmployee(db, userId);
-    if (!employee) return NextResponse.json({ success: true, required: false });
+    let employee;
+    if (params.get('t')) {
+        const found = await findEmployeeByLink(db, params.get('t'));
+        if (found.error) return NextResponse.json({ success: false, error: found.error }, { status: 403 });
+        employee = found.employee;
+    } else {
+        employee = await findEmployee(db, (params.get('userId') || '').trim());
+        if (!employee) return NextResponse.json({ success: true, required: false });
+    }
     // ?peek=1: page load (shows the "ทำ KPI" button) — does not start the skip window.
     const state = await getKpiState(db, employee, { touch: params.get('peek') !== '1' });
-    return NextResponse.json({ success: true, ...publicState(state) });
+    const name = params.get('t') ? employee.nickname || employee.name : undefined;
+    return NextResponse.json({ success: true, name, ...publicState(state) });
 }
 
 /**
@@ -63,7 +84,14 @@ export async function POST(request) {
         return NextResponse.json({ success: false, error: 'ข้อมูลไม่ถูกต้อง' }, { status: 400 });
     }
 
-    const employee = await findEmployee(db, String(body?.userId || '').trim());
+    let employee;
+    if (body?.token) {
+        const found = await findEmployeeByLink(db, String(body.token));
+        if (found.error) return NextResponse.json({ success: false, error: found.error }, { status: 403 });
+        employee = found.employee;
+    } else {
+        employee = await findEmployee(db, String(body?.userId || '').trim());
+    }
     if (!employee) {
         return NextResponse.json({ success: false, error: 'ไม่พบข้อมูลพนักงาน' }, { status: 403 });
     }
