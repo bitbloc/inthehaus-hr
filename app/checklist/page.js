@@ -1,38 +1,16 @@
-/* Hallmark · route: /checklist · structure: utilitarian operations & logs dashboard
- * paper: oklch(96% 0.006 80) · accent: oklch(62% 0.16 45) · display: Geist Mono · body: Geist Sans
- * axes: light / geometric-sans / warm · gates: all-pass
- */
+/* Brand v2 (Thai Twist Modern) · /checklist: today's form status, zone check, month figures, calendar, log.
+ * Cream surface, plum header, one charcoal primary (เปิดฟอร์มเปิด-ปิดร้าน). SOV_monomon heads, IBM Plex Sans Thai body, DM Mono numbers. No icons or emoji.
+ * Hallmark · redesign: full · shape: app screen · theme: brand (inthehaus-booking/.agents/AGENTS.md)
+ * Hallmark · pre-emit critique: P5 H5 E5 S5 R5 V5
+ * Hallmark · waive 39b, 72 · calendar day cells are 64px tap targets holding the day and two form marks (AGENTS.md §4: taps ≥48px)
+ * Hallmark · waive 76 · evidence thumbnails are staff photos on Google Drive; they load for signed-in viewers, onError hides the rest
+ * Hallmark · waive 71 · the staff name sits under its own type and time line, which belongs to it */
 "use client";
 import React, { useEffect, useState, useMemo, useRef } from "react";
 import Link from "next/link";
 import { format, isValid, parse } from "date-fns";
 import { th } from "date-fns/locale";
-import { motion, AnimatePresence } from "framer-motion";
-import {
-  Check,
-  CheckCircle2,
-  AlertTriangle,
-  AlertCircle,
-  Camera,
-  User,
-  Clock,
-  DollarSign,
-  RefreshCw,
-  FileText,
-  Calendar,
-  ArrowUpRight,
-  ArrowDownRight,
-  X,
-  ChevronRight,
-  ChevronDown,
-  ChevronUp,
-  Search,
-  ExternalLink,
-  Play,
-  Pause,
-  Layers,
-  Sparkles
-} from "lucide-react";
+import { motion, AnimatePresence, MotionConfig } from "framer-motion";
 import NavigationDock from "../_components/NavigationDock";
 import { supabase } from "../../lib/supabaseClient";
 
@@ -557,12 +535,13 @@ export default function ChecklistPage() {
           });
         }
 
-        // 3. Punctuality
+        // 3. Punctuality: the opening form covers opening and the afternoon
+        // ("เปิดร้านและช่วงบ่าย"), so it is late only after 17:00 (owner, 2026-11-27).
         const hr = item.timestamp.getHours();
         const min = item.timestamp.getMinutes();
         const decimalTime = hr + min / 60;
 
-        if (item.type === "Opening" && decimalTime > 12.0) {
+        if (item.type === "Opening" && decimalTime > 17.0) {
           warnings.push({
             type: "late_submission",
             message: `ส่งฟอร์มเปิดร้านล่าช้า (${format(item.timestamp, "HH:mm")} น.)`
@@ -726,949 +705,666 @@ export default function ChecklistPage() {
     }));
   };
 
+  const ZONES = [
+    { id: "BAR", label: "บาร์น้ำ" },
+    { id: "KITCHEN", label: "ครัว" },
+    { id: "HALL", label: "หน้าร้าน ห้องน้ำ" },
+    { id: "CLOSING", label: "ล็อกร้านก่อนกลับ" }
+  ];
+  const SHIFT_TABS = [
+    { id: "All", label: "ทั้งหมด" },
+    { id: "Opening", label: "เปิดร้าน" },
+    { id: "Closing", label: "ปิดร้าน" },
+    { id: "Discrepancy", label: "มีจุดต้องตรวจ" }
+  ];
+  const todayStr = format(new Date(), "yyyy-MM-dd");
+  const todayStatus = dayStatusMap[todayStr];
+  const signed = (n) => (n > 0 ? `+${n.toLocaleString()}` : n.toLocaleString());
+  const fieldCls =
+    "w-full min-h-12 px-3 bg-cream border border-charcoal text-base text-charcoal placeholder:text-neutral outline-none focus-visible:border-plum";
+
   return (
-    <div className="min-h-screen bg-rams-bg text-rams-ink safe-bottom-dock font-sans pb-32">
-      {/* Top Header */}
-      <header className="border-b border-rams-rule-light bg-rams-panel px-4 sm:px-6 py-4 sticky top-0 z-30 shadow-none">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-rams-orange"></span>
-              <span className="text-[10px] font-mono font-bold tracking-widest uppercase text-rams-ink-muted">
-                IN THE HAUS · OPERATIONS & CHECKLIST LOGS
-              </span>
-              <span className="relative flex h-2 w-2 ml-1">
-                {isAutoSync && (
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rams-green opacity-75"></span>
-                )}
-                <span
-                  className={`relative inline-flex rounded-full h-2 w-2 ${
-                    isAutoSync ? "bg-rams-green" : "bg-rams-ink-muted"
-                  }`}
-                ></span>
-              </span>
-            </div>
-            <h1 className="text-xl sm:text-2xl font-mono font-bold tracking-tight text-rams-ink mt-0.5">
-              ระบบตรวจร้าน & สรุปบันทึก (CHECKLIST)
-            </h1>
-            <p className="text-xs font-mono text-rams-ink-muted mt-0.5">
-              {lastSyncedTime
-                ? `อัปเดตล่าสุด: ${format(lastSyncedTime, "HH:mm:ss น.")}`
-                : "กำลังโหลดข้อมูล..."}
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2.5">
-            {/* Espresso Quick Calibration Button */}
-            <button
-              type="button"
-              onClick={() => setShowEspressoModal(true)}
-              className="flex items-center gap-2 bg-rams-ink hover:bg-neutral-800 text-rams-panel border border-rams-rule px-3.5 py-2.5 rounded-sm font-mono font-bold text-xs uppercase tracking-wider transition-all tactile-btn cursor-pointer"
-            >
-              <span>☕ บันทึกช็อตกาแฟ (NFC)</span>
-            </button>
-
-            {/* Primary Action Button to Google Form */}
-            <Link
-              href={GOOGLE_FORM_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 bg-rams-orange hover:bg-rams-orange-active text-rams-panel border border-rams-rule px-4 py-2.5 rounded-sm font-mono font-bold text-xs uppercase tracking-wider transition-all tactile-btn shadow-none cursor-pointer"
-            >
-              <span>📋 เปิดฟอร์มเปิด-ปิดร้าน</span>
-              <ExternalLink className="w-3.5 h-3.5" />
-            </Link>
-
-            {/* Month Select */}
-            {availableMonths.length > 0 && (
-              <div className="relative">
-                <select
-                  value={selectedMonth}
-                  onChange={(e) => {
-                    setSelectedMonth(e.target.value);
-                    setSelectedDayFilter(null);
-                  }}
-                  className="appearance-none pl-3 pr-8 py-2.5 rounded-sm bg-rams-bg border border-rams-rule-light text-xs font-mono font-bold text-rams-ink focus:outline-none focus:border-rams-orange transition-all cursor-pointer min-w-[140px]"
-                >
-                  {availableMonths.map((m) => (
-                    <option key={m} value={m}>
-                      {format(parse(m, "MMMM yyyy", new Date()), "MMMM yyyy", { locale: th })}
-                    </option>
-                  ))}
-                </select>
-                <div className="absolute inset-y-0 right-2.5 flex items-center pointer-events-none text-rams-ink-muted">
-                  <ChevronRight size={14} className="rotate-90" />
-                </div>
-              </div>
-            )}
-
-            {/* Auto-Sync Toggle */}
-            <button
-              onClick={() => setIsAutoSync(!isAutoSync)}
-              className={`flex items-center gap-1.5 px-3 py-2.5 rounded-sm text-[11px] font-mono font-bold uppercase transition-all border cursor-pointer select-none tactile-btn-sm ${
-                isAutoSync
-                  ? "bg-rams-green/10 text-rams-green border-rams-green/30"
-                  : "bg-rams-bg border-rams-rule-light text-rams-ink-muted hover:text-rams-ink"
-              }`}
-            >
-              {isAutoSync ? <Pause size={12} className="animate-pulse" /> : <Play size={12} />}
-              <span>{isAutoSync ? `LIVE (${countdown}s)` : "SYNC OFF"}</span>
-            </button>
-
-            {/* Manual Refresh */}
-            <button
-              onClick={fetchData}
-              disabled={loading}
-              title="รีเฟรชข้อมูลจาก Google Sheets"
-              className="p-2.5 flex items-center justify-center rounded-sm bg-rams-bg border border-rams-rule-light hover:bg-rams-panel hover:text-rams-ink text-rams-ink-muted transition-all tactile-btn-sm cursor-pointer disabled:opacity-50"
-            >
-              <RefreshCw size={14} className={loading ? "animate-spin text-rams-orange" : ""} />
-            </button>
+    <MotionConfig reducedMotion="user">
+    <div className="brand-v2 min-h-screen pb-36">
+      {/* Header: plum bar, title cell + wordmark cell */}
+      <header className="sticky top-0 z-30 bg-plum text-cream border-b border-plum-3">
+        <div className="mx-auto max-w-5xl px-4 flex items-stretch">
+          <Link
+            href="/checkin"
+            className="min-h-14 pr-4 flex items-center text-base text-on-plum-2 hover:text-cream focus-visible:!outline-cream transition-colors duration-150"
+          >
+            ← ลงเวลา
+          </Link>
+          <div className="flex-1 border-l border-plum-3 pl-4 py-2 flex items-center justify-end gap-3">
+            <span className="text-sm text-on-plum-2">ตรวจร้าน</span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-inbaan-wordmark-cream-96.png" alt="ในบ้าน" width={73} height={40} className="h-10 w-auto shrink-0" />
           </div>
         </div>
       </header>
 
-      {/* Main Container */}
-      <main className="max-w-6xl mx-auto p-4 sm:p-6 space-y-6">
-        {/* In-App NFC Zone Verification & Quick SOP Panel */}
-        <section className="bg-rams-panel border-2 border-rams-rule rounded-sm p-4 sm:p-5 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-rams-rule-light pb-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-rams-green animate-pulse" />
-                <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-rams-ink-muted">
-                  NFC ZONE PROOF OF PRESENCE · ระบบแตะเช็กตามจุดปฏิบัติงานจริง
-                </span>
-              </div>
-              <h2 className="text-sm sm:text-base font-mono font-bold text-rams-ink mt-1">
-                {nfcStation
-                  ? `ยืนยันจุดแตะแผ่น NFC สำเร็จ: ${nfcStation} (โซน ${activeZone || "BAR"})`
-                  : "เลือกโซนปฏิบัติงาน (หรือนำโทรศัพท์แตะแผ่น NFC ประจำจุด)"}
-              </h2>
-            </div>
+      <main className="mx-auto max-w-5xl px-4 pt-6 flex flex-col gap-8">
+        {/* Title + actions */}
+        <section className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div className="min-w-0">
+            <h1 className="font-head text-3xl leading-normal text-charcoal break-words">ตรวจร้านเปิด-ปิด</h1>
+            <p className="text-base text-subtle mt-1" role="status">
+              {lastSyncedTime ? (
+                <>
+                  ข้อมูลจากฟอร์ม อัปเดตล่าสุด <span className="font-num">{format(lastSyncedTime, "HH:mm")}</span> น.
+                </>
+              ) : (
+                "กำลังโหลดข้อมูลจากฟอร์ม…"
+              )}
+            </p>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap md:justify-end">
+            <Link
+              href={GOOGLE_FORM_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="min-h-12 px-5 flex items-center justify-center bg-charcoal hover:bg-charcoal-2 text-cream text-base font-semibold transition-colors duration-150"
+            >
+              เปิดฟอร์มเปิด-ปิดร้าน
+            </Link>
+            <button
+              type="button"
+              onClick={() => setShowEspressoModal(true)}
+              className="min-h-12 px-4 border border-plum text-plum hover:bg-paper-2 text-base font-semibold transition-colors duration-150"
+            >
+              บันทึกช็อตกาแฟ
+            </button>
+          </div>
+        </section>
 
-            <div className="flex flex-wrap gap-1.5">
-              {[
-                { id: "BAR", label: "☕ โซนบาร์น้ำ" },
-                { id: "KITCHEN", label: "🍳 โซนครัว" },
-                { id: "HALL", label: "🪑 โซนลูกค้า/ห้องน้ำ" },
-                { id: "CLOSING", label: "🔒 ล็อกร้านก่อนกลับ" }
-              ].map((z) => (
+        {/* Today: did the forms arrive? */}
+        <section aria-labelledby="today-h" className="border border-charcoal grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]">
+          <div className="px-4 py-3 bg-plum text-cream flex flex-col justify-center">
+            <h2 id="today-h" className="text-base font-semibold">วันนี้</h2>
+            <p className="text-sm text-on-plum-2">{format(new Date(), "EEEE d MMMM", { locale: th })}</p>
+          </div>
+          {[
+            { label: "ฟอร์มเปิดร้าน", entry: todayStatus?.opening },
+            { label: "ฟอร์มปิดร้าน", entry: todayStatus?.closing }
+          ].map(({ label, entry }) => (
+            <div key={label} className="px-4 py-3 border-t sm:border-t-0 sm:border-l border-rule">
+              <p className="text-sm text-neutral">{label}</p>
+              {entry ? (
+                <p className="text-base text-charcoal">
+                  ได้รับแล้ว <span className="font-num">{format(entry.timestamp, "HH:mm")}</span> น. โดย {entry.staffName}
+                </p>
+              ) : (
+                <p className="text-base text-subtle">ยังไม่ได้รับ</p>
+              )}
+            </div>
+          ))}
+        </section>
+
+        {/* NFC zone check */}
+        <section aria-labelledby="zone-h" className="flex flex-col gap-3">
+          <div>
+            <h2 id="zone-h" className="font-head text-2xl leading-normal text-charcoal">ตรวจตามโซน</h2>
+            <p className="text-base text-subtle">
+              {nfcStation
+                ? `แตะแผ่น NFC ${nfcStation} แล้ว โซน ${activeZone || "BAR"}`
+                : "เลือกโซน หรือแตะโทรศัพท์ที่แผ่น NFC ประจำจุด"}
+            </p>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 border border-charcoal" role="group" aria-label="โซน">
+            {ZONES.map((z, i) => {
+              const on = activeZone === z.id;
+              return (
                 <button
                   key={z.id}
                   type="button"
-                  onClick={() => setActiveZone(activeZone === z.id ? null : z.id)}
-                  className={`px-3 py-1.5 rounded-sm text-xs font-mono font-bold border transition cursor-pointer ${
-                    activeZone === z.id
-                      ? "bg-rams-orange text-rams-panel border-rams-rule"
-                      : "bg-rams-bg text-rams-ink border-rams-rule-light hover:border-rams-rule"
-                  }`}
+                  aria-pressed={on}
+                  onClick={() => setActiveZone(on ? null : z.id)}
+                  className={`min-h-12 px-3 text-base transition-colors duration-150 ${
+                    i % 2 === 1 ? "border-l border-charcoal" : ""
+                  } ${i >= 2 ? "border-t md:border-t-0 border-charcoal" : ""} ${
+                    i === 2 ? "md:border-l" : ""
+                  } ${on ? "bg-plum text-cream font-semibold" : "bg-cream text-charcoal hover:bg-paper-2"}`}
                 >
                   {z.label}
                 </button>
-              ))}
-            </div>
+              );
+            })}
           </div>
 
           {activeZone && ZONE_SOP_ITEMS[activeZone] && (
-            <div className="space-y-3 pt-1">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div className="border border-rule">
+              <ul className="divide-y divide-rule">
                 {ZONE_SOP_ITEMS[activeZone].map((itemText, idx) => {
                   const key = `${activeZone}_${idx}`;
                   const checked = Boolean(zoneCheckedItems[key]);
                   return (
-                    <label
-                      key={key}
-                      onClick={() =>
-                        setZoneCheckedItems((prev) => ({ ...prev, [key]: !prev[key] }))
-                      }
-                      className={`p-3 rounded-sm border flex items-start gap-3 cursor-pointer select-none transition ${
-                        checked
-                          ? "bg-rams-green/10 border-rams-green text-rams-ink"
-                          : "bg-rams-bg border-rams-rule-light text-rams-ink hover:border-rams-rule"
-                      }`}
-                    >
-                      <div
-                        className={`w-5 h-5 rounded-sm border flex items-center justify-center shrink-0 mt-0.5 font-mono text-xs font-bold ${
-                          checked
-                            ? "bg-rams-green text-rams-panel border-rams-rule"
-                            : "bg-rams-panel border-rams-rule-light"
-                        }`}
-                      >
-                        {checked ? "✓" : ""}
-                      </div>
-                      <span className="text-xs font-medium leading-relaxed">{itemText}</span>
-                    </label>
+                    <li key={key}>
+                      <label className="min-h-12 px-4 py-3 flex items-start gap-3 cursor-pointer hover:bg-paper-2 transition-colors duration-150">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() =>
+                            setZoneCheckedItems((prev) => ({ ...prev, [key]: !prev[key] }))
+                          }
+                          className="mt-1 size-5 shrink-0 accent-plum"
+                        />
+                        <span className="text-base text-charcoal">{itemText}</span>
+                      </label>
+                    </li>
                   );
                 })}
-              </div>
-
-              <div className="flex justify-end">
+              </ul>
+              <div className="border-t border-rule p-3 flex justify-end">
                 <button
                   type="button"
                   onClick={handleZoneSopSubmit}
                   disabled={zoneSubmitting}
-                  className="px-5 py-2.5 bg-rams-ink hover:bg-neutral-800 text-rams-panel border border-rams-rule rounded-sm font-mono font-bold text-xs uppercase tracking-wider cursor-pointer tactile-btn-sm"
+                  className="min-h-12 px-5 bg-plum hover:bg-plum-2 text-cream text-base font-semibold transition-colors duration-150 disabled:opacity-60"
                 >
-                  {zoneSubmitting
-                    ? "กำลังบันทึก..."
-                    : `ยืนยันการตรวจโซน ${activeZone} →`}
+                  {zoneSubmitting ? "กำลังบันทึก…" : `ยืนยันการตรวจโซน${ZONES.find((z) => z.id === activeZone)?.label || ""}`}
                 </button>
               </div>
             </div>
           )}
         </section>
 
-        {/* Espresso Calibration Modal (Triggered by NFC tag ESPRESSO_CAL or Header button) */}
-        <AnimatePresence>
-          {showEspressoModal && (
-            <div className="fixed inset-0 z-50 bg-rams-ink/60 backdrop-blur-[2px] flex items-center justify-center p-4">
-              <motion.div
-                initial={{ scale: 0.96, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.96, opacity: 0 }}
-                className="w-full max-w-md bg-rams-panel border-2 border-rams-rule rounded-sm p-6 shadow-[0_4px_0_0_var(--color-rams-rule)] space-y-4"
-              >
-                <div className="flex items-center justify-between border-b border-rams-rule-light pb-3">
-                  <div>
-                    <span className="text-[10px] font-mono font-bold text-rams-orange uppercase tracking-widest block">
-                      NFC STATION · ESPRESSO_CAL
-                    </span>
-                    <h3 className="text-base font-mono font-bold text-rams-ink">
-                      ☕ บันทึกการตั้งช็อตกาแฟประจำวัน
-                    </h3>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowEspressoModal(false)}
-                    className="w-8 h-8 bg-rams-bg border border-rams-rule-light rounded-sm flex items-center justify-center font-mono text-xs cursor-pointer"
-                  >
-                    ✕
-                  </button>
-                </div>
-
-                <form onSubmit={handleEspressoSubmit} className="space-y-3">
-                  <div>
-                    <label className="block text-[10px] font-mono font-bold text-rams-ink-muted uppercase mb-1">
-                      ชื่อบาริสต้าผู้สกัดช็อต
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="เช่น พี่บอส / น้อง..."
-                      value={espressoForm.staffName}
-                      onChange={(e) =>
-                        setEspressoForm({ ...espressoForm, staffName: e.target.value })
-                      }
-                      className="w-full p-2.5 bg-rams-bg border border-rams-rule-light rounded-sm text-xs font-mono font-bold text-rams-ink outline-none focus:border-rams-orange"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2.5">
-                    <div>
-                      <label className="block text-[10px] font-mono font-bold text-rams-ink-muted uppercase mb-1">
-                        Dose (กรัม)
-                      </label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        required
-                        value={espressoForm.dose}
-                        onChange={(e) =>
-                          setEspressoForm({ ...espressoForm, dose: e.target.value })
-                        }
-                        className="w-full p-2.5 bg-rams-bg border border-rams-rule-light rounded-sm text-xs font-mono font-bold text-center text-rams-ink outline-none focus:border-rams-orange"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-mono font-bold text-rams-ink-muted uppercase mb-1">
-                        Yield (กรัม)
-                      </label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        required
-                        value={espressoForm.yieldWeight}
-                        onChange={(e) =>
-                          setEspressoForm({ ...espressoForm, yieldWeight: e.target.value })
-                        }
-                        className="w-full p-2.5 bg-rams-bg border border-rams-rule-light rounded-sm text-xs font-mono font-bold text-center text-rams-ink outline-none focus:border-rams-orange"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-mono font-bold text-rams-ink-muted uppercase mb-1">
-                        Time (วินาที)
-                      </label>
-                      <input
-                        type="number"
-                        step="1"
-                        required
-                        value={espressoForm.shotTime}
-                        onChange={(e) =>
-                          setEspressoForm({ ...espressoForm, shotTime: e.target.value })
-                        }
-                        className="w-full p-2.5 bg-rams-bg border border-rams-rule-light rounded-sm text-xs font-mono font-bold text-center text-rams-ink outline-none focus:border-rams-orange"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-mono font-bold text-rams-ink-muted uppercase mb-1">
-                      คาแรกเตอร์รสชาติ / ครีม่า
-                    </label>
-                    <input
-                      type="text"
-                      value={espressoForm.tasteNotes}
-                      onChange={(e) =>
-                        setEspressoForm({ ...espressoForm, tasteNotes: e.target.value })
-                      }
-                      className="w-full p-2.5 bg-rams-bg border border-rams-rule-light rounded-sm text-xs font-mono text-rams-ink outline-none focus:border-rams-orange"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-mono font-bold text-rams-ink-muted uppercase mb-1">
-                      การปรับเบอร์บด (Grinder Adjustment)
-                    </label>
-                    <input
-                      type="text"
-                      value={espressoForm.grinderAdjust}
-                      onChange={(e) =>
-                        setEspressoForm({ ...espressoForm, grinderAdjust: e.target.value })
-                      }
-                      className="w-full p-2.5 bg-rams-bg border border-rams-rule-light rounded-sm text-xs font-mono text-rams-ink outline-none focus:border-rams-orange"
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={espressoSubmitting}
-                    className="w-full py-3 bg-rams-orange hover:bg-rams-orange-active text-rams-panel border border-rams-rule rounded-sm font-mono font-bold text-xs uppercase tracking-wider shadow-[0_2px_0_0_var(--color-rams-rule)] cursor-pointer"
-                  >
-                    {espressoSubmitting ? "กำลังบันทึก..." : "บันทึกผลช็อตกาแฟเข้าสู่ระบบ →"}
-                  </button>
-                </form>
-              </motion.div>
-            </div>
-          )}
-        </AnimatePresence>
-
-        {/* Error Alert */}
         {error && (
-          <div className="p-4 rounded-sm bg-rams-red/10 border border-rams-red text-rams-red text-xs font-mono font-bold flex items-center justify-between">
-            <span>{error}</span>
+          <div role="alert" className="border border-error px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-base text-error">{error}</p>
             <button
+              type="button"
               onClick={fetchData}
-              className="underline hover:text-rams-ink cursor-pointer ml-4"
+              className="min-h-12 px-4 border border-error text-error text-base font-semibold hover:bg-paper-2 transition-colors duration-150"
             >
-              ลองใหม่อีกครั้ง
+              ลองใหม่
             </button>
           </div>
         )}
 
-        {/* 1. Dashboard Metrics Summary Cards */}
-        <section className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4 font-mono">
-          {/* Card 1: Compliance Score */}
-          <div className="bg-rams-panel p-4 sm:p-5 border border-rams-rule-light rounded-sm flex flex-col justify-between shadow-none">
-            <span className="text-[10px] font-bold text-rams-ink-muted tracking-widest uppercase block mb-2">
-              ความสมบูรณ์ข้อมูล
-            </span>
-            <div className="flex items-end justify-between">
-              <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-rams-ink">
-                {stats.complianceScore}%
-              </h2>
-              <span
-                className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-sm border ${
-                  stats.complianceScore >= 85
-                    ? "bg-rams-green/10 text-rams-green border-rams-green/30"
-                    : stats.complianceScore >= 60
-                    ? "bg-rams-amber/10 text-rams-amber border-rams-amber/30"
-                    : "bg-rams-red/10 text-rams-red border-rams-red/30"
+        {/* Month: figures, then the calendar */}
+        <section aria-labelledby="month-h" className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 id="month-h" className="font-head text-2xl leading-normal text-charcoal">ประจำเดือน</h2>
+            <div className="flex flex-wrap items-center gap-2">
+              {availableMonths.length > 0 && (
+                <label className="flex items-center gap-2">
+                  <span className="text-sm text-neutral">เดือน</span>
+                  <select
+                    value={selectedMonth}
+                    onChange={(e) => {
+                      setSelectedMonth(e.target.value);
+                      setSelectedDayFilter(null);
+                    }}
+                    className="min-h-12 px-3 bg-cream border border-charcoal text-base text-charcoal outline-none focus-visible:border-plum cursor-pointer"
+                  >
+                    {availableMonths.map((m) => (
+                      <option key={m} value={m}>
+                        {format(parse(m, "MMMM yyyy", new Date()), "MMMM yyyy", { locale: th })}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              <button
+                type="button"
+                aria-pressed={isAutoSync}
+                onClick={() => setIsAutoSync(!isAutoSync)}
+                className={`min-h-12 px-4 border text-base transition-colors duration-150 ${
+                  isAutoSync ? "border-plum bg-plum text-cream" : "border-charcoal text-charcoal hover:bg-paper-2"
                 }`}
               >
-                {stats.complianceScore === 100
-                  ? "EXCELLENT"
-                  : stats.complianceScore >= 85
-                  ? "GOOD"
-                  : "WARNING"}
-              </span>
-            </div>
-            <div className="h-1.5 w-full bg-rams-bg border border-rams-rule-light rounded-sm mt-3 overflow-hidden">
-              <div
-                className={`h-full transition-all duration-500 ${
-                  stats.complianceScore >= 85
-                    ? "bg-rams-green"
-                    : stats.complianceScore >= 60
-                    ? "bg-rams-amber"
-                    : "bg-rams-red"
-                }`}
-                style={{ width: `${stats.complianceScore}%` }}
-              />
+                {isAutoSync ? "อัปเดตอัตโนมัติ เปิด" : "อัปเดตอัตโนมัติ ปิด"}
+              </button>
+              <button
+                type="button"
+                onClick={fetchData}
+                disabled={loading}
+                className="min-h-12 px-4 border border-charcoal text-charcoal text-base hover:bg-paper-2 transition-colors duration-150 disabled:opacity-60"
+              >
+                {loading ? "กำลังโหลด…" : "โหลดใหม่"}
+              </button>
             </div>
           </div>
 
-          {/* Card 2: Total Reports */}
-          <div className="bg-rams-panel p-4 sm:p-5 border border-rams-rule-light rounded-sm flex flex-col justify-between shadow-none">
-            <span className="text-[10px] font-bold text-rams-ink-muted tracking-widest uppercase block mb-2">
-              รายงานทั้งหมด
-            </span>
-            <div>
-              <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-rams-ink">
-                {stats.total}{" "}
-                <span className="text-xs font-normal text-rams-ink-muted">REPORTS</span>
-              </h2>
-              <div className="flex gap-2.5 mt-2.5 text-[10px] font-bold tracking-wider text-rams-ink-muted uppercase">
-                <span className="text-rams-orange">☀️ OPEN: {stats.opening}</span>
-                <span>•</span>
-                <span className="text-rams-ink">🌙 CLOSE: {stats.closing}</span>
-              </div>
+          <dl className="grid grid-cols-2 lg:grid-cols-4 border border-rule">
+            <div className="px-4 py-3">
+              <dt className="text-sm text-neutral">ฟอร์มครบไม่มีจุดต้องตรวจ</dt>
+              <dd className="font-num text-3xl text-charcoal tabular-nums">{stats.complianceScore}%</dd>
             </div>
-          </div>
+            <div className="px-4 py-3 border-l border-rule">
+              <dt className="text-sm text-neutral">รายงานทั้งหมด</dt>
+              <dd className="font-num text-3xl text-charcoal tabular-nums">{stats.total}</dd>
+              <dd className="text-sm text-subtle">
+                เปิด <span className="font-num">{stats.opening}</span> ปิด <span className="font-num">{stats.closing}</span>
+              </dd>
+            </div>
+            <div className="px-4 py-3 border-t lg:border-t-0 lg:border-l border-rule">
+              <dt className="text-sm text-neutral">กะที่ยอดเงินข้ามกะไม่ตรง</dt>
+              <dd className={`font-num text-3xl tabular-nums ${stats.mismatches > 0 ? "text-plum" : "text-charcoal"}`}>
+                {stats.mismatches}
+              </dd>
+            </div>
+            <div className="px-4 py-3 border-t border-l lg:border-t-0 border-rule">
+              <dt className="text-sm text-neutral">เงินลิ้นชักต่างสะสม (บาท)</dt>
+              <dd className={`font-num text-3xl tabular-nums ${stats.netMismatch !== 0 ? "text-plum" : "text-charcoal"}`}>
+                {signed(stats.netMismatch)}
+              </dd>
+            </div>
+          </dl>
 
-          {/* Card 3: Shift Discrepancies */}
-          <div className="bg-rams-panel p-4 sm:p-5 border border-rams-rule-light rounded-sm flex flex-col justify-between shadow-none">
-            <span className="text-[10px] font-bold text-rams-ink-muted tracking-widest uppercase block mb-2">
-              จุดบกพร่อง / ต่างกะ
-            </span>
-            <div className="flex items-end justify-between">
-              <div>
-                <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-rams-ink">
-                  {stats.mismatches}{" "}
-                  <span className="text-xs font-normal text-rams-ink-muted">SHIFTS</span>
-                </h2>
-                <p className="text-[10px] text-rams-ink-muted uppercase tracking-wider mt-1">
-                  ยอดเงินข้ามกะไม่ตรงกัน
-                </p>
-              </div>
-              <div
-                className={`p-2 rounded-sm border flex items-center justify-center ${
-                  stats.mismatches > 0
-                    ? "bg-rams-amber/10 border-rams-amber/30 text-rams-amber"
-                    : "bg-rams-green/10 border-rams-green/30 text-rams-green"
-                }`}
-              >
-                <AlertTriangle size={16} />
-              </div>
+          {/* Calendar */}
+          <div className="border border-rule">
+            <div className="grid grid-cols-7 border-b border-rule bg-paper-2">
+              {["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"].map((d) => (
+                <div key={d} className="py-2 text-center text-sm text-neutral">
+                  {d}
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7">
+              {Array.from({ length: firstDayOfWeek }).map((_, i) => (
+                <div key={`pad-${i}`} aria-hidden="true" />
+              ))}
+              {daysInMonth.map((day) => {
+                const dateStr = format(day, "yyyy-MM-dd");
+                const dayStatus = dayStatusMap[dateStr];
+                const isToday = todayStr === dateStr;
+                const isSelected = selectedDayFilter === dateStr;
+                const mark = (entry, word) =>
+                  entry ? (
+                    <span className={entry.hasDiscrepancies ? (isSelected ? "text-cream underline" : "text-plum underline") : ""}>
+                      {word}
+                    </span>
+                  ) : (
+                    <span className="opacity-0">{word}</span>
+                  );
+                const label = `${format(day, "d MMMM", { locale: th })} ${
+                  dayStatus?.opening ? `เปิดร้านโดย ${dayStatus.opening.staffName}` : "ไม่มีฟอร์มเปิดร้าน"
+                } ${dayStatus?.closing ? `ปิดร้านโดย ${dayStatus.closing.staffName}` : "ไม่มีฟอร์มปิดร้าน"}`;
+                return (
+                  <button
+                    key={dateStr}
+                    type="button"
+                    aria-pressed={isSelected}
+                    aria-label={label}
+                    title={label}
+                    onClick={() => handleDayClick(dateStr)}
+                    className={`min-h-16 px-2 py-1.5 flex flex-col items-start justify-between text-left -mt-px -ml-px border transition-colors duration-150 ${
+                      isSelected
+                        ? "bg-plum text-cream border-plum relative z-10"
+                        : isToday
+                        ? "bg-cream text-charcoal border-charcoal relative z-10"
+                        : "bg-cream text-charcoal border-rule hover:bg-paper-2"
+                    }`}
+                  >
+                    <span className={`font-num text-sm ${isToday && !isSelected ? "font-medium" : ""}`}>{day.getDate()}</span>
+                    <span className="flex flex-col text-xs leading-tight">
+                      {mark(dayStatus?.opening, "เปิด")}
+                      {mark(dayStatus?.closing, "ปิด")}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
-
-          {/* Card 4: Accumulated Cash Discrepancy */}
-          <div className="bg-rams-panel p-4 sm:p-5 border border-rams-rule-light rounded-sm flex flex-col justify-between shadow-none">
-            <span className="text-[10px] font-bold text-rams-ink-muted tracking-widest uppercase block mb-2">
-              สะสมเงินคลาดเคลื่อน
-            </span>
-            <div className="flex items-end justify-between">
-              <div>
-                <h2
-                  className={`text-2xl sm:text-3xl font-black tracking-tight ${
-                    stats.netMismatch > 0
-                      ? "text-rams-green"
-                      : stats.netMismatch < 0
-                      ? "text-rams-red"
-                      : "text-rams-ink"
-                  }`}
-                >
-                  {stats.netMismatch > 0 ? `+${stats.netMismatch}` : stats.netMismatch}{" "}
-                  <span className="text-xs font-normal text-rams-ink-muted">THB</span>
-                </h2>
-                <p className="text-[10px] text-rams-ink-muted uppercase tracking-wider mt-1">
-                  ดรอเวอร์ดิฟสะสมเดือนนี้
-                </p>
-              </div>
-              <div
-                className={`p-2 rounded-sm border flex items-center justify-center ${
-                  stats.netMismatch > 0
-                    ? "bg-rams-green/10 border-rams-green/30 text-rams-green"
-                    : stats.netMismatch < 0
-                    ? "bg-rams-red/10 border-rams-red/30 text-rams-red"
-                    : "bg-rams-bg border-rams-rule-light text-rams-ink-muted"
-                }`}
-              >
-                {stats.netMismatch > 0 ? (
-                  <ArrowUpRight size={16} />
-                ) : stats.netMismatch < 0 ? (
-                  <ArrowDownRight size={16} />
-                ) : (
-                  <Check size={16} />
-                )}
-              </div>
-            </div>
-          </div>
+          <p className="text-sm text-subtle">
+            เปิด และ ปิด ในช่องวัน คือได้รับฟอร์มแล้ว ขีดเส้นใต้สีม่วงคือมีจุดต้องตรวจ แตะวันเพื่อดูเฉพาะวันนั้น
+          </p>
         </section>
 
-        {/* 2. Monthly Activity Calendar Grid */}
-        <section className="bg-rams-panel p-4 sm:p-6 border border-rams-rule-light rounded-sm font-mono shadow-none">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+        {/* Log feed */}
+        <section ref={logsContainerRef} aria-labelledby="log-h" className="flex flex-col gap-4 scroll-mt-20">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
-              <h2 className="text-base font-bold text-rams-ink uppercase tracking-wider flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-rams-orange" />
-                <span>ปฏิทินตรวจการทำงานรายเดือน (MONTHLY ACTIVITY)</span>
+              <h2 id="log-h" className="font-head text-2xl leading-normal text-charcoal">
+                {selectedDayFilter
+                  ? `บันทึกวันที่ ${format(parse(selectedDayFilter, "yyyy-MM-dd", new Date()), "d MMMM yyyy", { locale: th })}`
+                  : "บันทึกทั้งเดือน"}
               </h2>
-              <p className="text-[11px] text-rams-ink-muted mt-0.5">
-                แตะเลือกวันที่เพื่อกรองดูรายการบันทึกของวันนั้น หรือกดซ้ำเพื่อดูทั้งหมด
+              <p className="text-sm text-neutral">
+                แสดง <span className="font-num">{filteredData.length}</span> จาก{" "}
+                <span className="font-num">{currentMonthData.length}</span> รายการ
               </p>
             </div>
-
             {selectedDayFilter && (
               <button
+                type="button"
                 onClick={() => setSelectedDayFilter(null)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-sm bg-rams-orange/10 border border-rams-orange text-xs font-bold text-rams-orange transition-all self-start sm:self-auto cursor-pointer"
+                className="min-h-12 px-4 border border-plum text-plum text-base hover:bg-paper-2 transition-colors duration-150"
               >
-                <X size={12} />
-                <span>
-                  CLEAR FILTER:{" "}
-                  {format(parse(selectedDayFilter, "yyyy-MM-dd", new Date()), "d MMM yyyy", {
-                    locale: th
-                  }).toUpperCase()}
-                </span>
+                ดูทั้งเดือน
               </button>
             )}
           </div>
 
-          {/* Weekdays */}
-          <div className="grid grid-cols-7 gap-1.5 sm:gap-2 mb-2 text-center text-[10px] font-bold uppercase text-rams-ink-muted border-b border-rams-rule-light pb-2">
-            {["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"].map((d) => (
-              <div key={d} className="py-1">
-                {d}
-              </div>
-            ))}
-          </div>
-
-          {/* Day Cells */}
-          <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
-            {/* Leading padding */}
-            {Array.from({ length: firstDayOfWeek }).map((_, i) => (
-              <div
-                key={`pad-${i}`}
-                className="aspect-square rounded-sm bg-rams-bg/40 border border-dashed border-rams-rule-light/40"
-              />
-            ))}
-
-            {daysInMonth.map((day) => {
-              const dateStr = format(day, "yyyy-MM-dd");
-              const dayStatus = dayStatusMap[dateStr];
-              const isToday = format(new Date(), "yyyy-MM-dd") === dateStr;
-              const isSelected = selectedDayFilter === dateStr;
-
-              const getDotClass = (entry) => {
-                if (!entry) return "bg-rams-bg border border-rams-rule-light";
-                return entry.hasDiscrepancies
-                  ? "bg-rams-amber border border-rams-amber"
-                  : "bg-rams-green border border-rams-green";
-              };
-
-              return (
-                <div
-                  key={dateStr}
-                  onClick={() => handleDayClick(dateStr)}
-                  className={`aspect-square rounded-sm p-1.5 sm:p-2 flex flex-col justify-between border cursor-pointer transition-all relative overflow-hidden select-none ${
-                    isSelected
-                      ? "bg-rams-orange/10 border-rams-orange shadow-none ring-1 ring-rams-orange"
-                      : isToday
-                      ? "bg-rams-bg border-rams-rule"
-                      : "bg-rams-panel border-rams-rule-light hover:border-rams-rule"
-                  }`}
-                >
-                  <div className="flex justify-between items-start">
-                    <span
-                      className={`text-xs font-bold ${
-                        isToday
-                          ? "text-rams-orange font-black"
-                          : isSelected
-                          ? "text-rams-orange"
-                          : "text-rams-ink"
-                      }`}
-                    >
-                      {day.getDate()}
-                    </span>
-                    {isToday && <span className="w-1.5 h-1.5 rounded-full bg-rams-orange animate-pulse" />}
-                  </div>
-
-                  <div className="flex justify-center items-center gap-1 mt-auto">
-                    <div
-                      title={
-                        dayStatus?.opening
-                          ? `เปิดร้าน: ${dayStatus.opening.staffName}`
-                          : "ไม่มีบันทึกเปิดร้าน"
-                      }
-                      className={`w-1.5 h-1.5 rounded-full ${getDotClass(dayStatus?.opening)}`}
-                    />
-                    <div
-                      title={
-                        dayStatus?.closing
-                          ? `ปิดร้าน: ${dayStatus.closing.staffName}`
-                          : "ไม่มีบันทึกปิดร้าน"
-                      }
-                      className={`w-1.5 h-1.5 rounded-full ${getDotClass(dayStatus?.closing)}`}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-
-        {/* 3. Toolbar & Log Feed Section */}
-        <section ref={logsContainerRef} className="space-y-4 font-mono">
-          {/* Toolbar */}
-          <div className="bg-rams-panel p-4 border border-rams-rule-light rounded-sm flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-none">
-            {/* Search */}
-            <div className="relative flex-1 max-w-md">
-              <Search className="w-3.5 h-3.5 text-rams-ink-muted absolute left-3 top-1/2 -translate-y-1/2" />
+          <div className="flex flex-col gap-3 md:flex-row md:items-end">
+            <label className="flex-1 max-w-md">
+              <span className="block text-sm text-neutral mb-1">ค้นหา</span>
               <input
-                type="text"
-                placeholder="ค้นหาชื่อพนักงาน (Aka), วันที่, หรือหมายเหตุ..."
+                type="search"
+                placeholder="ชื่อพนักงาน วันที่ หรือหมายเหตุ"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-rams-bg border border-rams-rule-light focus:border-rams-orange rounded-sm pl-9 pr-3 py-2 text-xs font-sans text-rams-ink outline-none transition"
+                className={fieldCls}
               />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery("")}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-rams-ink-muted hover:text-rams-ink text-xs"
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-
-            {/* Filter Tabs */}
-            <div className="flex flex-wrap bg-rams-bg p-1 rounded-sm border border-rams-rule-light gap-1">
-              {[
-                { id: "All", label: "ทั้งหมด (All)" },
-                { id: "Opening", label: "☀️ เปิดร้าน" },
-                { id: "Closing", label: "🌙 ปิดร้าน" },
-                { id: "Discrepancy", label: "⚠️ มีจุดสังเกต" }
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setShiftFilter(tab.id)}
-                  className={`px-3 py-1.5 rounded-sm text-[11px] font-bold transition-all cursor-pointer tactile-btn-sm ${
-                    shiftFilter === tab.id
-                      ? "bg-rams-ink text-rams-panel border border-rams-ink"
-                      : "text-rams-ink-muted hover:text-rams-ink"
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
+            </label>
+            <div className="grid grid-cols-2 sm:grid-cols-4 border border-charcoal" role="group" aria-label="กรองประเภท">
+              {SHIFT_TABS.map((tab, i) => {
+                const on = shiftFilter === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => setShiftFilter(tab.id)}
+                    className={`min-h-12 px-3 text-base transition-colors duration-150 ${
+                      i % 2 === 1 ? "border-l border-charcoal" : ""
+                    } ${i >= 2 ? "border-t sm:border-t-0 border-charcoal" : ""} ${i === 2 ? "sm:border-l" : ""} ${
+                      on ? "bg-charcoal text-cream font-semibold" : "bg-cream text-charcoal hover:bg-paper-2"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          {/* Result Count Status */}
-          <div className="flex justify-between items-center px-1 text-[11px] text-rams-ink-muted">
-            <span>
-              {selectedDayFilter
-                ? `บันทึกสำหรับวันที่ ${format(
-                    parse(selectedDayFilter, "yyyy-MM-dd", new Date()),
-                    "d MMMM yyyy",
-                    { locale: th }
-                  )}`
-                : "รายการบันทึกทั้งหมดประจำเดือน"}
-            </span>
-            <span className="font-bold">
-              แสดง {filteredData.length} จาก {currentMonthData.length} รายการ
-            </span>
-          </div>
-
-          {/* Loading Skeleton */}
           {loading && data.length === 0 ? (
-            <div className="space-y-4">
+            <div role="status" className="flex flex-col gap-3">
+              <span className="sr-only">กำลังโหลดบันทึก</span>
               {[1, 2, 3].map((i) => (
-                <div
-                  key={i}
-                  className="w-full h-48 bg-rams-panel rounded-sm animate-pulse border border-rams-rule-light"
-                />
+                <div key={i} className="h-40 bg-paper-2 border border-rule" />
               ))}
             </div>
           ) : filteredData.length === 0 ? (
-            /* Empty State */
-            <div className="bg-rams-panel rounded-sm p-12 text-center border border-rams-rule-light flex flex-col items-center justify-center space-y-3">
-              <div className="p-3 bg-rams-bg border border-rams-rule-light text-rams-ink-muted rounded-sm">
-                <FileText size={28} />
-              </div>
-              <h3 className="text-sm font-bold text-rams-ink uppercase tracking-wider">
-                ไม่พบบันทึกตามเงื่อนไขที่เลือก
-              </h3>
-              <p className="text-rams-ink-muted text-xs max-w-sm leading-relaxed font-sans">
-                ไม่มีรายงานการตรวจร้านที่ตรงกับวันที่ หรือตัวกรองที่คุณกำหนด กรุณาเปลี่ยนตัวกรองหรือลองค้นหาคำใหม่
+            <div className="border border-rule px-4 py-8 text-center">
+              <p className="text-lg font-semibold text-charcoal">ไม่พบบันทึกตามที่เลือก</p>
+              <p className="text-base text-subtle mt-1">
+                ถ้าส่งฟอร์มแล้วแต่ไม่ขึ้น ให้เช็กว่ากดส่งจนเห็นหน้ายืนยันของ Google Form
               </p>
               {selectedDayFilter && (
                 <button
+                  type="button"
                   onClick={() => setSelectedDayFilter(null)}
-                  className="bg-rams-orange text-rams-panel px-3.5 py-1.5 rounded-sm text-xs font-bold hover:bg-rams-orange-active transition"
+                  className="mt-4 min-h-12 px-4 border border-plum text-plum text-base hover:bg-paper-2 transition-colors duration-150"
                 >
                   ดูบันทึกทั้งเดือน
                 </button>
               )}
             </div>
           ) : (
-            /* Log Cards Feed */
-            <div className="space-y-4">
+            <ul className="flex flex-col gap-4">
               {filteredData.map((item) => {
                 const isExpanded = !!expandedTasksMap[item.id];
                 const displayedTasks = isExpanded ? item.tasks : item.tasks.slice(0, 4);
-
+                const isOpening = item.type === "Opening";
                 return (
-                  <div
+                  <li
                     key={item.id}
-                    className={`bg-rams-panel rounded-sm p-5 border transition-all relative overflow-hidden shadow-none ${
-                      item.hasDiscrepancies ? "border-rams-amber" : "border-rams-rule-light"
-                    }`}
+                    className={`border bg-cream ${item.hasDiscrepancies ? "border-plum" : "border-rule"}`}
                   >
-                    {/* Left Indicator Strip */}
-                    <div
-                      className={`absolute left-0 top-0 bottom-0 w-1 ${
-                        item.type === "Opening" ? "bg-rams-orange" : "bg-rams-ink"
-                      }`}
-                    />
-
-                    <div className="pl-2 space-y-4">
-                      {/* Top Header Row */}
-                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 pb-3 border-b border-rams-rule-light/60">
-                        <div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span
-                              className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-sm border ${
-                                item.type === "Opening"
-                                  ? "bg-rams-orange/10 text-rams-orange border-rams-orange/30"
-                                  : "bg-rams-ink text-rams-panel border border-rams-ink"
-                              }`}
-                            >
-                              {item.type === "Opening" ? "☀️ OPENING (เปิดร้าน)" : "🌙 CLOSING (ปิดร้าน)"}
-                            </span>
-                            <span className="text-rams-ink-muted text-xs font-semibold flex items-center gap-1">
-                              <Clock size={12} />
-                              {format(item.timestamp, "d MMMM yyyy • HH:mm", { locale: th })} น.
-                            </span>
-                          </div>
-
-                          <h3 className="text-xl font-black text-rams-ink flex items-center gap-2 mt-2">
-                            <User size={16} className="text-rams-ink-muted" />
-                            <span>{item.staffName}</span>
-                          </h3>
-                        </div>
-
-                        {/* Cash Badge */}
-                        {item.cashStr && (
-                          <div className="flex flex-col sm:items-end bg-rams-bg p-3 rounded-sm border border-rams-rule-light min-w-[140px]">
-                            <span className="text-[9px] font-bold text-rams-ink-muted uppercase tracking-widest mb-1">
-                              {item.type === "Opening" ? "เงินทอนเปิดร้าน (POS)" : "เงินสดปิดร้าน"}
-                            </span>
-                            <span className="text-lg font-black text-rams-ink tabular-nums">
-                              {item.cash !== null ? `฿${item.cash.toLocaleString()}` : item.cashStr}{" "}
-                              <span className="text-[10px] font-bold text-rams-ink-muted">THB</span>
-                            </span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Warnings Panel */}
-                      {item.warnings.length > 0 && (
-                        <div className="p-3.5 bg-rams-amber/10 rounded-sm border border-rams-amber/40 space-y-1.5">
-                          <div className="flex items-center gap-2 text-rams-amber font-bold text-xs uppercase tracking-wider">
-                            <AlertCircle size={14} />
-                            <span>พบจุดที่ต้องตรวจสอบ ({item.warnings.length} รายการ)</span>
-                          </div>
-                          <ul className="space-y-1 pl-5 list-disc text-xs text-rams-ink leading-relaxed font-sans font-medium">
-                            {item.warnings.map((w, idx) => (
-                              <li key={idx} className="marker:text-rams-amber">
-                                {w.message}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-
-                      {/* Content Grid */}
-                      <div className="grid md:grid-cols-2 gap-4">
-                        {/* Tasks Checklist */}
-                        <div className="bg-rams-bg rounded-sm p-4 border border-rams-rule-light flex flex-col justify-between">
-                          <div>
-                            <div className="flex items-center justify-between mb-3 border-b border-rams-rule-light/60 pb-2">
-                              <span className="text-[10px] font-bold text-rams-ink-muted uppercase tracking-wider flex items-center gap-1.5">
-                                <Check size={12} className="text-rams-green" />
-                                ภารกิจที่ตรวจเช็ค
-                              </span>
-                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-sm bg-rams-green/10 text-rams-green border border-rams-green/20">
-                                {item.tasks.length} รายการ
-                              </span>
-                            </div>
-
-                            {item.tasks.length > 0 ? (
-                              <div className="space-y-2">
-                                {displayedTasks.map((t, idx) => (
-                                  <div key={idx} className="flex items-start gap-2">
-                                    <div className="w-3.5 h-3.5 rounded-full bg-rams-green/10 flex items-center justify-center shrink-0 mt-0.5 border border-rams-green/30">
-                                      <Check size={8} className="text-rams-green" strokeWidth={3} />
-                                    </div>
-                                    <span className="text-xs text-rams-ink leading-relaxed font-sans font-medium">
-                                      {t}
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
-                            ) : (
-                              <p className="text-rams-ink-muted text-xs italic font-sans py-1">
-                                ไม่มีการบันทึกรายการภารกิจ
-                              </p>
-                            )}
-                          </div>
-
-                          {item.tasks.length > 4 && (
-                            <button
-                              onClick={() => toggleTaskExpand(item.id)}
-                              className="mt-3 pt-2 border-t border-rams-rule-light/60 text-xs font-bold text-rams-orange hover:underline flex items-center gap-1 self-start cursor-pointer"
-                            >
-                              {isExpanded ? (
-                                <>
-                                  <span>ย่อรายการ</span>
-                                  <ChevronUp size={12} />
-                                </>
-                              ) : (
-                                <>
-                                  <span>ดูทั้งหมด {item.tasks.length} รายการ</span>
-                                  <ChevronDown size={12} />
-                                </>
-                              )}
-                            </button>
-                          )}
-                        </div>
-
-                        {/* Notes & Extra Info */}
-                        <div className="space-y-3">
-                          {/* General Note */}
-                          <div className="bg-rams-bg rounded-sm p-4 border border-rams-rule-light h-full flex flex-col">
-                            <span className="text-[10px] font-bold text-rams-ink-muted uppercase tracking-wider flex items-center gap-1.5 mb-2">
-                              <FileText size={12} />
-                              หมายเหตุเพิ่มเติม
-                            </span>
-                            {item.note ? (
-                              <p className="text-xs text-rams-ink leading-relaxed font-sans bg-rams-panel p-2.5 rounded-sm border border-rams-rule-light flex-1 italic">
-                                &ldquo;{item.note}&rdquo;
-                              </p>
-                            ) : (
-                              <p className="text-rams-ink-muted text-xs italic font-sans flex-1">
-                                ไม่มีหมายเหตุเพิ่มเติม
-                              </p>
-                            )}
-
-                            {/* Extra fields: coffee cleaner / defects */}
-                            {(item.coffeeCleaner || item.nightDefects) && (
-                              <div className="mt-3 pt-2.5 border-t border-rams-rule-light space-y-2 text-xs font-sans">
-                                {item.coffeeCleaner && (
-                                  <div className="flex justify-between items-center bg-rams-panel p-2 rounded-sm border border-rams-rule-light">
-                                    <span className="text-rams-ink-muted font-bold text-[10px] uppercase">
-                                      ☕ เวรล้างถังน้ำกาแฟ:
-                                    </span>
-                                    <span className="font-bold text-rams-ink">{item.coffeeCleaner}</span>
-                                  </div>
-                                )}
-
-                                {item.nightDefects && (
-                                  <div className="p-2 rounded-sm bg-rams-amber/10 border border-rams-amber/30 text-rams-ink">
-                                    <span className="text-rams-amber font-bold text-[10px] uppercase block mb-0.5">
-                                      ⚠️ จุดบกพร่องจากกะก่อนหน้า:
-                                    </span>
-                                    <p className="text-[11px] leading-relaxed">{item.nightDefects}</p>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Evidence Photo Gallery */}
-                      {item.photos.length > 0 && (
-                        <div className="space-y-2 pt-2 border-t border-rams-rule-light/60">
-                          <span className="text-[10px] font-bold text-rams-ink-muted uppercase tracking-wider flex items-center gap-1.5">
-                            <Camera size={12} />
-                            รูปถ่ายหลักฐาน ({item.photos.length} รูป)
+                    {/* Row 1: type, when, who, cash */}
+                    <div className="grid grid-cols-[minmax(0,1fr)_auto] border-b border-rule">
+                      <div className="px-4 py-3 min-w-0">
+                        <p className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                          <span
+                            className={`px-2 text-sm font-semibold ${
+                              isOpening ? "border border-charcoal text-charcoal" : "bg-charcoal text-cream"
+                            }`}
+                          >
+                            {isOpening ? "เปิดร้าน" : "ปิดร้าน"}
                           </span>
-                          <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
-                            {item.photos.map((photo, i) => (
-                              <div
-                                key={i}
-                                onClick={() => setSelectedImage(photo.full)}
-                                className="aspect-square rounded-sm overflow-hidden cursor-pointer relative group border border-rams-rule-light bg-rams-bg hover:border-rams-orange transition-all"
-                              >
-                                <img
-                                  src={photo.thumbnail}
-                                  alt="Checklist Evidence"
-                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                                  onError={(e) => {
-                                    e.target.style.display = "none";
-                                  }}
-                                />
-                              </div>
-                            ))}
-                          </div>
+                          <span className="text-sm text-neutral">
+                            {format(item.timestamp, "d MMMM yyyy", { locale: th })}{" "}
+                            <span className="font-num">{format(item.timestamp, "HH:mm")}</span> น.
+                          </span>
+                        </p>
+                        <h3 className="text-xl font-semibold text-charcoal mt-2 break-words">{item.staffName}</h3>
+                      </div>
+                      {item.cashStr && (
+                        <div className="px-4 py-3 border-l border-rule text-right">
+                          <p className="text-sm text-neutral">{isOpening ? "เงินทอนเปิดร้าน" : "เงินสดปิดร้าน"}</p>
+                          <p className="font-num text-2xl text-charcoal tabular-nums">
+                            {item.cash !== null ? item.cash.toLocaleString() : item.cashStr}
+                            <span className="text-sm text-neutral"> บาท</span>
+                          </p>
                         </div>
                       )}
                     </div>
-                  </div>
+
+                    {item.warnings.length > 0 && (
+                      <div className="px-4 py-3 bg-paper-2 border-b border-rule">
+                        <p className="text-base font-semibold text-plum">
+                          จุดต้องตรวจ <span className="font-num">{item.warnings.length}</span> รายการ
+                        </p>
+                        <ul className="mt-1 list-disc pl-5 text-base text-charcoal marker:text-plum">
+                          {item.warnings.map((w, idx) => (
+                            <li key={idx}>{w.message}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                      <div className="px-4 py-3">
+                        <p className="text-sm text-neutral">
+                          งานที่ติ๊กแล้ว <span className="font-num">{item.tasks.length}</span> รายการ
+                        </p>
+                        {item.tasks.length > 0 ? (
+                          <ul className="mt-2 flex flex-col gap-1.5 list-disc pl-5 marker:text-plum">
+                            {displayedTasks.map((t, idx) => (
+                              <li key={idx} className="text-base text-charcoal break-words">
+                                {t}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="mt-2 text-base text-subtle">ไม่มีรายการงาน</p>
+                        )}
+                        {item.tasks.length > 4 && (
+                          <button
+                            type="button"
+                            aria-expanded={isExpanded}
+                            onClick={() => toggleTaskExpand(item.id)}
+                            className="mt-2 min-h-12 text-base font-semibold text-plum underline-offset-4 hover:underline"
+                          >
+                            {isExpanded ? "ย่อรายการ" : `ดูทั้งหมด ${item.tasks.length} รายการ`}
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="px-4 py-3 border-t md:border-t-0 md:border-l border-rule flex flex-col gap-3">
+                        <div>
+                          <p className="text-sm text-neutral">หมายเหตุ</p>
+                          <p className={`text-base ${item.note ? "text-charcoal" : "text-subtle"} break-words`}>
+                            {item.note || "ไม่มี"}
+                          </p>
+                        </div>
+                        {item.coffeeCleaner && (
+                          <div>
+                            <p className="text-sm text-neutral">เวรล้างถังน้ำกาแฟ</p>
+                            <p className="text-base text-charcoal">{item.coffeeCleaner}</p>
+                          </div>
+                        )}
+                        {item.nightDefects && (
+                          <div>
+                            <p className="text-sm text-neutral">จุดไม่เรียบร้อยจากกะก่อนหน้า</p>
+                            <p className="text-base text-charcoal break-words">{item.nightDefects}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {item.photos.length > 0 && (
+                      <div className="px-4 py-3 border-t border-rule">
+                        <p className="text-sm text-neutral mb-2">
+                          รูปหลักฐาน <span className="font-num">{item.photos.length}</span> รูป
+                        </p>
+                        <div className="grid grid-cols-[repeat(auto-fill,minmax(4.5rem,1fr))] gap-2">
+                          {item.photos.map((photo, i) => (
+                            <button
+                              key={i}
+                              type="button"
+                              onClick={() => setSelectedImage(photo.full)}
+                              aria-label={`เปิดรูปหลักฐานที่ ${i + 1}`}
+                              className="aspect-square bg-paper-3 border border-rule hover:border-plum transition-colors duration-150 overflow-clip"
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={photo.thumbnail}
+                                alt=""
+                                loading="lazy"
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  e.target.style.display = "none";
+                                }}
+                              />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </li>
                 );
               })}
-            </div>
+            </ul>
           )}
         </section>
       </main>
 
-      {/* Lightbox / Google Drive Viewer Modal */}
+      {/* Espresso calibration (NFC tag ESPRESSO or header button) */}
       <AnimatePresence>
-        {selectedImage && (
+        {showEspressoModal && (
           <motion.div
+            key="espresso"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={() => setSelectedImage(null)}
-            className="fixed inset-0 z-50 bg-rams-ink/80 backdrop-blur-xs flex items-center justify-center p-4"
+            transition={{ duration: 0.16, ease: "easeOut" }}
+            className="brand-v2 !bg-charcoal/50 fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="espresso-h"
           >
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
-              className="relative w-full max-w-4xl h-[85vh] bg-rams-panel rounded-sm overflow-hidden border border-rams-rule shadow-2xl flex flex-col"
-            >
-              {/* Modal Header */}
-              <div className="p-3 border-b border-rams-rule-light flex justify-between items-center bg-rams-bg font-mono">
-                <span className="text-xs font-bold text-rams-ink flex items-center gap-2">
-                  <Camera className="w-3.5 h-3.5 text-rams-orange" />
-                  หลักฐานรูปภาพประกอบ (EVIDENCE PREVIEW)
-                </span>
+            <div className="w-full max-w-md bg-cream border border-charcoal max-h-[92vh] overflow-y-auto">
+              <div className="flex items-stretch bg-plum text-cream">
+                <h3 id="espresso-h" className="flex-1 px-4 py-3 text-lg font-semibold">บันทึกช็อตกาแฟประจำวัน</h3>
                 <button
-                  onClick={() => setSelectedImage(null)}
-                  className="bg-rams-panel hover:bg-rams-ink hover:text-rams-panel border border-rams-rule px-2.5 py-1 rounded-sm text-xs font-bold text-rams-ink transition cursor-pointer"
+                  type="button"
+                  onClick={() => setShowEspressoModal(false)}
+                  className="min-w-14 border-l border-plum-3 text-base text-on-plum-2 hover:text-cream focus-visible:!outline-cream transition-colors duration-150"
                 >
-                  ✕ ปิด (CLOSE)
+                  ปิด
                 </button>
               </div>
-
-              {/* Modal Body */}
-              <div className="flex-1 bg-rams-bg p-2 overflow-hidden flex items-center justify-center">
-                {selectedImage.includes("drive.google.com") ? (
-                  <iframe
-                    src={selectedImage}
-                    className="w-full h-full border-0 rounded-sm"
-                    allow="autoplay"
+              <form onSubmit={handleEspressoSubmit} className="p-4 flex flex-col gap-4">
+                <label>
+                  <span className="block text-sm text-neutral mb-1">ชื่อบาริสต้า</span>
+                  <input
+                    type="text"
+                    required
+                    placeholder="ชื่อเล่น"
+                    value={espressoForm.staffName}
+                    onChange={(e) => setEspressoForm({ ...espressoForm, staffName: e.target.value })}
+                    className={fieldCls}
                   />
-                ) : (
-                  <img
-                    src={selectedImage}
-                    alt="Evidence Preview"
-                    className="max-w-full max-h-full object-contain rounded-sm"
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { k: "dose", label: "Dose (กรัม)", step: "0.1" },
+                    { k: "yieldWeight", label: "Yield (กรัม)", step: "0.1" },
+                    { k: "shotTime", label: "เวลา (วินาที)", step: "1" }
+                  ].map((f) => (
+                    <label key={f.k}>
+                      <span className="block text-sm text-neutral mb-1">{f.label}</span>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        step={f.step}
+                        required
+                        value={espressoForm[f.k]}
+                        onChange={(e) => setEspressoForm({ ...espressoForm, [f.k]: e.target.value })}
+                        className={`${fieldCls} font-num text-center`}
+                      />
+                    </label>
+                  ))}
+                </div>
+                <label>
+                  <span className="block text-sm text-neutral mb-1">รสชาติและครีม่า</span>
+                  <input
+                    type="text"
+                    value={espressoForm.tasteNotes}
+                    onChange={(e) => setEspressoForm({ ...espressoForm, tasteNotes: e.target.value })}
+                    className={fieldCls}
                   />
-                )}
-              </div>
-            </motion.div>
+                </label>
+                <label>
+                  <span className="block text-sm text-neutral mb-1">การปรับเบอร์บด</span>
+                  <input
+                    type="text"
+                    value={espressoForm.grinderAdjust}
+                    onChange={(e) => setEspressoForm({ ...espressoForm, grinderAdjust: e.target.value })}
+                    className={fieldCls}
+                  />
+                </label>
+                <button
+                  type="submit"
+                  disabled={espressoSubmitting}
+                  className="w-full min-h-14 bg-charcoal hover:bg-charcoal-2 text-cream text-lg font-semibold transition-colors duration-150 disabled:opacity-60"
+                >
+                  {espressoSubmitting ? "กำลังบันทึก…" : "บันทึกผลช็อต"}
+                </button>
+              </form>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Navigation Dock for Staff Mobile Flow */}
+      {/* Photo viewer (Google Drive preview or image) */}
+      <AnimatePresence>
+        {selectedImage && (
+          <motion.div
+            key="photo"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.16, ease: "easeOut" }}
+            onClick={() => setSelectedImage(null)}
+            className="brand-v2 !bg-charcoal/80 fixed inset-0 z-50 flex items-center justify-center p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="photo-h"
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-4xl h-[85vh] bg-cream border border-charcoal flex flex-col"
+            >
+              <div className="flex items-stretch border-b border-rule">
+                <h3 id="photo-h" className="flex-1 px-4 py-3 text-base font-semibold text-charcoal">รูปหลักฐาน</h3>
+                <button
+                  type="button"
+                  onClick={() => setSelectedImage(null)}
+                  className="min-w-14 px-4 border-l border-rule text-base text-charcoal hover:bg-paper-2 transition-colors duration-150"
+                >
+                  ปิด
+                </button>
+              </div>
+              <div className="flex-1 min-h-0 bg-paper-2 p-2 flex items-center justify-center">
+                {selectedImage.includes("drive.google.com") ? (
+                  <iframe src={selectedImage} title="รูปหลักฐาน" className="w-full h-full border-0" allow="autoplay" />
+                ) : (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={selectedImage} alt="รูปหลักฐาน" className="max-w-full max-h-full object-contain" />
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <NavigationDock />
     </div>
+    </MotionConfig>
   );
 }
