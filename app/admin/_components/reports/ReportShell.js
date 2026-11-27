@@ -3,7 +3,7 @@
 
 import { PRINT_CSS, monthLabel } from "./monthTools";
 
-export default function ReportShell({ backHref = "/admin", backLabel = "หลังบ้าน", toolTitle, toolSub, month, onMonth, docTitle, children }) {
+export default function ReportShell({ backHref = "/admin", backLabel = "หลังบ้าน", toolTitle, toolSub, month, onMonth, docTitle, footNote = "ข้อมูลจากกลุ่ม LINE ของร้าน ตรวจและบันทึกโดยยูซุ", toolExtra = null, children }) {
     return (
         <div className="brand-v2 min-h-screen print-root">
             <style jsx global>{PRINT_CSS}</style>
@@ -17,7 +17,8 @@ export default function ReportShell({ backHref = "/admin", backLabel = "หล�
                             <p className="text-sm text-on-plum-2">{toolSub}</p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2 pb-3 sm:pb-0 sm:pl-4 sm:border-l border-plum-3">
+                    <div className="flex flex-wrap items-center gap-2 pb-3 sm:pb-0 sm:pl-4 sm:border-l border-plum-3">
+                        {toolExtra}
                         <label className="flex items-center">
                             <span className="sr-only">เดือน</span>
                             <input type="month" value={month} onChange={(e) => e.target.value && onMonth(e.target.value)} className="min-h-12 px-3 bg-plum-2 border border-plum-3 font-num text-base text-cream [color-scheme:dark]" />
@@ -47,7 +48,7 @@ export default function ReportShell({ backHref = "/admin", backLabel = "หล�
                     {children}
 
                     <footer className="mt-10 pt-4 border-t border-rule flex justify-between gap-4 text-sm text-neutral">
-                        <span>ข้อมูลจากกลุ่ม LINE ของร้าน ตรวจและบันทึกโดยยูซุ</span>
+                        <span>{footNote}</span>
                         <span className="shrink-0">ในบ้าน นครพนม</span>
                     </footer>
                 </article>

@@ -21,6 +21,7 @@ function cn(...inputs) {
 
 import WeatherCard from "./components/WeatherCard";
 import QRScannerModal from "./components/QRScannerModal";
+import KpiGate, { deadlineText } from "./components/KpiGate";
 import { sfx } from "../../utils/soundEffects";
 
 export default function CheckIn() {
@@ -62,6 +63,30 @@ export default function CheckIn() {
   const [selectedMood, setSelectedMood] = useState(null);
   const [waterSipped, setWaterSipped] = useState(false);
   const [hasNewMeeting, setHasNewMeeting] = useState(false);
+
+  // Monthly team survey (แบบวัดผลประจำเดือน): status card + gate before the punch photo.
+  const [kpiStatus, setKpiStatus] = useState(null); // { required, done, overdue, daysLeft, deadline, survey }
+  const [kpiGate, setKpiGate] = useState(null);     // { kpi, mode: 'gate' | 'voluntary', intent }
+  const [kpiChecking, setKpiChecking] = useState(false);
+
+  const fetchKpi = async (peek) => {
+    if (!profile?.userId) return null;
+    try {
+      const res = await fetch(`/api/kpi?userId=${encodeURIComponent(profile.userId)}${peek ? '&peek=1' : ''}`, { cache: "no-store" });
+      const json = await res.json();
+      return json?.success ? json : null;
+    } catch {
+      return null;
+    }
+  };
+
+  useEffect(() => {
+    if (!profile?.userId) return;
+    let cancelled = false;
+    fetchKpi(true).then((k) => { if (!cancelled) setKpiStatus(k); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.userId]);
 
   // "ใหม่" marker on the meeting-notes link: newest note is later than the last
   // time this phone opened /meetings (never opened: posted in the last 7 days).
@@ -718,7 +743,33 @@ export default function CheckIn() {
       alert("คุณอยู่นอกพื้นที่ร้าน หรือสัญญาณ GPS ในอาคารยังไม่นิ่ง\n💡 สามารถแตะแผ่น NFC ที่เคาน์เตอร์บาร์ หรือกดปุ่ม 'ยืนยันพิกัดด้วย NFC หรือ QR' ด้านล่างเพื่อลงเวลาได้ทันที");
       return;
     }
+    openCameraAfterKpi();
+  };
+
+  // Ask for the monthly survey first while it is still open; owners are exempt.
+  // Any error opens the camera straight away so the survey never stops a punch.
+  const openCameraAfterKpi = async () => {
+    if (kpiChecking) return;
+    const intent = lastAction === 'check_in' ? 'check_out' : 'check_in';
+    if (isOwner || kpiStatus?.done) {
+      setShowCamera(true);
+      return;
+    }
+    setKpiChecking(true);
+    const k = await fetchKpi(false);
+    setKpiChecking(false);
+    if (k) setKpiStatus(k);
+    if (k?.required) {
+      setKpiGate({ kpi: k, mode: 'gate', intent });
+      return;
+    }
     setShowCamera(true);
+  };
+
+  const openKpiVoluntary = async () => {
+    const k = (await fetchKpi(true)) || kpiStatus;
+    if (k) setKpiStatus(k);
+    if (k?.required) setKpiGate({ kpi: k, mode: 'voluntary', intent: 'check_in' });
   };
 
   // --- Dynamic Dieter Rams Style Technical Watermark Canvas Helper ---
@@ -881,6 +932,15 @@ export default function CheckIn() {
       const json = await res.json();
 
       if (!json.success) {
+        if (json.code === 'KPI_REQUIRED') {
+          setShowCamera(false);
+          const k = await fetchKpi(false);
+          if (k?.required) {
+            setKpiStatus(k);
+            setKpiGate({ kpi: k, mode: 'gate', intent: intendedAction });
+            return;
+          }
+        }
         alert(json.error || "เกิดข้อผิดพลาดในการลงเวลา");
         return;
       }
@@ -1254,6 +1314,37 @@ export default function CheckIn() {
                 <span className="font-num text-xs tracking-[0.14em] opacity-70 mt-1">{mainButtonConfig.en}</span>
               </motion.button>
 
+              {kpiStatus && (kpiStatus.done || kpiStatus.required) && (
+                kpiStatus.done ? (
+                  <div className={cn(card, "px-4 py-3 flex items-center justify-between gap-3")}>
+                    <div className="min-w-0">
+                      <p className={sectionLabel}>แบบวัดผลประจำเดือน</p>
+                      <p className="text-base text-charcoal">เดือนนี้ทำแล้ว ขอบคุณที่ช่วยตอบ</p>
+                    </div>
+                    <span className="text-sm font-semibold text-charcoal border border-charcoal px-2 py-1 shrink-0">ทำแล้ว</span>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={openKpiVoluntary}
+                    className={cn(card, "px-4 py-3 flex items-center justify-between gap-3 text-left hover:bg-paper-2 transition-colors duration-150", kpiStatus.overdue ? "border-error" : "border-charcoal")}
+                  >
+                    <div className="min-w-0">
+                      <p className={sectionLabel}>แบบวัดผลประจำเดือน</p>
+                      <p className="text-base font-semibold text-charcoal">ยังไม่ได้ทำ</p>
+                      <p className={cn("text-sm", kpiStatus.overdue ? "text-error font-semibold" : "text-subtle")}>
+                        {kpiStatus.overdue
+                          ? 'เลยกำหนดแล้ว ต้องทำก่อนลงเวลาเข้างาน'
+                          : kpiStatus.deadline
+                            ? <>ว่างเมื่อไหร่กดทำได้เลย ข้ามได้ถึง {deadlineText(kpiStatus.deadline)}</>
+                            : 'ว่างเมื่อไหร่กดทำได้เลย ใช้เวลาประมาณ 3 นาที'}
+                      </p>
+                    </div>
+                    <span className="min-h-11 px-4 flex items-center bg-charcoal text-cream text-base font-semibold shrink-0">ทำเลย</span>
+                  </button>
+                )
+              )}
+
               {lastAction === 'check_in' && (
                 <p className="border border-rule bg-cream px-4 py-3 text-sm text-subtle">
                   ออกไปธุระระหว่างวัน: กด <span className="font-semibold text-charcoal">ออกงาน</span> ก่อนออกจากร้าน แล้วกด <span className="font-semibold text-charcoal">เข้างาน</span> อีกครั้งเมื่อกลับ ระบบจะนับเวลาที่ออกไปให้ ไม่นับเป็นมาสาย
@@ -1590,6 +1681,28 @@ export default function CheckIn() {
       />
 
       <AnimatePresence>
+        {/* Monthly survey (gate before the photo, or opened from the status card) */}
+        {kpiGate && (
+          <KpiGate
+            key="kpi-gate"
+            kpi={kpiGate.kpi}
+            userId={profile?.userId}
+            mode={kpiGate.mode}
+            intent={kpiGate.intent}
+            onDone={() => {
+              const wasGate = kpiGate.mode === 'gate';
+              setKpiGate(null);
+              setKpiStatus({ required: false, done: true });
+              if (wasGate) setShowCamera(true);
+            }}
+            onSkip={() => {
+              setKpiGate(null);
+              setShowCamera(true);
+            }}
+            onClose={() => setKpiGate(null)}
+          />
+        )}
+
         {/* Camera */}
         {showCamera && (
           <motion.div
